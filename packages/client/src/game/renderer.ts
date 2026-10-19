@@ -524,6 +524,29 @@ export class Renderer {
         ctx.restore();
         break;
       }
+      case "drop": {
+        // mina letí po mírném oblouku a zmenšuje se "do dálky"
+        const x = e.from.x + (e.to.x - e.from.x) * t;
+        const y = e.from.y + (e.to.y - e.from.y) * t - Math.sin(t * Math.PI) * 18;
+        const scale = 1.25 - 0.25 * t;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(t * Math.PI * 2);
+        ctx.scale(scale, scale);
+        drawSprite(ctx, this.sprites.mine(e.color), 0, 0, 0);
+        ctx.restore();
+        // stín/stopa
+        ctx.save();
+        ctx.globalAlpha = 0.35 * (1 - t);
+        ctx.strokeStyle = e.color;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(e.from.x, e.from.y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
       case "launch": {
         // záblesk u přídě + oblak výfuku, který se roztahuje dozadu
         const f = forward(e.heading);

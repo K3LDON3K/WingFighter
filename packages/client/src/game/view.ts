@@ -40,7 +40,8 @@ export type Effect =
   | { kind: "ring"; x: number; y: number; radius: number; color: string; start: number; duration: number }
   | { kind: "text"; x: number; y: number; text: string; color: string; start: number; duration: number }
   | { kind: "shield"; shipId: string; start: number; duration: number }
-  | { kind: "launch"; x: number; y: number; heading: number; color: string; start: number; duration: number };
+  | { kind: "launch"; x: number; y: number; heading: number; color: string; start: number; duration: number }
+  | { kind: "drop"; from: { x: number; y: number }; to: { x: number; y: number }; color: string; start: number; duration: number };
 
 export interface ViewModel {
   ships: ViewShip[];

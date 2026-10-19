@@ -93,6 +93,7 @@ export class TurnAnimation {
   private schedule: Scheduled[] = [];
   private tweens: Tween[] = [];
   private total = 0;
+  private pendingMines: { at: number; mine: import("@spacegame/shared").Mine }[] = [];
   private startedAt = 0;
   private started = false;
   finished = false;
@@ -155,7 +156,7 @@ export class TurnAnimation {
           time = movePassed ? Math.max(lasersStart, laserTime + LASER_GAP) + 150 : 0;
           break;
         case "spawnMine":
-          time = Math.max(lasersStart, laserTime + LASER_GAP) + 150;
+          time = movePassed ? Math.max(lasersStart, laserTime + LASER_GAP) + 150 : 0;
           break;
       }
       lastTime = time;
@@ -196,6 +197,13 @@ export class TurnAnimation {
       this.fire(s.event, now);
     }
 
+    for (const pm of [...this.pendingMines]) {
+      if (now >= pm.at) {
+        this.view.mines.push(mineToView(pm.mine));
+        this.view.effects.push({ kind: "ring", x: pm.mine.x, y: pm.mine.y, radius: pm.mine.radius, color: TEAM_COLORS[pm.mine.team], start: now, duration: 500 });
+        this.pendingMines = this.pendingMines.filter((x) => x !== pm);
+      }
+    }
     this.view.effects = this.view.effects.filter((e) => now - e.start < e.duration);
     if (t >= this.total) this.finished = true;
   }
@@ -304,14 +312,21 @@ export class TurnAnimation {
         v.torpedoes.push(torpedoToView(e.torpedo));
         v.effects.push({ kind: "launch", x: e.torpedo.x, y: e.torpedo.y, heading: e.torpedo.heading, color: TEAM_COLORS[e.torpedo.team], start: now, duration: 700 });
         break;
-      case "spawnMine":
-        v.mines.push(mineToView(e.mine));
+      case "spawnMine": {
+        // odhození: mina letí od lodi na místo, pak se objeví s polem
+        const owner = v.ships.find((s) => s.id.startsWith(`ship-${e.mine.ownerId}-`) && s.team === e.mine.team);
+        const from = owner ? { x: owner.x, y: owner.y } : { x: e.mine.x, y: e.mine.y };
+        const dur = 550;
+        v.effects.push({ kind: "drop", from, to: { x: e.mine.x, y: e.mine.y }, color: TEAM_COLORS[e.mine.team], start: now, duration: dur });
+        this.pendingMines.push({ at: now + dur, mine: e.mine });
         break;
+      }
     }
   }
 
   /** Pro jistotu: po dokončení se model srovná s výsledným stavem. */
   finalView(): ViewModel {
+    this.pendingMines = [];
     const final = viewFromState(this.result.state);
     final.effects = this.view.effects;
     return final;

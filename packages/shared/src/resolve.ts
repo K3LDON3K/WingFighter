@@ -266,6 +266,18 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     spawnEvents.push({ type: "spawnTorpedo", torpedo });
   }
 
+  // Miny se odhazují ze startovní pozice hned na začátku kola (aktivní až od příštího kola).
+  for (const ship of state.ships) {
+    const o = orders.get(ship.id);
+    if (!ship.alive || o?.special?.type !== "mine" || ship.ammo.mines <= 0) continue;
+    ship.ammo.mines--;
+    const sp = startPose.get(ship.id)!;
+    const pos = mineDropPosition(sp, o.special.side);
+    const mine: Mine = { id: newId("mine"), ownerId: ship.ownerId, team: ship.team, x: pos.x, y: pos.y, radius: MINE.radius, armed: false, timer: o.special.timer };
+    state.mines.push(mine);
+    spawnEvents.push({ type: "spawnMine", mine });
+  }
+
   const torpMovers = new Map<string, Mover>();
   for (const t of state.torpedoes) {
     let delta = 0;
@@ -692,21 +704,6 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   }
   for (const [id, dmg] of pending) applyDamage(shipById(state, id)!, dmg, events);
   state.torpedoes = state.torpedoes.filter((t) => !shotTorpedoes.has(t.id));
-
-  /* ---------- 4. Položení min ---------- */
-  for (const ship of state.ships) {
-    const o = orders.get(ship.id);
-    if (!o?.special || !ship.alive) continue;
-    if (o.special.type === "mine") {
-      if (ship.ammo.mines <= 0) continue;
-      ship.ammo.mines--;
-      const sp = startPose.get(ship.id)!;
-      const pos = mineDropPosition(sp, o.special.side);
-      const mine: Mine = { id: newId("mine"), ownerId: ship.ownerId, team: ship.team, x: pos.x, y: pos.y, radius: MINE.radius, armed: false, timer: o.special.timer };
-      state.mines.push(mine);
-      events.push({ type: "spawnMine", mine });
-    }
-  }
 
   /* ---------- 5. Konec kola ---------- */
   // časované miny: odpočet; na nule vybuchnou (lodě už stojí na koncových pozicích)
