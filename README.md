@@ -65,7 +65,7 @@ paměti v podobě, v jaké ho naposledy viděl – poškození mimo dohled se ne
 ### Výbava lodi (inventář)
 Loď **Stíhač** má 4 malé sloty: příď, záď, levobok, pravobok. Příď a záď jsou pod sebou a lze je spojit v jeden
 **velký** slot pro budoucí velké moduly. Moduly:
-**Lasery** (100 cr, váha 2), **Torpédomet** (150, váha 1 + 1 za torpédo, 3 ks), **Minový zásobník** (100, váha 1 +
+**Lasery** (100 cr, váha 2), **Torpédomet** (150, váha 1 + 1 za torpédo, 3 ks), **Miny** (100, váha 1 +
 0,5 za minu, 2 ks), **Segmentový štít** (120, váha 2), **Celolodní štít** (120, váha 2). Součet váhy snižuje
 max. rychlost: každých 6 váhy = −1 (výchozí sestava má váhu 10 → rychlost max. 4, prázdná loď 5). Vystřelená
 munice loď odlehčí. Loď smí letět i bez modulů. Více modulů stejného typu = víc munice; při střelbě si vybereš,
@@ -142,6 +142,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.1 – editor výbavy: **hexagonové moduly** v plástvi na větší lodi, plné názvy, barva podle kategorie (zbraně
+  červeně, speciální moduly modře); šipky natočení na všech povolených hranách (šedé = možnosti, žlutá = zvolená,
+  klik přepne); modul „Minový zásobník“ přejmenován na „Miny“.
 - v3.0 – **generované mapy a elektromagnetické bouře**. V místnosti karta Mapa: velikost (2400×1600 až 6400×4000),
   hustota asteroidů, shluky, počet a velikost bouří, symetrie, seed (🎲); náhled mapy se startovními body po okraji –
   klik = zvolit start (barva týmu + jméno, ostatní to vidí; host nastavuje i botům). Bouře (fialová mlhovina, blesky):
@@ -174,7 +177,7 @@ Příkazy (z kořenové složky):
 - v2.0.1 – sloty podle schváleného nákresu: 4 malé (příď, záď, levobok, pravobok), příď + záď pod sebou jde spojit
   v 1 velký (žlutý rám); velká pixelová loď se sloty uvnitř siluety v editoru i inventáři.
 - v2.0 – **Inventář, piloti a ekonomika**: loď Stíhač má 4 sloty (boky malé, příď a záď na 1 velký / 2 malé);
-  moduly Lasery, Torpédomet (3 ks), Minový zásobník (2 ks), Segmentový štít, Celolodní štít – každý má cenu a váhu,
+  moduly Lasery, Torpédomet (3 ks), Miny (2 ks), Segmentový štít, Celolodní štít – každý má cenu a váhu,
   váha snižuje max. rychlost (vystřelená munice odlehčí). Výbava se kupuje v místnosti z rozpočtu (ladění →
   Ekonomika); host omezuje počty modulů na hráče a volí výbavu botů (výchozí / náhodná / ruční). Pilot „Kadet“.
   Kredity: zbytek rozpočtu + odměny za sestřel a přežité kolo. Akce **Vyhodit modul** (trosky lze sestřelit

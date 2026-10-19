@@ -41,14 +41,27 @@ export interface LoadoutEditorOptions {
 
 const NS = "http://www.w3.org/2000/svg";
 const FIGHTER = ["..GG............", "..GPG...........", "..GPPG..........", "EEDPPPG.........", "..GPPPPGGG......", "...GPPPPPPGGGG..", "EEDDPWWPPPPPPPGG", "EEDDPWWPPPPPPPGG", "...GPPPPPPGGGG..", "..GPPPPGGG......", "EEDPPPG.........", "..GPPG..........", "..GPG...........", "..GG............"];
-/** Rozměry nákresu (varianta A): loď 16 px / pixel šablony, sloty uvnitř siluety. */
-const DIAG = { w: 340, h: 290, s: 16, x0: 58, y0: 16 };
+/** Nákres lodi: 24 px na pixel šablony, čtyři hexagonové sloty v plástvi (příď nad zádí, boky na šikmých stěnách zádi). */
+const DIAG = { w: 480, h: 412, s: 24, x0: 72, y0: 14 };
+const HEX_R = 50;
+const HW = 2 * HEX_R;
+const HH = Math.sqrt(3) * HEX_R;
+const FY = 112;
 const SLOT_BOX: Record<SlotId, { x: number; y: number; w: number; h: number }> = {
-  front: { x: 138, y: 92, w: 64, h: 74 },
-  back: { x: 138, y: 166, w: 64, h: 74 },
-  left: { x: 72, y: 136, w: 60, h: 48 },
-  right: { x: 208, y: 136, w: 60, h: 48 },
+  front: { x: 190, y: FY, w: HW, h: HH },
+  back: { x: 190, y: FY + HH, w: HW, h: HH },
+  left: { x: 190 - HW * 0.75, y: FY + HH + HH / 2, w: HW, h: HH },
+  right: { x: 190 + HW * 0.75, y: FY + HH + HH / 2, w: HW, h: HH },
 };
+function hexPoints(b: { x: number; y: number; w: number; h: number }): string {
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  return [0, 60, 120, 180, 240, 300].map((a) => `${(cx + HEX_R * Math.cos((a * Math.PI) / 180)).toFixed(1)},${(cy + HEX_R * Math.sin((a * Math.PI) / 180)).toFixed(1)}`).join(" ");
+}
+/** Barva kategorie: zbraně červeně, speciální moduly modře. */
+export function moduleColor(type: ModuleType): string {
+  return type === "laser" || type === "torpedo" || type === "mine" ? "#ef4444" : "#3b82f6";
+}
 
 function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>, text?: string): SVGElementTagNameMap[K] {
   const el = document.createElementNS(NS, tag);
@@ -77,52 +90,59 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     change({ ...loadout, modules: [...loadout.modules, newModule(type, slot)] });
   };
 
-  /* --- nákres lodi se sloty (varianta A) --- */
-  const scale = opts.compact ? 0.72 : 1;
-  const svg = svgEl("svg", { viewBox: `0 0 ${DIAG.w} ${DIAG.h}`, width: Math.round(DIAG.w * scale), height: Math.round(DIAG.h * scale), "shape-rendering": "crispEdges", class: "lo-svg" });
-  const g = svgEl("g", { transform: `translate(${DIAG.x0}, ${DIAG.y0 + 16 * DIAG.s}) rotate(-90) scale(${DIAG.s})` });
+  /* --- nákres lodi s hexagonovými sloty --- */
+  const scale = opts.compact ? 0.62 : 1;
+  const svg = svgEl("svg", { viewBox: `0 0 ${DIAG.w} ${DIAG.h}`, width: Math.round(DIAG.w * scale), height: Math.round(DIAG.h * scale), class: "lo-svg" });
+  const g = svgEl("g", { transform: `translate(${DIAG.x0}, ${DIAG.y0 + 16 * DIAG.s}) rotate(-90) scale(${DIAG.s})`, "shape-rendering": "crispEdges" });
   const pal: Record<string, string> = { P: "#3b82f6", G: "#9aa3ad", D: "#4b5563", W: "#dbeafe", E: "#fb923c" };
   FIGHTER.forEach((row, y) => [...row].forEach((c, x) => pal[c] && g.append(svgEl("rect", { x, y, width: 1, height: 1, fill: pal[c] }))));
   svg.append(g);
   const free = freeSlots(loadout);
   const drawn = new Set<string>();
+  const arrowAt = (box: { x: number; y: number; w: number; h: number }, f: Facing) => ({
+    x: f === "left" ? box.x + 10 : f === "right" ? box.x + box.w - 10 : box.x + box.w / 2,
+    y: f === "front" ? box.y + 8 : f === "back" ? box.y + box.h - 8 : box.y + box.h / 2,
+    rot: f === "right" ? 90 : f === "back" ? 180 : f === "left" ? 270 : 0,
+  });
   const slotBox = (slot: SlotId, box: { x: number; y: number; w: number; h: number }, m?: (typeof loadout.modules)[number]) => {
     const def = m ? MODULES[m.type] : undefined;
-    const large = def?.size === "large";
-    const stroke = large ? "#fbbf24" : "#7dd3fc";
     const selectable = !!m && !!opts.onSelect;
     const selected = !!m && opts.selectedId === m.id;
     const grp = svgEl("g", { class: `lo-g ${m ? "mod" : "empty"} ${ro && !selectable ? "ro" : ""} ${selected ? "sel" : ""} ${selectable ? "selectable" : ""}` });
-    grp.append(svgEl("rect", { x: box.x, y: box.y, width: box.w, height: box.h, fill: selected ? "#4a2a1e" : m ? "#1e2a4a" : "rgba(5,7,15,0.55)", stroke: selected ? "#fb923c" : stroke, "stroke-width": 3, ...(m ? {} : { "stroke-dasharray": "6 4" }) }));
+    const pts = hexPoints(box);
     if (m && def) {
+      const col = selected ? "#fb923c" : moduleColor(m.type);
+      grp.append(svgEl("polygon", { points: pts, fill: "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
+      grp.append(svgEl("polygon", { points: pts, fill: col, opacity: selected ? 0.3 : 0.18 }));
       const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
-      grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "PS2P", "font-size": 10, fill: "#e2e8f0", "text-anchor": "middle" }, label(def.short)));
-      if (ammo !== undefined) grp.append(svgEl("text", { x: box.x + box.w - 6, y: box.y + 11, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "end" }, String(ammo)));
+      const words = def.name.toUpperCase().split(" ");
+      const long = Math.max(...words.map((w) => w.length)) > 8;
+      const fs = long ? 9.5 : 12;
+      const base = box.y + box.h / 2 + 4 - (words.length - 1) * 6;
+      words.forEach((w, i) => grp.append(svgEl("text", { x: box.x + box.w / 2, y: base + i * 12, "font-family": "Pix, ui-monospace, monospace", "font-size": fs, fill: "#f8fafc", "text-anchor": "middle" }, w)));
+      if (ammo !== undefined) grp.append(svgEl("text", { x: box.x + box.w / 2 + 20, y: box.y + 14, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "middle" }, String(ammo)));
+      if (m.type === "scanner") grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + 14, "font-family": "PS2P", "font-size": 6, fill: (m.cooldown ?? 0) > 0 ? "#f87171" : "#fbbf24", "text-anchor": "middle" }, (m.cooldown ?? 0) > 0 ? `CD ${m.cooldown}` : `${m.charges ?? 0}×`));
       if (hasFacing(m.type)) {
-        // šipka natočení sedí na té hraně modulu, kam modul míří (nahoru = horní střed, dolů = dolní střed…)
-        const f = m.facing ?? "front";
-        const ax = f === "left" ? box.x + 9 : f === "right" ? box.x + box.w - 9 : box.x + box.w / 2;
-        const ay = f === "front" ? box.y + 9 : f === "back" ? box.y + box.h - 9 : box.y + box.h / 2;
-        const rot = f === "right" ? 90 : f === "back" ? 180 : f === "left" ? 270 : 0;
-        const arrow = svgEl("g", { class: `lo-arrow ${ro ? "ro" : ""}`, transform: `translate(${ax}, ${ay}) rotate(${rot})` });
-        arrow.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: "#0b1020", stroke: "#fbbf24", "stroke-width": 1 }));
-        arrow.append(svgEl("path", { d: "M0,-5 L5,2 L1.5,2 L1.5,5 L-1.5,5 L-1.5,2 L-5,2 Z", fill: "#fbbf24" }));
-        arrow.append(svgEl("title", {}, `Natočení: ${FACING_NAMES[f]}${ro ? "" : "\nKlik = otočit (jen ven ze slotu)"}`));
-        if (!ro) {
-          arrow.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            const opts = allowedFacings(m.type, m.slot);
-            const next: Facing = opts[(opts.indexOf(m.facing ?? opts[0]) + 1) % opts.length];
-            change({ ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? { ...x, facing: next } : x)) });
-          });
+        // šipky natočení: všechny povolené směry (šedé = možnosti, žlutá = zvolený); boční v cípech, ↑↓ uprostřed hran
+        for (const f of allowedFacings(m.type, m.slot)) {
+          const sel = (m.facing ?? "front") === f;
+          const a = arrowAt(box, f);
+          const col2 = sel ? "#fbbf24" : "#64748b";
+          const arrow = svgEl("g", { class: `lo-arrow ${sel ? "sel" : "opt"} ${ro ? "ro" : ""}`, transform: `translate(${a.x}, ${a.y}) rotate(${a.rot})` });
+          arrow.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: sel ? "#0b1020" : "rgba(11,16,32,0.7)", stroke: col2, "stroke-width": 1, ...(sel ? {} : { "stroke-dasharray": "2 1" }) }));
+          arrow.append(svgEl("path", { d: "M0,-5 L5,2 L1.5,2 L1.5,5 L-1.5,5 L-1.5,2 L-5,2 Z", fill: col2 }));
+          arrow.append(svgEl("title", {}, `${FACING_NAMES[f]}${sel ? " (zvoleno)" : ro ? "" : " – klik = natočit"}`));
+          if (!ro && !sel) {
+            arrow.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              change({ ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? { ...x, facing: f } : x)) });
+            });
+          }
+          grp.append(arrow);
         }
-        grp.append(arrow);
       }
       if (!ro && !selectable) {
-        // křížek pro odebrání v pravém dolním rohu
-        const cx = box.x + box.w - 9;
-        const cy = box.y + box.h - 9;
-        const x = svgEl("g", { class: "lo-remove", transform: `translate(${cx}, ${cy})` });
+        const x = svgEl("g", { class: "lo-remove", transform: `translate(${box.x + box.w - 24}, ${box.y + box.h - 14})` });
         x.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: "#0b1020", stroke: "#f87171", "stroke-width": 1 }));
         x.append(svgEl("path", { d: "M-4,-4 L4,4 M4,-4 L-4,4", stroke: "#f87171", "stroke-width": 2 }));
         x.append(svgEl("title", {}, `Odebrat ${def.name} (vrátí ${def.price} kreditů)`));
@@ -132,29 +152,27 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         });
         grp.append(x);
       }
-      const title = svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${selectable ? "\nKlik = vybrat k vyhození" : ro ? "" : "\nKřížek = odebrat (vrátí cenu), šipka = otočit"}`);
-      grp.append(title);
+      grp.append(svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${selectable ? "\nKlik = vybrat k vyhození" : ""}`));
       if (selectable) grp.addEventListener("click", () => opts.onSelect!(m.id));
     } else {
       const name = hull.slots.find((x) => x.id === slot)?.name ?? slot;
-      grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 3, "font-family": "PS2P", "font-size": 6, fill: stroke, "text-anchor": "middle" }, label(name)));
+      grp.append(svgEl("polygon", { points: pts, fill: "rgba(5,7,15,0.55)", stroke: "#7dd3fc", "stroke-width": 3, "stroke-dasharray": "6 4" }));
+      grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "Pix, ui-monospace, monospace", "font-size": 11, fill: "#7dd3fc", "text-anchor": "middle" }, name.toUpperCase()));
       grp.append(svgEl("title", {}, `${name}: volný malý slot`));
     }
     svg.append(grp);
   };
-  // žlutý rám "1 velký" kolem přídě + zádi, když jsou obě volné
   if (LARGE_SLOTS.every((sl) => free.includes(sl))) {
     const f = SLOT_BOX.front;
     const b = SLOT_BOX.back;
-    svg.append(svgEl("rect", { x: f.x - 6, y: f.y - 6, width: f.w + 12, height: b.y + b.h - f.y + 12, fill: "none", stroke: "#fbbf24", "stroke-width": 2, "stroke-dasharray": "3 5" }));
-    svg.append(svgEl("text", { x: f.x + f.w / 2, y: f.y - 12, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "middle" }, "1 VELKY"));
+    svg.append(svgEl("rect", { x: f.x - 8, y: f.y - 8, width: f.w + 16, height: b.y + b.h - f.y + 16, fill: "none", stroke: "#fbbf24", "stroke-width": 2, "stroke-dasharray": "3 5" }));
+    svg.append(svgEl("text", { x: f.x + f.w / 2, y: f.y - 14, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "middle" }, "1 VELKY"));
   }
   for (const m of loadout.modules) {
     const occ = occupiedSlots(m);
     if (MODULES[m.type].size === "large") {
-      const f = SLOT_BOX.front;
-      const b = SLOT_BOX.back;
-      slotBox("front", { x: f.x, y: f.y, w: f.w, h: b.y + b.h - f.y }, m);
+      slotBox("front", SLOT_BOX.front, m);
+      slotBox("back", SLOT_BOX.back, m);
     } else slotBox(m.slot, SLOT_BOX[m.slot], m);
     occ.forEach((sl) => drawn.add(sl));
   }
@@ -177,9 +195,9 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       shop.append(
         h(
           "button",
-          { class: "lo-buy", disabled: !!why, title: `${def.name}\n${def.description}\nCena ${def.price} · váha ${def.weight}${def.ammo ? ` + ${def.ammoWeight} × ${def.ammo} munice` : ""}${why ? `\nNelze: ${why}` : ""}`, onclick: () => add(t) },
+          { class: "lo-buy", style: `--mc:${moduleColor(t)}`, disabled: !!why, title: `${def.name}\n${def.description}\nCena ${def.price} · váha ${def.weight}${def.ammo ? ` + ${def.ammoWeight} × ${def.ammo} munice` : ""}${why ? `\nNelze: ${why}` : ""}`, onclick: () => add(t) },
           icon(def.icon, "currentColor", 12),
-          h("span", { class: "lo-buyname" }, label(def.short)),
+          h("span", { class: "lo-buyname txt" }, def.name),
           h("span", { class: "lo-price" }, `${def.price}`),
           have ? h("span", { class: "lo-have" }, `×${have}`) : null,
         ),
