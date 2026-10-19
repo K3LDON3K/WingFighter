@@ -143,6 +143,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.3.1 – kulomet je v editoru a obchodě červený jako ostatní zbraně.
 - v3.3 – zbraňový modul **Kulomet** (120 cr, váha 1 + 0,02/náboj, 100 nábojů): na začátku kola dávka 10 projektilů
   s rozptylem, každý 3 zranění, šance zásahu 70 % zblízka → 35 % na hranici dosahu 150, výseč ±45°, otočný (ne do
   středu). Míří na preferovaný cíl (loď, torpédo, trosky) nebo nejbližší loď ve výseči; úhyb cíle šanci snižuje.

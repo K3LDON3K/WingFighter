@@ -60,7 +60,7 @@ function hexPoints(b: { x: number; y: number; w: number; h: number }): string {
 }
 /** Barva kategorie: zbraně červeně, speciální moduly modře. */
 export function moduleColor(type: ModuleType): string {
-  return type === "laser" || type === "torpedo" || type === "mine" ? "#ef4444" : "#3b82f6";
+  return type === "laser" || type === "torpedo" || type === "mine" || type === "mg" ? "#ef4444" : "#3b82f6";
 }
 
 function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>, text?: string): SVGElementTagNameMap[K] {
