@@ -24,6 +24,7 @@ import {
 } from "@spacegame/shared";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
+import { getSavedTuning, initialTuning, saveTuning } from "./tuning-store.ts";
 
 export interface Client {
   id: string;
@@ -65,7 +66,7 @@ class Room {
   name: string;
   hostId: string;
   settings: GameSettings = { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1 };
-  tuning: Tuning = { ...DEFAULT_TUNING };
+  tuning: Tuning = initialTuning();
   members = new Map<string, RoomMember>();
   game: RunningGame | null = null;
 
@@ -86,6 +87,7 @@ class Room {
       hostId: this.hostId,
       settings: this.settings,
       tuning: this.tuning,
+      savedTuning: getSavedTuning(),
       inGame: !!this.game,
       players: [...this.members.values()].map((m) => ({
         id: m.id,
@@ -247,11 +249,28 @@ export class Hub {
         return;
       }
       case "setTuning":
-      case "resetTuning": {
+      case "resetTuning":
+      case "loadTuning": {
         if (!room || room.hostId !== client.id) return;
-        room.tuning = msg.type === "resetTuning" ? { ...DEFAULT_TUNING } : sanitizeTuning(msg.tuning, room.tuning);
+        if (msg.type === "loadTuning") {
+          const saved = getSavedTuning();
+          if (!saved) return this.error(client, "Na serveru nejsou žádné uložené parametry.");
+          room.tuning = { ...saved };
+        } else room.tuning = msg.type === "resetTuning" ? { ...DEFAULT_TUNING } : sanitizeTuning(msg.tuning, room.tuning);
         if (room.game) this.retune(room);
         this.broadcastRoom(room);
+        return;
+      }
+      case "saveTuning": {
+        if (!room || room.hostId !== client.id) return;
+        try {
+          saveTuning(room.tuning);
+          this.send(client, { type: "notice", message: "Parametry uloženy (tuning.json) – platí pro všechny nové místnosti." });
+          this.broadcastRoom(room);
+        } catch (e) {
+          console.error("Uložení tuning.json selhalo", e);
+          this.error(client, "Uložení se nepodařilo.");
+        }
         return;
       }
       case "startGame":

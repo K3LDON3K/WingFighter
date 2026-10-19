@@ -17,6 +17,8 @@ export interface RoomState {
   hostId: string;
   settings: GameSettings;
   tuning: Tuning;
+  /** Hodnoty uložené na serveru (tuning.json), pokud existují. */
+  savedTuning: Tuning | null;
   players: RoomPlayer[];
   inGame: boolean;
 }
@@ -42,6 +44,8 @@ export type ClientMessage =
   | { type: "setSettings"; settings: Partial<GameSettings> }
   | { type: "setTuning"; tuning: Partial<Tuning> }
   | { type: "resetTuning" }
+  | { type: "saveTuning" }
+  | { type: "loadTuning" }
   | { type: "startGame" }
   | { type: "submitOrders"; orders: ShipOrders[] }
   | { type: "unready" }
@@ -56,5 +60,6 @@ export type ServerMessage =
   | { type: "gameState"; state: GameState; ready: string[] }
   | { type: "planningStatus"; ready: string[] }
   | { type: "tuning"; tuning: Tuning }
+  | { type: "notice"; message: string }
   | { type: "turnResult"; result: TurnResult }
   | { type: "error"; message: string };

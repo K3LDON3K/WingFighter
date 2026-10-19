@@ -730,3 +730,23 @@ h3,
   border-color: var(--yellow);
   color: var(--yellow);
 }
+
+.toast {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 8px 14px;
+  background: rgba(11, 16, 32, 0.95);
+  border: 3px solid;
+  border-color: var(--bevel-l) var(--bevel-d) var(--bevel-d) var(--bevel-l);
+  font-family: var(--txt);
+  font-size: 15px;
+}
+.toast.ok {
+  color: var(--green);
+}
+.toast.err {
+  color: var(--red);
+}

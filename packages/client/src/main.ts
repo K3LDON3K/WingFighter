@@ -114,6 +114,18 @@ function setName(n: string) {
   }
 }
 
+function showNotice(msg: string) {
+  notice = msg;
+  render();
+  clearTimeout(noticeTimer);
+  noticeTimer = window.setTimeout(() => {
+    notice = "";
+    render();
+  }, 4000);
+}
+let notice = "";
+let noticeTimer: number | undefined;
+
 function showError(msg: string) {
   error = msg;
   render();
@@ -176,6 +188,9 @@ net.on((msg) => {
       break;
     case "error":
       showError(msg.message);
+      return;
+    case "notice":
+      showNotice(msg.message);
       return;
   }
   render();
@@ -309,6 +324,7 @@ let hudEl: HTMLElement | null = null;
 let overlayEl: HTMLElement | null = null;
 let tooltipEl: HTMLElement | null = null;
 let tuneEl: HTMLElement | null = null;
+let toastEl: HTMLElement | null = null;
 let mapEl: HTMLElement | null = null;
 let raf = 0;
 let resizeObs: ResizeObserver | null = null;
@@ -320,6 +336,7 @@ function mountGame() {
   overlayEl = h("div");
   tooltipEl = h("div", { class: "tooltip", style: "display:none" });
   tuneEl = h("div", { class: "tune-wrap", style: "display:none" });
+  toastEl = h("div", { class: "toast", style: "display:none" });
   barEl = h("div", { class: "bottombar" });
   sideEl = h("div", { class: "maplog" });
   mapEl = h(
@@ -333,6 +350,7 @@ function mountGame() {
     tooltipEl,
     overlayEl,
     tuneEl,
+    toastEl,
   );
   app.append(h("div", { class: "game" }, h("div", { class: "mapcol" }, mapEl, barEl)));
 
@@ -373,7 +391,7 @@ function mountGame() {
 function unmountGame() {
   cancelAnimationFrame(raf);
   resizeObs?.disconnect();
-  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = null;
+  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = null;
   render();
 }
 
@@ -565,17 +583,21 @@ function renderTooltip() {
 function renderSide() {
   if (!sideEl || !barEl || !game) return;
   clear(sideEl);
+  if (toastEl) {
+    toastEl.textContent = error || notice;
+    toastEl.style.display = error || notice ? "block" : "none";
+    toastEl.className = `toast ${error ? "err" : "ok"}`;
+  }
   if (tuneEl) {
     tuneEl.style.display = tuningOpen ? "block" : "none";
     if (tuningOpen) {
-      renderTuningPanel(
-        tuneEl,
-        game.state.tuning,
-        room?.hostId === playerId,
-        (patch) => net.send({ type: "setTuning", tuning: patch }),
-        () => net.send({ type: "resetTuning" }),
-        () => ((tuningOpen = false), renderSide()),
-      );
+      renderTuningPanel(tuneEl, game.state.tuning, room?.savedTuning ?? null, room?.hostId === playerId, {
+        onChange: (patch) => net.send({ type: "setTuning", tuning: patch }),
+        onReset: () => net.send({ type: "resetTuning" }),
+        onSave: () => net.send({ type: "saveTuning" }),
+        onLoad: () => net.send({ type: "loadTuning" }),
+        onClose: () => ((tuningOpen = false), renderSide()),
+      });
     } else clear(tuneEl);
   }
   renderBottomBar(
@@ -933,7 +955,7 @@ function render() {
     renderSide();
     return;
   }
-  renderLobby(app, { playerId, name: playerName, rooms, room, error, connected }, net, setName);
+  renderLobby(app, { playerId, name: playerName, rooms, room, error: error || notice, connected }, net, setName);
 }
 
 render();

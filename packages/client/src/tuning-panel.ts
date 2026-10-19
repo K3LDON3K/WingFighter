@@ -6,14 +6,17 @@ import { icon, label } from "./icons.ts";
  * Ladicí menu parametrů hry. Host hodnoty mění (posílají se na server a platí pro všechny),
  * ostatní je vidí jen pro čtení.
  */
-export function renderTuningPanel(
-  root: HTMLElement,
-  tuning: Tuning,
-  canEdit: boolean,
-  onChange: (patch: Partial<Tuning>) => void,
-  onReset: () => void,
-  onClose: () => void,
-) {
+export interface TuningActions {
+  onChange: (patch: Partial<Tuning>) => void;
+  onReset: () => void;
+  onSave: () => void;
+  onLoad: () => void;
+  onClose: () => void;
+}
+
+export function renderTuningPanel(root: HTMLElement, tuning: Tuning, savedTuning: Tuning | null, canEdit: boolean, a: TuningActions) {
+  const { onChange, onReset, onSave, onLoad, onClose } = a;
+  const dirty = !!savedTuning && TUNING_FIELDS.some((f) => savedTuning[f.key] !== tuning[f.key]);
   clear(root);
   const groups = [...new Set(TUNING_FIELDS.map((f) => f.group))];
   const body = h("div", { class: "tune-body" });
@@ -59,7 +62,10 @@ export function renderTuningPanel(
         h("span", { class: "ttl" }, label("Ladění parametrů")),
         h("span", { class: "muted txt" }, canEdit ? "Změny platí pro všechny hráče od příštího kola." : "Mění jen host."),
         h("div", { class: "spacer" }),
-        canEdit ? h("button", { onclick: onReset }, label("Výchozí")) : null,
+        h("span", { class: "muted", style: "font-size:8px" }, savedTuning ? (dirty ? label("neuloženo") : label("uloženo")) : label("nic neuloženo")),
+        canEdit ? h("button", { class: dirty ? "on" : "", title: "Uloží na server do tuning.json – výchozí pro každou novou místnost", onclick: onSave }, label("Uložit")) : null,
+        canEdit && savedTuning ? h("button", { title: "Načte hodnoty uložené na serveru", onclick: onLoad }, label("Načíst uložené")) : null,
+        canEdit ? h("button", { title: "Tovární hodnoty", onclick: onReset }, label("Výchozí")) : null,
         h("button", { onclick: onClose }, "✕"),
       ),
       body,

@@ -73,8 +73,10 @@ Trup 100, štíty 50 (dobíjejí se 10 za kolo). Jeden čistý zásah laseru = 1
 Host má v lobby i během bitvy tlačítko **LADĚNÍ** (⌖): menu se všemi čísly – zranění (laser, torpédo
 přímé/plošné, mina, nárazy, nebezpečný manévr, kráter), loď (trup, štíty, dobíjení, kostky, munice, dohled),
 dosahy (laser, torpédo: zaměření, dolet, rychlost, zatáčení, životnost) a akce/stres. Změny se pošlou na
-server, platí pro všechny od příštího kola (u běžících lodí se přepočítají maxima) a jdou vrátit tlačítkem
-VÝCHOZÍ. Výchozí hodnoty a meze jsou v `packages/shared/src/tuning.ts`.
+server, platí pro všechny od příštího kola (u běžících lodí se přepočítají maxima). **ULOŽIT** je zapíše
+na server do `tuning.json` v kořeni projektu – stanou se výchozími pro každou novou místnost (i po restartu);
+**NAČÍST ULOŽENÉ** je vrátí, **VÝCHOZÍ** dá tovární hodnoty. Meze a tovární hodnoty jsou
+v `packages/shared/src/tuning.ts`.
 
 ## Struktura projektu
 
@@ -95,6 +97,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.11.1 – ukládání parametrů na server (tuning.json), načtení uložených, oznámení ve hře.
 - v1.11 – lasery střílí na začátku kola ze startovní pozice (výseč se kreslí u lodi), animace: salvy → pohyb.
 - v1.10.1 – miny vybuchují na začátku kola (nepřítel v poli, nebo odpočet na nule), ne až na konci.
 - v1.10 – ladicí menu parametrů hry (host, lobby i bitva, platí pro všechny).

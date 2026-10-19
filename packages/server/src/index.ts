@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import type { ClientMessage } from "@spacegame/shared";
 import { Hub } from "./rooms.ts";
+import { loadSavedTuning, TUNING_FILE } from "./tuning-store.ts";
+
+if (loadSavedTuning()) console.log(`  Načteny uložené parametry: ${TUNING_FILE}`);
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? "0.0.0.0";

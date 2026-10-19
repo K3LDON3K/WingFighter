@@ -232,14 +232,13 @@ function roomView(m: LobbyModel, net: Net) {
       wrap.append(toggle);
       if (tuningOpen) {
         const panel = h("div", { style: "margin-top:10px" });
-        renderTuningPanel(
-          panel,
-          room.tuning,
-          isHost,
-          (patch) => net.send({ type: "setTuning", tuning: patch }),
-          () => net.send({ type: "resetTuning" }),
-          () => ((tuningOpen = false), rerender()),
-        );
+        renderTuningPanel(panel, room.tuning, room.savedTuning, isHost, {
+          onChange: (patch) => net.send({ type: "setTuning", tuning: patch }),
+          onReset: () => net.send({ type: "resetTuning" }),
+          onSave: () => net.send({ type: "saveTuning" }),
+          onLoad: () => net.send({ type: "loadTuning" }),
+          onClose: () => ((tuningOpen = false), rerender()),
+        });
         wrap.append(panel);
       }
       return wrap;
