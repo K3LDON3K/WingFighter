@@ -1,5 +1,4 @@
 import { SCANNER, TORPEDO } from "./constants.ts";
-import { pointInStorm } from "./mapgen.ts";
 import type { Vec } from "./geometry.ts";
 import type { Asteroid, GameState, MovePath, TurnEvent, TurnResult } from "./types.ts";
 
@@ -20,7 +19,7 @@ export function teamEyes(state: GameState, team: number, paths?: MovePath[]): Ey
   for (const s of state.ships) {
     if (s.team !== team) continue;
     const r = s.stats.vision ?? VISION_REF.value;
-    if (s.alive && !pointInStorm(state.storms ?? [], s)) eyes.push({ x: s.x, y: s.y, r }); // z bouře není vidět ven
+    if (s.alive) eyes.push({ x: s.x, y: s.y, r });
     const path = paths?.find((p) => p.id === s.id);
     if (path) for (let i = 0; i < path.points.length; i += 4) eyes.push({ x: path.points[i].x, y: path.points[i].y, r });
   }
@@ -48,7 +47,7 @@ export function stateForTeam(state: GameState, team: number, memory: AsteroidMem
   for (const [id, a] of memory) if (!live.has(id) && seenBy(eyes, a, a.radius)) memory.delete(id);
   return {
     ...state,
-    ships: state.ships.filter((s) => s.team === team || !s.alive || (seenBy(eyes, s, s.stats.radius) && !pointInStorm(state.storms ?? [], s))),
+    ships: state.ships.filter((s) => s.team === team || !s.alive || seenBy(eyes, s, s.stats.radius)),
     torpedoes: state.torpedoes.filter((t) => t.team === team || seenBy(eyes, t, TORPEDO.radius)),
     mines: state.mines.filter((m) => m.team === team || seenBy(eyes, m, m.radius)),
     debris: (state.debris ?? []).filter((d) => seenBy(eyes, d, 12)),
@@ -75,7 +74,7 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
     const own = p.kind === "ship" ? shipTeam(p.id) === team : torpTeam(p.id) === team;
     if (own || pathVisible(p)) (p.kind === "ship" ? visibleShip : visibleTorp).add(p.id);
   }
-  for (const s of result.state.ships) if (s.team === team || (seenBy(eyes, s, s.stats.radius) && !pointInStorm(result.state.storms ?? [], s))) visibleShip.add(s.id);
+  for (const s of result.state.ships) if (s.team === team || seenBy(eyes, s, s.stats.radius)) visibleShip.add(s.id);
   for (const t of result.state.torpedoes) if (t.team === team || seenBy(eyes, t, TORPEDO.radius)) visibleTorp.add(t.id);
 
   const events: TurnEvent[] = [];

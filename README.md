@@ -55,7 +55,7 @@ a seed – stejný seed = stejná mapa. Náhled ukazuje asteroidy, bouře a **st
 velikosti, mimo překážky); hráč si klikem vybere start, ostatní vidí barvu a jméno. Kdo nevybere, dostane volný
 bod co nejdál od soupeřů. **Elektromagnetická bouře**: uvnitř nefungují štíty (zásah jde rovnou do trupu) ani lasery
 (nejde střílet z bouře, do bouře ani skrz ni), torpédo po vletu ohluchne a letí rovně, skener a dohled bouří
-neprojdou – loď v bouři není vidět a sama nevidí ven.
+neprojdou (dohled bouře neovlivňuje – loď v bouři je vidět).
 
 ### Fog of war
 Každá loď vidí do vzdálenosti **960** (3 × zaměřovací dostřel torpéda); tým dohled sdílí. Server každému
@@ -143,6 +143,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.4.1 – loď v bouři je normálně vidět (bouře ruší jen skener a lasery, ne dohled); po kole se kamera na loď
+  jen přesune, zoom zůstává.
 - v3.4 – zoom: tlačítka + / − / CENTROVAT nahoře uprostřed mapy (krok 10 %, stejně kolečko; klávesy +, −, C).
   Centrování nastaví zoom tak, aby byl v okně celý kruh dohledu lodi (kreslí se slabou čárkovanou čarou), druhý
   stisk = celá mapa; stejné centrování při startu bitvy a když loď po kole zmizí ze záběru. Loď u okraje jde
@@ -165,7 +167,7 @@ Příkazy (z kořenové složky):
   hustota asteroidů, shluky, počet a velikost bouří, symetrie, seed (🎲); náhled mapy se startovními body po okraji –
   klik = zvolit start (barva týmu + jméno, ostatní to vidí; host nastavuje i botům). Bouře (fialová mlhovina, blesky):
   uvnitř nefungují štíty (zásah jde do trupu) ani lasery (ani zvenku na loď v bouři, paprsek se o bouři zastaví),
-  torpédo po vletu ohluchne a letí rovně, skener a dohled bouří neprojdou (loď v bouři není vidět a nevidí ven).
+  torpédo po vletu ohluchne a letí rovně, skener bouří neprojde.
 - v2.4.1 – po kliknutí na SKENER se na mapě tyrkysově ukáže dosah skenu lodi (vyplněný kruh) a hlubokého skenu.
 - v2.4 – **žebříček** po skončení bitvy (a kdykoli z Esc menu → Statistiky): sestřely, poškození uděleno/utrženo,
   vydělané kredity, manévry (zelený/bílý/červený/nebezpečný · otočky), lasery zásahy/salvy, torpéda, miny, skeny.

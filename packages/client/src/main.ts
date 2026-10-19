@@ -318,7 +318,11 @@ function ensureVisible(shipId: string | undefined) {
   if (!s) return;
   const sp = cam.toScreen(s.x, s.y);
   const m = 120;
-  if (sp.x < m || sp.y < m || sp.x > cam.viewW - m || sp.y > cam.viewH - m) centerOnShip(shipId, true);
+  if (sp.x < m || sp.y < m || sp.x > cam.viewW - m || sp.y > cam.viewH - m) {
+    // jen přesun na loď, zoom zůstává
+    cam.centerOn(s.x, s.y);
+    cam.clampTo(game.state.width, game.state.height);
+  }
 }
 
 /** Nastaví manévr; úhel ořízne na to, co loď při dané rychlosti zvládne. Vrací true při úspěchu. */

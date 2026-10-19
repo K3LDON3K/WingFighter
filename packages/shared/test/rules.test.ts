@@ -774,8 +774,8 @@ describe("generovaná mapa a bouře", () => {
     // útočník mimo bouři nevystřelí na cíl v bouři
     let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: true }], createRng(1));
     expect(r.events.some((e) => e.type === "laser")).toBe(false);
-    // loď v bouři není pro soupeře vidět, ani její tým z ní nevidí ven
-    expect(stateForTeam(g, 0, new Map()).ships.some((s) => s.id === "ship-p2-0")).toBe(false);
+    // loď v bouři je normálně vidět (bouře ruší jen skener)
+    expect(stateForTeam(g, 0, new Map()).ships.some((s) => s.id === "ship-p2-0")).toBe(true);
     // zásah lodi v bouři jde rovnou do trupu (segmenty beze změny): výbuch miny
     const g2 = structuredClone(g);
     g2.mines.push({ id: "m", ownerId: "p1", team: 0, x: b.x, y: b.y, radius: 70, armed: true, timer: 1 });
