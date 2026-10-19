@@ -1,0 +1,411 @@
+:root {
+  --bg: #05070f;
+  --panel: #0d1222;
+  --panel-2: #141b30;
+  --border: #243049;
+  --text: #e2e8f0;
+  --muted: #8b9bb4;
+  --accent: #38bdf8;
+  --green: #4ade80;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14px;
+  color: var(--text);
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+}
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.primary {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+  color: #03111c;
+  font-weight: 700;
+}
+button.primary:hover:not(:disabled) {
+  background: #38bdf8;
+}
+button.danger {
+  border-color: #7f1d1d;
+}
+input,
+select {
+  font: inherit;
+  color: var(--text);
+  background: #0a0f1d;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+h1,
+h2,
+h3 {
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+h1 {
+  font-size: 28px;
+  letter-spacing: 2px;
+}
+h2 {
+  font-size: 18px;
+}
+h3 {
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.muted {
+  color: var(--muted);
+}
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.row.wrap {
+  flex-wrap: wrap;
+}
+.spacer {
+  flex: 1;
+}
+
+/* ---- obrazovky ---- */
+.screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.center {
+  margin: auto;
+  width: min(900px, 94vw);
+  display: grid;
+  gap: 16px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.title {
+  text-align: center;
+  padding: 24px 0 0;
+}
+.title .sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+.status {
+  position: fixed;
+  top: 8px;
+  right: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.status.ok::before {
+  content: "● ";
+  color: var(--green);
+}
+.status.bad::before {
+  content: "● ";
+  color: var(--red);
+}
+
+.room-list {
+  display: grid;
+  gap: 6px;
+}
+.room-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.room-item .code {
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+
+.teams {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.team {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  min-height: 140px;
+  background: var(--panel-2);
+}
+.team h3 {
+  color: var(--team);
+}
+.team.mine {
+  box-shadow: inset 0 0 0 1px var(--team);
+}
+.player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.player .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.player .dot.off {
+  background: var(--red);
+}
+.player .host {
+  color: var(--yellow);
+  font-size: 11px;
+}
+.player .x {
+  margin-left: auto;
+  padding: 0 6px;
+  font-size: 12px;
+}
+.settings label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.settings label span {
+  width: 160px;
+  color: var(--muted);
+}
+.error {
+  color: var(--red);
+  min-height: 1.2em;
+}
+
+/* ---- hra ---- */
+.game {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  grid-template-rows: 1fr;
+  height: 100%;
+}
+.game canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+.game .map {
+  position: relative;
+  overflow: hidden;
+}
+.hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(13, 18, 34, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.hud .big {
+  font-size: 16px;
+  font-weight: 700;
+}
+.hint {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  background: rgba(5, 7, 15, 0.7);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.side {
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.side .panel {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.side .log {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.side .log .turn {
+  color: var(--text);
+  font-weight: 700;
+  margin-top: 8px;
+}
+.side .log div {
+  padding: 1px 0;
+}
+.ship-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.ship-tabs button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.ship-tabs button.done::after {
+  content: " ✓";
+  color: var(--green);
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.stats div {
+  background: var(--panel-2);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.stats b {
+  display: block;
+  font-size: 14px;
+}
+.dial {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.dial button {
+  padding: 6px 2px;
+  font-size: 15px;
+  line-height: 1;
+  position: relative;
+}
+.dial button small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.dial button.green {
+  border-color: #166534;
+}
+.dial button.red {
+  border-color: #7f1d1d;
+}
+.dial button.active {
+  background: #1e3a5f;
+  border-color: var(--accent);
+}
+.dial .label {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.choices button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.choices button.active {
+  background: #1e3a5f;
+  border-color: var(--accent);
+}
+.choices select {
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.field {
+  margin-bottom: 8px;
+}
+.field h3 {
+  margin-bottom: 4px;
+}
+.ready-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.waiting {
+  font-size: 12px;
+  color: var(--muted);
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 7, 15, 0.7);
+}
+.overlay .card {
+  text-align: center;
+  min-width: 320px;
+}
+.overlay h2 {
+  font-size: 26px;
+}
+@media (max-width: 900px) {
+  .game {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .side {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    max-height: 45vh;
+  }
+  .teams {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@spacegame/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@spacegame/shared": "*"
+  },
+  "devDependencies": {
+    "vite": "^6.1.0"
+  }
+}
