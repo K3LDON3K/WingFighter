@@ -48,6 +48,15 @@ v tom kole −50 %), **lasery**, **torpédo**, **mina**. Bez akce loď jen letí
 Staré akce po pohybu (zaměřit, úhyb, zámek, posun, úskok) jsou vypnuté – vrátí se jako schopnosti pilotů.
 Torpédo odstartuje **hned se začátkem pohybu** ze startovní pozice lodi.
 
+### Mapa a bouře
+Host v místnosti nastaví mapu: velikost (Malá 2400×1600 · Střední 3600×2400 · Velká 4800×3200 · Obří 6400×4000),
+asteroidy (žádné/málo/střední/hodně, volitelně shluky), bouře (0–5, malé/střední/velké), symetrii (zrcadlená mapa)
+a seed – stejný seed = stejná mapa. Náhled ukazuje asteroidy, bouře a **startovní body** po okraji (12–24 podle
+velikosti, mimo překážky); hráč si klikem vybere start, ostatní vidí barvu a jméno. Kdo nevybere, dostane volný
+bod co nejdál od soupeřů. **Elektromagnetická bouře**: uvnitř nefungují štíty (zásah jde rovnou do trupu) ani lasery
+(nejde střílet z bouře, do bouře ani skrz ni), torpédo po vletu ohluchne a letí rovně, skener a dohled bouří
+neprojdou – loď v bouři není vidět a sama nevidí ven.
+
 ### Fog of war
 Každá loď vidí do vzdálenosti **960** (3 × zaměřovací dostřel torpéda); tým dohled sdílí. Server každému
 posílá jen to, co jeho tým vidí (lodě, torpéda, miny). Asteroid, který tým jednou spatřil, zůstává v jeho
@@ -133,6 +142,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.0 – **generované mapy a elektromagnetické bouře**. V místnosti karta Mapa: velikost (2400×1600 až 6400×4000),
+  hustota asteroidů, shluky, počet a velikost bouří, symetrie, seed (🎲); náhled mapy se startovními body po okraji –
+  klik = zvolit start (barva týmu + jméno, ostatní to vidí; host nastavuje i botům). Bouře (fialová mlhovina, blesky):
+  uvnitř nefungují štíty (zásah jde do trupu) ani lasery (ani zvenku na loď v bouři, paprsek se o bouři zastaví),
+  torpédo po vletu ohluchne a letí rovně, skener a dohled bouří neprojdou (loď v bouři není vidět a nevidí ven).
 - v2.4.1 – po kliknutí na SKENER se na mapě tyrkysově ukáže dosah skenu lodi (vyplněný kruh) a hlubokého skenu.
 - v2.4 – **žebříček** po skončení bitvy (a kdykoli z Esc menu → Statistiky): sestřely, poškození uděleno/utrženo,
   vydělané kredity, manévry (zelený/bílý/červený/nebezpečný · otočky), lasery zásahy/salvy, torpéda, miny, skeny.

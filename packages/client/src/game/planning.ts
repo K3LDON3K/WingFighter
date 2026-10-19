@@ -3,6 +3,7 @@ import {
   actionList,
   laserOdds,
   FACING_NAMES,
+  inStorm,
   SCANNER,
   scannerModule,
   loadoutWeight,
@@ -179,6 +180,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       ),
     );
   }
+  if (inStorm(m.state, ship)) right.prepend(h("div", { class: "storm-warn", title: "Elektromagnetická bouře: štíty a lasery mimo provoz, torpéda neřiditelná, skener a dohled nefungují" }, "⚡ ", label("bouře: štíty a lasery mimo")));
   const status = h(
     "div",
     { class: "pnl bb-ship" },

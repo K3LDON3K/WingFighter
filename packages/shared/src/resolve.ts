@@ -29,6 +29,16 @@ import {
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
 import { computeStats, facingAngle, laserHalfArc, mineSideOf, MODULES, profileOf } from "./ships.ts";
+import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
+
+/** Je loď/bod v elektromagnetické bouři? */
+export function inStorm(state: GameState, p: Vec): boolean {
+  return pointInStorm(state.storms ?? [], p);
+}
+/** Laserová čára: nesmí začínat ani končit v bouři a nesmí ji protínat. */
+function laserBlockedByStorm(state: GameState, a: Vec, b: Vec): boolean {
+  return (state.storms?.length ?? 0) > 0 && (inStorm(state, a) || inStorm(state, b) || lineCrossesStorm(state.storms, a, b));
+}
 import type { ModuleInstance } from "./types.ts";
 
 /** Pozice lodi natočená podle směru modulu (výseč laserů, výlet torpéda). */
@@ -51,6 +61,7 @@ import type {
   Segments,
   Ship,
   ShipOrders,
+  Storm,
   Torpedo,
   TurnEvent,
   TurnResult,
@@ -130,7 +141,10 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec
   if (amount <= 0 || !ship.alive) return;
   let absorbed = 0;
   let segment: number | undefined;
-  if (from && ship.shieldType === "segment") {
+  const stormed = !!creditCtx && inStorm(creditCtx.state, ship); // v bouři štíty nefungují
+  if (stormed) {
+    /* zásah jde rovnou do trupu */
+  } else if (from && ship.shieldType === "segment") {
     segment = hitSegment(ship, from);
     if (ship.segments[segment] > 0) {
       ship.segments[segment]--;
@@ -326,14 +340,15 @@ const TORPEDO_SUBSTEPS = MOVE_STEPS * 2;
  * výlet (rovně, startovní rychlost) → zaměření (otáčí se na cíl) → let (zrychluje, mírně zatáčí, cíl mimo výseč ztratí).
  * Mění `t.phase/speed/launchLeft/lost`; vrací vzorky (MOVE_STEPS + 1) a ujetou délku.
  */
-export function simulateTorpedo(t: Torpedo, aimAt: (k: number) => Vec | undefined): { samples: Pose[]; length: number } {
+export function simulateTorpedo(t: Torpedo, aimAt: (k: number) => Vec | undefined, storms: Storm[] = []): { samples: Pose[]; length: number } {
   const dt = 1 / TORPEDO_SUBSTEPS;
   let { x, y, heading } = t;
   let length = 0;
   const micro: Pose[] = [{ x, y, heading }];
   for (let i = 0; i < TORPEDO_SUBSTEPS; i++) {
     const k = Math.min(MOVE_STEPS, Math.round(((i + 1) / TORPEDO_SUBSTEPS) * MOVE_STEPS));
-    const aim = aimAt(k);
+    if (!t.lost && pointInStorm(storms, { x, y })) t.lost = true; // v bouři torpédo ohluchne – natrvalo
+    const aim = t.lost ? undefined : aimAt(k);
     const err = aim ? normalizeAngle(Math.atan2(aim.y - y, aim.x - x) - heading) : 0;
     if (t.phase === "launch") {
       t.speed = TORPEDO.launchSpeed;
@@ -341,7 +356,7 @@ export function simulateTorpedo(t: Torpedo, aimAt: (k: number) => Vec | undefine
       if (t.launchLeft <= 0) t.phase = aim ? "lock" : "cruise";
     } else if (t.phase === "lock") {
       t.speed = TORPEDO.launchSpeed;
-      if (!aim || Math.abs(err) <= TORPEDO.lockAngle) t.phase = "cruise";
+      if (!aim || t.lost || Math.abs(err) <= TORPEDO.lockAngle) t.phase = "cruise";
       else heading += clamp(err, -TORPEDO.lockTurn * dt, TORPEDO.lockTurn * dt);
     }
     if (t.phase === "cruise") {
@@ -375,6 +390,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   if (input.tuning) applyTuning(input.tuning);
   const state: GameState = structuredClone(input);
   if (!state.debris) state.debris = [];
+  if (!state.storms) state.storms = [];
   const events: TurnEvent[] = [];
   const turn = state.turn;
   creditCtx = { state, events };
@@ -450,13 +466,14 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!ship.alive) continue;
     const o = orders.get(ship.id)!;
     if (!o.fire || ship.stats.attack <= 0) continue;
+    if (inStorm(state, ship)) continue; // v bouři lasery nefungují
     const lmod = laserModule(ship, o.laserModuleId);
     const aim = aimPose(ship, lmod);
     const arc = laserHalfArc(lmod?.facing);
 
     const deb = state.debris.find((d) => d.id === o.preferredTargetId);
     if (deb && !shotDebris.has(deb.id)) {
-      if (dist(ship, deb) <= LASER.range && inArc(aim, deb, arc) && !lineBlocked(state.asteroids, ship, deb)) {
+      if (dist(ship, deb) <= LASER.range && inArc(aim, deb, arc) && !lineBlocked(state.asteroids, ship, deb) && !laserBlockedByStorm(state, ship, deb)) {
         const rangeBand = clamp(Math.ceil(dist(ship, deb) / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, { attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0), defenseDice: rangeBand === 3 ? 1 : 0, attackerFocus: ship.tokens.focus > 0, attackerLock: false, defenderFocus: false, defenderEvade: false });
         const destroyed = outcome.damage > 0;
@@ -468,7 +485,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
     const torp = torpedoById(state, o.preferredTargetId);
     if (torp && torp.team !== ship.team) {
-      if (dist(ship, torp) <= LASER.range && inArc(aim, torp, arc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, ship, torp)) {
+      if (dist(ship, torp) <= LASER.range && inArc(aim, torp, arc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, ship, torp) && !laserBlockedByStorm(state, ship, torp)) {
         const d = dist(ship, torp);
         const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, {
@@ -487,7 +504,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
 
     const candidates = state.ships.filter(
-      (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(aim, e, arc) && !lineBlocked(state.asteroids, ship, e),
+      (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(aim, e, arc) && !lineBlocked(state.asteroids, ship, e) && !laserBlockedByStorm(state, ship, e),
     );
     if (candidates.length === 0) continue;
     let target = candidates.find((c) => c.id === o.preferredTargetId);
@@ -615,7 +632,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       const s = shipById(state, t.targetId);
       if (s?.alive) return posAt(shipMovers.get(s.id)!, k);
       return torpedoById(state, t.targetId);
-    });
+    }, state.storms ?? []);
     torpMovers.set(t.id, { samples: sim.samples, length: sim.length, frozenAt: null, deflections: 0, collided: false });
   }
   const removedTorpedoes = new Set<string>();
@@ -1070,8 +1087,9 @@ export function laserTarget(state: GameState, ship: Ship, preferredTargetId?: st
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
   const arc = laserHalfArc(lmod?.facing);
+  if (inStorm(state, ship)) return undefined;
   const candidates = state.ships.filter(
-    (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(aim, e, arc) && !lineBlocked(state.asteroids, ship, e),
+    (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(aim, e, arc) && !lineBlocked(state.asteroids, ship, e) && !laserBlockedByStorm(state, ship, e),
   );
   if (candidates.length === 0) return undefined;
   return candidates.find((c) => c.id === preferredTargetId) ?? candidates.reduce((best, c) => (dist(ship, c) < dist(ship, best) ? c : best));
@@ -1113,6 +1131,7 @@ export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: 
     const target = state.ships.find((s) => s.id === targetId && s.alive && s.team !== ship.team);
     if (!target) return { error: "cíl skenu není cizí živá loď" };
     if (dist(ship, target) > SCANNER.range) return { error: `cíl je mimo dosah skeneru (${SCANNER.range})` };
+    if (inStorm(state, ship) || inStorm(state, target)) return { error: "bouře ruší skener" };
     mod.charges = charges - 1;
     const st = statsOf(state, ship.ownerId);
     if (st) st.scans++;
@@ -1120,6 +1139,7 @@ export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: 
   }
   if (mode === "deep") {
     if (charges < 2) return { error: "hluboký sken potřebuje 2 náboje" };
+    if (inStorm(state, ship)) return { error: "bouře ruší skener" };
     mod.charges = 0;
     mod.cooldown = SCANNER.cooldown;
     const st = statsOf(state, ship.ownerId);

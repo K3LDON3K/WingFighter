@@ -220,6 +220,8 @@ export interface PlayerInfo {
   loadout?: ShipLoadout;
   /** Kredity: zbytek rozpočtu + odměny za sestřely a přežití. */
   credits?: number;
+  /** Zvolený startovní bod (index v generované mapě). */
+  startIndex?: number;
 }
 
 /** Vyhozený modul plující vesmírem – lze sestřelit laserem za odměnu. */
@@ -233,6 +235,26 @@ export interface Debris {
   value: number;
 }
 
+/** Nastavení generované mapy. */
+export interface MapSettings {
+  size: "small" | "medium" | "large" | "huge";
+  asteroids: "none" | "few" | "medium" | "many";
+  /** Asteroidy ve shlucích (pásech). */
+  clusters: boolean;
+  /** Počet bouří (0–5). */
+  storms: number;
+  stormSize: "small" | "medium" | "large";
+  seed: number;
+  /** Zrcadlově symetrická mapa (férová pro týmy). */
+  symmetric: boolean;
+}
+
+/** Elektromagnetická bouře: shluk kruhů. Uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener a dohled nepronikne. */
+export interface Storm {
+  id: string;
+  blobs: { x: number; y: number; r: number }[];
+}
+
 export interface GameSettings {
   mode: GameMode;
   /** 0 = bez limitu. */
@@ -242,6 +264,8 @@ export interface GameSettings {
   allowedModules: Partial<Record<ModuleType, number>>;
   /** Výbava botů: výchozí sestava, náhodná, nebo ruční (host ji nakliká). */
   botLoadout: "default" | "random" | "manual";
+  /** Generovaná mapa (chybí = klasická pevná mapa 1). */
+  map?: MapSettings;
 }
 
 export interface GameResult {
@@ -274,6 +298,7 @@ export interface GameState {
   width: number;
   height: number;
   asteroids: Asteroid[];
+  storms: Storm[];
   ships: Ship[];
   torpedoes: Torpedo[];
   mines: Mine[];

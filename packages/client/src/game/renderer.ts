@@ -13,9 +13,11 @@ import {
   type Pose,
   RULES,
   MODULES,
+  pointInStorm,
 } from "@spacegame/shared";
 import type { Camera } from "./camera.ts";
 import { segmentColor, strengthColor } from "./shield-ui.ts";
+import { drawStorms, drawStormSparks } from "./storm-draw.ts";
 import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
 import type { ViewDebris, ViewModel, ViewShip } from "./view.ts";
@@ -67,6 +69,7 @@ export const ICON_RADIUS = 13;
 
 export class Renderer {
   readonly sprites = new SpriteCache();
+  private stormsRef: import("@spacegame/shared").Storm[] | null = null;
   private starPattern: CanvasPattern | null = null;
 
   constructor(
@@ -88,6 +91,8 @@ export class Renderer {
 
     this.drawBackground(state, cam);
     this.drawGrid(state);
+    this.stormsRef = state.storms ?? null;
+    if (state.storms?.length) drawStorms(ctx, state.storms, now, cam.zoom);
     for (const a of view.asteroids) this.drawAsteroid(a);
     for (const m of view.mines) this.drawMine(m, now);
     for (const d of view.debris) this.drawDebris(d, overlay, now);
@@ -443,6 +448,7 @@ export class Renderer {
       }
       ctx.restore();
     } else drawSprite(ctx, this.sprites.fighter(color), s.x, s.y, s.heading);
+    if (this.stormsRef && pointInStorm(this.stormsRef, s)) drawStormSparks(ctx, s.x, s.y, s.radius, now);
 
     ctx.save();
     ctx.font = "13px Pix, ui-monospace, Menlo, monospace";

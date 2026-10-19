@@ -24,6 +24,9 @@ import {
   type ShipOrders,
   type TurnEvent,
   applyScan,
+  DEFAULT_MAP,
+  generateMap,
+  sanitizeMapSettings,
   type ModuleType,
   DEFAULT_LOADOUT,
   MODULE_TYPES,
@@ -53,6 +56,8 @@ interface RoomMember {
   loadout: ShipLoadout;
   /** Bot: výbavu nastavil host ručně (přepíše výchozí/náhodnou při startu). */
   manualLoadout?: boolean;
+  /** Zvolený startovní bod. */
+  startIndex?: number;
 }
 
 interface RunningGame {
@@ -99,7 +104,7 @@ class Room {
   code: string;
   name: string;
   hostId: string;
-  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" };
+  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default", map: { ...DEFAULT_MAP, seed: Math.floor(Math.random() * 100000) } };
   tuning: Tuning = initialTuning();
   members = new Map<string, RoomMember>();
   game: RunningGame | null = null;
@@ -130,6 +135,7 @@ class Room {
         isBot: m.isBot,
         ready: m.ready,
         loadout: m.loadout,
+        startIndex: m.startIndex,
         connected: m.isBot ? true : !!clients.get(m.id)?.ws,
       })),
     };
@@ -255,6 +261,23 @@ export class Hub {
         this.broadcastRoom(room);
         return;
       }
+      case "setStart": {
+        if (!room || room.game || !room.settings.map) return;
+        const targetId = msg.botId ?? client.id;
+        const m = room.members.get(targetId);
+        if (!m) return;
+        if (msg.botId && (room.hostId !== client.id || !m.isBot)) return;
+        if (msg.index === null) {
+          m.startIndex = undefined;
+        } else {
+          const n = generateMap(room.settings.map).starts.length;
+          const i = clampInt(msg.index, 0, Math.max(0, n - 1));
+          if ([...room.members.values()].some((o) => o.id !== m.id && o.startIndex === i)) return this.error(client, "Tenhle startovní bod už někdo má.");
+          m.startIndex = i;
+        }
+        this.broadcastRoom(room);
+        return;
+      }
       case "setLoadout": {
         if (!room || room.game) return;
         const targetId = msg.botId ?? client.id;
@@ -298,6 +321,12 @@ export class Hub {
         if (s.botLoadout === "default" || s.botLoadout === "random" || s.botLoadout === "manual") {
           room.settings.botLoadout = s.botLoadout;
           for (const m of room.members.values()) if (m.isBot && !m.manualLoadout) m.loadout = this.botLoadout(room);
+        }
+        if (s.map && typeof s.map === "object") {
+          room.settings.map = sanitizeMapSettings(s.map, room.settings.map ?? DEFAULT_MAP);
+          // startovní body se po změně mapy přepočítají – neplatné volby zrušit
+          const n = generateMap(room.settings.map).starts.length;
+          for (const m of room.members.values()) if (m.startIndex !== undefined && m.startIndex >= n) m.startIndex = undefined;
         }
         if (s.allowedModules && typeof s.allowedModules === "object") {
           const out: Partial<Record<ModuleType, number>> = {};
@@ -413,7 +442,7 @@ export class Hub {
       const err = validateLoadout(m.loadout, { allowed: room.settings.allowedModules, budget: room.tuning.startBudget });
       if (err) return this.error(host, `${m.name} – výbava: ${err}.`);
     }
-    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadout) }));
+    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadout), startIndex: m.startIndex }));
     const state = createGame({ players, settings: room.settings, tuning: room.tuning });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     room.game = { state, orders: new Map(), rng, memory: new Map(), pendingEvents: [] };

@@ -10,6 +10,7 @@ export interface RoomPlayer {
   ready: boolean;
   connected: boolean;
   loadout: ShipLoadout;
+  startIndex?: number;
 }
 
 export interface RoomState {
@@ -40,6 +41,8 @@ export type ClientMessage =
   | { type: "joinRoom"; code: string }
   | { type: "leaveRoom" }
   | { type: "setTeam"; team: number }
+  /** Startovní bod (null = uvolnit); host může nastavit botovi. */
+  | { type: "setStart"; index: number | null; botId?: string }
   /** Vlastní výbava, nebo (host) výbava bota. */
   | { type: "setLoadout"; loadout: ShipLoadout; botId?: string }
   | { type: "addBot"; team: number }

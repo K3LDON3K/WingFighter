@@ -7,6 +7,7 @@ import {
   moduleCost,
   validateLoadout,
   applyScan,
+  generateMap,
   newModule,
   actionCost,
   classifyManeuver,
@@ -737,5 +738,56 @@ describe("skener", () => {
     g3.ships[0].loadout.modules = [{ ...newModule("scanner", "left", "sc"), charges: 0 }];
     const r3 = resolveTurn(g3, [{ shipId: g3.ships[0].id, maneuverId: "m2a0", fire: false }], createRng(1)); // rovně 2 = zelený
     expect(r3.state.ships[0].loadout.modules[0].charges).toBe(1);
+  });
+});
+
+describe("generovaná mapa a bouře", () => {
+  const map = { size: "medium" as const, asteroids: "medium" as const, clusters: false, storms: 2, stormSize: "medium" as const, seed: 42, symmetric: true };
+  it("generátor je deterministický, symetrický a startovní body jsou mimo překážky", () => {
+    const a = generateMap(map);
+    const b = generateMap(map);
+    expect(a).toEqual(b);
+    expect(a.width).toBe(3600);
+    expect(a.storms.length).toBe(2);
+    expect(a.asteroids.length).toBeGreaterThan(10);
+    for (const st of a.starts) {
+      expect(a.asteroids.some((x) => Math.hypot(x.x - st.x, x.y - st.y) < x.radius + 60)).toBe(false);
+      expect(a.storms.some((s) => s.blobs.some((bl) => Math.hypot(bl.x - st.x, bl.y - st.y) <= bl.r + 40))).toBe(false);
+    }
+    // zrcadlo: ke každému asteroidu vlevo existuje protějšek vpravo
+    const left = a.asteroids.filter((x) => x.x < a.width / 2 - x.radius * 2 - 40);
+    for (const x of left) expect(a.asteroids.some((y) => Math.abs(y.x - (a.width - x.x)) < 1 && y.y === x.y)).toBe(true);
+  });
+  it("hra na generované mapě: startovní body hráčů, v bouři nefungují štíty ani lasery, torpédo ohluchne, loď v bouři není vidět", () => {
+    const g = createGame({ players: [{ ...players[0], startIndex: 0 }, { ...players[1], startIndex: 5 }], settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default", map }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    const gen = generateMap(map);
+    expect(g.ships[0].x).toBe(gen.starts[0].x);
+    expect(g.ships[1].x).toBe(gen.starts[5].x);
+    expect(g.storms.length).toBe(2);
+    // umístíme obě lodě proti sobě, obránce do bouře
+    const b = g.storms[0].blobs[0];
+    g.asteroids = [];
+    place(g, "ship-p1-0", b.x - b.r - 150, b.y, 0);
+    place(g, "ship-p2-0", b.x, b.y, Math.PI);
+    g.ships[0].stats.agility = 0;
+    g.ships[1].stats.agility = 0;
+    // útočník mimo bouři nevystřelí na cíl v bouři
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: true }], createRng(1));
+    expect(r.events.some((e) => e.type === "laser")).toBe(false);
+    // loď v bouři není pro soupeře vidět, ani její tým z ní nevidí ven
+    expect(stateForTeam(g, 0, new Map()).ships.some((s) => s.id === "ship-p2-0")).toBe(false);
+    // zásah lodi v bouři jde rovnou do trupu (segmenty beze změny): výbuch miny
+    const g2 = structuredClone(g);
+    g2.mines.push({ id: "m", ownerId: "p1", team: 0, x: b.x, y: b.y, radius: 70, armed: true, timer: 1 });
+    r = resolveTurn(g2, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    const hit = r.state.ships[1];
+    expect(hit.hull).toBeLessThan(100);
+    expect(hit.segments).toEqual([2, 2, 2, 2]);
+    // torpédo vletí do bouře a ohluchne
+    const g3 = structuredClone(g);
+    place(g3, "ship-p2-0", b.x + 20, b.y + 150, Math.PI);
+    r = resolveTurn(g3, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false, special: { type: "torpedo", targetId: "ship-p2-0" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    for (let i = 0; i < 2 && r.state.torpedoes.length; i++) r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    if (r.state.torpedoes.length) expect(r.state.torpedoes[0].lost).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { RULES, actionCost, makeManeuver, mineModule, mineSideOf, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@spacegame/shared";
+import { RULES, actionCost, inStorm, makeManeuver, mineModule, mineSideOf, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@spacegame/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -33,7 +33,7 @@ export const ACTIONS: ActionOption[] = [
     glyph: "⚡",
     label: "Lasery (1 akce)",
     description: "Na začátku kola (před pohybem) vystřelí lasery ze současné pozice na cíl ve výseči ±20° do 300 (preferovaný cíl, jinak nejbližší nepřítel; ne skrz asteroid). Bez této akce loď nestřílí.",
-    disabled: (ship, _s, o) => (ship.loadout.modules.some((m) => m.type === "laser") ? noAp(ship, o, !!o.fire) : "loď nemá laserový modul"),
+    disabled: (ship, s, o) => (!ship.loadout.modules.some((m) => m.type === "laser") ? "loď nemá laserový modul" : inStorm(s, ship) ? "v bouři lasery nefungují" : noAp(ship, o, !!o.fire)),
     active: (o) => !!o.fire,
     apply: (o, ship) => ({ fire: !o.fire, laserModuleId: o.fire ? undefined : ship.loadout.modules.find((m) => m.type === "laser")?.id }),
     requiresModule: "laser",

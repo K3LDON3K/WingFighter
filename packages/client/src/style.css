@@ -1441,3 +1441,42 @@ button.px.tiny {
 .scan-card.wide {
   width: min(900px, 95%);
 }
+
+/* ---- mapa v místnosti ---- */
+.map-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.map-settings label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.map-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.map-preview {
+  display: block;
+  max-width: 100%;
+  image-rendering: pixelated;
+  cursor: crosshair;
+  border: 3px solid;
+  border-color: var(--bevel-d) var(--bevel-l) var(--bevel-l) var(--bevel-d);
+}
+.storm-warn {
+  color: #e879f9;
+  font-size: 7px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.map-settings label > span:first-child {
+  font-family: var(--txt);
+  font-size: 13px;
+}

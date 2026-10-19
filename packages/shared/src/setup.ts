@@ -3,7 +3,8 @@ import { MAP, RULES } from "./constants.ts";
 import type { Pose } from "./geometry.ts";
 import { computeStats, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf } from "./ships.ts";
 import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
-import type { Asteroid, GameSettings, GameState, PlayerInfo, Ship, ShipLoadout } from "./types.ts";
+import type { Asteroid, GameSettings, GameState, PlayerInfo, Ship, ShipLoadout, Storm } from "./types.ts";
+import { generateMap, START_MARGIN } from "./mapgen.ts";
 
 /** Mapa 1 – statické asteroidy (vx, vy = 0; v budoucnu mohou létat). Tvar se generuje ze seedu. */
 const MAP_1: Omit<Asteroid, "profile" | "version">[] = [
@@ -75,21 +76,71 @@ export function createGame(opts: CreateGameOptions): GameState {
   if (settings.mode === "dm") players = players.map((p, i) => ({ ...p, team: i }));
 
   const teams = [...new Set(players.map((p) => p.team))].sort((a, b) => a - b);
-  const zones = spawnZones(teams.length, MAP.width, MAP.height);
+  // mapa: generovaná podle nastavení, jinak klasická mapa 1
+  let width = MAP.width;
+  let height = MAP.height;
+  let asteroids: Asteroid[] = structuredClone(MAP_1_ASTEROIDS);
+  let storms: Storm[] = [];
+  let startAt: ((p: PlayerInfo) => Pose) | null = null;
+  if (settings.map) {
+    const gen = generateMap(settings.map);
+    width = gen.width;
+    height = gen.height;
+    asteroids = gen.asteroids;
+    storms = gen.storms;
+    const taken = new Set(players.map((p) => p.startIndex).filter((i): i is number => typeof i === "number" && i >= 0 && i < gen.starts.length));
+    const freeIdx = gen.starts.map((_, i) => i).filter((i) => !taken.has(i));
+    const assigned = new Map<string, number>();
+    for (const p of players) {
+      let i = typeof p.startIndex === "number" && p.startIndex >= 0 && p.startIndex < gen.starts.length && !assigned.has(`i${p.startIndex}`) ? p.startIndex : undefined;
+      if (i === undefined || [...assigned.values()].includes(i)) {
+        // volný bod co nejdál od už obsazených (hlavně od cizích týmů)
+        const used = [...assigned.entries()].map(([pid, idx]) => ({ idx, team: players.find((q) => q.id === pid)?.team }));
+        let best = freeIdx[0];
+        let bestScore = -1;
+        for (const cand of freeIdx) {
+          const c = gen.starts[cand];
+          let score = Infinity;
+          for (const u of used) {
+            const o = gen.starts[u.idx];
+            const d = Math.hypot(c.x - o.x, c.y - o.y) * (u.team === p.team ? 0.4 : 1);
+            score = Math.min(score, d);
+          }
+          if (used.length === 0) score = 0;
+          if (score > bestScore) {
+            bestScore = score;
+            best = cand;
+          }
+        }
+        i = best ?? Math.floor(Math.random() * gen.starts.length);
+        const at = freeIdx.indexOf(i);
+        if (at >= 0) freeIdx.splice(at, 1);
+      }
+      assigned.set(p.id, i);
+      p.startIndex = i;
+    }
+    startAt = (p) => {
+      const st = gen.starts[assigned.get(p.id) ?? 0] ?? { x: START_MARGIN, y: height / 2, heading: 0 };
+      return { x: st.x, y: st.y, heading: st.heading };
+    };
+  }
+  const zones = spawnZones(teams.length, width, height);
 
   const ships: Ship[] = [];
   teams.forEach((team, zi) => {
-    const zone = zones[zi];
+    const zoneT = zones[zi];
     const members = players.filter((p) => p.team === team);
     const total = members.length * Math.max(1, settings.shipsPerPlayer);
     const spacing = 60;
-    // kolmice ke kurzu zóny
-    const px = -Math.sin(zone.heading);
-    const py = Math.cos(zone.heading);
     let idx = 0;
     for (const p of members) {
-      for (let k = 0; k < Math.max(1, settings.shipsPerPlayer); k++) {
-        const offset = (idx - (total - 1) / 2) * spacing;
+      const zone = startAt ? startAt(p) : zoneT;
+      // kolmice ke kurzu zóny
+      const px = -Math.sin(zone.heading);
+      const py = Math.cos(zone.heading);
+      const perPlayer = Math.max(1, settings.shipsPerPlayer);
+      for (let k = 0; k < perPlayer; k++) {
+        const offset = startAt ? (k - (perPlayer - 1) / 2) * spacing : (idx - (total - 1) / 2) * spacing;
         const loadout = structuredClone(p.loadout!);
         const stats = computeStats(loadout);
         ships.push({
@@ -122,9 +173,10 @@ export function createGame(opts: CreateGameOptions): GameState {
     turn: 1,
     settings,
     tuning,
-    width: MAP.width,
-    height: MAP.height,
-    asteroids: structuredClone(MAP_1_ASTEROIDS),
+    width,
+    height,
+    asteroids,
+    storms,
     ships,
     torpedoes: [],
     mines: [],

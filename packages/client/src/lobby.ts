@@ -1,4 +1,5 @@
-import { applyTuning, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@spacegame/shared";
+import { applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@spacegame/shared";
+import { renderMapPreview } from "./map-preview.ts";
 import { loadoutTag, renderLoadout } from "./loadout-ui.ts";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
@@ -126,6 +127,8 @@ let rerender: () => void = () => {};
 const lobbyTunePanel = h("div", { style: "margin-top:10px" });
 /** Bot, kterému host právě kliká výbavu. */
 let botEdit: string | null = null;
+/** Komu host vybírá startovní bod (null = sobě). */
+let startFor: string | null = null;
 
 function roomView(m: LobbyModel, net: Net) {
   const room = m.room!;
@@ -225,6 +228,46 @@ function roomView(m: LobbyModel, net: Net) {
           renderLoadout({ loadout: me.loadout, budget, allowed: room.settings.allowedModules, onChange: (lo) => net.send({ type: "setLoadout", loadout: lo }) }),
         )
       : null,
+    (() => {
+      const map = settings.map ?? DEFAULT_MAP;
+      const setMap = (patch: Partial<MapSettings>) => set({ map: { ...map, ...patch } });
+      const sel = (lbl: string, value: string, opts: [string, string][], onChange: (v: string) => void) =>
+        h("label", {}, h("span", {}, lbl), h("select", { disabled: !isHost, onchange: (e) => onChange((e.target as HTMLSelectElement).value) }, ...opts.map(([v, t]) => h("option", { value: v, selected: value === v }, t))));
+      const bots = room.players.filter((p) => p.isBot);
+      const targetSel = isHost && bots.length ? h("select", { onchange: (e) => (startFor = (e.target as HTMLSelectElement).value || null) }, h("option", { value: "", selected: !startFor }, "já"), ...bots.map((b) => h("option", { value: b.id, selected: startFor === b.id }, b.name))) : null;
+      return h(
+        "div",
+        { class: "card mapcard" },
+        h("h3", {}, label("Mapa"), isHost ? "" : label(" (mění host)")),
+        h(
+          "div",
+          { class: "map-grid" },
+          h(
+            "div",
+            { class: "settings map-settings" },
+            sel("Velikost", map.size, Object.entries(MAP_SIZES).map(([k, v]) => [k, v.label]), (v) => setMap({ size: v as MapSettings["size"] })),
+            sel("Asteroidy", map.asteroids, [["none", "žádné"], ["few", "málo"], ["medium", "střední"], ["many", "hodně"]], (v) => setMap({ asteroids: v as MapSettings["asteroids"] })),
+            h("label", {}, h("span", {}, "Shluky asteroidů"), h("input", { type: "checkbox", checked: map.clusters, disabled: !isHost, onchange: (e) => setMap({ clusters: (e.target as HTMLInputElement).checked }) })),
+            sel("Bouře", String(map.storms), [["0", "žádná"], ["1", "1"], ["2", "2"], ["3", "3"], ["5", "mnoho (5)"]], (v) => setMap({ storms: Number(v) })),
+            sel("Velikost bouří", map.stormSize, [["small", "malé"], ["medium", "střední"], ["large", "velké"]], (v) => setMap({ stormSize: v as MapSettings["stormSize"] })),
+            h("label", {}, h("span", {}, "Symetrická"), h("input", { type: "checkbox", checked: map.symmetric, disabled: !isHost, title: "Zrcadlená mapa – obě strany stejné podmínky", onchange: (e) => setMap({ symmetric: (e.target as HTMLInputElement).checked }) })),
+            h(
+              "label",
+              {},
+              h("span", {}, "Seed"),
+              h("span", { class: "row", style: "gap:4px" }, h("input", { type: "number", value: String(map.seed), min: "0", max: "999999", disabled: !isHost, style: "width:90px", onchange: (e) => setMap({ seed: Number((e.target as HTMLInputElement).value) || 0 }) }), isHost ? h("button", { title: "Nová náhodná mapa", onclick: () => setMap({ seed: Math.floor(Math.random() * 100000) }) }, "🎲") : null),
+            ),
+            h("div", { class: "muted txt", style: "margin-top:6px" }, "Stejný seed = stejná mapa. Elektromagnetická bouře (fialová): uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener a dohled jí neprojdou."),
+          ),
+          h(
+            "div",
+            { class: "map-side" },
+            h("div", { class: "muted txt" }, "Klikni na startovní bod na okraji mapy. Barva = tým, ostatní vidí, kde kdo startuje. Bez volby dostaneš volný bod při startu.", targetSel ? h("span", {}, " Nastavuji start pro: ", targetSel) : null),
+            renderMapPreview(map, room.players, startFor ?? m.playerId, (index) => net.send({ type: "setStart", index, ...(startFor ? { botId: startFor } : {}) })),
+          ),
+        ),
+      );
+    })(),
     h(
       "div",
       { class: "card settings" },
