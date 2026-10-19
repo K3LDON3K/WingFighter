@@ -47,6 +47,8 @@ export interface ViewMine {
 export type Effect =
   | { kind: "explosion"; x: number; y: number; size: number; start: number; duration: number; color?: string }
   | { kind: "laser"; from: Pose; to: Pose; color: string; start: number; duration: number; hit: boolean }
+  /** Projektil kulometu: krátká stopa letící od střelce směrem k cíli (s rozptylem), hit = zasáhne. */
+  | { kind: "tracer"; from: Pose; to: Pose; angle: number; hit: boolean; start: number; duration: number }
   | { kind: "ring"; x: number; y: number; radius: number; color: string; start: number; duration: number }
   | { kind: "text"; x: number; y: number; text: string; color: string; start: number; duration: number }
   | { kind: "shield"; shipId: string; start: number; duration: number }

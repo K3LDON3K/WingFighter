@@ -36,6 +36,7 @@ export const MODULES: Record<ModuleType, ModuleDef> = {
   torpedo: { id: "torpedo", name: "Torpédomet", short: "TORP", icon: "torpedo", size: "small", weight: 1, price: 150, ammo: 3, ammoWeight: 1, description: "Fázové torpédo, 3 kusy na modul. Každé vystřelené torpédo loď odlehčí." },
   mine: { id: "mine", name: "Miny", short: "MINA", icon: "mine", size: "small", weight: 1, price: 100, ammo: 2, ammoWeight: 0.5, description: "Miny, 2 kusy na modul. Odhazují se za loď nebo do stran." },
   "shield-segment": { id: "shield-segment", name: "Segmentový štít", short: "SEG", icon: "segments", size: "small", weight: 2, price: 120, shieldType: "segment", description: "Čtyři segmenty po 2 bodech; každý zásah ubere 1 bod a je pohlcen celý. Akce Úprava štítu body přesouvá. Nelze kombinovat s celolodním." },
+  mg: { id: "mg", name: "Kulomet", short: "KUL", icon: "mg", size: "small", weight: 1, price: 120, ammo: 100, ammoWeight: 0.02, description: "Krátký dosah (150), široká výseč ±45°. Dávka 10 projektilů s rozptylem, každý 3 zranění; šance zásahu klesá se vzdáleností. Střílí na začátku kola na cokoliv (loď, torpédo, trosky). Funguje i v bouři. 100 nábojů = 10 dávek." },
   scanner: { id: "scanner", name: "Skener", short: "SKEN", icon: "scan", size: "small", weight: 1, price: 130, description: "2 náboje (dobíjí zelený manévr). Sken lodi (1 náboj): hned ukáže výbavu, natočení modulů, munici a pilota cizí lodi v dohledu. Hluboký sken (2 náboje): hned odkryje mapu celému týmu do konce kola, pak cooldown 3 kola. Nebere akci." },
   "shield-whole": { id: "shield-whole", name: "Celolodní štít", short: "CEL", icon: "shield", size: "small", weight: 2, price: 120, shieldType: "whole", shields: 50, description: "Zásoba 50 kolem celé lodi, pohltí účinnost % zranění; účinnost po každém zásahu klesá o 10 %. Nelze kombinovat se segmentovým." },
 };
@@ -61,7 +62,7 @@ export const WEIGHT = {
 
 /** Má modul směr (otáčí se)? Štíty ne. */
 export function hasFacing(type: ModuleType): boolean {
-  return type === "laser" || type === "torpedo" || type === "mine";
+  return type === "laser" || type === "torpedo" || type === "mine" || type === "mg";
 }
 
 const OPPOSITE: Record<SlotId, SlotId> = { front: "back", back: "front", left: "right", right: "left" };

@@ -36,6 +36,8 @@ import {
   type Ship,
   laserArcOf,
   laserOdds,
+  mgArcOf,
+  mgPreview,
   laserTarget,
   mineSideOf,
   mineModule,
@@ -529,7 +531,7 @@ function buildOverlay(view: ViewModel): Overlay {
     const man = resolveManeuver(profile, o.maneuverId, ship.speed);
     if (!man) continue;
     const aiming = g.aimingShipId === ship.id && !g.submitted;
-    overlay.previews.push({ ship: vs, maneuver: man, aiming, fire: !!o.fire, laserArc: o.fire ? laserArcOf(ship, o.laserModuleId) : undefined });
+    overlay.previews.push({ ship: vs, maneuver: man, aiming, fire: !!o.fire, laserArc: o.fire ? laserArcOf(ship, o.laserModuleId) : undefined, mgArc: o.fireMg ? mgArcOf(ship, o.mgModuleId) : undefined });
     const end = maneuverEnd(ship, man);
 
     if (aiming) {
@@ -552,6 +554,14 @@ function buildOverlay(view: ViewModel): Overlay {
         overlay.rangeCircle2 = { radius: TORPEDO.pointRange };
       } else {
         overlay.targetId = o.preferredTargetId;
+        if (o.fireMg && !o.fire) {
+          const pv = mgPreview(g.state, ship, o.preferredTargetId, o.mgModuleId);
+          if (pv) {
+            const pct = Math.round(pv.hitChance * 100);
+            overlay.targetId = pv.targetId;
+            overlay.laserOdds = { x: pv.x, y: pv.y, text: `${pct} % ×${pv.shots}`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171" };
+          }
+        }
         if (o.fire) {
           const tgt = laserTarget(g.state, ship, o.preferredTargetId, o.laserModuleId);
           if (tgt) {
@@ -655,7 +665,7 @@ function renderLeaderboard(s: GameState): HTMLElement {
   const table = h(
     "table",
     { class: "lb" },
-    h("thead", {}, h("tr", {}, th("#"), th("hráč"), th("sestřely"), th("poškození", "Uděleno / utrženo (trup i štít)"), th("kredity", "Vydělané kredity (bez startovního rozpočtu)"), th("manévry", "zelený / bílý / červený / nebezpečný · otočky"), th("lasery", "zásahy / salvy"), th("torp.", "vystřelená torpéda"), th("miny"), th("skeny"))),
+    h("thead", {}, h("tr", {}, th("#"), th("hráč"), th("sestřely"), th("poškození", "Uděleno / utrženo (trup i štít)"), th("kredity", "Vydělané kredity (bez startovního rozpočtu)"), th("manévry", "zelený / bílý / červený / nebezpečný · otočky"), th("lasery", "zásahy / salvy"), th("kulomet", "zásahy / projektily"), th("torp.", "vystřelená torpéda"), th("miny"), th("skeny"))),
     h(
       "tbody",
       {},
@@ -671,6 +681,7 @@ function renderLeaderboard(s: GameState): HTMLElement {
           td(st!.creditsEarned, "num"),
           h("td", { class: "num man" }, h("span", { style: "color:#4ade80" }, String(m.green)), " / ", h("span", {}, String(m.white)), " / ", h("span", { style: "color:#f87171" }, String(m.red)), " / ", h("span", { style: "color:#fb923c" }, String(m.danger)), m.koiogran ? h("span", { class: "muted" }, ` · ⟲${m.koiogran}`) : null),
           td(`${st!.laserHits} / ${st!.lasersFired}`, "num"),
+          td(`${st!.mgHits ?? 0} / ${st!.mgShots ?? 0}`, "num"),
           td(st!.torpedoesFired, "num"),
           td(st!.minesDropped, "num"),
           td(st!.scans, "num"),

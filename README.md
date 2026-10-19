@@ -65,7 +65,8 @@ paměti v podobě, v jaké ho naposledy viděl – poškození mimo dohled se ne
 ### Výbava lodi (inventář)
 Loď **Stíhač** má 4 malé sloty: příď, záď, levobok, pravobok. Příď a záď jsou pod sebou a lze je spojit v jeden
 **velký** slot pro budoucí velké moduly. Moduly:
-**Lasery** (100 cr, váha 2), **Torpédomet** (150, váha 1 + 1 za torpédo, 3 ks), **Miny** (100, váha 1 +
+**Lasery** (100 cr, váha 2), **Kulomet** (120, váha 1 + 0,02/náboj, 100 nábojů; dávka 10 × 3 zranění, dosah 150,
+výseč ±45°, šance zásahu podle vzdálenosti, funguje v bouři), **Torpédomet** (150, váha 1 + 1 za torpédo, 3 ks), **Miny** (100, váha 1 +
 0,5 za minu, 2 ks), **Segmentový štít** (120, váha 2), **Celolodní štít** (120, váha 2). Součet váhy snižuje
 max. rychlost: každých 6 váhy = −1 (výchozí sestava má váhu 10 → rychlost max. 4, prázdná loď 5). Vystřelená
 munice loď odlehčí. Loď smí letět i bez modulů. Více modulů stejného typu = víc munice; při střelbě si vybereš,
@@ -142,6 +143,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.3 – zbraňový modul **Kulomet** (120 cr, váha 1 + 0,02/náboj, 100 nábojů): na začátku kola dávka 10 projektilů
+  s rozptylem, každý 3 zranění, šance zásahu 70 % zblízka → 35 % na hranici dosahu 150, výseč ±45°, otočný (ne do
+  středu). Míří na preferovaný cíl (loď, torpédo, trosky) nebo nejbližší loď ve výseči; úhyb cíle šanci snižuje.
+  Celolodní štít řeší každý projektil zvlášť, segmentový pohltí celou dávku za 1 bod. Funguje i v bouři. Ladění →
+  Kulomet. V liště šance zásahu a průměrné zranění, na mapě stopy projektilů; sloupec v žebříčku.
 - v3.2 – loď v bouři: štít na mapě zmizí (jen fialový tečkovaný obrys), bublina štítu v panelu zešedne a probliká
   fialově s nápisem „ŠTÍT VYPNUT ⚡“, řádek štítu přeškrtnutý; tlačítka LASERY, ŠTÍT a SKENER fialově šrafovaná
   s bleskem a vypnutá; pod akcemi shrnutí, co v bouři nefunguje.

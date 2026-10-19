@@ -77,6 +77,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "evadePass":
         lines.push(`  ${name(e.shipId)} proletěl skrz ${name(e.victimId)}.`);
         break;
+      case "mg":
+        lines.push(`${name(e.shooterId)} kulomet → ${name(e.targetId)}: ${e.hits}/${e.shots} zásahů${e.damage ? `, −${e.damage}` : ""}${e.destroyed ? " – zničeno" : ""}.`);
+        break;
       case "scan":
         lines.push(e.mode === "ship" ? `${name(e.shipId)} skenoval ${e.targetId ? name(e.targetId) : "loď"}.` : e.mode === "deep" ? `${name(e.shipId)} provedl hluboký sken – mapa odkryta do konce kola.` : `${name(e.shipId)} vynutil cooldown skeneru.`);
         break;
@@ -190,6 +193,7 @@ export class TurnAnimation {
           }
           break;
         case "laser":
+        case "mg":
         case "torpedoShot":
           if (!movePassed) {
             time = preCount * LASER_GAP;
@@ -369,6 +373,25 @@ export class TurnAnimation {
         if (shooter) {
           shooter.tokens.focus = 0;
           if (shooter.lockTargetId === e.targetId) shooter.lockTargetId = undefined;
+        }
+        break;
+      }
+      case "mg": {
+        const shooter = v.ships.find((x) => x.id === e.shooterId);
+        const n = e.shots;
+        for (let i = 0; i < n; i++) {
+          v.effects.push({ kind: "tracer", from: e.from, to: e.to, angle: e.spread[i] ?? 0, hit: i < e.hits, start: now + i * 35, duration: 320 });
+        }
+        if (e.hits > 0) v.effects.push({ kind: "text", x: e.to.x, y: e.to.y, text: `${e.hits}/${e.shots}${e.damage ? ` −${e.damage}` : ""}`, color: "#fde047", start: now + n * 35 + 100, duration: 900 });
+        else v.effects.push({ kind: "text", x: e.to.x, y: e.to.y, text: "minul", color: "#cbd5e1", start: now + n * 35 + 100, duration: 700 });
+        if (e.destroyed) {
+          v.torpedoes = v.torpedoes.filter((x) => x.id !== e.targetId);
+          v.debris = v.debris.filter((x) => x.id !== e.targetId);
+          v.effects.push({ kind: "explosion", x: e.to.x, y: e.to.y, size: 18, start: now + n * 35 + 150, duration: 500 });
+        }
+        if (shooter) {
+          const mod = this.result.state.ships.find((x) => x.id === shooter.id)?.loadout.modules.find((m) => m.type === "mg");
+          void mod;
         }
         break;
       }

@@ -7,6 +7,7 @@ import {
   SCANNER,
   scannerModule,
   loadoutWeight,
+  mgPreview,
   mineModule,
   mineSideOf,
   MODULES,
@@ -85,12 +86,12 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
 const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: "bílý", red: "červený", danger: "nebezpečný" };
 /** Kategorie akcí v liště: zbraně · pohyb · speciální. */
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
-  { label: "Zbraně", ids: ["laser", "torpedo", "mine"] },
+  { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
   { label: "Pohyb", ids: ["evade", "koiogran"] },
   { label: "Speciální", ids: ["shield", "jettison"] },
 ];
 const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
-const ACTION_ICON: Record<string, string> = { laser: "laser", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
+const ACTION_ICON: Record<string, string> = { laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
   if (koiogran) return "⟲";
@@ -286,7 +287,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   const details = h("div", { class: "bb-details" });
   const seg = (content: Node | string, active: boolean, title: string, onclick: () => void) => h("button", { class: `px seg ${active ? "on" : ""}`, disabled: locked, title, onclick }, content);
   /** Výběr modulu (když je jich víc stejného typu): 1, 2, … s municí. */
-  const modulePicker = (type: "laser" | "torpedo", currentId: string | undefined, onPick: (id: string) => void) => {
+  const modulePicker = (type: "laser" | "torpedo" | "mg", currentId: string | undefined, onPick: (id: string) => void) => {
     const mods = ship.loadout.modules.filter((m) => m.type === type);
     if (mods.length < 2) return null;
     return h(
@@ -302,6 +303,20 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     if (cd > 0) details.append(h("span", { class: "muted" }, label(`cooldown ${cd} kol · pak plné náboje`)));
     else if (m.scanPick) details.append(h("span", { class: "warn" }, label(`klikni na cizí loď v dohledu (dosah ${SCANNER.range}) – sken proběhne hned`)), h("span", { class: "muted" }, label(`· ${sc.charges ?? 0} nábojů · nebere akci`)));
     else details.append(h("span", { class: "muted" }, label(`${sc.charges ?? 0} nábojů · nebere akci · +1 za zelený manévr`)));
+  } else if (o.fireMg && o.special?.type !== "torpedo" && o.special?.type !== "mine") {
+    const picker = modulePicker("mg", o.mgModuleId, (id) => cb.setOrders(ship.id, { mgModuleId: id }));
+    if (picker) details.append(picker);
+    const pv = mgPreview(m.state, ship, o.preferredTargetId, o.mgModuleId);
+    const tname = pv ? (m.state.ships.find((x) => x.id === pv.targetId)?.name ?? (m.state.torpedoes.some((x) => x.id === pv.targetId) ? "torpédo" : "trosky")) : null;
+    details.append(icon("target", pv ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, pv ? `kulomet: ${tname}` : "nikdo ve výseči kulometu"));
+    if (pv) {
+      const pct = Math.round(pv.hitChance * 100);
+      details.append(
+        h("span", { class: "odds", style: `color:${pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171"}`, title: `Šance zásahu jednoho projektilu podle vzdálenosti; dávka ${pv.shots} projektilů.` }, label(`zásah ${pct} %`)),
+        h("span", { class: "muted" }, label(`· ${pv.shots} projektilů · průměr ${Math.round(pv.expectedDamage)} zranění`)),
+      );
+    }
+    details.append(h("span", { class: "muted" }, label("· klik na cíl = zaměřit")));
   } else if (o.special?.type === "torpedo") {
     const sp = o.special;
     const tname = sp.targetId ? (m.state.ships.find((x) => x.id === sp.targetId)?.name ?? "torpédo") : null;

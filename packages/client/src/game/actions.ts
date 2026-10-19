@@ -39,6 +39,16 @@ export const ACTIONS: ActionOption[] = [
     requiresModule: "laser",
   },
   {
+    id: "mg",
+    glyph: "⁘",
+    label: "Kulomet (1 akce)",
+    description: "Na začátku kola vystřelí dávku projektilů s rozptylem na cíl ve výseči kulometu (krátký dosah, široká výseč). Každý projektil má šanci zasáhnout podle vzdálenosti a dává malé zranění. Míří na preferovaný cíl (loď, torpédo, trosky), jinak na nejbližší nepřátelskou loď. Funguje i v bouři.",
+    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mg") ? "loď nemá kulomet" : !ship.loadout.modules.some((m) => m.type === "mg" && (m.ammo ?? 0) > 0) ? "došly náboje" : noAp(ship, o, !!o.fireMg)),
+    active: (o) => !!o.fireMg,
+    apply: (o, ship) => ({ fireMg: !o.fireMg, mgModuleId: o.fireMg ? undefined : ship.loadout.modules.find((m) => m.type === "mg" && (m.ammo ?? 0) > 0)?.id }),
+    requiresModule: "mg",
+  },
+  {
     id: "torpedo",
     glyph: "➤",
     label: "Torpédo (1 akce)",

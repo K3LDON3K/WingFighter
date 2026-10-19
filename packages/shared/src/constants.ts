@@ -91,6 +91,17 @@ export const MINE = {
   damage: 30,
 };
 
+/** Kulomet: dosah, poloviční výseč, projektilů v dávce, zranění za projektil, rozptyl, šance zásahu blízko/daleko (%). */
+export const MG = {
+  range: 150,
+  halfArc: (45 * Math.PI) / 180,
+  burst: 10,
+  damage: 3,
+  spread: (8 * Math.PI) / 180,
+  hitNear: 70,
+  hitFar: 35,
+};
+
 /** Skener (mutovatelné kvůli ladění): náboje, dosah skenu lodi, dosah hlubokého skenu, cooldown v kolech. */
 export const SCANNER = {
   charges: 2,

@@ -114,7 +114,8 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
         }
         break;
       case "laser":
-        if (visibleShip.has(e.shooterId) || visibleShip.has(e.targetId)) events.push(e);
+      case "mg":
+        if (visibleShip.has(e.shooterId) || visibleShip.has(e.targetId) || visibleTorp.has(e.targetId)) events.push(e);
         break;
       case "spawnTorpedo":
         if (e.torpedo.team === team || seenBy(eyes, e.torpedo, 20)) {

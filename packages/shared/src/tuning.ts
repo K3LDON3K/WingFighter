@@ -2,7 +2,7 @@
  * Ladicí parametry hry (balanc). Host je může měnit v lobby i během bitvy;
  * server je aplikuje před každým vyhodnocením, klient před vykreslením.
  */
-import { CRATER_RADIUS_REF, LASER, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
+import { CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
 import { HULLS, LASER_DICE, MODULES, WEIGHT } from "./ships.ts";
 
@@ -73,6 +73,18 @@ export interface Tuning {
   weightPerMine: number;
   weightShield: number;
   weightPerSpeed: number;
+  // kulomet
+  mgAmmo: number;
+  mgRange: number;
+  mgArcDeg: number;
+  mgBurst: number;
+  mgDamage: number;
+  mgSpreadDeg: number;
+  mgHitNear: number;
+  mgHitFar: number;
+  priceMg: number;
+  weightMg: number;
+  weightPerMgRound: number;
   // skener
   scannerCharges: number;
   scannerRange: number;
@@ -147,6 +159,17 @@ export const DEFAULT_TUNING: Tuning = {
   weightPerMine: 0.5,
   weightShield: 2,
   weightPerSpeed: 6,
+  mgAmmo: 100,
+  mgRange: 150,
+  mgArcDeg: 45,
+  mgBurst: 10,
+  mgDamage: 3,
+  mgSpreadDeg: 8,
+  mgHitNear: 70,
+  mgHitFar: 35,
+  priceMg: 120,
+  weightMg: 1,
+  weightPerMgRound: 0.02,
   scannerCharges: 2,
   scannerRange: 600,
   scannerDeepRange: 2000,
@@ -236,6 +259,18 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "priceShieldSegment", label: "Segmentový – cena", group: "Štíty", min: 0, max: 2000, step: 10 },
   { key: "priceShieldWhole", label: "Celolodní – cena", group: "Štíty", min: 0, max: 2000, step: 10 },
   { key: "weightShield", label: "Štít – váha modulu", group: "Štíty", min: 0, max: 20, step: 0.5 },
+  // --- kulomet ---
+  { key: "mgAmmo", label: "Nábojů na modul", group: "Kulomet", min: 10, max: 500, step: 10, hint: "projeví se u nových lodí; dávka spotřebuje tolik nábojů, kolik má projektilů" },
+  { key: "mgBurst", label: "Projektilů v dávce", group: "Kulomet", min: 1, max: 30, step: 1 },
+  { key: "mgDamage", label: "Zranění za projektil", group: "Kulomet", min: 1, max: 20, step: 1 },
+  { key: "mgRange", label: "Dosah", group: "Kulomet", min: 50, max: 600, step: 10 },
+  { key: "mgArcDeg", label: "Výseč ± °", group: "Kulomet", min: 10, max: 180, step: 5 },
+  { key: "mgSpreadDeg", label: "Rozptyl ± ° (animace)", group: "Kulomet", min: 0, max: 45, step: 1 },
+  { key: "mgHitNear", label: "Šance zásahu zblízka %", group: "Kulomet", min: 0, max: 100, step: 5 },
+  { key: "mgHitFar", label: "Šance zásahu na hranici dosahu %", group: "Kulomet", min: 0, max: 100, step: 5, hint: "mezi tím lineárně; úhyb cíle šanci snižuje o 'Úhyb – snížení zranění %'" },
+  { key: "priceMg", label: "Modul – cena", group: "Kulomet", min: 0, max: 2000, step: 10 },
+  { key: "weightMg", label: "Modul – váha (prázdný)", group: "Kulomet", min: 0, max: 20, step: 0.5 },
+  { key: "weightPerMgRound", label: "Váha jednoho náboje", group: "Kulomet", min: 0, max: 1, step: 0.01 },
   // --- skener ---
   { key: "scannerCharges", label: "Náboje (max)", group: "Skener", min: 1, max: 6, step: 1, hint: "start plné; +1 za zelený manévr; po cooldownu plné" },
   { key: "scannerRange", label: "Sken lodi – dosah", group: "Skener", min: 50, max: 4000, step: 50, hint: "cíl musí být navíc v dohledu" },
@@ -330,6 +365,17 @@ export function applyTuning(t: Tuning): void {
   MODULES["shield-segment"].weight = t.weightShield;
   MODULES["shield-whole"].weight = t.weightShield;
   WEIGHT.perSpeed = t.weightPerSpeed;
+  MG.range = t.mgRange;
+  MG.halfArc = (t.mgArcDeg * Math.PI) / 180;
+  MG.burst = t.mgBurst;
+  MG.damage = t.mgDamage;
+  MG.spread = (t.mgSpreadDeg * Math.PI) / 180;
+  MG.hitNear = t.mgHitNear;
+  MG.hitFar = t.mgHitFar;
+  MODULES.mg.ammo = t.mgAmmo;
+  MODULES.mg.price = t.priceMg;
+  MODULES.mg.weight = t.weightMg;
+  MODULES.mg.ammoWeight = t.weightPerMgRound;
   SCANNER.charges = t.scannerCharges;
   SCANNER.range = t.scannerRange;
   SCANNER.deepRange = t.scannerDeepRange;

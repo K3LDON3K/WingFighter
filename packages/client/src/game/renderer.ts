@@ -39,7 +39,7 @@ export interface Overlay {
   selectedShipId?: string;
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
-  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; laserArc?: { heading: number; halfArc: number } }[];
+  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; laserArc?: { heading: number; halfArc: number }; mgArc?: { heading: number; halfArc: number; range: number } }[];
   /** Dohled vlastního týmu (fog of war). */
   vision?: { x: number; y: number; r: number }[];
   /** Dosažitelné pozice při zvolené rychlosti (body obarvené náročností). */
@@ -119,7 +119,7 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
-    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArc);
+    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArc, p.mgArc);
 
     for (const t of view.torpedoes) {
       // plamen motoru
@@ -547,7 +547,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArc?: { heading: number; halfArc: number }) {
+  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArc?: { heading: number; halfArc: number }, mgArc?: { heading: number; halfArc: number; range: number }) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[ship.team];
     const pts = samplePath(maneuverPath(ship, man), 24);
@@ -562,6 +562,7 @@ export class Renderer {
     ctx.stroke();
     ctx.restore();
     if (fire) this.drawArc({ x: ship.x, y: ship.y, heading: laserArc?.heading ?? ship.heading }, color, LASER.range, laserArc?.halfArc ?? LASER.halfArc); // lasery střílí ze startovní pozice, před pohybem
+    if (mgArc) this.drawArc({ x: ship.x, y: ship.y, heading: mgArc.heading }, "#fbbf24", mgArc.range, mgArc.halfArc);
     ctx.save();
     ctx.strokeStyle = shade(color, 1.3);
     ctx.lineWidth = 1;
@@ -640,6 +641,27 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(e.x, e.y, r * 0.5, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
+        break;
+      }
+      case "tracer": {
+        // stopa letí od střelce k cíli; rozptyl = úhlová odchylka od směru na cíl
+        const base = Math.atan2(e.to.y - e.from.y, e.to.x - e.from.x) + e.angle;
+        const len = Math.hypot(e.to.x - e.from.x, e.to.y - e.from.y) + (e.hit ? 0 : 40);
+        const head = Math.min(1, t * 1.15) * len;
+        const tail = Math.max(0, head - 22);
+        ctx.save();
+        ctx.globalAlpha = t < 0.85 ? 1 : 1 - (t - 0.85) / 0.15;
+        ctx.strokeStyle = "#fde047";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(e.from.x + Math.cos(base) * (tail + 14), e.from.y + Math.sin(base) * (tail + 14));
+        ctx.lineTo(e.from.x + Math.cos(base) * (head + 14), e.from.y + Math.sin(base) * (head + 14));
+        ctx.stroke();
+        if (e.hit && t > 0.8) {
+          ctx.fillStyle = "#fff7ae";
+          ctx.fillRect(e.to.x + Math.cos(base) * 0 - 2 + (Math.random() - 0.5) * 8, e.to.y - 2 + (Math.random() - 0.5) * 8, 3, 3);
+        }
         ctx.restore();
         break;
       }

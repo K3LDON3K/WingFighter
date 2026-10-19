@@ -54,13 +54,16 @@ export interface ShipOrders {
   fire: boolean;
   /** Ze kterého laserového modulu se střílí (když je jich víc). */
   laserModuleId?: string;
+  /** Kulomet: dávka na začátku kola (1 akce), ze kterého modulu. */
+  fireMg?: boolean;
+  mgModuleId?: string;
   /** Preferovaný cíl laserů (loď nebo torpédo); když není ve výseči, střílí se na nejbližší nepřátelskou loď. */
   preferredTargetId?: string;
 }
 
 /** Sloty stíhače. */
 export type SlotId = "front" | "back" | "left" | "right";
-export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner";
+export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg";
 
 /** Trup lodi – nese moduly ve slotech. */
 export interface HullDef {
@@ -285,6 +288,8 @@ export interface PlayerStats {
   maneuvers: { green: number; white: number; red: number; danger: number; koiogran: number };
   lasersFired: number;
   laserHits: number;
+  mgShots: number;
+  mgHits: number;
   torpedoesFired: number;
   minesDropped: number;
   scans: number;
@@ -342,6 +347,8 @@ export type TurnEvent =
       damage: number;
       rangeBand: number;
     }
+  /** Dávka kulometu: počet projektilů, zásahy, celkové zranění; úhly rozptylu pro animaci (rad, relativně ke směru na cíl). */
+  | { type: "mg"; shooterId: string; targetId: string; from: Pose; to: Pose; shots: number; hits: number; damage: number; spread: number[]; destroyed?: boolean }
   | { type: "spawnTorpedo"; torpedo: Torpedo }
   | { type: "spawnMine"; mine: Mine }
   | {

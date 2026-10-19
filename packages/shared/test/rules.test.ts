@@ -791,3 +791,35 @@ describe("generovaná mapa a bouře", () => {
     if (r.state.torpedoes.length) expect(r.state.torpedoes[0].lost).toBe(true);
   });
 });
+
+describe("kulomet", () => {
+  it("dávka 10 projektilů před pohybem, zranění podle zásahů, funguje z bouře i do bouře; segmentový štít pohltí dávku za 1 bod", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, mgHitNear: 100, mgHitFar: 100 } });
+    g.asteroids = [];
+    const me = g.ships[0];
+    me.loadout.modules = [newModule("mg", "front", "mg1")];
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 640, 500, Math.PI);
+    let r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: false, fireMg: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    const ev = r.events.find((e) => e.type === "mg");
+    expect(ev && ev.type === "mg" && ev.shots).toBe(10);
+    expect(ev && ev.type === "mg" && ev.hits).toBe(10);
+    expect(r.state.ships[0].loadout.modules[0].ammo).toBe(90);
+    // segmentový štít: celá dávka = jeden zásah → přední segment 2 → 1, trup celý
+    expect(r.state.ships[1].segments[0]).toBe(1);
+    expect(r.state.ships[1].hull).toBe(100);
+    expect(r.events.indexOf(ev!)).toBeLessThan(r.events.findIndex((e) => e.type === "move"));
+    // celolodní štít: každý projektil zvlášť (10 × 3, účinnost klesá po každém)
+    const g2 = structuredClone(g);
+    g2.ships[1].shieldType = "whole";
+    g2.ships[1].shields = 50;
+    g2.ships[1].stats.shields = 50;
+    r = resolveTurn(g2, [{ shipId: me.id, maneuverId: "m1a0", fire: false, fireMg: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.state.ships[1].shieldEff).toBe(0); // 10 zásahů × −10 %
+    expect(r.state.ships[1].hull).toBeLessThan(100);
+    // kulomet není akce zdarma: s laserem a torpédem (2 akce) se neschválí
+    me.loadout.modules.push(newModule("laser", "left", "l1"), newModule("torpedo", "back", "t1"));
+    const fixed = sanitizeOrders(g, "p1", [{ shipId: me.id, maneuverId: "m1a0", fire: true, fireMg: true, special: { type: "torpedo", point: { x: 900, y: 500 } } }]);
+    expect(fixed[0].fireMg).toBe(false);
+  });
+});
