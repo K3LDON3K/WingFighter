@@ -1,6 +1,9 @@
 import { MAX_TEAMS_TDM, TEAM_COLORS, TEAM_NAMES, type RoomState, type RoomSummary } from "@spacegame/shared";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
+import { renderTuningPanel } from "./tuning-panel.ts";
+
+let tuningOpen = false;
 import type { Net } from "./net.ts";
 
 export interface LobbyModel {
@@ -16,6 +19,7 @@ export interface LobbyModel {
 const drafts = { name: null as string | null, roomName: "", code: "" };
 
 export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName: (n: string) => void) {
+  rerender = () => renderLobby(root, m, net, setName);
   const activeId = (document.activeElement as HTMLElement | null)?.id;
   const selStart = (document.activeElement as HTMLInputElement | null)?.selectionStart ?? null;
   clear(root);
@@ -113,6 +117,8 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
     ),
   );
 }
+
+let rerender: () => void = () => {};
 
 function roomView(m: LobbyModel, net: Net) {
   const room = m.room!;
@@ -220,6 +226,24 @@ function roomView(m: LobbyModel, net: Net) {
       ),
       h("div", { class: "muted txt", style: "margin-top:6px" }, "Při limitu kol vyhrává tým s největším součtem zbývajícího trupu a štítů."),
     ),
+    (() => {
+      const wrap = h("div");
+      const toggle = h("button", { onclick: () => ((tuningOpen = !tuningOpen), rerender()) }, icon("target", "currentColor", 12), label(tuningOpen ? "Skrýt ladění" : "Ladění parametrů"));
+      wrap.append(toggle);
+      if (tuningOpen) {
+        const panel = h("div", { style: "margin-top:10px" });
+        renderTuningPanel(
+          panel,
+          room.tuning,
+          isHost,
+          (patch) => net.send({ type: "setTuning", tuning: patch }),
+          () => net.send({ type: "resetTuning" }),
+          () => ((tuningOpen = false), rerender()),
+        );
+        wrap.append(panel);
+      }
+      return wrap;
+    })(),
     h(
       "div",
       { class: "row" },

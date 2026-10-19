@@ -2,6 +2,7 @@ import { generateProfile } from "./asteroids.ts";
 import { MAP, STRESS } from "./constants.ts";
 import type { Pose } from "./geometry.ts";
 import { computeStats, DEFAULT_LOADOUT } from "./ships.ts";
+import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
 import type { Asteroid, GameSettings, GameState, PlayerInfo, Ship, ShipLoadout } from "./types.ts";
 
 /** Mapa 1 – statické asteroidy (vx, vy = 0; v budoucnu mohou létat). Tvar se generuje ze seedu. */
@@ -56,6 +57,7 @@ export interface CreateGameOptions {
   players: PlayerInfo[];
   settings: GameSettings;
   loadout?: ShipLoadout;
+  tuning?: Tuning;
 }
 
 /**
@@ -64,6 +66,8 @@ export interface CreateGameOptions {
  */
 export function createGame(opts: CreateGameOptions): GameState {
   const settings = { ...opts.settings };
+  const tuning = sanitizeTuning(opts.tuning ?? DEFAULT_TUNING);
+  applyTuning(tuning);
   const loadout = opts.loadout ?? DEFAULT_LOADOUT;
   let players = opts.players.map((p) => ({ ...p }));
   if (settings.mode === "dm") players = players.map((p, i) => ({ ...p, team: i }));
@@ -97,7 +101,7 @@ export function createGame(opts: CreateGameOptions): GameState {
           heading: zone.heading,
           hull: stats.hull,
           shields: stats.shields,
-          stressPoints: STRESS.max,
+          stressPoints: tuning.stressMax,
           speed: 2,
           tokens: { focus: 0, evade: 0 },
           ammo: { torpedoes: stats.torpedoes, mines: stats.mines },
@@ -111,6 +115,7 @@ export function createGame(opts: CreateGameOptions): GameState {
   return {
     turn: 1,
     settings,
+    tuning,
     width: MAP.width,
     height: MAP.height,
     asteroids: structuredClone(MAP_1_ASTEROIDS),

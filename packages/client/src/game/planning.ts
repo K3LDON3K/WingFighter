@@ -1,5 +1,5 @@
 import {
-  ACTION_POINTS,
+  RULES,
   actionList,
   hullOf,
   parseManeuverId,
@@ -127,7 +127,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
 
   /* ---- 3. akce ---- */
   const apips = h("div", { class: "apip" });
-  for (let i = 0; i < ACTION_POINTS; i++) apips.append(h("i", { class: i < acts.length ? "on" : "" }));
+  for (let i = 0; i < RULES.actionPoints; i++) apips.append(h("i", { class: i < acts.length ? "on" : "" }));
   const buttons = h("div", { class: "bb-weapons" });
   for (const a of ACTIONS) {
     const active = a.active(o);

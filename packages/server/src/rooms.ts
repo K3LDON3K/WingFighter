@@ -1,4 +1,9 @@
 import {
+  applyTuning,
+  computeStats,
+  DEFAULT_TUNING,
+  sanitizeTuning,
+  type Tuning,
   createGame,
   createRng,
   MAX_TEAMS_TDM,
@@ -60,6 +65,7 @@ class Room {
   name: string;
   hostId: string;
   settings: GameSettings = { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1 };
+  tuning: Tuning = { ...DEFAULT_TUNING };
   members = new Map<string, RoomMember>();
   game: RunningGame | null = null;
 
@@ -79,6 +85,7 @@ class Room {
       name: this.name,
       hostId: this.hostId,
       settings: this.settings,
+      tuning: this.tuning,
       inGame: !!this.game,
       players: [...this.members.values()].map((m) => ({
         id: m.id,
@@ -239,6 +246,14 @@ export class Hub {
         this.broadcastRoom(room);
         return;
       }
+      case "setTuning":
+      case "resetTuning": {
+        if (!room || room.hostId !== client.id) return;
+        room.tuning = msg.type === "resetTuning" ? { ...DEFAULT_TUNING } : sanitizeTuning(msg.tuning, room.tuning);
+        if (room.game) this.retune(room);
+        this.broadcastRoom(room);
+        return;
+      }
       case "startGame":
         if (!room || room.hostId !== client.id || room.game) return;
         return this.startGame(room, client);
@@ -288,7 +303,7 @@ export class Hub {
       return this.error(host, "V týmovém módu musí být obsazené alespoň dva týmy.");
     }
     const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot }));
-    const state = createGame({ players, settings: room.settings });
+    const state = createGame({ players, settings: room.settings, tuning: room.tuning });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     room.game = { state, orders: new Map(), rng, memory: new Map() };
     const g = room.game;
@@ -302,6 +317,21 @@ export class Hub {
     this.broadcastRooms();
     this.planBots(room);
     this.maybeResolve(room);
+  }
+
+  /** Změna parametrů během bitvy: přepočítá maxima lodí a rozešle nové hodnoty. */
+  private retune(room: Room) {
+    const g = room.game!;
+    g.state.tuning = { ...room.tuning };
+    applyTuning(g.state.tuning);
+    for (const s of g.state.ships) {
+      const stats = computeStats(s.loadout);
+      s.stats = stats;
+      s.hull = Math.min(s.hull, stats.hull);
+      s.shields = Math.min(s.shields, stats.shields);
+      s.stressPoints = Math.min(s.stressPoints, g.state.tuning.stressMax);
+    }
+    this.broadcast(room, { type: "tuning", tuning: g.state.tuning });
   }
 
   private planBots(room: Room) {

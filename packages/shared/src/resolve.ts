@@ -1,16 +1,13 @@
 import { asteroidDestroyed, carveCrater, circleHitsAsteroid, lineBlocked } from "./asteroids.ts";
 import {
-  ACTION_POINTS,
-  COLLISION_DAMAGE,
   COLLISION_SCATTER,
-  DAMAGE_PER_HIT,
   LASER,
   LOCK_RANGE,
   MAX_DEFLECTIONS,
   MINE,
   MOVE_STEPS,
   MOVE_UNIT,
-  SHIELD_RECHARGE_PER_TURN,
+  RULES,
   STRESS,
   TORPEDO,
   TORPEDO_AGILITY,
@@ -32,6 +29,7 @@ import {
 import { makeManeuver, maneuverLength, maneuverPath, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
 import type { Rng } from "./rng.ts";
 import { hullOf } from "./ships.ts";
+import { applyTuning } from "./tuning.ts";
 import type {
   ActionOrder,
   Asteroid,
@@ -141,6 +139,7 @@ function enemyTarget(state: GameState, ship: Ship, id: string | undefined): Ship
  * Vrací sadu rozkazů pro všechny živé lodě hráče.
  */
 export function sanitizeOrders(state: GameState, playerId: string, incoming: ShipOrders[]): ShipOrders[] {
+  if (state.tuning) applyTuning(state.tuning);
   const out: ShipOrders[] = [];
   for (const ship of state.ships) {
     if (!ship.alive || ship.ownerId !== playerId) continue;
@@ -183,9 +182,9 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     const preferredTargetId = enemyTarget(state, ship, raw.preferredTargetId)?.id;
     const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, fire: !!raw.fire, preferredTargetId };
     // limit akcí: nejdřív padá zbraň, pak lasery, nakonec manévr
-    if (actionCost(ship, o) > ACTION_POINTS) o.special = undefined;
-    if (actionCost(ship, o) > ACTION_POINTS) o.fire = false;
-    if (actionCost(ship, o) > ACTION_POINTS) o.maneuverId = def.maneuverId;
+    if (actionCost(ship, o) > RULES.actionPoints) o.special = undefined;
+    if (actionCost(ship, o) > RULES.actionPoints) o.fire = false;
+    if (actionCost(ship, o) > RULES.actionPoints) o.maneuverId = def.maneuverId;
     out.push(o);
   }
   return out;
@@ -205,6 +204,7 @@ interface Mover {
 }
 
 export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng): TurnResult {
+  if (input.tuning) applyTuning(input.tuning);
   const state: GameState = structuredClone(input);
   const events: TurnEvent[] = [];
   const turn = state.turn;
@@ -456,7 +456,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               deflect(om, k, h2);
               touching.get(other.id)!.add(ship.id);
               events.push({ type: "collision", shipId: other.id, with: "ship", otherId: ship.id, t, newHeading: h2 });
-              applyDamage(other, COLLISION_DAMAGE, events);
+              applyDamage(other, RULES.collisionShip, events);
               if (!other.alive) om.frozenAt = k - 1;
             }
             break;
@@ -466,7 +466,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
           deflect(m, k, hit.heading);
           touching.get(ship.id)!.add(hit.otherId ?? "edge");
           events.push({ type: "collision", shipId: ship.id, with: hit.with, otherId: hit.otherId, t, newHeading: hit.heading });
-          applyDamage(ship, COLLISION_DAMAGE, events);
+          applyDamage(ship, hit.with === "ship" ? RULES.collisionShip : hit.with === "asteroid" ? RULES.collisionAsteroid : RULES.collisionEdge, events);
           if (!ship.alive) m.frozenAt = k - 1;
           changed = true;
         }
@@ -686,7 +686,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       defenderEvade: target.tokens.evade > 0,
     });
     if (useLock) ship.lockTargetId = undefined;
-    const damage = outcome.damage * DAMAGE_PER_HIT;
+    const damage = outcome.damage * RULES.damagePerHit;
     events.push({
       type: "laser",
       shooterId: ship.id,
@@ -717,7 +717,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   for (const mine of state.mines) mine.armed = true;
   for (const ship of state.ships) {
     if (!ship.alive) continue;
-    ship.shields = Math.min(ship.stats.shields, ship.shields + SHIELD_RECHARGE_PER_TURN);
+    ship.shields = Math.min(ship.stats.shields, ship.shields + RULES.shieldRecharge);
     ship.tokens.focus = 0;
     ship.tokens.evade = 0;
     if (ship.lockTargetId && !shipById(state, ship.lockTargetId)?.alive) ship.lockTargetId = undefined;

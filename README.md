@@ -67,7 +67,12 @@ Trup 100, štíty 50 (dobíjejí se 10 za kolo). Jeden čistý zásah laseru = 1
   na lodě nereaguje, vybuchne po odpočtu (na mapě ⏱). Zranění 30 všem v poli, kráter do asteroidu.
 - **Asteroidy** mají tvar (48 paprsků); výbuchy z nich vykusují krátery (poloměr 45), malý zbytek se rozpadne.
 
-Všechna čísla jsou v `packages/shared/src/constants.ts` a `ships.ts`.
+### Ladění parametrů ve hře
+Host má v lobby i během bitvy tlačítko **LADĚNÍ** (⌖): menu se všemi čísly – zranění (laser, torpédo
+přímé/plošné, mina, nárazy, nebezpečný manévr, kráter), loď (trup, štíty, dobíjení, kostky, munice, dohled),
+dosahy (laser, torpédo: zaměření, dolet, rychlost, zatáčení, životnost) a akce/stres. Změny se pošlou na
+server, platí pro všechny od příštího kola (u běžících lodí se přepočítají maxima) a jdou vrátit tlačítkem
+VÝCHOZÍ. Výchozí hodnoty a meze jsou v `packages/shared/src/tuning.ts`.
 
 ## Struktura projektu
 
@@ -88,6 +93,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.10 – ladicí menu parametrů hry (host, lobby i bitva, platí pro všechny).
 - v1.9.2 – mina se odhazuje na začátku kola s animací letu na zvolené místo; ikony zbraní u konce dráhy odstraněny (jen lišta).
 - v1.9 – mina se volí na mapě ve dvou krocích: kam odhodit (tři místa kolem lodi), pak čas výbuchu (✕ = zpět na místo).
 - v1.8 – pixel art UI „Retro konzole“ (přibalené fonty Press Start 2P + Pixelify Sans, pixelové ikony,

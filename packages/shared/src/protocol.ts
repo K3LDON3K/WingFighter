@@ -1,3 +1,4 @@
+import type { Tuning } from "./tuning.ts";
 import type { GameSettings, GameState, ShipOrders, TurnResult } from "./types.ts";
 
 /** Stav místnosti v lobby. */
@@ -15,6 +16,7 @@ export interface RoomState {
   name: string;
   hostId: string;
   settings: GameSettings;
+  tuning: Tuning;
   players: RoomPlayer[];
   inGame: boolean;
 }
@@ -38,6 +40,8 @@ export type ClientMessage =
   | { type: "addBot"; team: number }
   | { type: "removeBot"; botId: string }
   | { type: "setSettings"; settings: Partial<GameSettings> }
+  | { type: "setTuning"; tuning: Partial<Tuning> }
+  | { type: "resetTuning" }
   | { type: "startGame" }
   | { type: "submitOrders"; orders: ShipOrders[] }
   | { type: "unready" }
@@ -51,5 +55,6 @@ export type ServerMessage =
   | { type: "gameStart"; state: GameState }
   | { type: "gameState"; state: GameState; ready: string[] }
   | { type: "planningStatus"; ready: string[] }
+  | { type: "tuning"; tuning: Tuning }
   | { type: "turnResult"; result: TurnResult }
   | { type: "error"; message: string };

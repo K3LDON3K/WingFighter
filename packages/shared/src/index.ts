@@ -10,4 +10,5 @@ export * from "./setup.ts";
 export * from "./bot.ts";
 export * from "./asteroids.ts";
 export * from "./fog.ts";
+export * from "./tuning.ts";
 export * from "./protocol.ts";

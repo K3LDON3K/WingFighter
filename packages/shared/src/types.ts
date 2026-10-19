@@ -1,4 +1,5 @@
 import type { Pose } from "./geometry.ts";
+import type { Tuning } from "./tuning.ts";
 
 export type GameMode = "tdm" | "dm";
 
@@ -182,6 +183,8 @@ export interface GameResult {
 export interface GameState {
   turn: number;
   settings: GameSettings;
+  /** Ladicí parametry platné pro tuto bitvu. */
+  tuning: Tuning;
   width: number;
   height: number;
   asteroids: Asteroid[];

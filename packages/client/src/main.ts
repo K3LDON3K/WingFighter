@@ -1,5 +1,5 @@
 import {
-  ACTION_POINTS,
+  RULES,
   actionCost,
   ANGLE_STEP,
   defaultOrders,
@@ -21,6 +21,8 @@ import {
   TEAM_NAMES,
   TORPEDO,
   MINE,
+  applyTuning,
+  computeStats,
   type GameState,
   type Pose,
   type RoomState,
@@ -29,7 +31,7 @@ import {
   type TurnResult,
 } from "@spacegame/shared";
 import { clear, h } from "./dom.ts";
-import { icon } from "./icons.ts";
+import { icon, label } from "./icons.ts";
 import { actionById } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
@@ -37,6 +39,7 @@ import { DIFFICULTY_COLOR, renderBottomBar } from "./game/planning.ts";
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
+import { renderTuningPanel } from "./tuning-panel.ts";
 import { Net } from "./net.ts";
 
 /* ------------------------------------------------------------------ */
@@ -83,6 +86,18 @@ let error = "";
 let errorTimer: number | undefined;
 let game: GameSession | null = null;
 let screen: "lobby" | "game" = "lobby";
+let tuningOpen = false;
+
+/** Promítne parametry bitvy do pravidel a přepočítá maxima lodí (klientská kopie). */
+function adoptTuning(state: GameState) {
+  if (!state.tuning) return;
+  applyTuning(state.tuning);
+  for (const sh of state.ships) {
+    sh.stats = computeStats(sh.loadout);
+    sh.hull = Math.min(sh.hull, sh.stats.hull);
+    sh.shields = Math.min(sh.shields, sh.stats.shields);
+  }
+}
 
 const net = new Net(() => playerName || "Pilot");
 net.onStatus = (c) => {
@@ -125,9 +140,11 @@ net.on((msg) => {
       }
       break;
     case "gameStart":
+      adoptTuning(msg.state);
       startGame(msg.state);
       break;
     case "gameState":
+      adoptTuning(msg.state);
       if (!game) startGame(msg.state);
       else {
         game.state = msg.state;
@@ -147,6 +164,14 @@ net.on((msg) => {
       if (game) {
         game.queue.push(msg.result);
         pumpQueue();
+      }
+      break;
+    case "tuning":
+      if (game) {
+        game.state.tuning = msg.tuning;
+        adoptTuning(game.state);
+        game.view = game.anim ? game.view : viewFromState(game.state);
+        renderSide();
       }
       break;
     case "error":
@@ -231,7 +256,7 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
     man = makeManeuver(profile, speed, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, false, ship.speed);
   }
   if (!man) return false;
-  if (actionCost(ship, { ...o, maneuverId: man.id }) > ACTION_POINTS) return false;
+  if (actionCost(ship, { ...o, maneuverId: man.id }) > RULES.actionPoints) return false;
   if (man.id !== o.maneuverId) {
     game.orders.set(shipId, { ...o, maneuverId: man.id });
     renderSide();
@@ -251,6 +276,7 @@ function pumpQueue() {
     if (!game) return;
     game.log.push({ turn: result.turn, lines });
     game.state = result.state;
+    adoptTuning(game.state);
     game.view = game.anim!.finalView();
     game.anim = null;
     game.ready = [];
@@ -282,6 +308,7 @@ let barEl: HTMLElement | null = null;
 let hudEl: HTMLElement | null = null;
 let overlayEl: HTMLElement | null = null;
 let tooltipEl: HTMLElement | null = null;
+let tuneEl: HTMLElement | null = null;
 let mapEl: HTMLElement | null = null;
 let raf = 0;
 let resizeObs: ResizeObserver | null = null;
@@ -292,6 +319,7 @@ function mountGame() {
   hudEl = h("div", { class: "hud" });
   overlayEl = h("div");
   tooltipEl = h("div", { class: "tooltip", style: "display:none" });
+  tuneEl = h("div", { class: "tune-wrap", style: "display:none" });
   barEl = h("div", { class: "bottombar" });
   sideEl = h("div", { class: "maplog" });
   mapEl = h(
@@ -301,8 +329,10 @@ function mountGame() {
     hudEl,
     h("div", { class: "hint" }, "KLIK NA LOD = KRESLIT DRAHU · KLIK = POTVRDIT · KLIK NA NEPRITELE = CIL · TAZENI = POSUN · CMD/CTRL+KOLECKO = ZOOM"),
     sideEl,
+    h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => ((tuningOpen = !tuningOpen), renderSide()) }, icon("target", "currentColor", 12), label("ladění")),
     tooltipEl,
     overlayEl,
+    tuneEl,
   );
   app.append(h("div", { class: "game" }, h("div", { class: "mapcol" }, mapEl, barEl)));
 
@@ -343,7 +373,7 @@ function mountGame() {
 function unmountGame() {
   cancelAnimationFrame(raf);
   resizeObs?.disconnect();
-  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = null;
+  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = null;
   render();
 }
 
@@ -535,6 +565,19 @@ function renderTooltip() {
 function renderSide() {
   if (!sideEl || !barEl || !game) return;
   clear(sideEl);
+  if (tuneEl) {
+    tuneEl.style.display = tuningOpen ? "block" : "none";
+    if (tuningOpen) {
+      renderTuningPanel(
+        tuneEl,
+        game.state.tuning,
+        room?.hostId === playerId,
+        (patch) => net.send({ type: "setTuning", tuning: patch }),
+        () => net.send({ type: "resetTuning" }),
+        () => ((tuningOpen = false), renderSide()),
+      );
+    } else clear(tuneEl);
+  }
   renderBottomBar(
     barEl,
     {
@@ -787,7 +830,7 @@ function bindInput(c: HTMLCanvasElement) {
       const o = g.orders.get(hit.id)!;
       const curCost = actionCost(ship, o);
       const adjusting = actionCost(ship, o) > actionCost(ship, { ...o, maneuverId: defaultOrders(ship).maneuverId });
-      if (curCost >= ACTION_POINTS && !adjusting) showError("Úprava pohybu stojí akci a obě už máš použité. Odeber zbraň.");
+      if (curCost >= RULES.actionPoints && !adjusting) showError("Úprava pohybu stojí akci a obě už máš použité. Odeber zbraň.");
       else g.aimingShipId = hit.id;
       renderSide();
       return;

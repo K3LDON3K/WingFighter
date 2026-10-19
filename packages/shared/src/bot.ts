@@ -1,4 +1,4 @@
-import { ACTION_POINTS, LASER, TORPEDO } from "./constants.ts";
+import { LASER, RULES, TORPEDO } from "./constants.ts";
 import { actionCost } from "./resolve.ts";
 import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from "./geometry.ts";
 import { isRed, listManeuvers, maneuverEnd, maneuverPath, stressCost } from "./maneuvers.ts";
@@ -40,7 +40,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
     const willHaveTarget = enemies.some((e) => inArc(end, e, LASER.halfArc * 2) && dist(end, e) <= LASER.range);
 
     const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, fire: false, preferredTargetId: nearest?.id };
-    const left = () => ACTION_POINTS - actionCost(ship, orders);
+    const left = () => RULES.actionPoints - actionCost(ship, orders);
     const torpTarget = enemies.find((e) => dist(ship, e) <= TORPEDO.lockRange);
     if (left() > 0 && willHaveTarget) orders.fire = true;
     if (left() > 0 && ship.ammo.torpedoes > 0 && torpTarget && rng.next() < 0.5) {

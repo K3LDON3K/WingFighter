@@ -1,4 +1,4 @@
-import { ACTION_POINTS, actionCost, hullOf, makeManeuver, parseManeuverId, TORPEDO, type GameState, type Ship, type ShipOrders } from "@spacegame/shared";
+import { RULES, actionCost, hullOf, makeManeuver, parseManeuverId, TORPEDO, type GameState, type Ship, type ShipOrders } from "@spacegame/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -16,7 +16,7 @@ export interface ActionOption {
   pick?: "torpedo";
 }
 
-const noAp = (ship: Ship, o: ShipOrders, active: boolean) => (!active && actionCost(ship, o) >= ACTION_POINTS ? "žádná volná akce (max. 2 za kolo)" : null);
+const noAp = (ship: Ship, o: ShipOrders, active: boolean) => (!active && actionCost(ship, o) >= RULES.actionPoints ? `žádná volná akce (max. ${RULES.actionPoints} za kolo)` : null);
 
 export const ACTIONS: ActionOption[] = [
   {
@@ -60,7 +60,7 @@ export const ACTIONS: ActionOption[] = [
       const man = makeManeuver(profile, sp, 0, true, ship.speed);
       if (!man) return "loď otočku nezvládne";
       const cost = actionCost(ship, { ...o, maneuverId: man.id });
-      return cost > ACTION_POINTS ? `otočka by stála ${cost} akce` : null;
+      return cost > RULES.actionPoints ? `otočka by stála ${cost} akce` : null;
     },
     active: (o) => !!parseManeuverId(o.maneuverId)?.koiogran,
     apply: (o, ship) => {

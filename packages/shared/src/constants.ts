@@ -20,8 +20,18 @@ export const LASER = {
   band: 100,
 };
 
-/** Zranění za jeden čistý zásah laserem (zásahy − úhyby). */
-export const DAMAGE_PER_HIT = 15;
+/** Mutovatelná pravidla, která ladí `applyTuning` (viz tuning.ts). */
+export const RULES = {
+  /** Zranění za jeden čistý zásah laserem (zásahy − úhyby). */
+  damagePerHit: 15,
+  /** Zranění za náraz. */
+  collisionShip: 15,
+  collisionAsteroid: 15,
+  collisionEdge: 15,
+  shieldRecharge: 10,
+  /** Počet akcí na kolo. */
+  actionPoints: 2,
+};
 
 export const TORPEDO = {
   /** Zaměřovací dostřel na loď/torpédo při plánování (měří se z pozic na začátku kola). */
@@ -55,16 +65,8 @@ export const MINE = {
   damage: 30,
 };
 
-/** Kráter, který výbuch torpéda/miny vykousne z asteroidu. */
-export const CRATER_RADIUS = 45;
-
-export const SHIELD_RECHARGE_PER_TURN = 10;
-
-/** Zranění za náraz (do asteroidu, okraje mapy i jiné lodi). */
-export const COLLISION_DAMAGE = 15;
-
-/** Počet akcí na kolo (úprava pohybu, otočka, lasery, torpédo, mina – každá 1). */
-export const ACTION_POINTS = 2;
+/** Kráter, který výbuch torpéda/miny vykousne z asteroidu (mutovatelné kvůli ladění). */
+export const CRATER_RADIUS_REF = { value: 45 };
 
 /** Stresové body: zásoba, cena manévrů, dobití za zelený manévr, poškození za nebezpečný (% trupu). */
 export const STRESS = {

@@ -2,8 +2,9 @@ import { TORPEDO } from "./constants.ts";
 import type { Vec } from "./geometry.ts";
 import type { Asteroid, GameState, MovePath, TurnEvent, TurnResult } from "./types.ts";
 
-/** Základní dohled lodi (3 × zaměřovací dostřel torpéda). */
-export const VISION_RADIUS = TORPEDO.lockRange * 3;
+/** Základní dohled lodi (3 × zaměřovací dostřel torpéda); mutovatelné kvůli ladění. */
+export const VISION_REF = { value: TORPEDO.lockRange * 3 };
+export const VISION_RADIUS = VISION_REF.value;
 
 /** Paměť týmu: asteroidy tak, jak je tým naposledy viděl. */
 export type AsteroidMemory = Map<string, Asteroid>;
@@ -17,7 +18,7 @@ export function teamEyes(state: GameState, team: number, paths?: MovePath[]): Ey
   const eyes: Eye[] = [];
   for (const s of state.ships) {
     if (s.team !== team) continue;
-    const r = s.stats.vision ?? VISION_RADIUS;
+    const r = s.stats.vision ?? VISION_REF.value;
     if (s.alive) eyes.push({ x: s.x, y: s.y, r });
     const path = paths?.find((p) => p.id === s.id);
     if (path) for (let i = 0; i < path.points.length; i += 4) eyes.push({ x: path.points[i].x, y: path.points[i].y, r });

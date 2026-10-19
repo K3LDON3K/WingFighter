@@ -1,4 +1,4 @@
-import { CRATER_RADIUS } from "./constants.ts";
+import { CRATER_RADIUS_REF } from "./constants.ts";
 import type { Vec } from "./geometry.ts";
 import type { Asteroid } from "./types.ts";
 
@@ -65,7 +65,7 @@ export function circleHitsAsteroid(a: Asteroid, p: Vec, r: number): boolean {
  * Výbuch v bodě `c` o poloměru `cr` vykousne z asteroidu kráter: každý paprsek,
  * který kráter protne, se zkrátí na jeho bližší průsečík. Vrací true, když se tvar změnil.
  */
-export function carveCrater(a: Asteroid, c: Vec, cr = CRATER_RADIUS): boolean {
+export function carveCrater(a: Asteroid, c: Vec, cr = CRATER_RADIUS_REF.value): boolean {
   const n = a.profile.length;
   const cx = c.x - a.x;
   const cy = c.y - a.y;
