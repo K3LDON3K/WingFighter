@@ -62,9 +62,9 @@ Trup 100, štíty 50 (dobíjejí se 10 za kolo). Jeden čistý zásah laseru = 1
   Přímý zásah lodi = 45. Výbuch (na bodě, o asteroid, na konci doletu) = poloměr 70, zranění 30 všem lodím
   v poli a **kráter do asteroidu**. Sestřelení: torpédo jde ručně označit jako cíl laserů (2 obranné kostky)
   nebo jako cíl jiného torpéda; dvě torpéda, která se potkají, vybuchnou.
-- **Mina** (2 ks, místo akce) – zůstane na místě, kde loď kolo začala. Aktivní od příštího kola,
-  spustí ji kdokoliv (i vlastní loď) nebo torpédo při vstupu do pole (poloměr 70), zranění 30 všem v poli,
-  kráter do asteroidu.
+- **Mina** (2 ks, 1 akce) – zůstane na místě, kde loď kolo začala. Buď **na vstup**: od příštího kola ji
+  spustí kdokoliv (i vlastní loď) nebo torpédo při vstupu do pole (poloměr 70), nebo **časovaná 1–3 kola**:
+  na lodě nereaguje, vybuchne po odpočtu (na mapě ⏱). Zranění 30 všem v poli, kráter do asteroidu.
 - **Asteroidy** mají tvar (48 paprsků); výbuchy z nich vykusují krátery (poloměr 45), malý zbytek se rozpadne.
 
 Všechna čísla jsou v `packages/shared/src/constants.ts` a `ships.ts`.
@@ -88,6 +88,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.5 – výseč laserů jen při zapnuté akci lasery; miny na vstup nebo časované 1–3 kola.
 - v1.4 – systém 2 akcí na kolo (úprava pohybu, otočka, lasery, torpédo, mina); lasery jen jako akce.
 - v1.3 – míření jen po označení lodi, zbraně ∅/torpédo/mina (akce po pohybu vypnuté), torpédo startuje
   s pohybem, fog of war s pamětí asteroidů, lasery nestřílí skrz asteroidy.

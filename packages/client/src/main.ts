@@ -393,7 +393,7 @@ function buildOverlay(view: ViewModel): Overlay {
     const man = resolveManeuver(profile, o.maneuverId, ship.speed);
     if (!man) continue;
     const aiming = g.aimingShipId === ship.id && !g.submitted;
-    overlay.previews.push({ ship: vs, maneuver: man, aiming });
+    overlay.previews.push({ ship: vs, maneuver: man, aiming, fire: !!o.fire });
     const end = maneuverEnd(ship, man);
 
     if (aiming) {

@@ -33,7 +33,7 @@ export type ActionOrder =
 
 export type SpecialOrder =
   | { type: "torpedo"; targetId?: string; point?: { x: number; y: number } }
-  | { type: "mine" };
+  | { type: "mine"; timer?: number };
 
 /** Rozkaz pro jednu loď na jedno kolo. */
 export interface ShipOrders {
@@ -135,6 +135,8 @@ export interface Mine {
   y: number;
   radius: number;
   armed: boolean;
+  /** Časovaná mina: za kolik kol vybuchne (nereaguje na vstup do pole). undefined = reaguje na vstup. */
+  timer?: number;
 }
 
 export interface Asteroid {

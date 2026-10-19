@@ -31,7 +31,7 @@ export interface Overlay {
   selectedShipId?: string;
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
-  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean }[];
+  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean }[];
   /** Dohled vlastního týmu (fog of war). */
   vision?: { x: number; y: number; r: number }[];
   /** Dosažitelné pozice při zvolené rychlosti (body obarvené náročností). */
@@ -88,7 +88,7 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
-    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming);
+    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire);
 
     for (const t of view.torpedoes) {
       drawSprite(ctx, this.sprites.torpedo(TEAM_COLORS[t.team]), t.x, t.y, t.heading);
@@ -199,7 +199,7 @@ export class Renderer {
     drawSprite(this.ctx, this.sprites.asteroid(a), a.x, a.y, 0);
   }
 
-  private drawMine(m: { x: number; y: number; radius: number; team: number; armed: boolean }, now: number) {
+  private drawMine(m: { x: number; y: number; radius: number; team: number; armed: boolean; timer?: number }, now: number) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[m.team];
     ctx.save();
@@ -218,6 +218,14 @@ export class Renderer {
     if (m.armed && Math.floor(now / 400) % 2 === 0) {
       ctx.fillStyle = "#ef4444";
       ctx.fillRect(m.x - 2, m.y - 2, 4, 4);
+    }
+    if (m.timer !== undefined) {
+      ctx.save();
+      ctx.font = "bold 12px ui-monospace, Menlo, monospace";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#fbbf24";
+      ctx.fillText(`⏱${m.timer}`, m.x, m.y - 14);
+      ctx.restore();
     }
   }
 
@@ -364,7 +372,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean) {
+  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[ship.team];
     const pts = samplePath(maneuverPath(ship, man), 24);
@@ -378,7 +386,7 @@ export class Renderer {
     for (const p of pts) ctx.lineTo(p.x, p.y);
     ctx.stroke();
     ctx.restore();
-    this.drawArc(end, color);
+    if (fire) this.drawArc(end, color);
     ctx.save();
     ctx.strokeStyle = shade(color, 1.3);
     ctx.lineWidth = 1;

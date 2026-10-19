@@ -42,7 +42,7 @@ export const ACTIONS: ActionOption[] = [
     id: "mine",
     glyph: "✹",
     label: "Mina (1 akce)",
-    description: "Položí minu na místo, kde loď kolo začínala. Od příštího kola ji odpálí kdokoliv (i ty) nebo torpédo při vstupu do pole; zraní všechny v poli a vykousne kráter do asteroidu.",
+    description: "Položí minu na místo, kde loď kolo začínala. Buď reaguje na vstup lodi/torpéda do pole (od příštího kola), nebo je časovaná na 1–3 kola. Zraní všechny v poli a vykousne kráter do asteroidu.",
     disabled: (ship, _s, o) => (ship.ammo.mines > 0 ? noAp(ship, o, o.special?.type === "mine") : "došly miny"),
     active: (o) => o.special?.type === "mine",
     apply: (o) => ({ special: o.special?.type === "mine" ? undefined : { type: "mine" } }),

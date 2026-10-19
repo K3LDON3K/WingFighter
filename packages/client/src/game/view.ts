@@ -31,6 +31,7 @@ export interface ViewMine {
   y: number;
   radius: number;
   armed: boolean;
+  timer?: number;
 }
 
 export type Effect =
@@ -74,7 +75,7 @@ export function torpedoToView(t: Torpedo): ViewTorpedo {
 }
 
 export function mineToView(m: Mine): ViewMine {
-  return { id: m.id, team: m.team, x: m.x, y: m.y, radius: m.radius, armed: m.armed };
+  return { id: m.id, team: m.team, x: m.x, y: m.y, radius: m.radius, armed: m.armed, timer: m.timer };
 }
 
 export function viewFromState(state: GameState): ViewModel {

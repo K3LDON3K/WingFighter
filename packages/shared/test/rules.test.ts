@@ -430,6 +430,21 @@ describe("vyhodnocení kola", () => {
     expect(blast && blast.type === "mineBlast" && blast.hits.some((h) => h.shipId === "ship-p1-0" && h.damage === MINE.damage)).toBe(true);
   });
 
+  it("časovaná mina nereaguje na vstup a vybuchne po odpočtu", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, Math.PI);
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: false, special: { type: "mine", timer: 2 } }], createRng(1));
+    expect(r.state.mines[0].timer).toBe(2);
+    // p1 se otočí a vletí do pole – časovaná mina nereaguje
+    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "k3", fire: false }], createRng(1)); // kolo 2: odpočet 2→1
+    expect(r.state.mines).toHaveLength(1);
+    expect(r.state.mines[0].timer).toBe(1);
+    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m3a0", fire: false }], createRng(1)); // kolo 3: 1→0 → výbuch
+    expect(r.state.mines).toHaveLength(0);
+    expect(r.events.some((e) => e.type === "mineBlast")).toBe(true);
+  });
+
   it("bitva mezi boty skončí", () => {
     const bots: PlayerInfo[] = [
       { id: "b1", name: "Bot 1", team: 0, isBot: true },

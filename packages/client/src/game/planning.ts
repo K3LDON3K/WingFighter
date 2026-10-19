@@ -154,7 +154,17 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
     if (a.id === "torpedo" && o.special?.type === "torpedo") {
       text += o.special.targetId ? ` → ${targetName(o.special.targetId)}` : o.special.point ? ` → bod [${Math.round(o.special.point.x)}, ${Math.round(o.special.point.y)}]` : " – vyber cíl";
     }
-    weaponLines.push(h("div", {}, h("b", { style: "font-size:13px" }, text), h("div", { class: "muted", style: "font-size:12px" }, a.description)));
+    const extra: HTMLElement[] = [];
+    if (a.id === "mine" && o.special?.type === "mine") {
+      const timer = o.special.timer;
+      const opt = (label: string, value: number | undefined) =>
+        h("button", { class: timer === value ? "active" : "", disabled: locked, onclick: () => cb.setOrders(ship.id, { special: { type: "mine", timer: value } }) }, label);
+      extra.push(
+        h("div", { class: "row", style: "margin-top:4px;flex-wrap:wrap" }, h("span", { class: "muted", style: "font-size:12px" }, "výbuch:"), opt("při vstupu", undefined), opt("za 1 kolo", 1), opt("za 2 kola", 2), opt("za 3 kola", 3)),
+        h("div", { class: "muted", style: "font-size:11px" }, timer ? "Časovaná mina nereaguje na lodě – vybuchne po odpočtu (odpočet začíná kolem po položení)." : "Vybuchne, až do pole vstoupí loď nebo torpédo (od příštího kola)."),
+      );
+    }
+    weaponLines.push(h("div", {}, h("b", { style: "font-size:13px" }, text), h("div", { class: "muted", style: "font-size:12px" }, a.description), ...extra));
   }
   panel.append(
     h(
