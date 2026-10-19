@@ -6,6 +6,9 @@ import {
   maxSpeedFor,
   moduleCost,
   validateLoadout,
+  applyScan,
+  newModule,
+  stateForTeam,
   actionCost,
   classifyManeuver,
   carveCrater,
@@ -691,5 +694,49 @@ describe("natočení modulů", () => {
     place(g, "ship-p2-0", 1500, 1200, 0);
     r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: false, special: { type: "torpedo", point: { x: 100, y: 500 } } }], createRng(1));
     expect(r.state.torpedoes[0].x).toBeLessThan(500);
+  });
+});
+
+describe("skener", () => {
+  it("sken lodi bere náboj, hluboký sken odkryje mapu do konce kola a spustí cooldown, po cooldownu plné náboje; vynucený cooldown je kratší o náboje", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g.asteroids = [];
+    const me = g.ships[0];
+    me.loadout.modules = [newModule("scanner", "left", "sc")];
+    place(g, "ship-p1-0", 300, 500, 0);
+    place(g, "ship-p2-0", 2000, 1200, Math.PI); // daleko mimo dohled
+    expect(stateForTeam(g, 0, new Map()).ships.some((s) => s.id === "ship-p2-0")).toBe(false);
+    // sken lodi mimo dosah selže, v dosahu projde a stojí náboj
+    expect(applyScan(g, me, "sc", "ship", "ship-p2-0").error).toMatch(/dosah/);
+    place(g, "ship-p2-0", 700, 500, Math.PI);
+    expect(applyScan(g, me, "sc", "ship", "ship-p2-0").target?.id).toBe("ship-p2-0");
+    expect(me.loadout.modules[0].charges).toBe(1);
+    // s jedním nábojem hluboký sken nejde; vynucený cooldown = 3 − 1 = 2
+    expect(applyScan(g, me, "sc", "deep").error).toMatch(/2 náboje/);
+    expect(applyScan(g, me, "sc", "cooldown").error).toBeUndefined();
+    expect(me.loadout.modules[0].cooldown).toBe(2);
+    expect(me.loadout.modules[0].charges).toBe(0);
+    // po dvou kolech je zásoba plná
+    let r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m2a0", fire: false }], createRng(1));
+    expect(r.state.ships[0].loadout.modules[0].cooldown).toBe(1);
+    r = resolveTurn(r.state, [{ shipId: me.id, maneuverId: "m2a0", fire: false }], createRng(1));
+    expect(r.state.ships[0].loadout.modules[0]).toMatchObject({ cooldown: 0, charges: 2 });
+    // hluboký sken: tým vidí vzdálenou loď jen do konce kola
+    const g2 = r.state;
+    place(g2, "ship-p2-0", 2000, 1200, Math.PI);
+    expect(applyScan(g2, g2.ships[0], "sc", "deep").error).toBeUndefined();
+    expect(g2.revealTeams).toEqual([0]);
+    expect(stateForTeam(g2, 0, new Map()).ships.some((s) => s.id === "ship-p2-0")).toBe(true);
+    expect(stateForTeam(g2, 1, new Map()).ships.some((s) => s.id === "ship-p1-0")).toBe(false);
+    r = resolveTurn(g2, [{ shipId: me.id, maneuverId: "m2a0", fire: false }], createRng(1));
+    expect(r.state.revealTeams).toEqual([]);
+    expect(stateForTeam(r.state, 0, new Map()).ships.some((s) => s.id === "ship-p2-0")).toBe(false);
+    expect(r.state.ships[0].loadout.modules[0].cooldown).toBe(2);
+    // zelený manévr mimo cooldown dobije +1
+    const g3 = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g3.asteroids = [];
+    g3.ships[0].loadout.modules = [{ ...newModule("scanner", "left", "sc"), charges: 0 }];
+    const r3 = resolveTurn(g3, [{ shipId: g3.ships[0].id, maneuverId: "m2a0", fire: false }], createRng(1)); // rovně 2 = zelený
+    expect(r3.state.ships[0].loadout.modules[0].charges).toBe(1);
   });
 });

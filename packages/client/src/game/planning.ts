@@ -3,6 +3,8 @@ import {
   actionList,
   laserOdds,
   FACING_NAMES,
+  SCANNER,
+  scannerModule,
   loadoutWeight,
   mineModule,
   mineSideOf,
@@ -35,6 +37,10 @@ export interface PlanningCallbacks {
   unready(): void;
   /** Otevře inventář s výběrem modulu k vyhození. */
   jettisonPick(shipId: string): void;
+  /** Skener: vysunout/zasunout tlačítka, zapnout výběr cíle, provést hned. */
+  scanToggle(shipId: string): void;
+  scanPickTarget(shipId: string, on: boolean): void;
+  scan(shipId: string, mode: "deep" | "cooldown"): void;
   /** Úprava štítu: změna bodů segmentu o ±1, potvrzení rozložení. */
   shieldDelta(shipId: string, segment: number, delta: number): void;
   shieldConfirm(shipId: string): void;
@@ -55,6 +61,9 @@ export interface PlanningModel {
   minePick?: "side" | "timer" | null;
   /** Otevřený režim úpravy štítu (–/+ u segmentů). */
   shieldEdit?: boolean;
+  /** Skener: vysunutá tlačítka, čeká se na klik na loď. */
+  scanOpen?: boolean;
+  scanPick?: boolean;
   inventoryOpen?: boolean;
 }
 
@@ -207,7 +216,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   const buttons = h("div", { class: "bb-weapons" });
   for (const grp of ACTION_GROUPS) {
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
-    if (avail.length === 0) continue; // skupina bez dostupných akcí (např. žádné zbraně) se neukazuje
+    if (avail.length === 0 && !(grp.label === "Speciální" && scannerModule(ship.loadout))) continue; // skupina bez dostupných akcí se neukazuje
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
@@ -227,6 +236,42 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         ),
       );
     }
+    if (grp.label === "Speciální") {
+      const sc = scannerModule(ship.loadout);
+      if (sc) {
+        const charges = sc.charges ?? 0;
+        const cd = sc.cooldown ?? 0;
+        const pips = h("span", { class: "scan-pips" });
+        const slots = Math.max(SCANNER.charges, SCANNER.cooldown);
+        for (let i = 0; i < slots; i++) pips.append(h("i", { class: cd > 0 ? (i < cd ? "red" : "") : i < charges ? "on" : "" }));
+        row.append(
+          h(
+            "button",
+            {
+              class: `px bb-weapon scan-btn ${m.scanOpen ? "on" : ""} ${cd > 0 ? "cool" : ""}`,
+              disabled: locked,
+              title: `${MODULES.scanner.name}\n${MODULES.scanner.description}\n${cd > 0 ? `Cooldown: ${cd} kol (pak plné náboje).` : `Náboje: ${charges}/${SCANNER.charges}.`}`,
+              onclick: () => cb.scanToggle(ship.id),
+            },
+            icon("scan", "currentColor", 22),
+            h("span", { class: "lbl" }, label("Skener")),
+            pips,
+          ),
+        );
+        if (m.scanOpen && cd === 0) {
+          const forceLen = Math.max(1, SCANNER.cooldown - charges);
+          row.append(
+            h(
+              "div",
+              { class: "scan-slide" },
+              h("button", { class: `px sm ${m.scanPick ? "on" : ""}`, disabled: locked || charges < 1, title: `Sken lodi (1 náboj): klikni na cizí loď v dohledu do ${SCANNER.range}. Proběhne hned, nebere akci.`, onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 9), label("sken lodi"), h("span", { class: "c" }, "·1")),
+              h("button", { class: "px sm", disabled: locked || charges < 2, title: `Hluboký sken (2 náboje): hned odkryje mapu do ${SCANNER.deepRange} celému týmu do konce kola, pak cooldown ${SCANNER.cooldown} kola.`, onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 9), label("sken vesmíru"), h("span", { class: "c" }, "·2")),
+              h("button", { class: "px sm force", disabled: locked || charges >= SCANNER.charges, title: charges >= SCANNER.charges ? "Jde jen bez plné zásoby nábojů" : `Vynutit cooldown: ${SCANNER.cooldown} − ${charges} = ${forceLen} kola, pak plné náboje`, onclick: () => cb.scan(ship.id, "cooldown") }, icon("turn", "currentColor", 9), label("vynutit cooldown"), h("span", { class: "c" }, `${forceLen} K`)),
+            ),
+          );
+        }
+      }
+    }
     box.append(row);
     buttons.append(box);
   }
@@ -242,7 +287,14 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       ...mods.map((m, i) => seg(`${i + 1}${FACING_GLYPH[m.facing ?? "front"]}${m.ammo !== undefined ? `·${m.ammo}` : ""}`, m.id === currentId, `${MODULES[type].name} ${i + 1} – ${FACING_NAMES[m.facing ?? "front"]}${m.ammo !== undefined ? ` (munice ${m.ammo})` : ""}`, () => onPick(m.id))),
     );
   };
-  if (o.special?.type === "torpedo") {
+  if (m.scanOpen && scannerModule(ship.loadout)) {
+    const sc = scannerModule(ship.loadout)!;
+    const cd = sc.cooldown ?? 0;
+    details.append(icon("scan", "#7dd3fc"));
+    if (cd > 0) details.append(h("span", { class: "muted" }, label(`cooldown ${cd} kol · pak plné náboje`)));
+    else if (m.scanPick) details.append(h("span", { class: "warn" }, label(`klikni na cizí loď v dohledu (dosah ${SCANNER.range}) – sken proběhne hned`)), h("span", { class: "muted" }, label(`· ${sc.charges ?? 0} nábojů · nebere akci`)));
+    else details.append(h("span", { class: "muted" }, label(`${sc.charges ?? 0} nábojů · nebere akci · +1 za zelený manévr`)));
+  } else if (o.special?.type === "torpedo") {
     const sp = o.special;
     const tname = sp.targetId ? (m.state.ships.find((x) => x.id === sp.targetId)?.name ?? "torpédo") : null;
     const picker = modulePicker("torpedo", sp.moduleId, (id) => cb.setOrders(ship.id, { special: { ...sp, moduleId: id } }));

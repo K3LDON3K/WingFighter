@@ -1,6 +1,6 @@
 import { VISION_REF } from "./fog.ts";
 import { FIGHTER_PROFILE } from "./maneuvers.ts";
-import { LASER } from "./constants.ts";
+import { LASER, SCANNER } from "./constants.ts";
 import type { Facing, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
 
 /**
@@ -36,6 +36,7 @@ export const MODULES: Record<ModuleType, ModuleDef> = {
   torpedo: { id: "torpedo", name: "Torpédomet", short: "TORP", icon: "torpedo", size: "small", weight: 1, price: 150, ammo: 3, ammoWeight: 1, description: "Fázové torpédo, 3 kusy na modul. Každé vystřelené torpédo loď odlehčí." },
   mine: { id: "mine", name: "Minový zásobník", short: "MINA", icon: "mine", size: "small", weight: 1, price: 100, ammo: 2, ammoWeight: 0.5, description: "Miny, 2 kusy na modul. Odhazují se za loď nebo do stran." },
   "shield-segment": { id: "shield-segment", name: "Segmentový štít", short: "SEG", icon: "segments", size: "small", weight: 2, price: 120, shieldType: "segment", description: "Čtyři segmenty po 2 bodech; každý zásah ubere 1 bod a je pohlcen celý. Akce Úprava štítu body přesouvá. Nelze kombinovat s celolodním." },
+  scanner: { id: "scanner", name: "Skener", short: "SKEN", icon: "scan", size: "small", weight: 1, price: 130, description: "2 náboje (dobíjí zelený manévr). Sken lodi (1 náboj): hned ukáže výbavu, natočení modulů, munici a pilota cizí lodi v dohledu. Hluboký sken (2 náboje): hned odkryje mapu celému týmu do konce kola, pak cooldown 3 kola. Nebere akci." },
   "shield-whole": { id: "shield-whole", name: "Celolodní štít", short: "CEL", icon: "shield", size: "small", weight: 2, price: 120, shieldType: "whole", shields: 50, description: "Zásoba 50 kolem celé lodi, pohltí účinnost % zranění; účinnost po každém zásahu klesá o 10 %. Nelze kombinovat se segmentovým." },
 };
 export const MODULE_TYPES = Object.keys(MODULES) as ModuleType[];
@@ -97,7 +98,12 @@ export function mineSideOf(f: Facing | undefined): MineSide {
 
 export function newModule(type: ModuleType, slot: SlotId, id?: string): ModuleInstance {
   const def = MODULES[type];
-  return { id: id ?? `${type}-${Math.random().toString(36).slice(2, 8)}`, type, slot, ammo: def.ammo, facing: defaultFacing(type, slot) };
+  return { id: id ?? `${type}-${Math.random().toString(36).slice(2, 8)}`, type, slot, ammo: def.ammo, facing: defaultFacing(type, slot), ...(type === "scanner" ? { charges: SCANNER.charges, cooldown: 0 } : {}) };
+}
+
+/** Skenerový modul lodi (první). */
+export function scannerModule(loadout: ShipLoadout): ModuleInstance | undefined {
+  return loadout.modules.find((m) => m.type === "scanner");
 }
 
 /** Velký modul zabírá příď + záď (zapisuje se do slotu "front"). */
@@ -195,7 +201,15 @@ export function validateLoadout(loadout: ShipLoadout, limits?: { allowed?: Parti
 
 /** Obnoví munici modulů na plnou (nová bitva). */
 export function refillLoadout(loadout: ShipLoadout): ShipLoadout {
-  return { ...loadout, modules: loadout.modules.map((m) => ({ ...m, ammo: MODULES[m.type]?.ammo, facing: hasFacing(m.type) ? (m.facing ?? defaultFacing(m.type, m.slot)) : undefined })) };
+  return {
+    ...loadout,
+    modules: loadout.modules.map((m) => ({
+      ...m,
+      ammo: MODULES[m.type]?.ammo,
+      facing: hasFacing(m.type) ? (m.facing ?? defaultFacing(m.type, m.slot)) : undefined,
+      ...(m.type === "scanner" ? { charges: SCANNER.charges, cooldown: 0 } : { charges: undefined, cooldown: undefined }),
+    })),
+  };
 }
 
 export function computeStats(loadout: ShipLoadout): ShipStats {

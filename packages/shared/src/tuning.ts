@@ -2,7 +2,7 @@
  * Ladicí parametry hry (balanc). Host je může měnit v lobby i během bitvy;
  * server je aplikuje před každým vyhodnocením, klient před vykreslením.
  */
-import { CRATER_RADIUS_REF, LASER, MINE, RULES, STRESS, TORPEDO } from "./constants.ts";
+import { CRATER_RADIUS_REF, LASER, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
 import { HULLS, LASER_DICE, MODULES, WEIGHT } from "./ships.ts";
 
@@ -73,6 +73,13 @@ export interface Tuning {
   weightPerMine: number;
   weightShield: number;
   weightPerSpeed: number;
+  // skener
+  scannerCharges: number;
+  scannerRange: number;
+  scannerDeepRange: number;
+  scannerCooldown: number;
+  priceScanner: number;
+  weightScanner: number;
   // ekonomika
   startBudget: number;
   creditsPerKill: number;
@@ -140,6 +147,12 @@ export const DEFAULT_TUNING: Tuning = {
   weightPerMine: 0.5,
   weightShield: 2,
   weightPerSpeed: 6,
+  scannerCharges: 2,
+  scannerRange: 600,
+  scannerDeepRange: 2000,
+  scannerCooldown: 3,
+  priceScanner: 130,
+  weightScanner: 1,
   startBudget: 500,
   creditsPerKill: 200,
   creditsPerTurn: 10,
@@ -223,6 +236,13 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "priceShieldSegment", label: "Segmentový – cena", group: "Štíty", min: 0, max: 2000, step: 10 },
   { key: "priceShieldWhole", label: "Celolodní – cena", group: "Štíty", min: 0, max: 2000, step: 10 },
   { key: "weightShield", label: "Štít – váha modulu", group: "Štíty", min: 0, max: 20, step: 0.5 },
+  // --- skener ---
+  { key: "scannerCharges", label: "Náboje (max)", group: "Skener", min: 1, max: 6, step: 1, hint: "start plné; +1 za zelený manévr; po cooldownu plné" },
+  { key: "scannerRange", label: "Sken lodi – dosah", group: "Skener", min: 50, max: 4000, step: 50, hint: "cíl musí být navíc v dohledu" },
+  { key: "scannerDeepRange", label: "Hluboký sken – dosah", group: "Skener", min: 100, max: 6000, step: 100, hint: "odkryje mapu týmu do konce kola" },
+  { key: "scannerCooldown", label: "Cooldown po hlubokém skenu (kola)", group: "Skener", min: 1, max: 10, step: 1, hint: "vynucený cooldown = tato hodnota − zbývající náboje" },
+  { key: "priceScanner", label: "Modul – cena", group: "Skener", min: 0, max: 2000, step: 10 },
+  { key: "weightScanner", label: "Modul – váha", group: "Skener", min: 0, max: 20, step: 0.5 },
   // --- ekonomika ---
   { key: "startBudget", label: "Rozpočet na výbavu", group: "Ekonomika", min: 0, max: 5000, step: 50, hint: "co hráč neutratí, má jako kredity ve hře" },
   { key: "creditsPerKill", label: "Odměna za sestřel", group: "Ekonomika", min: 0, max: 5000, step: 10 },
@@ -310,6 +330,12 @@ export function applyTuning(t: Tuning): void {
   MODULES["shield-segment"].weight = t.weightShield;
   MODULES["shield-whole"].weight = t.weightShield;
   WEIGHT.perSpeed = t.weightPerSpeed;
+  SCANNER.charges = t.scannerCharges;
+  SCANNER.range = t.scannerRange;
+  SCANNER.deepRange = t.scannerDeepRange;
+  SCANNER.cooldown = t.scannerCooldown;
+  MODULES.scanner.price = t.priceScanner;
+  MODULES.scanner.weight = t.weightScanner;
   RULES.creditsPerKill = t.creditsPerKill;
   RULES.creditsPerTurn = t.creditsPerTurn;
   RULES.debrisRewardPct = t.debrisRewardPct;

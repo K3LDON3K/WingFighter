@@ -1300,3 +1300,102 @@ button.px.tiny {
 .lo-remove:hover rect {
   fill: #3b0e0e;
 }
+
+/* ---- skener ---- */
+.scan-btn {
+  position: relative;
+}
+.scan-btn.cool {
+  background: #16203a;
+  color: #8b9bb4;
+}
+.scan-pips {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  display: inline-flex;
+  gap: 2px;
+}
+.scan-pips i {
+  width: 7px;
+  height: 7px;
+  background: #1e293b;
+  border: 1px solid #0a0e1c;
+}
+.scan-pips i.on {
+  background: #fbbf24;
+}
+.scan-pips i.red {
+  background: #ef4444;
+  border-color: #7f1d1d;
+}
+.scan-slide {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+  margin-left: 2px;
+  position: relative;
+  animation: slideout 0.22s steps(4, end) both;
+  transform-origin: left center;
+  overflow: hidden;
+}
+@keyframes slideout {
+  from {
+    width: 0;
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    width: 160px;
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.scan-slide .sm {
+  font-size: 6px;
+  height: 16px;
+  width: 160px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  white-space: nowrap;
+  border-width: 2px;
+}
+.scan-slide .sm .c {
+  margin-left: auto;
+  color: #fbbf24;
+}
+.scan-slide .sm.on .c {
+  color: #7f1d1d;
+}
+.scan-slide .sm.force {
+  border-color: #f87171 #7f1d1d #7f1d1d #f87171;
+  color: #fca5a5;
+}
+.scan-slide .sm.force .c {
+  color: #f87171;
+}
+.scan-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 7, 15, 0.55);
+}
+.scan-card {
+  width: 360px;
+  padding: 12px;
+  background: rgba(18, 26, 48, 0.98);
+}
+.scan-slide .sm:disabled {
+  opacity: 1;
+  color: #64748b;
+  background: #141c33;
+  border-color: #334155 #0a0e1c #0a0e1c #334155;
+}
+.scan-slide .sm:disabled .c {
+  color: #64748b;
+}

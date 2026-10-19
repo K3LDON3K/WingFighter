@@ -28,6 +28,11 @@ import {
   type GameState,
   type Pose,
   type RoomState,
+  FACING_NAMES,
+  HULLS,
+  PILOTS,
+  scannerModule,
+  type Ship,
   laserArcOf,
   laserOdds,
   laserTarget,
@@ -80,6 +85,9 @@ interface GameSession {
   jettisonPick: boolean;
   /** Herní menu (Esc). */
   menuOpen: boolean;
+  /** Skener: vysunutá tlačítka / výběr cíle skenu lodi. */
+  scanOpen: boolean;
+  scanPick: boolean;
   hoverId?: string;
   hoverIcon?: string;
   mouse: { x: number; y: number; sx: number; sy: number } | null;
@@ -175,9 +183,14 @@ net.on((msg) => {
       adoptTuning(msg.state);
       if (!game) startGame(msg.state);
       else {
+        const sameTurn = game.state.turn === msg.state.turn && !game.anim && game.queue.length === 0;
         game.state = msg.state;
         game.view = viewFromState(msg.state);
-        resetOrders();
+        if (sameTurn) {
+          // mezikolová aktualizace (skener): rozkazy zůstávají
+          for (const [id, o] of game.orders) if (!msg.state.ships.some((x) => x.id === id && x.alive)) game.orders.delete(id);
+          for (const sh of msg.state.ships) if (sh.alive && sh.ownerId === playerId && !game.orders.has(sh.id)) game.orders.set(sh.id, defaultOrders(sh));
+        } else resetOrders();
       }
       game!.ready = msg.ready;
       game!.submitted = msg.ready.includes(playerId);
@@ -187,6 +200,9 @@ net.on((msg) => {
         game.ready = msg.ready;
         game.submitted = msg.ready.includes(playerId);
       }
+      break;
+    case "scanResult":
+      if (game) showScanResult(msg.ship);
       break;
     case "turnResult":
       if (game) {
@@ -234,6 +250,8 @@ function startGame(state: GameState) {
     inventoryOpen: false,
     jettisonPick: false,
     menuOpen: false,
+    scanOpen: false,
+    scanPick: false,
     mouse: null,
     icons: [],
   };
@@ -581,6 +599,30 @@ function buildOverlay(view: ViewModel): Overlay {
   return overlay;
 }
 
+/** Okno s výsledkem skenu lodi: loď, pilot, moduly s natočením a municí. Platí jen teď (zavřením zmizí). */
+function showScanResult(ship: Ship) {
+  if (!mapEl || !game) return;
+  mapEl.querySelector(".scan-wrap")?.remove();
+  const lo = ship.loadout;
+  const lines = lo.modules.map((m) => `${MODULES[m.type].name}${m.facing ? ` (${FACING_NAMES[m.facing]})` : ""}${m.ammo !== undefined ? ` · ${m.ammo} ks` : ""}${m.type === "scanner" ? ` · ${m.charges ?? 0} nábojů` : ""}`);
+  const entry = game.log.find((l) => l.turn === game!.state.turn) ?? (game.log.push({ turn: game.state.turn, lines: [] }), game.log[game.log.length - 1]);
+  entry.lines.push(`Sken ${ship.name}: ${HULLS[lo.hullId]?.name ?? lo.hullId}, pilot ${PILOTS[lo.pilotId]?.name ?? lo.pilotId}; ${lines.length ? lines.join(", ") : "bez modulů"}.`);
+  const wrap = h(
+    "div",
+    { class: "scan-wrap" },
+    h(
+      "div",
+      { class: "pnl scan-card" },
+      h("div", { class: "bb-head" }, icon("scan", "#7dd3fc", 14), h("span", { class: "ttl" }, label(`Sken: ${ship.name}`)), h("button", { class: "px tiny", style: "margin-left:auto", onclick: () => wrap.remove() }, "✕")),
+      h("div", { class: "txt muted" }, `${HULLS[lo.hullId]?.name ?? lo.hullId} · pilot ${PILOTS[lo.pilotId]?.name ?? lo.pilotId} · trup ${ship.hull}/${ship.stats.hull}${ship.shieldType === "whole" ? ` · štít ${ship.shields}` : ship.shieldType === "segment" ? ` · segmenty ${ship.segments.join("/")}` : ""}`),
+      renderLoadout({ loadout: lo, readonly: true, hideHead: true, budget: game.state.tuning.startBudget, allowed: game.state.settings.allowedModules, compact: true }),
+      h("div", { class: "txt muted", style: "margin-top:6px" }, "Platí jen teď – po zavření je nutné skenovat znovu."),
+    ),
+  );
+  mapEl.append(wrap);
+  renderSide();
+}
+
 function toggleMenu(open?: boolean) {
   if (!game) return;
   game.menuOpen = open ?? !game.menuOpen;
@@ -725,6 +767,8 @@ function renderSide() {
       minePick: game.minePick,
       shieldEdit: game.shieldEdit,
       inventoryOpen: game.inventoryOpen,
+      scanOpen: game.scanOpen,
+      scanPick: game.scanPick,
     },
     {
       select: (id) => {
@@ -779,6 +823,26 @@ function renderSide() {
         renderSide();
       },
       centerOn: (id) => centerOnShip(id),
+      scanToggle: (id) => {
+        game!.selectedShipId = id;
+        game!.scanOpen = !game!.scanOpen;
+        game!.scanPick = false;
+        renderSide();
+      },
+      scanPickTarget: (id, on) => {
+        game!.selectedShipId = id;
+        game!.scanPick = on;
+        game!.picking = null;
+        renderSide();
+      },
+      scan: (id, mode) => {
+        const sh = game!.state.ships.find((x) => x.id === id);
+        const mod = sh && scannerModule(sh.loadout);
+        if (!mod) return;
+        net.send({ type: "scan", shipId: id, moduleId: mod.id, mode });
+        game!.scanPick = false;
+        renderSide();
+      },
       jettisonPick: (id) => {
         game!.selectedShipId = id;
         game!.inventoryOpen = true;
@@ -1082,6 +1146,14 @@ function bindInput(c: HTMLCanvasElement) {
     const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
     const o = sel && g.orders.get(sel.id);
     if (!sel || !o) return;
+    // 3b) sken lodi: klik na cizí loď → hned
+    if (g.scanPick && hit && hit.kind === "ship" && hit.team !== sel.team) {
+      const mod = scannerModule(sel.loadout);
+      if (mod) net.send({ type: "scan", shipId: sel.id, moduleId: mod.id, mode: "ship", targetId: hit.id });
+      g.scanPick = false;
+      renderSide();
+      return;
+    }
     // 4) výběr cíle pro označenou loď (trosky = jen cíl laserů)
     if (hit && hit.kind === "debris") {
       g.orders.set(sel.id, { ...o, preferredTargetId: o.preferredTargetId === hit.id ? undefined : hit.id });
@@ -1152,7 +1224,7 @@ function bindInput(c: HTMLCanvasElement) {
     const id = game.selectedShipId;
     const o = id && game.orders.get(id);
     const cur = o ? parseManeuverId(o.maneuverId) : null;
-    if (e.key === "Escape" && (game.submitted || !id || !cur || (!game.shieldEdit && !game.minePick && !game.picking && !game.aimingShipId && !game.jettisonPick && !game.inventoryOpen && !tuningOpen))) {
+    if (e.key === "Escape" && (game.submitted || !id || !cur || (!game.shieldEdit && !game.minePick && !game.picking && !game.aimingShipId && !game.jettisonPick && !game.inventoryOpen && !tuningOpen && !game.scanPick))) {
       toggleMenu(true);
       e.preventDefault();
       return;
@@ -1160,7 +1232,8 @@ function bindInput(c: HTMLCanvasElement) {
     if (game.submitted) return;
     if (!id || !cur) return;
     if (e.key === "Escape") {
-      if (tuningOpen) tuningOpen = false;
+      if (game.scanPick) game.scanPick = false;
+      else if (tuningOpen) tuningOpen = false;
       else if (game.jettisonPick || game.inventoryOpen) {
         game.jettisonPick = false;
         game.inventoryOpen = false;

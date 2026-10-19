@@ -22,6 +22,8 @@ import {
   type ServerMessage,
   type ShipLoadout,
   type ShipOrders,
+  type TurnEvent,
+  applyScan,
   type ModuleType,
   DEFAULT_LOADOUT,
   MODULE_TYPES,
@@ -59,6 +61,8 @@ interface RunningGame {
   rng: ReturnType<typeof createRng>;
   /** Fog of war: paměť asteroidů každého týmu. */
   memory: Map<number, AsteroidMemory>;
+  /** Události provedené hned při plánování (skener) – přidají se do výsledku příštího kola. */
+  pendingEvents: TurnEvent[];
 }
 
 function memoryFor(g: RunningGame, team: number): AsteroidMemory {
@@ -344,6 +348,31 @@ export class Hub {
         this.maybeResolve(room);
         return;
       }
+      case "scan": {
+        if (!room?.game) return;
+        const g = room.game;
+        if (g.state.status === "finished") return;
+        const ship = g.state.ships.find((x) => x.id === msg.shipId && x.ownerId === client.id && x.alive);
+        if (!ship) return this.error(client, "Skener: to není tvoje loď.");
+        const team = teamOf(g, client.id);
+        if (msg.mode === "ship") {
+          const visible = stateForTeam(g.state, team, memoryFor(g, team)).ships.some((x) => x.id === msg.targetId && x.alive);
+          if (!visible) return this.error(client, "Skener: cíl není v dohledu.");
+        }
+        const res = applyScan(g.state, ship, String(msg.moduleId), msg.mode, msg.targetId);
+        if (res.error) return this.error(client, `Skener: ${res.error}.`);
+        g.pendingEvents.push({ type: "scan", shipId: ship.id, mode: msg.mode, targetId: res.target?.id });
+        if (res.target) this.send(client, { type: "scanResult", shooterId: ship.id, ship: structuredClone(res.target) });
+        // nový stav všem (náboje, odkrytá mapa pro tým)
+        for (const m of room.members.values()) {
+          if (m.isBot) continue;
+          const c = this.clients.get(m.id);
+          if (!c) continue;
+          const t = teamOf(g, m.id);
+          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room) });
+        }
+        return;
+      }
       case "unready": {
         if (!room?.game) return;
         const m = room.members.get(client.id);
@@ -387,7 +416,7 @@ export class Hub {
     const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadout) }));
     const state = createGame({ players, settings: room.settings, tuning: room.tuning });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
-    room.game = { state, orders: new Map(), rng, memory: new Map() };
+    room.game = { state, orders: new Map(), rng, memory: new Map(), pendingEvents: [] };
     const g = room.game;
     for (const m of room.members.values()) m.ready = m.isBot;
     this.broadcastRoom(room);
@@ -458,6 +487,10 @@ export class Hub {
     const orders = [...g.orders.values()].flat();
     const prev = g.state;
     const result = resolveTurn(g.state, orders, g.rng);
+    if (g.pendingEvents.length) {
+      result.events.unshift(...g.pendingEvents);
+      g.pendingEvents = [];
+    }
     g.state = result.state;
     g.orders.clear();
     for (const m of room.members.values()) m.ready = m.isBot;

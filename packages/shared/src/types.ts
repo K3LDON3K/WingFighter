@@ -60,7 +60,7 @@ export interface ShipOrders {
 
 /** Sloty stíhače. */
 export type SlotId = "front" | "back" | "left" | "right";
-export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole";
+export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner";
 
 /** Trup lodi – nese moduly ve slotech. */
 export interface HullDef {
@@ -112,6 +112,9 @@ export interface ModuleInstance {
   ammo?: number;
   /** Natočení zbraně (lasery: výseč, miny: strana odhozu, torpéda: směr výletu). Štíty směr nemají. */
   facing?: Facing;
+  /** Skener: náboje a zbývající kola cooldownu (po něm plné náboje). */
+  charges?: number;
+  cooldown?: number;
 }
 
 /** Sestavená loď = trup + pilot + moduly → výsledné statistiky. */
@@ -261,6 +264,8 @@ export interface GameState {
   mines: Mine[];
   debris: Debris[];
   players: PlayerInfo[];
+  /** Týmy, které mají do konce kola odkrytou mapu (hluboký sken). */
+  revealTeams?: number[];
   status: "planning" | "finished";
   result?: GameResult;
 }
@@ -279,6 +284,8 @@ export type TurnEvent =
   | { type: "debrisShot"; debrisId: string; shooterId: string; x: number; y: number; destroyed: boolean; reward: number }
   | { type: "jettison"; shipId: string; debris: Debris }
   | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" }
+  /** Skener (vyhodnocuje se hned při plánování, ale zapisuje se do logu kola). */
+  | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }
   | { type: "action"; shipId: string; action: ActionOrder; ok: boolean; path?: Pose[] }
   | {
       type: "laser";

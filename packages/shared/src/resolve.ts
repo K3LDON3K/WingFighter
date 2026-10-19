@@ -8,6 +8,7 @@ import {
   MOVE_STEPS,
   MOVE_UNIT,
   RULES,
+  SCANNER,
   STRESS,
   TORPEDO,
   TORPEDO_AGILITY,
@@ -890,6 +891,17 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     ship.stressPoints = clamp(ship.stressPoints - cost, 0, STRESS.max);
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
     if (man.difficulty === "danger") applyDamage(ship, Math.max(1, Math.round((ship.stats.hull * STRESS.dangerHullPercent) / 100)), events);
+    // skener: cooldown odpočítává; po jeho konci plné náboje; jinak zelený manévr dobije +1
+    for (const mod of ship.loadout.modules) {
+      if (mod.type !== "scanner") continue;
+      if ((mod.cooldown ?? 0) > 0) {
+        mod.cooldown = (mod.cooldown ?? 0) - 1;
+        if (mod.cooldown <= 0) {
+          mod.cooldown = 0;
+          mod.charges = SCANNER.charges;
+        }
+      } else if (man.difficulty === "green") mod.charges = Math.min(SCANNER.charges, (mod.charges ?? 0) + 1);
+    }
   }
 
   /* ---------- 2. Akce ---------- */
@@ -963,6 +975,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (ship.lockTargetId && !shipById(state, ship.lockTargetId)?.alive) ship.lockTargetId = undefined;
   }
   for (const p of state.players) if (state.ships.some((s) => s.alive && s.ownerId === p.id)) awardCredits(state, events, p.id, RULES.creditsPerTurn, "survive");
+  state.revealTeams = []; // hluboký sken platí jen do konce kola
   creditCtx = null;
   state.turn = turn + 1;
 
@@ -1045,4 +1058,36 @@ export function laserOdds(ship: Ship, target: Ship): { hitChance: number; expect
     defenderEvade: target.tokens.evade > 0,
   });
   return { hitChance: odds.hitChance, expectedDamage: odds.expectedHits * RULES.damagePerHit, rangeBand };
+}
+
+/**
+ * Skener – okamžitá akce při plánování (nebere akci). Vrací chybu, nebo provede:
+ * ship = 1 náboj, cíl musí být nepřátelská loď v dosahu (viditelnost ověřuje server);
+ * deep = všechny náboje (min. 2), odkryje mapu týmu do konce kola a spustí cooldown;
+ * cooldown = vynucený cooldown (jen bez plné zásoby): délka = cooldown − zbývající náboje, náboje 0.
+ */
+export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: "ship" | "deep" | "cooldown", targetId?: string): { error?: string; target?: Ship } {
+  const mod = ship.loadout.modules.find((m) => m.id === moduleId && m.type === "scanner");
+  if (!mod) return { error: "loď nemá skener" };
+  if ((mod.cooldown ?? 0) > 0) return { error: `skener je v cooldownu (${mod.cooldown} kol)` };
+  const charges = mod.charges ?? 0;
+  if (mode === "ship") {
+    if (charges < 1) return { error: "skener nemá náboj" };
+    const target = state.ships.find((s) => s.id === targetId && s.alive && s.team !== ship.team);
+    if (!target) return { error: "cíl skenu není cizí živá loď" };
+    if (dist(ship, target) > SCANNER.range) return { error: `cíl je mimo dosah skeneru (${SCANNER.range})` };
+    mod.charges = charges - 1;
+    return { target };
+  }
+  if (mode === "deep") {
+    if (charges < 2) return { error: "hluboký sken potřebuje 2 náboje" };
+    mod.charges = 0;
+    mod.cooldown = SCANNER.cooldown;
+    state.revealTeams = [...new Set([...(state.revealTeams ?? []), ship.team])];
+    return {};
+  }
+  if (charges >= SCANNER.charges) return { error: "cooldown jde vynutit jen bez plné zásoby nábojů" };
+  mod.cooldown = Math.max(1, SCANNER.cooldown - charges);
+  mod.charges = 0;
+  return {};
 }

@@ -1,4 +1,4 @@
-import { TORPEDO } from "./constants.ts";
+import { SCANNER, TORPEDO } from "./constants.ts";
 import type { Vec } from "./geometry.ts";
 import type { Asteroid, GameState, MovePath, TurnEvent, TurnResult } from "./types.ts";
 
@@ -39,6 +39,8 @@ export function seenBy(eyes: Eye[], p: Vec, radius = 0): boolean {
 /** Stav tak, jak ho vidí daný tým. Aktualizuje paměť asteroidů. */
 export function stateForTeam(state: GameState, team: number, memory: AsteroidMemory): GameState {
   const eyes = teamEyes(state, team);
+  // hluboký sken: tým vidí všechno v dosahu skeneru kolem svých lodí
+  if (state.revealTeams?.includes(team)) for (const s of state.ships) if (s.team === team && s.alive) eyes.push({ x: s.x, y: s.y, r: SCANNER.deepRange });
   for (const a of state.asteroids) if (seenBy(eyes, a, a.radius)) memory.set(a.id, structuredClone(a));
   const live = new Set(state.asteroids.map((a) => a.id));
   // asteroid, který tým vidí jako zničený, z paměti zmizí (ostatní zničené v ní zůstávají)
@@ -61,6 +63,7 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
   const move = result.events.find((e) => e.type === "move");
   const paths = move?.type === "move" ? move.paths : [];
   const eyes = [...teamEyes(prev, team), ...teamEyes(result.state, team, paths)];
+  if (prev.revealTeams?.includes(team)) for (const s of prev.ships) if (s.team === team && s.alive) eyes.push({ x: s.x, y: s.y, r: SCANNER.deepRange });
 
   const shipTeam = (id: string) => prev.ships.find((s) => s.id === id)?.team ?? result.state.ships.find((s) => s.id === id)?.team;
   const torpTeam = (id: string) => prev.torpedoes.find((t) => t.id === id)?.team ?? result.state.torpedoes.find((t) => t.id === id)?.team ?? result.events.find((e) => e.type === "spawnTorpedo" && e.torpedo.id === id && e.torpedo.team === team) ? team : undefined;
@@ -129,6 +132,9 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
         break;
       case "debrisShot":
         if (visibleShip.has(e.shooterId) || seenBy(eyes, e, 20)) events.push(e);
+        break;
+      case "scan":
+        if (visibleShip.has(e.shipId)) events.push(e);
         break;
       case "credits":
         // kredity jsou veřejné (tabulka), ale důvod sestřelu vidí všichni stejně

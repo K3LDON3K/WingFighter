@@ -1,5 +1,5 @@
 import type { Tuning } from "./tuning.ts";
-import type { GameSettings, GameState, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
+import type { GameSettings, GameState, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
 
 /** Stav místnosti v lobby. */
 export interface RoomPlayer {
@@ -51,6 +51,8 @@ export type ClientMessage =
   | { type: "loadTuning" }
   | { type: "startGame" }
   | { type: "submitOrders"; orders: ShipOrders[] }
+  /** Skener – vyhodnotí se hned: sken lodi (1 náboj), hluboký sken (2 náboje), vynucený cooldown. */
+  | { type: "scan"; shipId: string; moduleId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }
   | { type: "unready" }
   | { type: "backToLobby" };
 
@@ -65,4 +67,6 @@ export type ServerMessage =
   | { type: "tuning"; tuning: Tuning }
   | { type: "notice"; message: string }
   | { type: "turnResult"; result: TurnResult }
+  /** Výsledek skenu lodi: plná loď včetně výbavy (jen pro skenujícího). */
+  | { type: "scanResult"; shooterId: string; ship: Ship }
   | { type: "error"; message: string };

@@ -91,6 +91,14 @@ export const MINE = {
   damage: 30,
 };
 
+/** Skener (mutovatelné kvůli ladění): náboje, dosah skenu lodi, dosah hlubokého skenu, cooldown v kolech. */
+export const SCANNER = {
+  charges: 2,
+  range: 600,
+  deepRange: 2000,
+  cooldown: 3,
+};
+
 /** Kráter, který výbuch torpéda/miny vykousne z asteroidu (mutovatelné kvůli ladění). */
 export const CRATER_RADIUS_REF = { value: 45 };
 

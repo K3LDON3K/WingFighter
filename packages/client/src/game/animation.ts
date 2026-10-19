@@ -77,6 +77,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "evadePass":
         lines.push(`  ${name(e.shipId)} proletěl skrz ${name(e.victimId)}.`);
         break;
+      case "scan":
+        lines.push(e.mode === "ship" ? `${name(e.shipId)} skenoval ${e.targetId ? name(e.targetId) : "loď"}.` : e.mode === "deep" ? `${name(e.shipId)} provedl hluboký sken – mapa odkryta do konce kola.` : `${name(e.shipId)} vynutil cooldown skeneru.`);
+        break;
       case "jettison":
         lines.push(`${name(e.shipId)} vyhodil modul ${MODULES[e.debris.type]?.name ?? e.debris.type} (sestřelení = +${e.debris.value} kreditů).`);
         break;
@@ -176,6 +179,9 @@ export class TurnAnimation {
           break;
         case "credits":
           time = e.reason === "survive" ? moveStart + MOVE_DURATION + 300 : lastTime + 80;
+          break;
+        case "scan":
+          time = 0;
           break;
         case "action":
           time = movePassed ? actionTime : 0;

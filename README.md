@@ -63,7 +63,10 @@ munice loď odlehčí. Loď smí letět i bez modulů. Více modulů stejného t
 ze kterého modulu střílíš (jeden za akci). **Natočení:** lasery, torpédomet a miny míří na jednu ze 4 stran
 (kamkoli kromě „do středu“ svého slotu; miny ne dopředu) – lasery pak střílí jen v té výseči (dopředu ±20°, do
 boku ±15°, dozadu ±10°), miny se odhazují na tu stranu a torpédo tím směrem vylétá. Natáčí se jen v místnosti
-(klik na šipku modulu). Pilot: zatím jen **Kadet** (bez schopností).
+(klik na šipku modulu). **Skener** (130 cr, váha 1): 2 náboje; sken lodi (1 náboj, do 600, cíl v dohledu) hned
+ukáže výbavu cizí lodi; hluboký sken (2 náboje) hned odkryje mapu do 2000 celému týmu do konce kola a spustí cooldown
+3 kola (po něm plné náboje); zelený manévr dobíjí +1; cooldown jde vynutit (délka = 3 − náboje). Nebere akci.
+Pilot: zatím jen **Kadet** (bez schopností).
 
 **Nákup:** v místnosti má každý rozpočet (ladění → Ekonomika, výchozí 500) a kupuje moduly; host může omezit
 počet kusů každého modulu na hráče a zvolit výbavu botů (výchozí / náhodná / ruční naklikání). Co hráč neutratí,
@@ -130,6 +133,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.3 – modul **Skener** (malý, 130 cr, váha 1, bez natočení, nebere akci): 2 náboje, +1 za zelený manévr. Sken lodi
+  (1 náboj, cíl v dohledu do 600) hned ukáže výbavu, natočení, munici a pilota cizí lodi (okno + řádek v logu).
+  Hluboký sken (2 náboje, dosah 2000) hned odkryje mapu týmu do konce kola, pak cooldown 3 kola; po cooldownu
+  plné náboje. Vynucený cooldown (jen bez plné zásoby) = cooldown − náboje. Tlačítko SKENER s náboji (žlutá) /
+  cooldownem (červená), po kliknutí vyjedou tlačítka SKEN LODI · SKEN VESMÍRU · VYNUTIT COOLDOWN. Ladění → Skener.
 - v2.2.2 – editor výbavy: šipka natočení sedí na hraně modulu ve směru, kam míří; modul se odebírá křížkem
   v pravém dolním rohu (klik na modul už nic nedělá).
 - v2.2.1 – herní menu na Esc (nebo tlačítko MENU nad mapou): Pokračovat, Ukončit bitvu – do místnosti (host, pro
