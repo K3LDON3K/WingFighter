@@ -920,7 +920,7 @@ button.px.tiny {
 /* ---- výbava (lobby + inventář) ---- */
 .loadout {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 340px 1fr;
   gap: 10px 16px;
   align-items: start;
   margin-top: 8px;
@@ -1084,4 +1084,17 @@ button.px.tiny {
 }
 .inventory {
   width: 320px;
+}
+.lo-svg {
+  display: block;
+  image-rendering: pixelated;
+}
+.lo-g.mod:not(.ro) {
+  cursor: pointer;
+}
+.lo-g.mod:not(.ro):hover rect {
+  stroke: #f87171;
+}
+.lo-g text {
+  pointer-events: none;
 }

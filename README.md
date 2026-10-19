@@ -54,7 +54,8 @@ posílá jen to, co jeho tým vidí (lodě, torpéda, miny). Asteroid, který t�
 paměti v podobě, v jaké ho naposledy viděl – poškození mimo dohled se neprojeví, dokud ho zase neuvidí.
 
 ### Výbava lodi (inventář)
-Loď **Stíhač** má 4 sloty: levobok a pravobok (malé), příď a záď (každý 1 velký nebo 2 malé moduly). Moduly:
+Loď **Stíhač** má 4 malé sloty: příď, záď, levobok, pravobok. Příď a záď jsou pod sebou a lze je spojit v jeden
+**velký** slot pro budoucí velké moduly. Moduly:
 **Lasery** (100 cr, váha 2), **Torpédomet** (150, váha 1 + 1 za torpédo, 3 ks), **Minový zásobník** (100, váha 1 +
 0,5 za minu, 2 ks), **Segmentový štít** (120, váha 2), **Celolodní štít** (120, váha 2). Součet váhy snižuje
 max. rychlost: každých 6 váhy = −1 (výchozí sestava má váhu 10 → rychlost max. 4, prázdná loď 5). Vystřelená
@@ -126,6 +127,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.0.1 – sloty podle schváleného nákresu: 4 malé (příď, záď, levobok, pravobok), příď + záď pod sebou jde spojit
+  v 1 velký (žlutý rám); velká pixelová loď se sloty uvnitř siluety v editoru i inventáři.
 - v2.0 – **Inventář, piloti a ekonomika**: loď Stíhač má 4 sloty (boky malé, příď a záď na 1 velký / 2 malé);
   moduly Lasery, Torpédomet (3 ks), Minový zásobník (2 ks), Segmentový štít, Celolodní štít – každý má cenu a váhu,
   váha snižuje max. rychlost (vystřelená munice odlehčí). Výbava se kupuje v místnosti z rozpočtu (ladění →

@@ -606,8 +606,8 @@ describe("inventář a ekonomika", () => {
   it("validace sestavy: kapacita slotů, míchání štítů, limity a rozpočet", () => {
     expect(validateLoadout(DEFAULT_LOADOUT)).toBeNull();
     const full = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules, { id: "x", type: "laser" as const, slot: "front" as const }] };
-    expect(validateLoadout(full)).toMatch(/plný/);
-    const mixed = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules, { id: "x", type: "shield-whole" as const, slot: "left" as const }] };
+    expect(validateLoadout(full)).toMatch(/obsazený/);
+    const mixed = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules.filter((m) => m.type !== "mine"), { id: "x", type: "shield-whole" as const, slot: "back" as const }] };
     expect(validateLoadout(mixed)).toMatch(/kombinovat/);
     expect(validateLoadout(DEFAULT_LOADOUT, { allowed: { torpedo: 0 } })).toMatch(/zakázán/);
     expect(moduleCost(DEFAULT_LOADOUT)).toBe(470);

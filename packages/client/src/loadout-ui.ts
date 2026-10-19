@@ -1,13 +1,15 @@
 import {
+  freeSlots,
   HULLS,
+  LARGE_SLOTS,
   loadoutWeight,
   maxSpeedFor,
   MODULE_TYPES,
   MODULES,
   moduleCost,
   newModule,
+  occupiedSlots,
   PILOTS,
-  slotCapacity,
   validateLoadout,
   type ModuleType,
   type ShipLoadout,
@@ -28,7 +30,23 @@ export interface LoadoutEditorOptions {
   compact?: boolean;
 }
 
-const SLOT_ORDER: SlotId[] = ["front", "left", "right", "back"];
+const NS = "http://www.w3.org/2000/svg";
+const FIGHTER = ["..GG............", "..GPG...........", "..GPPG..........", "EEDPPPG.........", "..GPPPPGGG......", "...GPPPPPPGGGG..", "EEDDPWWPPPPPPPGG", "EEDDPWWPPPPPPPGG", "...GPPPPPPGGGG..", "..GPPPPGGG......", "EEDPPPG.........", "..GPPG..........", "..GPG...........", "..GG............"];
+/** Rozměry nákresu (varianta A): loď 16 px / pixel šablony, sloty uvnitř siluety. */
+const DIAG = { w: 340, h: 290, s: 16, x0: 58, y0: 16 };
+const SLOT_BOX: Record<SlotId, { x: number; y: number; w: number; h: number }> = {
+  front: { x: 138, y: 92, w: 64, h: 74 },
+  back: { x: 138, y: 166, w: 64, h: 74 },
+  left: { x: 72, y: 136, w: 60, h: 48 },
+  right: { x: 208, y: 136, w: 60, h: 48 },
+};
+
+function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>, text?: string): SVGElementTagNameMap[K] {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
 
 /** Editor / náhled výbavy: loď, pilot, sloty s moduly, nákup modulů, souhrn (cena, váha, rychlost). */
 export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
@@ -42,46 +60,61 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
 
   const change = (lo: ShipLoadout) => opts.onChange?.(lo);
   const remove = (id: string) => change({ ...loadout, modules: loadout.modules.filter((m) => m.id !== id) });
-  const firstFreeSlot = (): SlotId | null => {
-    for (const s of SLOT_ORDER) {
-      const used = loadout.modules.filter((m) => m.slot === s).length;
-      if (used < slotCapacity(hull, s)) return s;
-    }
-    return null;
-  };
+  const firstFreeSlot = (): SlotId | null => freeSlots(loadout)[0] ?? null;
   const add = (type: ModuleType) => {
-    const slot = firstFreeSlot();
+    const def = MODULES[type];
+    const slot = def.size === "large" ? (LARGE_SLOTS.every((sl) => freeSlots(loadout).includes(sl)) ? LARGE_SLOTS[0] : null) : firstFreeSlot();
     if (!slot) return;
     change({ ...loadout, modules: [...loadout.modules, newModule(type, slot)] });
   };
 
-  /* --- sloty kolem lodi --- */
-  const cell = (slot: SlotId, index: number) => {
-    const mods = loadout.modules.filter((m) => m.slot === slot);
-    const m = mods[index];
-    if (!m) return h("div", { class: "lo-cell empty", title: `${hull.slots.find((s) => s.id === slot)?.name}: volný malý slot` }, "·");
-    const def = MODULES[m.type];
-    const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
-    return h(
-      "button",
-      { class: `lo-cell mod ${ro ? "ro" : ""}`, disabled: ro, title: `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${ro ? "" : "\nKlik = odebrat (vrátí cenu)"}`, onclick: () => !ro && remove(m.id) },
-      icon(def.icon, "currentColor", 12),
-      h("span", { class: "lo-short" }, def.short),
-      ammo !== undefined ? h("span", { class: "lo-ammo" }, String(ammo)) : null,
-    );
+  /* --- nákres lodi se sloty (varianta A) --- */
+  const scale = opts.compact ? 0.72 : 1;
+  const svg = svgEl("svg", { viewBox: `0 0 ${DIAG.w} ${DIAG.h}`, width: Math.round(DIAG.w * scale), height: Math.round(DIAG.h * scale), "shape-rendering": "crispEdges", class: "lo-svg" });
+  const g = svgEl("g", { transform: `translate(${DIAG.x0}, ${DIAG.y0 + 16 * DIAG.s}) rotate(-90) scale(${DIAG.s})` });
+  const pal: Record<string, string> = { P: "#3b82f6", G: "#9aa3ad", D: "#4b5563", W: "#dbeafe", E: "#fb923c" };
+  FIGHTER.forEach((row, y) => [...row].forEach((c, x) => pal[c] && g.append(svgEl("rect", { x, y, width: 1, height: 1, fill: pal[c] }))));
+  svg.append(g);
+  const free = freeSlots(loadout);
+  const drawn = new Set<string>();
+  const slotBox = (slot: SlotId, box: { x: number; y: number; w: number; h: number }, m?: (typeof loadout.modules)[number]) => {
+    const def = m ? MODULES[m.type] : undefined;
+    const large = def?.size === "large";
+    const stroke = large ? "#fbbf24" : "#7dd3fc";
+    const grp = svgEl("g", { class: `lo-g ${m ? "mod" : "empty"} ${ro ? "ro" : ""}` });
+    grp.append(svgEl("rect", { x: box.x, y: box.y, width: box.w, height: box.h, fill: m ? "#1e2a4a" : "rgba(5,7,15,0.55)", stroke, "stroke-width": 3, ...(m ? {} : { "stroke-dasharray": "6 4" }) }));
+    if (m && def) {
+      const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
+      grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "PS2P", "font-size": 10, fill: "#e2e8f0", "text-anchor": "middle" }, label(def.short)));
+      if (ammo !== undefined) grp.append(svgEl("text", { x: box.x + box.w - 6, y: box.y + 11, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "end" }, String(ammo)));
+      const title = svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${ro ? "" : "\nKlik = odebrat (vrátí cenu)"}`);
+      grp.append(title);
+      if (!ro) grp.addEventListener("click", () => remove(m.id));
+    } else {
+      const name = hull.slots.find((x) => x.id === slot)?.name ?? slot;
+      grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 3, "font-family": "PS2P", "font-size": 6, fill: stroke, "text-anchor": "middle" }, label(name)));
+      grp.append(svgEl("title", {}, `${name}: volný malý slot`));
+    }
+    svg.append(grp);
   };
-  const slotBox = (slot: SlotId) => {
-    const s = hull.slots.find((x) => x.id === slot)!;
-    const cap = slotCapacity(hull, slot);
-    return h("div", { class: `lo-slot lo-${slot}` }, h("span", { class: "lo-slotname" }, label(s.name)), h("div", { class: "lo-cells" }, ...Array.from({ length: cap }, (_, i) => cell(slot, i))));
-  };
-  const diagram = h(
-    "div",
-    { class: "lo-diagram" },
-    slotBox("front"),
-    h("div", { class: "lo-mid" }, slotBox("left"), h("div", { class: "lo-ship" }, icon("ship", "#60a5fa", 28)), slotBox("right")),
-    slotBox("back"),
-  );
+  // žlutý rám "1 velký" kolem přídě + zádi, když jsou obě volné
+  if (LARGE_SLOTS.every((sl) => free.includes(sl))) {
+    const f = SLOT_BOX.front;
+    const b = SLOT_BOX.back;
+    svg.append(svgEl("rect", { x: f.x - 6, y: f.y - 6, width: f.w + 12, height: b.y + b.h - f.y + 12, fill: "none", stroke: "#fbbf24", "stroke-width": 2, "stroke-dasharray": "3 5" }));
+    svg.append(svgEl("text", { x: f.x + f.w / 2, y: f.y - 12, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "middle" }, "1 VELKY"));
+  }
+  for (const m of loadout.modules) {
+    const occ = occupiedSlots(m);
+    if (MODULES[m.type].size === "large") {
+      const f = SLOT_BOX.front;
+      const b = SLOT_BOX.back;
+      slotBox("front", { x: f.x, y: f.y, w: f.w, h: b.y + b.h - f.y }, m);
+    } else slotBox(m.slot, SLOT_BOX[m.slot], m);
+    occ.forEach((sl) => drawn.add(sl));
+  }
+  for (const sl of hull.slots) if (!drawn.has(sl.id)) slotBox(sl.id, SLOT_BOX[sl.id]);
+  const diagram = h("div", { class: "lo-diagram" }, svg);
 
   /* --- nákup --- */
   const shop = h("div", { class: "lo-shop" });

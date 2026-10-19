@@ -12,14 +12,14 @@ export const HULLS: Record<string, HullDef> = {
   fighter: {
     id: "fighter",
     name: "Stíhač",
-    description: "Malá rychlá loď. Čtyři sloty: boky malé, příď a záď na jeden velký nebo dva malé moduly.",
+    description: "Malá rychlá loď. Čtyři malé sloty: příď, záď, levobok, pravobok. Příď + záď jde spojit v jeden velký slot.",
     radius: 16,
     hull: 100,
     slots: [
-      { id: "front", name: "příď", size: "flex" },
-      { id: "right", name: "pravobok", size: "small" },
-      { id: "back", name: "záď", size: "flex" },
+      { id: "front", name: "příď", size: "small" },
+      { id: "back", name: "záď", size: "small" },
       { id: "left", name: "levobok", size: "small" },
+      { id: "right", name: "pravobok", size: "small" },
     ],
     profile: FIGHTER_PROFILE,
   },
@@ -44,10 +44,10 @@ export const DEFAULT_LOADOUT: ShipLoadout = {
   hullId: "fighter",
   pilotId: "kadet",
   modules: [
-    { id: "m1", type: "laser", slot: "front" },
+    { id: "m1", type: "laser", slot: "left" },
     { id: "m2", type: "torpedo", slot: "front", ammo: 3 },
     { id: "m3", type: "mine", slot: "back", ammo: 2 },
-    { id: "m4", type: "shield-segment", slot: "back" },
+    { id: "m4", type: "shield-segment", slot: "right" },
   ],
 };
 
@@ -62,10 +62,24 @@ export function newModule(type: ModuleType, slot: SlotId, id?: string): ModuleIn
   return { id: id ?? `${type}-${Math.random().toString(36).slice(2, 8)}`, type, slot, ammo: def.ammo };
 }
 
-/** Kolik malých modulů slot pojme. */
+/** Velký modul zabírá příď + záď (zapisuje se do slotu "front"). */
+export const LARGE_SLOTS: [SlotId, SlotId] = ["front", "back"];
+
+/** Kolik malých modulů slot pojme (každý slot 1). */
 export function slotCapacity(hull: HullDef, slot: SlotId): number {
-  const s = hull.slots.find((x) => x.id === slot);
-  return !s ? 0 : s.size === "flex" ? 2 : 1;
+  return hull.slots.some((x) => x.id === slot) ? 1 : 0;
+}
+
+/** Které sloty modul obsazuje. */
+export function occupiedSlots(m: ModuleInstance): SlotId[] {
+  return MODULES[m.type]?.size === "large" ? [...LARGE_SLOTS] : [m.slot];
+}
+
+/** Volné sloty sestavy (v pořadí příď, záď, levobok, pravobok). */
+export function freeSlots(loadout: ShipLoadout): SlotId[] {
+  const hull = hullOf(loadout);
+  const used = new Set(loadout.modules.flatMap(occupiedSlots));
+  return hull.slots.map((s) => s.id).filter((id) => !used.has(id));
 }
 
 /** Celková váha sestavy (včetně zbývající munice). */
@@ -119,9 +133,11 @@ export function validateLoadout(loadout: ShipLoadout, limits?: { allowed?: Parti
     if (ids.has(m.id)) return "duplicitní modul";
     ids.add(m.id);
     if (!hull.slots.some((s) => s.id === m.slot)) return `neznámý slot ${m.slot}`;
-    perSlot[m.slot] = (perSlot[m.slot] ?? 0) + (def.size === "large" ? 2 : 1);
-    if (perSlot[m.slot] > slotCapacity(hull, m.slot)) return `slot ${hull.slots.find((s) => s.id === m.slot)?.name} je plný`;
-    if (def.size === "large" && slotCapacity(hull, m.slot) < 2) return "velký modul se vejde jen na příď nebo záď";
+    if (def.size === "large" && m.slot !== LARGE_SLOTS[0]) return "velký modul patří do spojeného slotu příď + záď";
+    for (const sl of occupiedSlots(m)) {
+      perSlot[sl] = (perSlot[sl] ?? 0) + 1;
+      if (perSlot[sl] > slotCapacity(hull, sl)) return `slot ${hull.slots.find((s) => s.id === sl)?.name} je obsazený`;
+    }
     perType[m.type] = (perType[m.type] ?? 0) + 1;
   }
   if (perType["shield-segment"] && perType["shield-whole"]) return "segmentový a celolodní štít nejde kombinovat";
@@ -176,7 +192,6 @@ export function hullOf(loadout: ShipLoadout): HullDef {
 /** Náhodná sestava v rámci povolených počtů a rozpočtu (pro boty). */
 export function randomLoadout(rng: () => number, allowed: Partial<Record<ModuleType, number>>, budget: number): ShipLoadout {
   const lo: ShipLoadout = { hullId: "fighter", pilotId: "kadet", modules: [] };
-  const hull = HULLS.fighter;
   const order = [...MODULE_TYPES].sort(() => rng() - 0.5);
   let spent = 0;
   for (let round = 0; round < 3; round++) {
@@ -186,9 +201,9 @@ export function randomLoadout(rng: () => number, allowed: Partial<Record<ModuleT
       if ((allowed[t] ?? 99) <= count || spent + def.price > budget) continue;
       if ((t === "shield-whole" && lo.modules.some((m) => m.type === "shield-segment")) || (t === "shield-segment" && lo.modules.some((m) => m.type === "shield-whole"))) continue;
       if (rng() < 0.35) continue;
-      const slot = hull.slots.find((s) => lo.modules.filter((m) => m.slot === s.id).length < slotCapacity(hull, s.id));
+      const slot = freeSlots(lo)[0];
       if (!slot) break;
-      lo.modules.push(newModule(t, slot.id, `b${lo.modules.length + 1}`));
+      lo.modules.push(newModule(t, slot, `b${lo.modules.length + 1}`));
       spent += def.price;
     }
   }
