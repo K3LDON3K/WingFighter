@@ -78,6 +78,8 @@ interface GameSession {
   inventoryOpen: boolean;
   /** Inventář v režimu výběru modulu k vyhození. */
   jettisonPick: boolean;
+  /** Herní menu (Esc). */
+  menuOpen: boolean;
   hoverId?: string;
   hoverIcon?: string;
   mouse: { x: number; y: number; sx: number; sy: number } | null;
@@ -231,6 +233,7 @@ function startGame(state: GameState) {
     shieldEdit: false,
     inventoryOpen: false,
     jettisonPick: false,
+    menuOpen: false,
     mouse: null,
     icons: [],
   };
@@ -368,6 +371,7 @@ let sideEl: HTMLElement | null = null;
 let barEl: HTMLElement | null = null;
 let hudEl: HTMLElement | null = null;
 let overlayEl: HTMLElement | null = null;
+let menuEl: HTMLElement | null = null;
 let tooltipEl: HTMLElement | null = null;
 let tuneEl: HTMLElement | null = null;
 let toastEl: HTMLElement | null = null;
@@ -380,6 +384,7 @@ function mountGame() {
   canvas = h("canvas");
   hudEl = h("div", { class: "hud" });
   overlayEl = h("div");
+  menuEl = h("div", { class: "menu-wrap", style: "display:none" });
   tooltipEl = h("div", { class: "tooltip", style: "display:none" });
   tuneEl = h("div", { class: "tune-wrap", style: "display:none" });
   toastEl = h("div", { class: "toast", style: "display:none" });
@@ -398,9 +403,11 @@ function mountGame() {
       h("button", { class: "gear", title: "Vycentrovat mapu na vybranou loď", onclick: () => centerOnShip(game?.selectedShipId) }, icon("center", "currentColor", 12), label("centrovat")),
       h("button", { class: "gear", id: "inv-btn", title: "Inventář lodi (připravuje se)", onclick: () => ((game!.inventoryOpen = !game!.inventoryOpen), renderSide()) }, icon("inventory", "currentColor", 12), label("inventář")),
       h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => ((tuningOpen = !tuningOpen), renderSide()) }, icon("target", "currentColor", 12), label("ladění")),
+      h("button", { class: "gear", title: "Herní menu (Esc)", onclick: () => toggleMenu() }, icon("log", "currentColor", 12), label("menu")),
     ),
     tooltipEl,
     overlayEl,
+    menuEl,
     tuneEl,
     toastEl,
   );
@@ -443,7 +450,7 @@ function mountGame() {
 function unmountGame() {
   cancelAnimationFrame(raf);
   resizeObs?.disconnect();
-  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = null;
+  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = null;
   render();
 }
 
@@ -574,6 +581,47 @@ function buildOverlay(view: ViewModel): Overlay {
   return overlay;
 }
 
+function toggleMenu(open?: boolean) {
+  if (!game) return;
+  game.menuOpen = open ?? !game.menuOpen;
+  renderSide();
+}
+
+/** Herní menu (Esc): pokračovat, ukončit bitvu (host – vrátí všechny do místnosti), opustit hru. */
+function renderMenu() {
+  if (!menuEl || !game) return;
+  clear(menuEl);
+  menuEl.style.display = game.menuOpen ? "grid" : "none";
+  if (!game.menuOpen) return;
+  const isHost = room?.hostId === playerId;
+  menuEl.append(
+    h(
+      "div",
+      { class: "pnl menu-card" },
+      h("div", { class: "menu-title" }, label("Menu")),
+      h("div", { class: "muted txt" }, `Kolo ${game.state.turn} · ${room?.name ?? ""}`),
+      h("button", { class: "px menu-btn primary", onclick: () => toggleMenu(false) }, icon("play", "currentColor", 12), " ", label("Pokračovat"), h("span", { class: "sub" }, "ESC")),
+      isHost
+        ? h(
+            "button",
+            { class: "px menu-btn", title: "Ukončí bitvu pro všechny a vrátí hráče do místnosti (výbava a nastavení zůstanou)", onclick: () => net.send({ type: "backToLobby" }) },
+            icon("people", "currentColor", 12),
+            " ",
+            label("Ukončit bitvu – do místnosti"),
+          )
+        : h("div", { class: "muted txt menu-note" }, "Bitvu může pro všechny ukončit jen host."),
+      h(
+        "button",
+        { class: "px menu-btn danger", title: "Opustí místnost; bitva ostatních pokračuje bez tebe", onclick: () => net.send({ type: "leaveRoom" }) },
+        icon("wait", "currentColor", 12),
+        " ",
+        label("Opustit hru – hlavní menu"),
+      ),
+      h("div", { class: "muted txt menu-note" }, "Esc během plánování nejdřív ruší rozdělanou akci (kreslení dráhy, výběr cíle), prázdný Esc otevře menu."),
+    ),
+  );
+}
+
 function renderHud() {
   if (!hudEl || !game) return;
   const s = game.state;
@@ -661,6 +709,7 @@ function renderSide() {
       });
     } else clear(tuneEl);
   }
+  renderMenu();
   renderBottomBar(
     barEl,
     {
@@ -1084,20 +1133,38 @@ function bindInput(c: HTMLCanvasElement) {
   );
 
   window.addEventListener("keydown", (e) => {
-    if (!game || game.anim) return;
+    if (!game) return;
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
-    if (e.key === "Enter") {
-      submitOrders();
+    if (e.key === "Escape" && game.menuOpen) {
+      toggleMenu(false);
+      e.preventDefault();
       return;
     }
-    if (game.submitted) return;
+    if (game.anim) {
+      if (e.key === "Escape") toggleMenu(true);
+      return;
+    }
+    if (e.key === "Enter") {
+      if (!game.menuOpen) submitOrders();
+      return;
+    }
     const id = game.selectedShipId;
     const o = id && game.orders.get(id);
     const cur = o ? parseManeuverId(o.maneuverId) : null;
+    if (e.key === "Escape" && (game.submitted || !id || !cur || (!game.shieldEdit && !game.minePick && !game.picking && !game.aimingShipId && !game.jettisonPick && !game.inventoryOpen && !tuningOpen))) {
+      toggleMenu(true);
+      e.preventDefault();
+      return;
+    }
+    if (game.submitted) return;
     if (!id || !cur) return;
     if (e.key === "Escape") {
-      if (game.shieldEdit) {
+      if (tuningOpen) tuningOpen = false;
+      else if (game.jettisonPick || game.inventoryOpen) {
+        game.jettisonPick = false;
+        game.inventoryOpen = false;
+      } else if (game.shieldEdit) {
         // zpět na původní rozložení = akce se zruší
         game.shieldEdit = false;
         if (o && o.action?.type === "shield") game.orders.set(id, { ...o, action: undefined });

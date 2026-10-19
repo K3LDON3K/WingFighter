@@ -1244,3 +1244,54 @@ button.px.tiny {
 .lo-arrow:not(.ro):hover rect {
   fill: #3b2a0e;
 }
+
+/* ---- herní menu (Esc) ---- */
+.menu-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 7, 15, 0.72);
+}
+.menu-card {
+  width: 360px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(18, 26, 48, 0.98);
+}
+.menu-title {
+  font-size: 14px;
+  color: #fff;
+  text-align: center;
+  text-shadow: 3px 3px #000;
+}
+.menu-btn {
+  width: 100%;
+  padding: 12px 10px;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.menu-btn .sub {
+  margin-left: auto;
+  font-size: 7px;
+  opacity: 0.7;
+}
+.menu-btn.primary {
+  background: #1d4ed8;
+  border-color: #93c5fd #1e3a8a #1e3a8a #93c5fd;
+  color: #fff;
+}
+.menu-btn.danger {
+  border-color: #fca5a5 #7f1d1d #7f1d1d #fca5a5;
+  color: #fca5a5;
+}
+.menu-note {
+  font-size: 12px;
+  text-align: center;
+}

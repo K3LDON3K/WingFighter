@@ -130,6 +130,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.2.1 – herní menu na Esc (nebo tlačítko MENU nad mapou): Pokračovat, Ukončit bitvu – do místnosti (host, pro
+  všechny), Opustit hru – hlavní menu. Esc nejdřív ruší rozdělanou akci, prázdný Esc otevře menu.
 - v2.2 – **natočení modulů**: lasery, torpédomet a miny mají směr (4 strany, ne „do středu“ slotu); šipka v rohu
   modulu v editoru (klik otočí), ve hře jen k nahlédnutí v inventáři, soupeř ji nevidí. Lasery střílí ve výseči
   podle natočení (dopředu ±20°, do boku ±15°, dozadu ±10° – ladění → Lasery), výseč v plánování se kreslí podle
