@@ -248,7 +248,9 @@ export type TurnEvent =
       effAfter?: number;
     }
   | { type: "destroyed"; shipId: string; x: number; y: number }
-  | { type: "stress"; shipId: string; stressPoints: number; delta: number };
+  | { type: "stress"; shipId: string; stressPoints: number; delta: number }
+  /** Úhybný manévr: loď proletěla skrz nepřátelskou loď (t = podíl dráhy, x/y = místo průletu). */
+  | { type: "evadePass"; shipId: string; victimId: string; t: number; x: number; y: number };
 
 export interface MovePath {
   id: string;

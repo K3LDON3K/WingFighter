@@ -26,6 +26,8 @@ import {
   type GameState,
   type Pose,
   type RoomState,
+  laserOdds,
+  laserTarget,
   type RoomSummary,
   type Segments,
   type ShipOrders,
@@ -506,6 +508,15 @@ function buildOverlay(view: ViewModel): Overlay {
         overlay.rangeCircle2 = { radius: TORPEDO.pointRange };
       } else {
         overlay.targetId = o.preferredTargetId;
+        if (o.fire) {
+          const tgt = laserTarget(g.state, ship, o.preferredTargetId);
+          if (tgt) {
+            const odds = laserOdds(ship, tgt);
+            const pct = Math.round(odds.hitChance * 100);
+            overlay.targetId = tgt.id;
+            overlay.laserOdds = { x: tgt.x, y: tgt.y, text: `${pct} %`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171" };
+          }
+        }
       }
       if (o.special?.type === "mine") {
         const side = o.special.side ?? "behind";

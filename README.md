@@ -67,7 +67,8 @@ celolodní štít kruh obarvený podle síly, segmentový čtyři oblouky otáč
 
 ### Zbraně
 - **Lasery** (1 akce) – střílí **na začátku kola ze startovní pozice**, výseč ±20° před přídí, dostřel 300
-  (3 pásma: blízko +1 kostka útoku, daleko +1 kostka obrany). Střílí na preferovaný cíl, pokud je ve výseči,
+  (3 pásma: blízko +1 kostka útoku, daleko +1 kostka obrany). Při zapnutých laserech lišta i mapa ukazují
+  **šanci na zásah v %** (aspoň jeden čistý zásah) a průměrné zranění. Střílí na preferovaný cíl, pokud je ve výseči,
   jinak na nejbližšího nepřítele.
   **Nestřílí skrz asteroidy.**
 - **Torpédo** (3 ks, místo akce) – cíl: nepřátelská loď/torpédo do 320 (sleduje 3 kola) **nebo bod na mapě**
@@ -109,6 +110,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.14 – úhybný manévr v animaci (varianta E): poloprůhledná loď se sudovým překrutem, pulzující modrý obrys,
+  jiskry, bledé kopie; při průletu nepřátelskou lodí vlnky a „PRŮLET −1 STRES“. Lasery: v liště i u cíle na mapě
+  se ukazuje šance na zásah v % (přesný výpočet z kostek, pásma, zaměření, zámku a úhybu) a průměrné zranění.
 - v1.13.2 – oprava: animace salv laserů běží na začátku kola před pohybem (událost pohybu se řadila před lasery).
 - v1.13.1 – lišta: akce ve skupinách Zbraně · Pohyb · Speciální, menší panel manévru, úzké svislé SPUSTIT KOLO; CENTROVAT a INVENTÁŘ přesunuty k tlačítku ladění nad mapou.
 - v1.13 – štíty: segmentový (4 × 2 body, zásah podle směru, akce Úprava štítu) nebo celolodní (zásoba + účinnost

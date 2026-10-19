@@ -12,8 +12,9 @@ export interface ViewShip extends Pose {
   shieldType: ShieldType;
   shieldEff: number;
   segments: Segments;
-  /** Úhybný manévr – kývání (nastavuje animace). */
+  /** Úhybný manévr – probíhá (nastavuje animace); `roll` = fáze sudového překrutu (0–2π). */
   evading?: boolean;
+  roll?: number;
   stressPoints: number;
   radius: number;
   alive: boolean;
@@ -47,7 +48,9 @@ export type Effect =
   | { kind: "shield"; shipId: string; start: number; duration: number }
   | { kind: "launch"; x: number; y: number; heading: number; color: string; start: number; duration: number }
   | { kind: "drop"; from: { x: number; y: number }; to: { x: number; y: number }; color: string; start: number; duration: number }
-  | { kind: "segmentHit"; shipId: string; segment: number; start: number; duration: number };
+  | { kind: "segmentHit"; shipId: string; segment: number; start: number; duration: number }
+  /** Vlnky při průletu úhybu skrz nepřátelskou loď. */
+  | { kind: "ripple"; x: number; y: number; color: string; start: number; duration: number };
 
 export interface ViewModel {
   ships: ViewShip[];

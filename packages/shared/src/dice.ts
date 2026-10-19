@@ -56,3 +56,35 @@ export function resolveAttack(rng: Rng, ctx: AttackContext): AttackOutcome {
   const damage = Math.max(0, hits - evades);
   return { attackDice, defenseDice, hits, evades, damage };
 }
+
+/** Rozdělení počtu úspěchů na n kostkách s pravděpodobností p (binomické). */
+function binomial(n: number, p: number): number[] {
+  const out = new Array(n + 1).fill(0);
+  for (let k = 0; k <= n; k++) {
+    let c = 1;
+    for (let i = 0; i < k; i++) c = (c * (n - i)) / (i + 1);
+    out[k] = c * p ** k * (1 - p) ** (n - k);
+  }
+  return out;
+}
+
+/** Přesná šance na aspoň jeden čistý zásah a očekávaný počet čistých zásahů pro daný souboj kostek. */
+export function attackOdds(ctx: AttackContext): { hitChance: number; expectedHits: number } {
+  const pHitRaw = (ctx.attackerFocus ? 6 : 4) / 8;
+  // zámek přehazuje všechny kostky bez zásahu/kritu (i oči), až po přehození se oči se zaměřením počítají
+  const pHit = ctx.attackerLock ? 0.5 + 0.5 * pHitRaw : pHitRaw;
+  const pEvade = (ctx.defenderFocus ? 5 : 3) / 8;
+  const A = binomial(Math.max(0, ctx.attackDice), pHit);
+  const D = binomial(Math.max(0, ctx.defenseDice), pEvade);
+  const extra = ctx.defenderEvade ? 1 : 0;
+  let hitChance = 0;
+  let expectedHits = 0;
+  A.forEach((pa, h) =>
+    D.forEach((pd, e) => {
+      const dmg = Math.max(0, h - e - extra);
+      if (dmg > 0) hitChance += pa * pd;
+      expectedHits += pa * pd * dmg;
+    }),
+  );
+  return { hitChance, expectedHits };
+}

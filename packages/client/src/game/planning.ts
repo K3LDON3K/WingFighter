@@ -2,6 +2,8 @@ import {
   RULES,
   actionList,
   hullOf,
+  laserOdds,
+  laserTarget,
   parseManeuverId,
   resolveManeuver,
   STRESS,
@@ -261,7 +263,21 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     details.append(icon("segments", "#60a5fa"), h("span", { class: "txt" }, `štít ${o.action.segments.join(" / ")}`), inHand > 0 ? h("span", { class: "warn" }, label(`← rozmísti ${inHand} b. v panelu lodi`)) : h("span", { class: "muted" }, label("· platí od začátku kola")));
   } else if (o.fire) {
     const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? "torpédo") : null;
-    details.append(icon("target", "#4ade80"), h("span", { class: "txt" }, tname ?? "nejbližší ve výseči"), h("span", { class: "muted" }, label("· střílí na začátku kola · klik na nepřítele = cíl")));
+    const target = laserTarget(m.state, ship, o.preferredTargetId);
+    details.append(icon("target", target ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, tname ?? (target ? `nejbližší: ${target.name}` : "nikdo ve výseči")));
+    if (target) {
+      const odds = laserOdds(ship, target);
+      const pct = Math.round(odds.hitChance * 100);
+      details.append(
+        h(
+          "span",
+          { class: "odds", style: `color:${pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171"}`, title: `Šance aspoň na jeden čistý zásah (zásahy − úhyby) ze současných pozic, pásmo ${odds.rangeBand}${odds.rangeBand === 1 ? " (+1 kostka útoku)" : odds.rangeBand === 3 ? " (+1 kostka obrany)" : ""}. Očekávané zranění ≈ ${Math.round(odds.expectedDamage)}.` },
+          label(`zásah ${pct} %`),
+        ),
+        h("span", { class: "muted" }, label(`· průměr ${Math.round(odds.expectedDamage)} zranění`)),
+      );
+    } else if (o.preferredTargetId) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
+    details.append(h("span", { class: "muted" }, label("· klik na nepřítele = cíl")));
   } else {
     details.append(h("span", { class: "muted" }, "—"));
   }

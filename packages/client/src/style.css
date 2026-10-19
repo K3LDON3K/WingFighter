@@ -911,3 +911,8 @@ button.px.tiny {
 .hand {
   white-space: nowrap;
 }
+.odds {
+  font-size: 9px;
+  padding: 2px 5px;
+  border: 2px solid currentColor;
+}

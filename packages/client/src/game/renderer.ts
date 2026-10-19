@@ -53,6 +53,8 @@ export interface Overlay {
   /** Zvolený cíl (loď / torpédo) a bod pro torpédo. */
   targetId?: string;
   targetPoint?: { x: number; y: number };
+  /** Šance laserů na zásah u cíle. */
+  laserOdds?: { x: number; y: number; text: string; color: string };
   /** Právě se vybírá cíl kliknutím. */
   picking?: "torpedo" | "lock";
   myTeam?: number;
@@ -131,6 +133,21 @@ export class Renderer {
       drawSprite(ctx, this.sprites.fighter(TEAM_COLORS[sel.team]), overlay.actionGhost.x, overlay.actionGhost.y, overlay.actionGhost.heading, 0.3);
     }
     for (const e of view.effects) this.drawEffect(e, view, now);
+    if (overlay.laserOdds) {
+      const lo = overlay.laserOdds;
+      ctx.save();
+      ctx.font = "9px PS2P, ui-monospace, Menlo, monospace";
+      ctx.textAlign = "center";
+      const w = ctx.measureText(lo.text).width + 10;
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(lo.x - w / 2, lo.y + 22, w, 14);
+      ctx.strokeStyle = lo.color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(lo.x - w / 2, lo.y + 22, w, 14);
+      ctx.fillStyle = lo.color;
+      ctx.fillText(lo.text, lo.x, lo.y + 32);
+      ctx.restore();
+    }
     if (overlay.vision) this.drawFog(overlay.vision, cam);
     if (overlay.icons) this.drawIcons(overlay.icons, cam);
 
@@ -346,7 +363,38 @@ export class Renderer {
     ctx.fill();
     ctx.restore();
 
-    drawSprite(ctx, this.sprites.fighter(color), s.x, s.y, s.heading);
+    if (s.evading) {
+      // varianta E: poloprůhledná loď se sudovým překrutem, pulzující modrý obrys a jiskry
+      const roll = s.roll ?? 0;
+      const squash = 0.35 + 0.65 * Math.abs(Math.cos(roll));
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.heading);
+      ctx.scale(1, squash * (Math.cos(roll) < 0 ? -1 : 1));
+      ctx.rotate(-s.heading);
+      // bledé kopie (motion blur) za lodí
+      const f2 = forward(s.heading);
+      for (let i = 1; i <= 2; i++) drawSprite(ctx, this.sprites.fighter(color), -f2.x * i * 9, -f2.y * i * 9, s.heading, 0.12);
+      drawSprite(ctx, this.sprites.fighter(color), 0, 0, s.heading, 0.55);
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = "#7dd3fc";
+      ctx.globalAlpha = 0.45 + 0.4 * Math.sin(now / 70);
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.radius + 9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#bae6fd";
+      for (let i = 0; i < 5; i++) {
+        const a = now / 120 + (i * Math.PI * 2) / 5;
+        const rr = s.radius + 4 + 6 * Math.sin(now / 90 + i);
+        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(now / 60 + i * 2);
+        ctx.fillRect(s.x + Math.cos(a) * rr - 1, s.y + Math.sin(a) * rr - 1, 2, 2);
+      }
+      ctx.restore();
+    } else drawSprite(ctx, this.sprites.fighter(color), s.x, s.y, s.heading);
 
     ctx.save();
     ctx.font = "13px Pix, ui-monospace, Menlo, monospace";
@@ -609,6 +657,21 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(e.x, e.y, 6 + 18 * t, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.restore();
+        break;
+      }
+      case "ripple": {
+        ctx.save();
+        ctx.strokeStyle = e.color;
+        for (let i = 0; i < 3; i++) {
+          const tt = Math.max(0, Math.min(1, t * 1.6 - i * 0.25));
+          if (tt <= 0) continue;
+          ctx.globalAlpha = (1 - tt) * 0.8;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, 6 + 30 * tt, 0, Math.PI * 2);
+          ctx.stroke();
+        }
         ctx.restore();
         break;
       }

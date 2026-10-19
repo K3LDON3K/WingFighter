@@ -12,7 +12,7 @@ import {
   TORPEDO,
   TORPEDO_AGILITY,
 } from "./constants.ts";
-import { resolveAttack } from "./dice.ts";
+import { attackOdds, resolveAttack } from "./dice.ts";
 import {
   circlesOverlap,
   clamp,
@@ -606,6 +606,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               const key = `${evader.id}:${victim.id}`;
               if (!passedThrough.has(key)) {
                 passedThrough.add(key);
+                events.push({ type: "evadePass", shipId: evader.id, victimId: victim.id, t: k / MOVE_STEPS, x: (p.x + op.x) / 2, y: (p.y + op.y) / 2 });
                 const before = victim.stressPoints;
                 victim.stressPoints = Math.max(0, victim.stressPoints - RULES.evadePassStress);
                 if (victim.stressPoints !== before) events.push({ type: "stress", shipId: victim.id, stressPoints: victim.stressPoints, delta: victim.stressPoints - before });
@@ -864,4 +865,27 @@ export function checkVictory(state: GameState): GameResult | null {
     };
   }
   return null;
+}
+
+/** Cíl laserů podle stejných pravidel jako vyhodnocení (preferovaný ve výseči, jinak nejbližší). Pro náhled v plánování. */
+export function laserTarget(state: GameState, ship: Ship, preferredTargetId?: string): Ship | undefined {
+  const candidates = state.ships.filter(
+    (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(ship, e, LASER.halfArc) && !lineBlocked(state.asteroids, ship, e),
+  );
+  if (candidates.length === 0) return undefined;
+  return candidates.find((c) => c.id === preferredTargetId) ?? candidates.reduce((best, c) => (dist(ship, c) < dist(ship, best) ? c : best));
+}
+
+/** Šance laserů na zásah (aspoň jeden čistý zásah) a očekávané zranění proti danému cíli ze současných pozic. */
+export function laserOdds(ship: Ship, target: Ship): { hitChance: number; expectedDamage: number; rangeBand: number } {
+  const rangeBand = clamp(Math.ceil(dist(ship, target) / LASER.band), 1, 3);
+  const odds = attackOdds({
+    attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0),
+    defenseDice: target.stats.agility + (rangeBand === 3 ? 1 : 0),
+    attackerFocus: ship.tokens.focus > 0,
+    attackerLock: ship.lockTargetId === target.id,
+    defenderFocus: target.tokens.focus > 0,
+    defenderEvade: target.tokens.evade > 0,
+  });
+  return { hitChance: odds.hitChance, expectedDamage: odds.expectedHits * RULES.damagePerHit, rangeBand };
 }

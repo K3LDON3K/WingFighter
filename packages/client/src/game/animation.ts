@@ -74,6 +74,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
           `${name(e.shooterId)} → ${name(e.targetId)} (pásmo ${e.rangeBand}): ${e.attackDice.map(die).join(" ")} vs ${e.defenseDice.map(die).join(" ")} → ${e.damage > 0 ? `−${e.damage}` : "minul"}.`,
         );
         break;
+      case "evadePass":
+        lines.push(`  ${name(e.shipId)} proletěl skrz ${name(e.victimId)}.`);
+        break;
       case "action":
         if (!e.ok) lines.push(`${name(e.shipId)}: akce se nepovedla.`);
         else if (e.action.type === "evade") lines.push(`${name(e.shipId)} provádí úhybný manévr.`);
@@ -146,6 +149,9 @@ export class TurnAnimation {
         case "stress":
           time = moveStart + MOVE_DURATION;
           break;
+        case "evadePass":
+          time = moveStart + e.t * MOVE_DURATION;
+          break;
         case "action":
           time = movePassed ? actionTime : 0;
           if (e.ok && e.path) {
@@ -204,11 +210,18 @@ export class TurnAnimation {
         ent.y = pose.y;
         ent.heading = pose.heading;
         // kývání při úhybném manévru: zatočení ±14° a vlnění do stran, utlumí se ke konci dráhy
-        if (tw.kind === "ship" && (ent as { evading?: boolean }).evading && p < 1) {
-          const w = Math.sin(t / 55) * (1 - p * 0.6);
-          ent.heading += w * 0.25;
-          ent.x += -Math.sin(pose.heading) * w * 10;
-          ent.y += Math.cos(pose.heading) * w * 10;
+        if (tw.kind === "ship") {
+          const es = ent as { evading?: boolean; roll?: number };
+          if (es.evading && p < 1) {
+            // sudový překrut: fáze otáčení kolem podélné osy (renderer podle ní zužuje sprite) + lehké vlnění do stran
+            es.roll = (p * 3 * Math.PI * 2) % (Math.PI * 2);
+            const w = Math.sin(p * Math.PI * 6);
+            ent.x += -Math.sin(pose.heading) * w * 6;
+            ent.y += Math.cos(pose.heading) * w * 6;
+          } else if (es.evading && p >= 1) {
+            es.evading = false;
+            es.roll = undefined;
+          }
         }
       }
     }
@@ -236,6 +249,12 @@ export class TurnAnimation {
       case "collision": {
         const s = v.ships.find((x) => x.id === e.shipId);
         if (s) v.effects.push({ kind: "ring", x: s.x, y: s.y, radius: 30, color: "#f8fafc", start: now, duration: 500 });
+        break;
+      }
+      case "evadePass": {
+        const victim = v.ships.find((x) => x.id === e.victimId);
+        v.effects.push({ kind: "ripple", x: e.x, y: e.y, color: "#7dd3fc", start: now, duration: 700 });
+        if (victim) v.effects.push({ kind: "text", x: victim.x, y: victim.y, text: "PRŮLET −1 STRES", color: "#f472b6", start: now + 100, duration: 1000 });
         break;
       }
       case "mineBlast":
