@@ -1116,11 +1116,9 @@ button.px.tiny {
   display: block;
   image-rendering: pixelated;
 }
+.lo-g.mod.sel,
 .lo-g.mod:not(.ro) {
-  cursor: pointer;
-}
-.lo-g.mod:not(.ro):hover rect {
-  stroke: #f87171;
+  cursor: default;
 }
 .lo-g text {
   pointer-events: none;
@@ -1208,7 +1206,7 @@ button.px.tiny {
 .lo-g.sel rect {
   stroke: #fb923c;
 }
-.lo-g.mod:not(.ro) {
+.lo-g.mod.selectable {
   cursor: pointer;
 }
 .bb-pilot {
@@ -1294,4 +1292,11 @@ button.px.tiny {
 .menu-note {
   font-size: 12px;
   text-align: center;
+}
+.lo-remove {
+  cursor: pointer;
+  pointer-events: all;
+}
+.lo-remove:hover rect {
+  fill: #3b0e0e;
 }

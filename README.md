@@ -130,6 +130,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.2.2 – editor výbavy: šipka natočení sedí na hraně modulu ve směru, kam míří; modul se odebírá křížkem
+  v pravém dolním rohu (klik na modul už nic nedělá).
 - v2.2.1 – herní menu na Esc (nebo tlačítko MENU nad mapou): Pokračovat, Ukončit bitvu – do místnosti (host, pro
   všechny), Opustit hru – hlavní menu. Esc nejdřív ruší rozdělanou akci, prázdný Esc otevře menu.
 - v2.2 – **natočení modulů**: lasery, torpédomet a miny mají směr (4 strany, ne „do středu“ slotu); šipka v rohu
