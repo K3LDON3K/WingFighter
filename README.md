@@ -38,8 +38,11 @@ Akce po pohybu zůstává vždy povolená.
 Lodě nikdy nestojí: při srážce s lodí, asteroidem nebo okrajem mapy je loď **odmrštěna** novým (náhodně
 odchýleným) směrem, dostane 15 zranění, ztratí akci a doletí zbytek pohybu tím směrem.
 
-### Zbraň kola – ikony u konce dráhy (∅ nic · ➤ torpédo · ✹ mina), najetím myší vysvětlení
-Akce po pohybu (zaměřit, úhyb, zámek, posun, úskok) jsou ve hře vypnuté – vrátí se jako schopnosti pilotů.
+### Akce – 2 na kolo
+Každá stojí 1 bod: **úprava pohybu** (jiná rychlost nebo směr než „stejnou rychlostí rovně“), **otočka 180°**,
+**lasery**, **torpédo**, **mina**. Bez akce loď jen letí dál a nestřílí. Ikony u konce dráhy
+(⚡ lasery · ➤ torpédo · ✹ mina · ⟲ otočka) zapínají/vypínají, panel ukazuje použité akce.
+Staré akce po pohybu (zaměřit, úhyb, zámek, posun, úskok) jsou vypnuté – vrátí se jako schopnosti pilotů.
 Torpédo odstartuje **hned se začátkem pohybu** ze startovní pozice lodi.
 
 ### Fog of war
@@ -85,6 +88,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.4 – systém 2 akcí na kolo (úprava pohybu, otočka, lasery, torpédo, mina); lasery jen jako akce.
 - v1.3 – míření jen po označení lodi, zbraně ∅/torpédo/mina (akce po pohybu vypnuté), torpédo startuje
   s pohybem, fog of war s pamětí asteroidů, lasery nestřílí skrz asteroidy.
 - v1.2 – ovládání jen myší u lodi (bez tlačítek), ikony akcí s vysvětlením u konce dráhy, stresové body,

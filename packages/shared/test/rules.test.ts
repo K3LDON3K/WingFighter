@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  actionCost,
   classifyManeuver,
   carveCrater,
   circleHitsAsteroid,
@@ -216,6 +217,24 @@ describe("vyhodnocení kola", () => {
     // 45 zranění: štít 50 → 5, trup 100; dobití → štít 15
     expect(r.state.ships[1].hull).toBe(100);
     expect(r.state.ships[1].shields).toBe(15);
+  });
+
+  it("akce: 2 na kolo – úprava pohybu, otočka, lasery, torpédo, mina; sanitizace přebytek ořeže", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 800, 500, Math.PI);
+    const ship = g.ships[0];
+    expect(actionCost(ship, { shipId: ship.id, maneuverId: "m2a0", fire: false })).toBe(0);
+    expect(actionCost(ship, { shipId: ship.id, maneuverId: "m3a0", fire: false })).toBe(1);
+    expect(actionCost(ship, { shipId: ship.id, maneuverId: "m2a15", fire: true })).toBe(2);
+    expect(actionCost(ship, { shipId: ship.id, maneuverId: "k3", fire: false })).toBe(2); // změna rychlosti + otočka
+    const fixed = sanitizeOrders(g, "p1", [{ shipId: ship.id, maneuverId: "m3a30", fire: true, special: { type: "torpedo", targetId: "ship-p2-0" } }]);
+    expect(actionCost(ship, fixed[0])).toBe(2);
+    expect(fixed[0].special).toBeUndefined();
+    expect(fixed[0].fire).toBe(true);
+    // bez akce "lasery" loď nestřílí
+    const r = resolveTurn(g, [{ shipId: ship.id, maneuverId: "m2a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m2a0", fire: false }], createRng(1));
+    expect(r.events.some((e) => e.type === "laser")).toBe(false);
   });
 
   it("laser nestřílí skrz asteroid", () => {

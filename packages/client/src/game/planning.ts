@@ -1,4 +1,6 @@
 import {
+  ACTION_POINTS,
+  actionList,
   dist,
   hullOf,
   maneuverLabel,
@@ -13,7 +15,7 @@ import {
   type Torpedo,
 } from "@spacegame/shared";
 import { clear, h } from "../dom.ts";
-import { activeAction } from "./actions.ts";
+import { ACTIONS } from "./actions.ts";
 
 export interface PlanningCallbacks {
   select(shipId: string): void;
@@ -65,7 +67,7 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
   const locked = m.submitted;
   const man = resolveManeuver(profile, o.maneuverId, ship.speed);
   const aiming = m.aimingShipId === ship.id;
-  const act = activeAction(o);
+  const acts = actionList(ship, o);
 
   const panel = h("div", { class: "panel" });
 
@@ -93,6 +95,15 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
       h("div", {}, "Rychlost", h("b", {}, String(ship.speed))),
       h("div", {}, "Torpéda", h("b", {}, String(ship.ammo.torpedoes))),
       h("div", {}, "Miny", h("b", {}, String(ship.ammo.mines))),
+    ),
+    h(
+      "div",
+      { class: "field actions-box" },
+      h("h3", {}, `Akce tohoto kola: ${acts.length} / ${ACTION_POINTS}`),
+      acts.length
+        ? h("div", {}, ...acts.map((a) => h("span", { class: "chip" }, a.label)))
+        : h("div", { class: "muted", style: "font-size:12px" }, "Žádná – loď poletí stejnou rychlostí rovně a nestřílí."),
+      h("div", { class: "muted", style: "font-size:11px;margin-top:4px" }, "Každá akce stojí 1 bod: úprava pohybu (jiná rychlost nebo směr), otočka, lasery, torpédo, mina."),
     ),
   );
 
@@ -129,31 +140,30 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
     ),
   );
 
-  /* ---- akce ---- */
+  /* ---- zbraně ---- */
   const targetName = (id: string | undefined) => {
     if (!id) return "";
     const s = m.state.ships.find((x) => x.id === id);
     if (s) return s.name;
     return m.state.torpedoes.some((t) => t.id === id) ? "torpédo" : "";
   };
-  let chosen = act.label;
-  if (o.special?.type === "torpedo") {
-    chosen += o.special.targetId ? ` → ${targetName(o.special.targetId)}` : o.special.point ? ` → bod [${Math.round(o.special.point.x)}, ${Math.round(o.special.point.y)}]` : " – vyber cíl";
-  } else if (o.action?.type === "lock") chosen += ` → ${targetName(o.action.targetId) || "vyber cíl"}`;
-
+  const weaponLines: HTMLElement[] = [];
+  for (const a of ACTIONS) {
+    if (!a.active(o)) continue;
+    let text = a.label;
+    if (a.id === "torpedo" && o.special?.type === "torpedo") {
+      text += o.special.targetId ? ` → ${targetName(o.special.targetId)}` : o.special.point ? ` → bod [${Math.round(o.special.point.x)}, ${Math.round(o.special.point.y)}]` : " – vyber cíl";
+    }
+    weaponLines.push(h("div", {}, h("b", { style: "font-size:13px" }, text), h("div", { class: "muted", style: "font-size:12px" }, a.description)));
+  }
   panel.append(
     h(
       "div",
       { class: "field" },
-      h("h3", {}, "2 · Zbraň"),
-      h(
-        "div",
-        {},
-        h("div", { style: "font-size:13px" }, h("b", {}, chosen)),
-        h("div", { class: "muted", style: "font-size:12px;margin-top:2px" }, act.description),
-        m.picking === "torpedo" ? h("div", { style: "color:var(--yellow);font-size:12px;margin-top:4px" }, "Klikni na nepřátelskou loď/torpédo (žlutý dostřel 320) nebo na bod mapy (do 1200).") : null,
-        h("div", { class: "muted", style: "font-size:11px;margin-top:4px" }, "Ikony u konce dráhy: ∅ nic · ➤ torpédo · ✹ mina. Najetím myší zobrazíš vysvětlení."),
-      ),
+      h("h3", {}, "2 · Zbraně a otočka"),
+      ...(weaponLines.length ? weaponLines : [h("div", { class: "muted", style: "font-size:12px" }, "Nic nevybráno.")]),
+      m.picking === "torpedo" ? h("div", { style: "color:var(--yellow);font-size:12px;margin-top:4px" }, "Klikni na nepřátelskou loď/torpédo (žlutý dostřel 320) nebo na bod mapy (do 1200).") : null,
+      h("div", { class: "muted", style: "font-size:11px;margin-top:4px" }, "Ikony u konce dráhy: ⚡ lasery · ➤ torpédo · ✹ mina · ⟲ otočka. Klik zapne/vypne, najetím myší vysvětlení."),
     ),
   );
 
@@ -169,14 +179,8 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
     h(
       "div",
       { class: "field" },
-      h("h3", {}, "3 · Lasery"),
-      h(
-        "div",
-        { class: "row" },
-        h("button", { class: o.fire ? "active" : "", disabled: locked, onclick: () => cb.setOrders(ship.id, { fire: !o.fire }) }, o.fire ? "pálit: ano" : "pálit: ne"),
-        h("span", { class: "muted", style: "font-size:12px" }, "cíl:"),
-        targetSelect,
-      ),
+      h("h3", {}, "3 · Cíl laserů"),
+      h("div", { class: "row" }, h("span", { class: "muted", style: "font-size:12px" }, "cíl:"), targetSelect),
       h(
         "div",
         { class: "muted", style: "font-size:12px;margin-top:4px" },

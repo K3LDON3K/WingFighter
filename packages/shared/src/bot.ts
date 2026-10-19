@@ -1,4 +1,5 @@
-import { LASER, TORPEDO } from "./constants.ts";
+import { ACTION_POINTS, LASER, TORPEDO } from "./constants.ts";
+import { actionCost } from "./resolve.ts";
 import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from "./geometry.ts";
 import { isRed, listManeuvers, maneuverEnd, maneuverPath, stressCost } from "./maneuvers.ts";
 import { circleHitsAsteroid } from "./asteroids.ts";
@@ -38,15 +39,17 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
     const nearest = enemies.length ? enemies.reduce((a, b) => (dist(ship, a) < dist(ship, b) ? a : b)) : undefined;
     const willHaveTarget = enemies.some((e) => inArc(end, e, LASER.halfArc * 2) && dist(end, e) <= LASER.range);
 
-    const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, fire: true, preferredTargetId: nearest?.id };
-    {
-      const torpTarget = enemies.find((e) => dist(ship, e) <= TORPEDO.lockRange);
-      if (ship.ammo.torpedoes > 0 && torpTarget && rng.next() < 0.45) {
-        orders.special = { type: "torpedo", targetId: torpTarget.id };
-      } else if (ship.ammo.mines > 0 && nearest && dist(ship, nearest) < 200 && Math.abs(bearingTo(ship, nearest)) > Math.PI / 2 && rng.next() < 0.5) {
-        orders.special = { type: "mine" };
-      }
+    const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, fire: false, preferredTargetId: nearest?.id };
+    const left = () => ACTION_POINTS - actionCost(ship, orders);
+    const torpTarget = enemies.find((e) => dist(ship, e) <= TORPEDO.lockRange);
+    if (left() > 0 && willHaveTarget) orders.fire = true;
+    if (left() > 0 && ship.ammo.torpedoes > 0 && torpTarget && rng.next() < 0.5) {
+      orders.special = { type: "torpedo", targetId: torpTarget.id };
+    } else if (left() > 0 && ship.ammo.mines > 0 && nearest && dist(ship, nearest) < 200 && Math.abs(bearingTo(ship, nearest)) > Math.PI / 2 && rng.next() < 0.5) {
+      orders.special = { type: "mine" };
     }
+    if (left() > 0 && !orders.fire) orders.fire = true;
+    // nemá-li střílet na nic, radši nechat akci na pohyb příště (nic nestojí)
     out.push(orders);
   }
   return out;

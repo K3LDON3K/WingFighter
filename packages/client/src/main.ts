@@ -1,4 +1,6 @@
 import {
+  ACTION_POINTS,
+  actionCost,
   ANGLE_STEP,
   defaultOrders,
   dist,
@@ -25,7 +27,7 @@ import {
   type TurnResult,
 } from "@spacegame/shared";
 import { clear, h } from "./dom.ts";
-import { ACTIONS, actionById, activeAction } from "./game/actions.ts";
+import { ACTIONS, actionById } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
 import { DIFFICULTY_COLOR, renderPlanning } from "./game/planning.ts";
@@ -222,6 +224,7 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
     man = makeManeuver(profile, speed, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, false, ship.speed);
   }
   if (!man) return false;
+  if (actionCost(ship, { ...o, maneuverId: man.id }) > ACTION_POINTS) return false;
   if (man.id !== o.maneuverId) {
     game.orders.set(shipId, { ...o, maneuverId: man.id });
     renderSide();
@@ -406,7 +409,6 @@ function buildOverlay(view: ViewModel): Overlay {
       // ikony zbraní u konce dráhy
       const n = ACTIONS.length;
       const ringR = ship.stats.radius + 40 / Math.min(1, cam!.zoom);
-      const active = activeAction(o);
       for (let i = 0; i < n; i++) {
         const a = ACTIONS[i];
         const ang = -Math.PI / 2 + ((i - (n - 1) / 2) / n) * Math.PI * 1.1;
@@ -416,8 +418,8 @@ function buildOverlay(view: ViewModel): Overlay {
           x: end.x + Math.cos(ang) * ringR,
           y: end.y + Math.sin(ang) * ringR,
           glyph: a.glyph,
-          active: a.id === active.id,
-          disabled: !!a.disabled(ship, g.state),
+          active: a.active(o),
+          disabled: !!a.disabled(ship, g.state, o),
           hover: g.hoverIcon === `${ship.id}:${a.id}`,
         });
       }
@@ -493,7 +495,7 @@ function renderTooltip() {
     tooltipEl.style.display = "none";
     return;
   }
-  const why = a.disabled(sel, game.state);
+  const why = a.disabled(sel, game.state, game.orders.get(sel.id)!);
   const html = `<b>${a.label}</b>${a.description}${why ? `<div class="warn">Nelze: ${why}.</div>` : ""}`;
   if (tooltipEl.innerHTML !== html) tooltipEl.innerHTML = html;
   tooltipEl.style.display = "block";
@@ -637,9 +639,14 @@ function chooseIcon(shipId: string, id: string) {
   const o = g.orders.get(shipId)!;
   const a = actionById(id);
   if (!a) return;
-  if (a.disabled(ship, g.state)) return;
-  g.orders.set(shipId, { ...o, ...a.apply(o, ship, g.state) });
-  g.picking = a.pick ?? null;
+  const why = a.disabled(ship, g.state, o);
+  if (why) {
+    showError(`${a.label}: ${why}.`);
+    return;
+  }
+  const next = { ...o, ...a.apply(o, ship, g.state) };
+  g.orders.set(shipId, next);
+  g.picking = a.pick && a.active(next) ? a.pick : null;
   renderSide();
 }
 
@@ -715,8 +722,13 @@ function bindInput(c: HTMLCanvasElement) {
     // 3) vlastní loď: označit a začít kreslit dráhu
     if (hit?.kind === "ship" && hit.ownerId === playerId) {
       g.selectedShipId = hit.id;
-      g.aimingShipId = hit.id;
       g.picking = null;
+      const ship = g.state.ships.find((s) => s.id === hit.id)!;
+      const o = g.orders.get(hit.id)!;
+      const curCost = actionCost(ship, o);
+      const adjusting = actionCost(ship, o) > actionCost(ship, { ...o, maneuverId: defaultOrders(ship).maneuverId });
+      if (curCost >= ACTION_POINTS && !adjusting) showError("Úprava pohybu stojí akci a obě už máš použité. Odeber zbraň.");
+      else g.aimingShipId = hit.id;
       renderSide();
       return;
     }
@@ -790,11 +802,7 @@ function bindInput(c: HTMLCanvasElement) {
       game.speedLock.set(id, Number(e.key));
       setManeuver(id, Number(e.key), cur.koiogran ? 0 : cur.angle, cur.koiogran);
     } else if (e.key === "k" || e.key === "K") {
-      const ship = game.state.ships.find((s) => s.id === id)!;
-      const ks = hullOf(ship.loadout).profile.koiogranSpeeds;
-      const sp = ks.includes(cur.speed) ? cur.speed : ks[0];
-      if (!cur.koiogran) game.speedLock.set(id, sp);
-      setManeuver(id, sp, 0, !cur.koiogran);
+      chooseIcon(id, "koiogran");
     } else if (e.key === " ") {
       if (game.aimingShipId) confirmManeuver(game.aimingShipId);
       else {

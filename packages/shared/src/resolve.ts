@@ -1,5 +1,6 @@
 import { asteroidDestroyed, carveCrater, circleHitsAsteroid, lineBlocked } from "./asteroids.ts";
 import {
+  ACTION_POINTS,
   COLLISION_DAMAGE,
   COLLISION_SCATTER,
   DAMAGE_PER_HIT,
@@ -28,7 +29,7 @@ import {
   type Pose,
   type Vec,
 } from "./geometry.ts";
-import { makeManeuver, maneuverLength, maneuverPath, resolveManeuver, stressCost } from "./maneuvers.ts";
+import { makeManeuver, maneuverLength, maneuverPath, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
 import type { Rng } from "./rng.ts";
 import { hullOf } from "./ships.ts";
 import type {
@@ -86,15 +87,33 @@ export function canAfford(ship: Ship, man: Maneuver): boolean {
   return stressCost(man.difficulty) <= ship.stressPoints;
 }
 
-/** Výchozí rozkaz, když hráč nic neposlal (nebo poslal nesmysl): stejná rychlost rovně, případně nejbližší levná. */
+/** Výchozí rozkaz (bez akcí): stejná rychlost rovně, nestřílí. */
 export function defaultOrders(ship: Ship): ShipOrders {
   const profile = hullOf(ship.loadout).profile;
   const candidates = [ship.speed, 2, ship.speed - 1, ship.speed + 1, 1, 3];
   for (const sp of candidates) {
     const man = makeManeuver(profile, sp, 0, false, ship.speed);
-    if (man && canAfford(ship, man)) return { shipId: ship.id, maneuverId: man.id, fire: true };
+    if (man && canAfford(ship, man)) return { shipId: ship.id, maneuverId: man.id, fire: false };
   }
-  return { shipId: ship.id, maneuverId: makeManeuver(profile, 1, 0, false, ship.speed)!.id, fire: true };
+  return { shipId: ship.id, maneuverId: makeManeuver(profile, 1, 0, false, ship.speed)!.id, fire: false };
+}
+
+/** Rozpis akcí rozkazu (každá stojí 1 bod). */
+export function actionList(ship: Ship, o: ShipOrders): { id: "move" | "koiogran" | "laser" | "torpedo" | "mine"; label: string }[] {
+  const out: { id: "move" | "koiogran" | "laser" | "torpedo" | "mine"; label: string }[] = [];
+  const m = parseManeuverId(o.maneuverId);
+  if (m) {
+    if (m.speed !== ship.speed || (!m.koiogran && m.angle !== 0)) out.push({ id: "move", label: "úprava pohybu" });
+    if (m.koiogran) out.push({ id: "koiogran", label: "otočka 180°" });
+  }
+  if (o.fire) out.push({ id: "laser", label: "lasery" });
+  if (o.special?.type === "torpedo") out.push({ id: "torpedo", label: "torpédo" });
+  if (o.special?.type === "mine") out.push({ id: "mine", label: "mina" });
+  return out;
+}
+
+export function actionCost(ship: Ship, o: ShipOrders): number {
+  return actionList(ship, o).length;
 }
 
 /** Je cíl (loď nebo torpédo) nepřátelský a existující? */
@@ -145,7 +164,12 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     if (special?.type === "mine" && ship.ammo.mines <= 0) special = undefined;
 
     const preferredTargetId = enemyTarget(state, ship, raw.preferredTargetId)?.id;
-    out.push({ shipId: ship.id, maneuverId: man.id, action, special, fire: !!raw.fire, preferredTargetId });
+    const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, fire: !!raw.fire, preferredTargetId };
+    // limit akcí: nejdřív padá zbraň, pak lasery, nakonec manévr
+    if (actionCost(ship, o) > ACTION_POINTS) o.special = undefined;
+    if (actionCost(ship, o) > ACTION_POINTS) o.fire = false;
+    if (actionCost(ship, o) > ACTION_POINTS) o.maneuverId = def.maneuverId;
+    out.push(o);
   }
   return out;
 }

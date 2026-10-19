@@ -60,6 +60,9 @@ export const SHIELD_RECHARGE_PER_TURN = 10;
 /** Zranění za náraz (do asteroidu, okraje mapy i jiné lodi). */
 export const COLLISION_DAMAGE = 15;
 
+/** Počet akcí na kolo (úprava pohybu, otočka, lasery, torpédo, mina – každá 1). */
+export const ACTION_POINTS = 2;
+
 /** Stresové body: zásoba, cena manévrů, dobití za zelený manévr, poškození za nebezpečný (% trupu). */
 export const STRESS = {
   max: 3,
