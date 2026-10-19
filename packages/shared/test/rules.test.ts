@@ -332,7 +332,7 @@ describe("vyhodnocení kola", () => {
   it("torpédo lze sestřelit ručně zaměřeným laserem", () => {
     const g = game();
     place(g, "ship-p1-0", 500, 500, 0);
-    place(g, "ship-p2-0", 1300, 500, Math.PI);
+    place(g, "ship-p2-0", 1100, 500, Math.PI);
     let r = resolveTurn(
       g,
       [

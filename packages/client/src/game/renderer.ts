@@ -406,7 +406,7 @@ export class Renderer {
     for (const p of pts) ctx.lineTo(p.x, p.y);
     ctx.stroke();
     ctx.restore();
-    if (fire) this.drawArc(end, color);
+    if (fire) this.drawArc(ship, color); // lasery střílí ze startovní pozice, před pohybem
     ctx.save();
     ctx.strokeStyle = shade(color, 1.3);
     ctx.lineWidth = 1;

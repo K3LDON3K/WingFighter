@@ -187,7 +187,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     else if (m.minePick === "timer") details.append(h("span", { class: "warn" }, label("← klikni na mapě na čas výbuchu (✕ = jiné místo)")));
   } else if (o.fire) {
     const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? "torpédo") : null;
-    details.append(icon("target", "#4ade80"), h("span", { class: "txt" }, tname ?? "nejbližší ve výseči"), h("span", { class: "muted" }, label("· klik na nepřítele = cíl")));
+    details.append(icon("target", "#4ade80"), h("span", { class: "txt" }, tname ?? "nejbližší ve výseči"), h("span", { class: "muted" }, label("· střílí na začátku kola · klik na nepřítele = cíl")));
   } else {
     details.append(h("span", { class: "muted" }, "—"));
   }

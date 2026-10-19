@@ -20,8 +20,8 @@ Stejný příkaz funguje jako **dedikovaný server** na jakémkoli stroji s Node
   Host může přidat boty a nastavit mód (týmový deathmatch / deathmatch), limit kol a počet lodí na hráče.
 - Každé kolo **všichni tajně naplánují** manévr (rychlost + směr), akci po pohybu *nebo* speciální zbraň
   a cíl laserů. Po „Připraven“ od všech se kolo **vyhodnotí najednou** a přehraje.
-- Pořadí vyhodnocení: pohyb lodí a torpéd (včetně srážek a min) → akce → lasery (všichni naráz)
-  → vypuštění nových torpéd a min → dobití štítů (+1).
+- Pořadí vyhodnocení: **lasery** (všichni naráz, ze startovních pozic) → start torpéd a odhození min →
+  výbuch min (nepřítel v poli / odpočet) → pohyb lodí a torpéd (srážky, vlet do min) → dobití štítů.
 
 ### Manévry
 Manévr = **rychlost 1–5** + **změna kurzu** (po 15°, max ±90°; čím rychleji, tím menší povolený úhel)
@@ -54,8 +54,9 @@ paměti v podobě, v jaké ho naposledy viděl – poškození mimo dohled se ne
 Trup 100, štíty 50 (dobíjejí se 10 za kolo). Jeden čistý zásah laseru = 15.
 
 ### Zbraně
-- **Lasery** – každé kolo zdarma, výseč ±20° před přídí, dostřel 300 (3 pásma: blízko +1 kostka útoku,
-  daleko +1 kostka obrany). Střílí na preferovaný cíl, pokud je ve výseči, jinak na nejbližšího nepřítele.
+- **Lasery** (1 akce) – střílí **na začátku kola ze startovní pozice**, výseč ±20° před přídí, dostřel 300
+  (3 pásma: blízko +1 kostka útoku, daleko +1 kostka obrany). Střílí na preferovaný cíl, pokud je ve výseči,
+  jinak na nejbližšího nepřítele.
   **Nestřílí skrz asteroidy.**
 - **Torpédo** (3 ks, místo akce) – cíl: nepřátelská loď/torpédo do 320 (sleduje 3 kola) **nebo bod na mapě**
   do 1200 (letí tam a vybuchne). Rychlost 240/kolo, zatáčí max 75°/kolo, žije 5 kol.
@@ -94,6 +95,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.11 – lasery střílí na začátku kola ze startovní pozice (výseč se kreslí u lodi), animace: salvy → pohyb.
 - v1.10.1 – miny vybuchují na začátku kola (nepřítel v poli, nebo odpočet na nule), ne až na konci.
 - v1.10 – ladicí menu parametrů hry (host, lobby i bitva, platí pro všechny).
 - v1.9.2 – mina se odhazuje na začátku kola s animací letu na zvolené místo; ikony zbraní u konce dráhy odstraněny (jen lišta).

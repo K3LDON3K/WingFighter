@@ -113,28 +113,33 @@ export class TurnAnimation {
     let laserTime = 0;
     let laserCount = 0;
     const actionCount = ev.filter((e) => e.type === "action" && e.ok && e.path).length;
-    const lasersStart = MOVE_DURATION + (actionCount > 0 ? ACTION_DURATION + 200 : 200);
+    // lasery se střílí na začátku kola (před pohybem): nejdřív salvy, pak start pohybu
+    const preLasers = ev.filter((e, i) => (e.type === "laser" || e.type === "torpedoShot") && !ev.slice(0, i).some((x) => x.type === "move")).length;
+    const moveStart = preLasers > 0 ? preLasers * LASER_GAP + 350 : 0;
+    actionTime = moveStart + MOVE_DURATION;
+    const lasersStart = moveStart + MOVE_DURATION + (actionCount > 0 ? ACTION_DURATION + 200 : 200);
     let movePassed = false;
+    let preCount = 0;
 
     for (const e of ev) {
       let time: number;
       switch (e.type) {
         case "move":
-          time = 0;
+          time = moveStart;
           movePassed = true;
-          for (const p of e.paths) this.tweens.push({ id: p.id, kind: p.kind, points: p.points, start: 0, duration: MOVE_DURATION });
+          for (const p of e.paths) this.tweens.push({ id: p.id, kind: p.kind, points: p.points, start: moveStart, duration: MOVE_DURATION });
           break;
         case "collision":
         case "mineBlast":
         case "torpedoHit":
         case "asteroidHit":
-          time = e.t * MOVE_DURATION;
+          time = moveStart + e.t * MOVE_DURATION;
           break;
         case "torpedoExpire":
-          time = MOVE_DURATION;
+          time = moveStart + MOVE_DURATION;
           break;
         case "stress":
-          time = MOVE_DURATION;
+          time = moveStart + MOVE_DURATION;
           break;
         case "action":
           time = actionTime;
@@ -144,25 +149,30 @@ export class TurnAnimation {
           break;
         case "laser":
         case "torpedoShot":
-          time = lasersStart + laserCount * LASER_GAP;
-          laserCount++;
-          laserTime = time;
+          if (!movePassed) {
+            time = preCount * LASER_GAP;
+            preCount++;
+          } else {
+            time = lasersStart + laserCount * LASER_GAP;
+            laserCount++;
+            laserTime = time;
+          }
           break;
         case "damage":
         case "destroyed":
           time = lastTime + 60;
           break;
         case "spawnTorpedo":
-          time = movePassed ? Math.max(lasersStart, laserTime + LASER_GAP) + 150 : 0;
+          time = movePassed ? Math.max(lasersStart, laserTime + LASER_GAP) + 150 : moveStart;
           break;
         case "spawnMine":
-          time = movePassed ? Math.max(lasersStart, laserTime + LASER_GAP) + 150 : 0;
+          time = movePassed ? Math.max(lasersStart, laserTime + LASER_GAP) + 150 : moveStart;
           break;
       }
       lastTime = time;
       this.schedule.push({ time, event: e, fired: false });
     }
-    this.total = Math.max(MOVE_DURATION + 400, ...this.schedule.map((s) => s.time + 500));
+    this.total = Math.max(moveStart + MOVE_DURATION + 400, ...this.schedule.map((s) => s.time + 500));
   }
 
   update(now: number) {
@@ -174,7 +184,7 @@ export class TurnAnimation {
 
     for (const s of this.schedule) {
       if (s.fired || s.time > t) continue;
-      if (s.event.type !== "spawnTorpedo" || s.time !== 0) continue;
+      if (s.event.type !== "spawnTorpedo") continue;
       s.fired = true;
       this.fire(s.event, now);
     }

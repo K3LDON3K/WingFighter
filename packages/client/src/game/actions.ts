@@ -23,7 +23,7 @@ export const ACTIONS: ActionOption[] = [
     id: "laser",
     glyph: "⚡",
     label: "Lasery (1 akce)",
-    description: "Po pohybu vystřelí lasery na cíl ve výseči ±20° do 300 (preferovaný cíl, jinak nejbližší nepřítel; ne skrz asteroid). Bez této akce loď nestřílí.",
+    description: "Na začátku kola (před pohybem) vystřelí lasery ze současné pozice na cíl ve výseči ±20° do 300 (preferovaný cíl, jinak nejbližší nepřítel; ne skrz asteroid). Bez této akce loď nestřílí.",
     disabled: (ship, _s, o) => noAp(ship, o, !!o.fire),
     active: (o) => !!o.fire,
     apply: (o) => ({ fire: !o.fire }),

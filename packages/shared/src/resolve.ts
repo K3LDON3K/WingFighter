@@ -218,7 +218,73 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   const startPose = new Map<string, Pose>();
   for (const ship of state.ships) startPose.set(ship.id, { x: ship.x, y: ship.y, heading: ship.heading });
 
-  /* ---------- 1. Pohyb (lodě i torpéda současně) ---------- */
+  /* ---------- 1. Lasery (všichni současně, ze startovních pozic, před pohybem) ---------- */
+  const pending = new Map<string, number>();
+  const shotTorpedoes = new Set<string>();
+  for (const ship of state.ships) {
+    if (!ship.alive) continue;
+    const o = orders.get(ship.id)!;
+    if (!o.fire || ship.stats.attack <= 0) continue;
+
+    const torp = torpedoById(state, o.preferredTargetId);
+    if (torp && torp.team !== ship.team) {
+      if (dist(ship, torp) <= LASER.range && inArc(ship, torp, LASER.halfArc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, ship, torp)) {
+        const d = dist(ship, torp);
+        const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
+        const outcome = resolveAttack(rng, {
+          attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0),
+          defenseDice: TORPEDO_AGILITY + (rangeBand === 3 ? 1 : 0),
+          attackerFocus: ship.tokens.focus > 0,
+          attackerLock: false,
+          defenderFocus: false,
+          defenderEvade: false,
+        });
+        const destroyed = outcome.damage > 0;
+        if (destroyed) shotTorpedoes.add(torp.id);
+        events.push({ type: "torpedoShot", torpedoId: torp.id, shooterId: ship.id, x: torp.x, y: torp.y, attackDice: outcome.attackDice, defenseDice: outcome.defenseDice, destroyed });
+      }
+      continue;
+    }
+
+    const candidates = state.ships.filter(
+      (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(ship, e, LASER.halfArc) && !lineBlocked(state.asteroids, ship, e),
+    );
+    if (candidates.length === 0) continue;
+    let target = candidates.find((c) => c.id === o.preferredTargetId);
+    if (!target) target = candidates.reduce((best, c) => (dist(ship, c) < dist(ship, best) ? c : best));
+    const d = dist(ship, target);
+    const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
+    const useLock = ship.lockTargetId === target.id;
+    const outcome = resolveAttack(rng, {
+      attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0),
+      defenseDice: target.stats.agility + (rangeBand === 3 ? 1 : 0),
+      attackerFocus: ship.tokens.focus > 0,
+      attackerLock: useLock,
+      defenderFocus: target.tokens.focus > 0,
+      defenderEvade: target.tokens.evade > 0,
+    });
+    if (useLock) ship.lockTargetId = undefined;
+    const damage = outcome.damage * RULES.damagePerHit;
+    events.push({
+      type: "laser",
+      shooterId: ship.id,
+      targetId: target.id,
+      from: { x: ship.x, y: ship.y, heading: ship.heading },
+      to: { x: target.x, y: target.y, heading: target.heading },
+      attackDice: outcome.attackDice,
+      defenseDice: outcome.defenseDice,
+      hits: outcome.hits,
+      evades: outcome.evades,
+      damage,
+      rangeBand,
+    });
+    pending.set(target.id, (pending.get(target.id) ?? 0) + damage);
+  }
+  for (const [id, dmg] of pending) applyDamage(shipById(state, id)!, dmg, events);
+  state.torpedoes = state.torpedoes.filter((t) => !shotTorpedoes.has(t.id));
+
+
+  /* ---------- 2. Pohyb (lodě i torpéda současně) ---------- */
   const shipMovers = new Map<string, Mover>();
   const maneuverOf = new Map<string, Maneuver>();
   for (const ship of state.ships) {
@@ -651,71 +717,6 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       }
     }
   }
-
-  /* ---------- 3. Lasery (všichni současně) ---------- */
-  const pending = new Map<string, number>();
-  const shotTorpedoes = new Set<string>();
-  for (const ship of state.ships) {
-    if (!ship.alive) continue;
-    const o = orders.get(ship.id)!;
-    if (!o.fire || ship.stats.attack <= 0) continue;
-
-    const torp = torpedoById(state, o.preferredTargetId);
-    if (torp && torp.team !== ship.team) {
-      if (dist(ship, torp) <= LASER.range && inArc(ship, torp, LASER.halfArc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, ship, torp)) {
-        const d = dist(ship, torp);
-        const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
-        const outcome = resolveAttack(rng, {
-          attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0),
-          defenseDice: TORPEDO_AGILITY + (rangeBand === 3 ? 1 : 0),
-          attackerFocus: ship.tokens.focus > 0,
-          attackerLock: false,
-          defenderFocus: false,
-          defenderEvade: false,
-        });
-        const destroyed = outcome.damage > 0;
-        if (destroyed) shotTorpedoes.add(torp.id);
-        events.push({ type: "torpedoShot", torpedoId: torp.id, shooterId: ship.id, x: torp.x, y: torp.y, attackDice: outcome.attackDice, defenseDice: outcome.defenseDice, destroyed });
-      }
-      continue;
-    }
-
-    const candidates = state.ships.filter(
-      (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(ship, e, LASER.halfArc) && !lineBlocked(state.asteroids, ship, e),
-    );
-    if (candidates.length === 0) continue;
-    let target = candidates.find((c) => c.id === o.preferredTargetId);
-    if (!target) target = candidates.reduce((best, c) => (dist(ship, c) < dist(ship, best) ? c : best));
-    const d = dist(ship, target);
-    const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
-    const useLock = ship.lockTargetId === target.id;
-    const outcome = resolveAttack(rng, {
-      attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0),
-      defenseDice: target.stats.agility + (rangeBand === 3 ? 1 : 0),
-      attackerFocus: ship.tokens.focus > 0,
-      attackerLock: useLock,
-      defenderFocus: target.tokens.focus > 0,
-      defenderEvade: target.tokens.evade > 0,
-    });
-    if (useLock) ship.lockTargetId = undefined;
-    const damage = outcome.damage * RULES.damagePerHit;
-    events.push({
-      type: "laser",
-      shooterId: ship.id,
-      targetId: target.id,
-      from: { x: ship.x, y: ship.y, heading: ship.heading },
-      to: { x: target.x, y: target.y, heading: target.heading },
-      attackDice: outcome.attackDice,
-      defenseDice: outcome.defenseDice,
-      hits: outcome.hits,
-      evades: outcome.evades,
-      damage,
-      rangeBand,
-    });
-    pending.set(target.id, (pending.get(target.id) ?? 0) + damage);
-  }
-  for (const [id, dmg] of pending) applyDamage(shipById(state, id)!, dmg, events);
-  state.torpedoes = state.torpedoes.filter((t) => !shotTorpedoes.has(t.id));
 
   /* ---------- 5. Konec kola ---------- */
   for (const mine of state.mines) mine.armed = true;
