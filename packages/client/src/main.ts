@@ -248,6 +248,16 @@ function resetOrders() {
   ensureVisible(game.selectedShipId);
 }
 
+/** Vycentruje kameru na loď. */
+function centerOnShip(shipId: string | undefined) {
+  if (!game || !cam || !shipId) return;
+  const s = game.state.ships.find((x) => x.id === shipId);
+  if (!s) return;
+  cam.x = s.x - cam.viewW / cam.zoom / 2;
+  cam.y = s.y - cam.viewH / cam.zoom / 2;
+  cam.clampTo(game.state.width, game.state.height);
+}
+
 /** Když je loď mimo záběr, vycentruje na ni kameru. */
 function ensureVisible(shipId: string | undefined) {
   if (!game || !cam || !shipId) return;
@@ -363,7 +373,13 @@ function mountGame() {
     hudEl,
     h("div", { class: "hint" }, "KLIK NA LOD = KRESLIT DRAHU · KLIK = POTVRDIT · KLIK NA NEPRITELE = CIL · TAZENI = POSUN · CMD/CTRL+KOLECKO = ZOOM"),
     sideEl,
-    h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => ((tuningOpen = !tuningOpen), renderSide()) }, icon("target", "currentColor", 12), label("ladění")),
+    h(
+      "div",
+      { class: "map-tools" },
+      h("button", { class: "gear", title: "Vycentrovat mapu na vybranou loď", onclick: () => centerOnShip(game?.selectedShipId) }, icon("center", "currentColor", 12), label("centrovat")),
+      h("button", { class: "gear", id: "inv-btn", title: "Inventář lodi (připravuje se)", onclick: () => ((game!.inventoryOpen = !game!.inventoryOpen), renderSide()) }, icon("inventory", "currentColor", 12), label("inventář")),
+      h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => ((tuningOpen = !tuningOpen), renderSide()) }, icon("target", "currentColor", 12), label("ladění")),
+    ),
     tooltipEl,
     overlayEl,
     tuneEl,
@@ -685,19 +701,14 @@ function renderSide() {
         g.shieldEdit = false;
         renderSide();
       },
-      centerOn: (id) => {
-        const s = game!.state.ships.find((x) => x.id === id);
-        if (!s || !cam) return;
-        cam.x = s.x - cam.viewW / cam.zoom / 2;
-        cam.y = s.y - cam.viewH / cam.zoom / 2;
-        cam.clampTo(game!.state.width, game!.state.height);
-      },
+      centerOn: (id) => centerOnShip(id),
       inventory: () => {
         game!.inventoryOpen = !game!.inventoryOpen;
         renderSide();
       },
     },
   );
+  document.getElementById("inv-btn")?.classList.toggle("on", game.inventoryOpen);
   if (game.inventoryOpen) {
     sideEl.append(
       h(
