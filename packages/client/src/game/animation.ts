@@ -31,11 +31,14 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "collision":
         lines.push(
           e.with === "ship"
-            ? `${name(e.shipId)} se srazil s ${name(e.otherId!)}.`
+            ? `${name(e.shipId)} se srazil s ${name(e.otherId!)} a byl odmrštěn (−1).`
             : e.with === "asteroid"
-              ? `${name(e.shipId)} narazil do asteroidu (−1).`
+              ? `${name(e.shipId)} narazil do asteroidu a byl odmrštěn (−1).`
               : `${name(e.shipId)} narazil do okraje mapy (−1).`,
         );
+        break;
+      case "torpedoShot":
+        lines.push(`${name(e.shooterId)} pálí na torpédo: ${e.attackDice.map(die).join(" ")} vs ${e.defenseDice.map(die).join(" ")} → ${e.destroyed ? "sestřeleno!" : "minul"}.`);
         break;
       case "mineBlast":
         lines.push(`Výbuch miny: ${e.hits.map((h) => `${name(h.shipId)} −${h.damage}`).join(", ")}.`);
@@ -120,6 +123,7 @@ export class TurnAnimation {
           }
           break;
         case "laser":
+        case "torpedoShot":
           time = lasersStart + laserCount * LASER_GAP;
           laserCount++;
           laserTime = time;
@@ -219,6 +223,20 @@ export class TurnAnimation {
         if (shooter) {
           shooter.tokens.focus = 0;
           if (shooter.lockTargetId === e.targetId) shooter.lockTargetId = undefined;
+        }
+        break;
+      }
+      case "torpedoShot": {
+        const shooter = v.ships.find((x) => x.id === e.shooterId);
+        const torp = v.torpedoes.find((x) => x.id === e.torpedoId);
+        const color = TEAM_COLORS[shooter?.team ?? 0];
+        if (shooter) {
+          const to = torp ?? { x: e.x, y: e.y, heading: 0 };
+          v.effects.push({ kind: "laser", from: { x: shooter.x, y: shooter.y, heading: shooter.heading }, to: { x: to.x, y: to.y, heading: 0 }, color, start: now, duration: 420, hit: e.destroyed });
+          if (e.destroyed) {
+            v.torpedoes = v.torpedoes.filter((x) => x.id !== e.torpedoId);
+            v.effects.push({ kind: "explosion", x: to.x, y: to.y, size: 22, start: now + 100, duration: 500 });
+          } else v.effects.push({ kind: "text", x: to.x, y: to.y, text: "minul", color: "#cbd5e1", start: now + 100, duration: 700 });
         }
         break;
       }

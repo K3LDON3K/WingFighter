@@ -1,4 +1,4 @@
-import { FIGHTER_DIAL } from "./maneuvers.ts";
+import { FIGHTER_PROFILE } from "./maneuvers.ts";
 import type { HullDef, ModuleDef, ShipLoadout, ShipStats } from "./types.ts";
 
 /**
@@ -14,7 +14,7 @@ export const HULLS: Record<string, HullDef> = {
     hull: 3,
     capacity: 6,
     slots: { weapon: 2, system: 1 },
-    dial: FIGHTER_DIAL,
+    profile: FIGHTER_PROFILE,
   },
 };
 

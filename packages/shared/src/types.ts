@@ -2,17 +2,25 @@ import type { Pose } from "./geometry.ts";
 
 export type GameMode = "tdm" | "dm";
 
-export type ManeuverKind = "straight" | "bank" | "turn" | "koiogran";
 export type Side = "left" | "right";
-export type Difficulty = "green" | "white" | "red";
+/** zelený = odstraní stres · bílý · červený = stres, bez akce · nebezpečný = červený + 1 zranění */
+export type Difficulty = "green" | "white" | "red" | "danger";
 
+/** Manévr = rychlost (1–5) + změna kurzu ve stupních (po 15°, záporné = vlevo), případně otočka o 180°. */
 export interface Maneuver {
-  /** Stabilní identifikátor, např. "bank-2-left". */
+  /** Stabilní identifikátor, např. "m3a-30" nebo "k3". */
   id: string;
-  kind: ManeuverKind;
   speed: number;
-  side?: Side;
+  angle: number;
+  koiogran: boolean;
   difficulty: Difficulty;
+}
+
+/** Co motor/trup dovolí. Index pole maxAngle = rychlost. */
+export interface ManeuverProfile {
+  maxSpeed: number;
+  maxAngle: number[];
+  koiogranSpeeds: number[];
 }
 
 /** Akce po pohybu – jedna za kolo (nebo místo ní speciální zbraň). */
@@ -32,7 +40,7 @@ export interface ShipOrders {
   action?: ActionOrder;
   special?: SpecialOrder;
   fire: boolean;
-  /** Preferovaný cíl laserů; když není ve výseči, střílí se na nejbližšího nepřítele. */
+  /** Preferovaný cíl laserů (loď nebo torpédo); když není ve výseči, střílí se na nejbližší nepřátelskou loď. */
   preferredTargetId?: string;
 }
 
@@ -46,8 +54,8 @@ export interface HullDef {
   /** Nosnost pro moduly (v1 nevyužito, připraveno pro inventář). */
   capacity: number;
   slots: { weapon: number; system: number };
-  /** Dostupné manévry ("ciferník"). */
-  dial: Maneuver[];
+  /** Pohybové možnosti lodi. */
+  profile: ManeuverProfile;
 }
 
 export interface ModuleDef {
@@ -91,6 +99,8 @@ export interface Ship extends Pose {
   hull: number;
   shields: number;
   stress: number;
+  /** Rychlost posledního manévru (prudká změna o 2+ = červený manévr). */
+  speed: number;
   tokens: { focus: number; evade: number };
   lockTargetId?: string;
   ammo: { torpedoes: number; mines: number };
@@ -170,10 +180,11 @@ export type DieFace = "hit" | "crit" | "focus" | "blank" | "evade";
 /** Události jednoho kola – klient podle nich animuje. */
 export type TurnEvent =
   | { type: "move"; paths: MovePath[] }
-  | { type: "collision"; shipId: string; with: "ship" | "asteroid" | "edge"; otherId?: string; t: number }
+  | { type: "collision"; shipId: string; with: "ship" | "asteroid" | "edge"; otherId?: string; t: number; newHeading: number }
   | { type: "mineBlast"; mineId: string; x: number; y: number; t: number; hits: { shipId: string; damage: number }[] }
   | { type: "torpedoHit"; torpedoId: string; shipId?: string; x: number; y: number; t: number; damage: number }
   | { type: "torpedoExpire"; torpedoId: string; x: number; y: number }
+  | { type: "torpedoShot"; torpedoId: string; shooterId: string; x: number; y: number; attackDice: DieFace[]; defenseDice: DieFace[]; destroyed: boolean }
   | { type: "action"; shipId: string; action: ActionOrder; ok: boolean; path?: Pose[] }
   | {
       type: "laser";

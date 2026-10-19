@@ -358,6 +358,11 @@ h3 {
   padding: 4px 8px;
   font-size: 12px;
 }
+.choices.dir button {
+  padding: 4px 4px;
+  font-size: 11px;
+  min-width: 34px;
+}
 .choices button.active {
   background: #1e3a5f;
   border-color: var(--accent);

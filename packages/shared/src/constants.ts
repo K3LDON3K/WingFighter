@@ -1,8 +1,8 @@
 /** Herní konstanty – tady se ladí čísla. Vše v herních jednotkách (1 jednotka ≈ 1 px při zoomu 1). */
 
 export const MAP = {
-  width: 1800,
-  height: 1200,
+  width: 2400,
+  height: 1600,
 };
 
 /** Délka jednoho "dílku" manévru – rychlost 3 = 3 dílky. */
@@ -46,8 +46,14 @@ export const MINE = {
 
 export const SHIELD_RECHARGE_PER_TURN = 1;
 
-/** Zranění za náraz do asteroidu nebo okraje mapy. */
-export const ASTEROID_COLLISION_DAMAGE = 1;
+/** Zranění za náraz (do asteroidu, okraje mapy i jiné lodi). */
+export const COLLISION_DAMAGE = 1;
+/** Max. náhodná odchylka směru po odmrštění (radiány). */
+export const COLLISION_SCATTER = (40 * Math.PI) / 180;
+/** Kolikrát se loď může v jednom kole odrazit, než se zastaví. */
+export const MAX_DEFLECTIONS = 4;
+/** Obranné kostky torpéda při pokusu o sestřelení laserem. */
+export const TORPEDO_AGILITY = 2;
 
 /** Rozsah dostřelu zaměřovače (akce "zámek cíle"). */
 export const LOCK_RANGE = 300;

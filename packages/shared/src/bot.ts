@@ -1,6 +1,6 @@
 import { LASER, TORPEDO } from "./constants.ts";
 import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from "./geometry.ts";
-import { maneuverEnd, maneuverPath } from "./maneuvers.ts";
+import { isRed, listManeuvers, maneuverEnd, maneuverPath } from "./maneuvers.ts";
 import type { Rng } from "./rng.ts";
 import { hullOf } from "./ships.ts";
 import type { GameState, Ship, ShipOrders } from "./types.ts";
@@ -14,7 +14,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
   const myShips = state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const ship of myShips) {
     const enemies = state.ships.filter((e) => e.alive && e.team !== ship.team);
-    const dial = hullOf(ship.loadout).dial.filter((m) => !(m.difficulty === "red" && ship.stress > 0));
+    const dial = listManeuvers(hullOf(ship.loadout).profile, ship.speed).filter((m) => !(isRed(m.difficulty) && ship.stress > 0) && m.difficulty !== "danger");
     let best = dial[0];
     let bestScore = -Infinity;
     for (const man of dial) {
@@ -26,7 +26,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
         if (p.x < r || p.y < r || p.x > state.width - r || p.y > state.height - r) score -= 15;
         for (const a of state.asteroids) if (circlesOverlap(p, r, a, a.radius)) score -= 15;
       }
-      if (man.difficulty === "red") score -= 3;
+      if (isRed(man.difficulty)) score -= 3;
       if (man.difficulty === "green" && ship.stress > 0) score += 4;
       if (score > bestScore) {
         bestScore = score;
@@ -39,7 +39,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
 
     const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, fire: true, preferredTargetId: nearest?.id };
     const canAct = ship.stress === 0 || best.difficulty === "green";
-    if (canAct && best.difficulty !== "red") {
+    if (canAct && !isRed(best.difficulty)) {
       const torpTarget = enemies.find((e) => dist(ship, e) <= TORPEDO.lockRange);
       if (ship.ammo.torpedoes > 0 && torpTarget && rng.next() < 0.45) {
         orders.special = { type: "torpedo", targetId: torpTarget.id };

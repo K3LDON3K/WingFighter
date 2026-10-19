@@ -5,15 +5,22 @@ import type { Asteroid, GameSettings, GameState, PlayerInfo, Ship, ShipLoadout }
 
 /** Mapa 1 – statické asteroidy (vx, vy = 0; v budoucnu mohou létat). */
 export const MAP_1_ASTEROIDS: Asteroid[] = [
-  { id: "a1", x: 900, y: 600, radius: 70, vx: 0, vy: 0, seed: 11 },
-  { id: "a2", x: 650, y: 350, radius: 45, vx: 0, vy: 0, seed: 23 },
-  { id: "a3", x: 1150, y: 850, radius: 50, vx: 0, vy: 0, seed: 37 },
-  { id: "a4", x: 1200, y: 320, radius: 35, vx: 0, vy: 0, seed: 41 },
-  { id: "a5", x: 600, y: 880, radius: 40, vx: 0, vy: 0, seed: 53 },
-  { id: "a6", x: 700, y: 160, radius: 30, vx: 0, vy: 0, seed: 67 },
-  { id: "a7", x: 1180, y: 1020, radius: 32, vx: 0, vy: 0, seed: 71 },
-  { id: "a8", x: 420, y: 600, radius: 28, vx: 0, vy: 0, seed: 83 },
-  { id: "a9", x: 1380, y: 600, radius: 28, vx: 0, vy: 0, seed: 97 },
+  { id: "a1", x: 1200, y: 800, radius: 80, vx: 0, vy: 0, seed: 11 },
+  { id: "a2", x: 850, y: 450, radius: 48, vx: 0, vy: 0, seed: 23 },
+  { id: "a3", x: 1550, y: 1150, radius: 52, vx: 0, vy: 0, seed: 37 },
+  { id: "a4", x: 1600, y: 420, radius: 38, vx: 0, vy: 0, seed: 41 },
+  { id: "a5", x: 800, y: 1180, radius: 42, vx: 0, vy: 0, seed: 53 },
+  { id: "a6", x: 950, y: 200, radius: 30, vx: 0, vy: 0, seed: 67 },
+  { id: "a7", x: 1550, y: 1400, radius: 32, vx: 0, vy: 0, seed: 71 },
+  { id: "a8", x: 560, y: 800, radius: 30, vx: 0, vy: 0, seed: 83 },
+  { id: "a9", x: 1840, y: 800, radius: 30, vx: 0, vy: 0, seed: 97 },
+  { id: "a10", x: 1250, y: 1300, radius: 36, vx: 0, vy: 0, seed: 101 },
+  { id: "a11", x: 1150, y: 330, radius: 26, vx: 0, vy: 0, seed: 113 },
+  { id: "a12", x: 2050, y: 300, radius: 34, vx: 0, vy: 0, seed: 127 },
+  { id: "a13", x: 350, y: 1250, radius: 34, vx: 0, vy: 0, seed: 131 },
+  { id: "a14", x: 1950, y: 1250, radius: 44, vx: 0, vy: 0, seed: 137 },
+  { id: "a15", x: 450, y: 350, radius: 40, vx: 0, vy: 0, seed: 139 },
+  { id: "a16", x: 1400, y: 600, radius: 24, vx: 0, vy: 0, seed: 149 },
 ];
 
 /** Startovní zóny: střed zóny a kurz směrem do mapy. */
@@ -89,6 +96,7 @@ export function createGame(opts: CreateGameOptions): GameState {
           hull: stats.hull,
           shields: stats.shields,
           stress: 0,
+          speed: 2,
           tokens: { focus: 0, evade: 0 },
           ammo: { torpedoes: stats.torpedoes, mines: stats.mines },
           alive: true,

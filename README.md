@@ -18,14 +18,21 @@ Stejný příkaz funguje jako **dedikovaný server** na jakémkoli stroji s Node
 
 - V lobby si zvol jméno, vytvoř místnost (nebo se připoj kódem / ze seznamu), vyber tým.
   Host může přidat boty a nastavit mód (týmový deathmatch / deathmatch), limit kol a počet lodí na hráče.
-- Každé kolo **všichni tajně naplánují** manévr (ciferník), akci po pohybu *nebo* speciální zbraň
+- Každé kolo **všichni tajně naplánují** manévr (rychlost + směr), akci po pohybu *nebo* speciální zbraň
   a cíl laserů. Po „Připraven“ od všech se kolo **vyhodnotí najednou** a přehraje.
 - Pořadí vyhodnocení: pohyb lodí a torpéd (včetně srážek a min) → akce → lasery (všichni naráz)
   → vypuštění nových torpéd a min → dobití štítů (+1).
 
 ### Manévry
-Zelené odstraňují stres, červené ho způsobí (loď pak nemůže provést akci a příště nesmí červený manévr).
-Srážka s lodí zastaví obě lodě; náraz do asteroidu nebo okraje mapy zastaví loď a dá 1 zranění.
+Manévr = **rychlost 1–5** + **změna kurzu** (po 15°, max ±90°; čím rychleji, tím menší povolený úhel)
+nebo **otočka o 180°** (rychlost 3–4). Nastavuje se myší přímo u lodi: klik na loď → pohyb myši = směr,
+kolečko = rychlost, klik = potvrdit; nebo tažením od lodi (vzdálenost = rychlost). Klávesy 1–5, šipky, K.
+Barva manévru: **zelený** (mírný; odstraní stres), **bílý**, **červený** (ostrý úhel *nebo* změna rychlosti
+o 2 a víc; způsobí stres → bez akce, příště žádný červený), **nebezpečný** (změna rychlosti o 2+ *a* ostrý
+úhel; jako červený + 1 zranění). Kolem lodi se zobrazují dosažitelné pozice obarvené podle náročnosti.
+
+Lodě nikdy nestojí: při srážce s lodí, asteroidem nebo okrajem mapy je loď **odmrštěna** novým (náhodně
+odchýleným) směrem, dostane 1 zranění, ztratí akci a doletí zbytek pohybu tím směrem.
 
 ### Akce (jedna za kolo)
 zaměřit (oči na kostkách = zásah/úhyb) · úhyb (+1 úhyb) · zámek cíle (přehození kostek)
@@ -34,10 +41,12 @@ zaměřit (oči na kostkách = zásah/úhyb) · úhyb (+1 úhyb) · zámek cíle
 ### Zbraně
 - **Lasery** – každé kolo zdarma, výseč ±20° před přídí, dostřel 300 (3 pásma: blízko +1 kostka útoku,
   daleko +1 kostka obrany). Střílí na preferovaný cíl, pokud je ve výseči, jinak na nejbližšího nepřítele.
-- **Torpédo** (3 ks, místo akce) – cíl musí být v zaměřovacím dostřelu 320. Letí rychlostí 240/kolo,
-  zatáčí max 75°/kolo, cíl sleduje 3 kola, žije 5 kol, zranění 3. Vybuchne o cokoliv.
+- **Torpédo** (3 ks, místo akce) – cíl (loď nebo nepřátelské torpédo) musí být v zaměřovacím dostřelu 320.
+  Letí rychlostí 240/kolo, zatáčí max 75°/kolo, cíl sleduje 3 kola, žije 5 kol, zranění 3. Vybuchne o cokoliv.
+  **Sestřelení:** torpédo jde ručně označit jako cíl laserů (2 obranné kostky, každý zásah ho zničí)
+  nebo jako cíl jiného torpéda.
 - **Mina** (2 ks, místo akce) – zůstane na místě, kde loď kolo začala. Aktivní od příštího kola,
-  spustí ji kdokoliv (i vlastní loď) při vstupu do pole (poloměr 70), zranění 2 všem v poli.
+  spustí ji kdokoliv (i vlastní loď) nebo torpédo při vstupu do pole (poloměr 70), zranění 2 všem v poli.
 
 Všechna čísla jsou v `packages/shared/src/constants.ts` a `ships.ts`.
 
@@ -58,6 +67,11 @@ Příkazy (z kořenové složky):
 | `npm run dev`   | vývojový režim (server s auto-restartem + Vite na portu 5173)  |
 | `npm test`      | testy herních pravidel                                         |
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
+
+## Historie změn
+- v1.1 – manévr myší (rychlost + úhel místo ciferníku), odmrštění při srážce, sestřelování torpéd,
+  torpéda spouští miny, větší mapa (2400×1600), oprava zadávání jména.
+- v1 – první hratelný prototyp.
 
 ## Co bude dál (v2)
 Utkání o více bitvách, vylepšování lodí mezi bitvami (inventář: trup + moduly, sloty),

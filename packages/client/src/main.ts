@@ -1,11 +1,18 @@
 import {
+  ANGLE_STEP,
   defaultOrders,
-  findManeuver,
   hullOf,
+  isRed,
+  makeManeuver,
+  maneuverEnd,
+  MAX_ANGLE,
+  MOVE_UNIT,
+  normalizeAngle,
+  parseManeuverId,
+  resolveManeuver,
   TEAM_COLORS,
   TEAM_NAMES,
   type GameState,
-  type Maneuver,
   type RoomState,
   type RoomSummary,
   type ShipOrders,
@@ -14,7 +21,7 @@ import {
 import { clear, h } from "./dom.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
-import { renderPlanning } from "./game/planning.ts";
+import { DIFFICULTY_COLOR, renderPlanning } from "./game/planning.ts";
 import { Renderer, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
@@ -34,8 +41,8 @@ interface GameSession {
   submitted: boolean;
   ready: string[];
   log: { turn: number; lines: string[] }[];
-  hoverManeuver: Maneuver | null;
-  pickingTorpedo: boolean;
+  /** Míření myší: pohyb = směr, kolečko = rychlost, klik = potvrdit. */
+  aiming: { shipId: string; drag: boolean } | null;
   hoverShipId?: string;
 }
 
@@ -142,8 +149,7 @@ function startGame(state: GameState) {
     submitted: false,
     ready: [],
     log: [],
-    hoverManeuver: null,
-    pickingTorpedo: false,
+    aiming: null,
   };
   resetOrders();
   screen = "game";
@@ -161,13 +167,35 @@ function resetOrders() {
   game.orders.clear();
   const my = game.state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const s of my) {
+    // výchozí manévr: stejná rychlost jako minule, rovně; pálit
+    const profile = hullOf(s.loadout).profile;
     const o = defaultOrders(s);
-    // rozumný výchozí manévr: rovně 2, pálit na nejbližšího
-    game.orders.set(s.id, { ...o, maneuverId: findManeuver(hullOf(s.loadout).dial, "straight-2")?.id ?? o.maneuverId, fire: true });
+    const keep = makeManeuver(profile, s.speed, 0, false, s.speed);
+    game.orders.set(s.id, { ...o, maneuverId: keep && !(isRed(keep.difficulty) && s.stress > 0) ? keep.id : o.maneuverId, fire: true });
   }
   if (!game.selectedShipId || !my.some((s) => s.id === game!.selectedShipId)) game.selectedShipId = my[0]?.id;
   game.submitted = false;
-  game.pickingTorpedo = false;
+  game.aiming = null;
+}
+
+/** Nastaví manévr; úhel ořízne na to, co loď při dané rychlosti zvládne. */
+function setManeuver(shipId: string, speed: number, angle: number, koiogran: boolean) {
+  if (!game) return;
+  const ship = game.state.ships.find((s) => s.id === shipId);
+  const o = game.orders.get(shipId);
+  if (!ship || !o) return;
+  const profile = hullOf(ship.loadout).profile;
+  speed = Math.max(1, Math.min(profile.maxSpeed, Math.round(speed)));
+  let man = makeManeuver(profile, speed, angle, koiogran, ship.speed);
+  if (!man && !koiogran) {
+    const max = profile.maxAngle[speed];
+    const clamped = Math.sign(angle) * Math.min(Math.abs(angle), max);
+    man = makeManeuver(profile, speed, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, false, ship.speed);
+  }
+  if (!man) return;
+  if (isRed(man.difficulty) && ship.stress > 0) return;
+  game.orders.set(shipId, { ...o, maneuverId: man.id });
+  renderSide();
 }
 
 function pumpQueue() {
@@ -176,7 +204,7 @@ function pumpQueue() {
   game.anim = new TurnAnimation(game.state, result);
   const lines = describeEvents(result, game.state);
   game.submitted = false;
-  game.pickingTorpedo = false;
+  game.aiming = null;
   renderSide();
   const finish = () => {
     if (!game) return;
@@ -196,7 +224,7 @@ function submitOrders() {
   if (!game) return;
   net.send({ type: "submitOrders", orders: [...game.orders.values()] });
   game.submitted = true;
-  game.pickingTorpedo = false;
+  game.aiming = null;
   renderSide();
 }
 
@@ -219,7 +247,7 @@ function mountGame() {
   canvas = h("canvas");
   hudEl = h("div", { class: "hud" });
   overlayEl = h("div");
-  mapEl = h("div", { class: "map" }, canvas, hudEl, h("div", { class: "hint" }, "kolečko = zoom · tažení = posun · klik na nepřítele = cíl"), overlayEl);
+  mapEl = h("div", { class: "map" }, canvas, hudEl, h("div", { class: "hint" }, "klik na svou loď / tažení od ní = manévr · kolečko = rychlost (při míření) nebo zoom · tažení = posun · klik na nepřítele či torpédo = cíl · K = otočka · Esc = zrušit míření"), overlayEl);
   sideEl = h("div", { class: "side" });
   app.append(h("div", { class: "game" }, mapEl, sideEl));
 
@@ -247,6 +275,14 @@ function mountGame() {
   resize();
   cam.fit(game!.state.width, game!.state.height);
   fitted = true;
+  // začít přiblížené na vlastní loď
+  const mine = game!.state.ships.find((s) => s.ownerId === playerId && s.alive);
+  if (mine && cam.zoom < 0.8) {
+    cam.zoom = 0.8;
+    cam.x = mine.x - cam.viewW / cam.zoom / 2;
+    cam.y = mine.y - cam.viewH / cam.zoom / 2;
+    cam.clampTo(game!.state.width, game!.state.height);
+  }
 
   bindInput(canvas);
   renderSide();
@@ -289,9 +325,21 @@ function buildOverlay(view: ViewModel): Overlay {
   overlay.selectedShipId = sel.id;
   overlay.showArc = true;
   const o = g.orders.get(sel.id);
-  const dial = hullOf(g.state.ships.find((s) => s.id === sel.id)!.loadout).dial;
-  const man = g.hoverManeuver ?? (o ? findManeuver(dial, o.maneuverId) : undefined);
+  const ship = g.state.ships.find((s) => s.id === sel.id)!;
+  const profile = hullOf(ship.loadout).profile;
+  const man = o ? resolveManeuver(profile, o.maneuverId, ship.speed) : null;
   if (man) overlay.preview = { ship: sel, maneuver: man };
+  overlay.aiming = !!g.aiming;
+  if (!g.submitted && man) {
+    const dots: { x: number; y: number; color: string }[] = [];
+    for (let a = -MAX_ANGLE; a <= MAX_ANGLE; a += ANGLE_STEP) {
+      const mm = makeManeuver(profile, man.speed, a, false, ship.speed);
+      if (!mm || (isRed(mm.difficulty) && ship.stress > 0)) continue;
+      const e = maneuverEnd(ship, mm);
+      dots.push({ x: e.x, y: e.y, color: DIFFICULTY_COLOR[mm.difficulty] });
+    }
+    overlay.reachable = dots;
+  }
   if (o?.special?.type === "torpedo") {
     overlay.showTorpedoRange = true;
     overlay.targetId = o.special.targetId || undefined;
@@ -374,20 +422,14 @@ function renderSide() {
         const cur = game!.orders.get(id);
         if (!cur) return;
         game!.orders.set(id, { ...cur, ...patch });
-        if (!(patch.special?.type === "torpedo")) game!.pickingTorpedo = false;
         renderSide();
       },
+      setManeuver,
       ready: submitOrders,
       unready: () => {
         net.send({ type: "unready" });
         game!.submitted = false;
         renderSide();
-      },
-      hoverManeuver: (m) => {
-        game!.hoverManeuver = m;
-      },
-      pickingTorpedoTarget: (on) => {
-        game!.pickingTorpedo = on;
       },
     },
   );
@@ -406,80 +448,180 @@ function renderSide() {
 /* ------------------------------------------------------------------ */
 
 function bindInput(c: HTMLCanvasElement) {
-  let dragging = false;
+  let panning = false;
   let moved = false;
   let lastX = 0;
   let lastY = 0;
+  let downOnOwnShip: string | null = null;
+
+  const worldPos = (e: MouseEvent) => {
+    const rect = c.getBoundingClientRect();
+    return cam!.toWorld(e.clientX - rect.left, e.clientY - rect.top);
+  };
+
+  /** Nastaví směr (a při tažení i rychlost) podle polohy myši vůči lodi. */
+  const aimAt = (wx: number, wy: number) => {
+    const g = game;
+    if (!g?.aiming) return;
+    const ship = g.state.ships.find((s) => s.id === g.aiming!.shipId);
+    const o = g.orders.get(ship?.id ?? "");
+    if (!ship || !o) return;
+    const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
+    const bearing = normalizeAngle(Math.atan2(wy - ship.y, wx - ship.x) - ship.heading);
+    // koncový bod oblouku leží na polovině úhlu zatáčky → úhel = 2 × směr k myši
+    let angle = Math.round(((bearing * 180) / Math.PI) * 2 / ANGLE_STEP) * ANGLE_STEP;
+    angle = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, angle));
+    let speed = cur.speed;
+    if (g.aiming.drag) {
+      const d = Math.hypot(wx - ship.x, wy - ship.y);
+      speed = Math.max(1, Math.min(5, Math.round(d / (MOVE_UNIT * 0.9))));
+    }
+    setManeuver(ship.id, speed, angle, false);
+  };
 
   c.addEventListener("mousedown", (e) => {
-    dragging = true;
+    if (!game || !cam) return;
     moved = false;
     lastX = e.clientX;
     lastY = e.clientY;
+    const w = worldPos(e);
+    const hit = entityAt(w.x, w.y);
+    if (hit?.kind === "ship" && hit.ownerId === playerId && !game.submitted && !game.anim) {
+      downOnOwnShip = hit.id;
+      game.selectedShipId = hit.id;
+      renderSide();
+      return;
+    }
+    panning = true;
   });
+
   window.addEventListener("mousemove", (e) => {
     if (!cam || !game) return;
-    if (dragging) {
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    if (panning) {
       cam.panBy(dx, dy);
       cam.clampTo(game.state.width, game.state.height);
       lastX = e.clientX;
       lastY = e.clientY;
-    } else {
-      const rect = c.getBoundingClientRect();
-      const w = cam.toWorld(e.clientX - rect.left, e.clientY - rect.top);
-      game.hoverShipId = shipAt(w.x, w.y)?.id;
+      return;
+    }
+    const w = worldPos(e);
+    if (downOnOwnShip && moved && !game.aiming) game.aiming = { shipId: downOnOwnShip, drag: true };
+    if (game.aiming) aimAt(w.x, w.y);
+    else game.hoverShipId = entityAt(w.x, w.y)?.id;
+  });
+
+  window.addEventListener("mouseup", () => {
+    panning = false;
+    if (!game) return;
+    if (downOnOwnShip) {
+      if (game.aiming?.drag) {
+        game.aiming = null; // tažení potvrzuje
+        renderSide();
+      } else if (!moved) {
+        // klik na vlastní loď: zapnout/vypnout míření myší
+        game.aiming = game.aiming?.shipId === downOnOwnShip ? null : { shipId: downOnOwnShip, drag: false };
+      }
+      downOnOwnShip = null;
     }
   });
-  window.addEventListener("mouseup", () => (dragging = false));
+
   c.addEventListener("click", (e) => {
     if (moved || !cam || !game || game.anim) return;
-    const rect = c.getBoundingClientRect();
-    const w = cam.toWorld(e.clientX - rect.left, e.clientY - rect.top);
-    const hit = shipAt(w.x, w.y);
-    if (!hit) return;
     const g = game;
-    if (hit.ownerId === playerId) {
-      g.selectedShipId = hit.id;
+    const w = worldPos(e);
+    const hit = entityAt(w.x, w.y);
+    if (g.aiming) {
+      if (hit?.kind === "ship" && hit.id === g.aiming.shipId) return; // řeší mouseup
+      g.aiming = null; // klik kamkoli potvrdí
       renderSide();
       return;
     }
+    if (!hit || (hit.kind === "ship" && hit.ownerId === playerId)) return;
     const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
     const o = sel && g.orders.get(sel.id);
     if (!sel || !o || g.submitted || hit.team === sel.team) return;
     if (o.special?.type === "torpedo") {
       g.orders.set(sel.id, { ...o, special: { type: "torpedo", targetId: hit.id }, preferredTargetId: hit.id });
-    } else if (o.action?.type === "lock") {
+    } else if (o.action?.type === "lock" && hit.kind === "ship") {
       g.orders.set(sel.id, { ...o, action: { type: "lock", targetId: hit.id }, preferredTargetId: hit.id });
     } else {
       g.orders.set(sel.id, { ...o, preferredTargetId: hit.id });
     }
     renderSide();
   });
+
   c.addEventListener(
     "wheel",
     (e) => {
       if (!cam || !game) return;
       e.preventDefault();
+      if (game.aiming && !game.submitted) {
+        const o = game.orders.get(game.aiming.shipId);
+        const cur = o && parseManeuverId(o.maneuverId);
+        if (cur) setManeuver(game.aiming.shipId, cur.speed + (e.deltaY < 0 ? 1 : -1), cur.koiogran ? 0 : cur.angle, cur.koiogran);
+        return;
+      }
       const rect = c.getBoundingClientRect();
       cam.zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.15 : 1 / 1.15);
       cam.clampTo(game.state.width, game.state.height);
     },
     { passive: false },
   );
+
+  window.addEventListener("keydown", (e) => {
+    if (!game || game.submitted || game.anim) return;
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+    const id = game.aiming?.shipId ?? game.selectedShipId;
+    const o = id && game.orders.get(id);
+    const cur = o ? parseManeuverId(o.maneuverId) : null;
+    if (!id || !cur) return;
+    if (e.key === "Escape") {
+      game.aiming = null;
+    } else if (/^[1-5]$/.test(e.key)) {
+      setManeuver(id, Number(e.key), cur.koiogran ? 0 : cur.angle, cur.koiogran);
+    } else if (e.key === "ArrowLeft") {
+      setManeuver(id, cur.speed, (cur.koiogran ? 0 : cur.angle) - ANGLE_STEP, false);
+    } else if (e.key === "ArrowRight") {
+      setManeuver(id, cur.speed, (cur.koiogran ? 0 : cur.angle) + ANGLE_STEP, false);
+    } else if (e.key === "ArrowUp") {
+      setManeuver(id, cur.speed + 1, cur.koiogran ? 0 : cur.angle, cur.koiogran);
+    } else if (e.key === "ArrowDown") {
+      setManeuver(id, cur.speed - 1, cur.koiogran ? 0 : cur.angle, cur.koiogran);
+    } else if (e.key === "k" || e.key === "K") {
+      const ship = game.state.ships.find((s) => s.id === id)!;
+      const ks = hullOf(ship.loadout).profile.koiogranSpeeds;
+      const sp = ks.includes(cur.speed) ? cur.speed : ks[0];
+      setManeuver(id, sp, 0, !cur.koiogran);
+    } else return;
+    e.preventDefault();
+  });
 }
 
-function shipAt(x: number, y: number) {
+interface Entity {
+  kind: "ship" | "torpedo";
+  id: string;
+  team: number;
+  ownerId?: string;
+}
+
+function entityAt(x: number, y: number): Entity | undefined {
   if (!game) return undefined;
   const view = game.anim ? game.anim.view : game.view;
-  let best: { id: string; d: number } | undefined;
+  let best: { e: Entity; d: number } | undefined;
   for (const s of view.ships) {
     const d = Math.hypot(s.x - x, s.y - y);
-    if (d <= s.radius + 10 && (!best || d < best.d)) best = { id: s.id, d };
+    const ship = game.state.ships.find((q) => q.id === s.id);
+    if (d <= s.radius + 10 && (!best || d < best.d)) best = { e: { kind: "ship", id: s.id, team: s.team, ownerId: ship?.ownerId }, d };
   }
-  return best ? game.state.ships.find((s) => s.id === best!.id) : undefined;
+  for (const t of view.torpedoes) {
+    const d = Math.hypot(t.x - x, t.y - y);
+    if (d <= 14 && (!best || d < best.d)) best = { e: { kind: "torpedo", id: t.id, team: t.team }, d };
+  }
+  return best?.e;
 }
 
 /* ------------------------------------------------------------------ */
@@ -496,3 +638,6 @@ function render() {
 
 render();
 net.connect();
+
+// Ladicí přístup ke stavu (pro automatické testy v prohlížeči).
+(window as unknown as { __sg: () => unknown }).__sg = () => ({ game, cam, playerId });

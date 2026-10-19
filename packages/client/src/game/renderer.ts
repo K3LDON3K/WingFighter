@@ -13,12 +13,17 @@ import {
 import type { Camera } from "./camera.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
 import type { ViewModel, ViewShip } from "./view.ts";
+import { DIFFICULTY_COLOR } from "./planning.ts";
 
 export interface Overlay {
   selectedShipId?: string;
   hoverShipId?: string;
   /** Náhled manévru vybrané lodi. */
   preview?: { ship: ViewShip; maneuver: Maneuver };
+  /** Dosažitelné pozice při zvolené rychlosti (body obarvené náročností). */
+  reachable?: { x: number; y: number; color: string }[];
+  /** Právě se míří myší. */
+  aiming?: boolean;
   /** Zvýraznit zaměřovací dostřel torpéd (při výběru cíle). */
   showTorpedoRange?: boolean;
   /** Zvýraznit lasery výseč u vybrané lodi. */
@@ -55,6 +60,14 @@ export class Renderer {
     for (const a of state.asteroids) this.drawAsteroid(a);
     for (const m of view.mines) this.drawMine(m, now);
 
+    if (overlay.reachable) {
+      for (const d of overlay.reachable) {
+        ctx.fillStyle = d.color;
+        ctx.globalAlpha = 0.8;
+        ctx.fillRect(d.x - 2, d.y - 2, 4, 4);
+      }
+      ctx.globalAlpha = 1;
+    }
     if (overlay.preview) this.drawPreview(overlay.preview.ship, overlay.preview.maneuver, overlay);
     if (overlay.selectedShipId) {
       const s = view.ships.find((x) => x.id === overlay.selectedShipId);
@@ -64,7 +77,18 @@ export class Renderer {
       }
     }
 
-    for (const t of view.torpedoes) drawSprite(ctx, this.sprites.torpedo(TEAM_COLORS[t.team]), t.x, t.y, t.heading);
+    for (const t of view.torpedoes) {
+      drawSprite(ctx, this.sprites.torpedo(TEAM_COLORS[t.team]), t.x, t.y, t.heading);
+      if (overlay.targetId === t.id || overlay.hoverShipId === t.id) {
+        ctx.save();
+        ctx.strokeStyle = overlay.targetId === t.id ? "#fbbf24" : "rgba(248,250,252,0.5)";
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 12, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
     for (const s of view.ships) this.drawShip(s, overlay, now);
     for (const e of view.effects) this.drawEffect(e, view, now);
 
@@ -260,8 +284,8 @@ export class Renderer {
     const pts = samplePath(maneuverPath(ship, man), 24);
     const end = pts[pts.length - 1];
     ctx.save();
-    ctx.strokeStyle = man.difficulty === "red" ? "#f87171" : man.difficulty === "green" ? "#4ade80" : "#e2e8f0";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = DIFFICULTY_COLOR[man.difficulty];
+    ctx.lineWidth = overlay.aiming ? 3 : 2;
     ctx.setLineDash([6, 4]);
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);

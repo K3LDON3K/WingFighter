@@ -11,7 +11,12 @@ export interface LobbyModel {
   connected: boolean;
 }
 
+/** Rozepsané hodnoty formulářů – přežijí překreslení při každé zprávě ze serveru. */
+const drafts = { name: null as string | null, roomName: "", code: "" };
+
 export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName: (n: string) => void) {
+  const activeId = (document.activeElement as HTMLElement | null)?.id;
+  const selStart = (document.activeElement as HTMLInputElement | null)?.selectionStart ?? null;
   clear(root);
   root.append(
     h("div", { class: `status ${m.connected ? "ok" : "bad"}` }, m.connected ? "připojeno" : "odpojeno – připojuji…"),
@@ -21,22 +26,44 @@ export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName:
       h("div", { class: "center" }, h("div", { class: "title" }, h("h1", {}, "SPACEGAME"), h("div", { class: "sub" }, "tahová vesmírná střílečka · prototyp v1")), m.room ? roomView(m, net) : lobbyView(m, net, setName)),
     ),
   );
+  if (activeId) {
+    const el = document.getElementById(activeId) as HTMLInputElement | null;
+    if (el) {
+      el.focus();
+      if (selStart !== null && typeof el.setSelectionRange === "function") {
+        try {
+          el.setSelectionRange(selStart, selStart);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
 }
 
 function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
-  const nameInput = h("input", { value: m.name, maxLength: 20, placeholder: "Tvoje jméno" });
+  const nameInput = h("input", { id: "in-name", value: drafts.name ?? m.name, maxLength: 20, placeholder: "Tvoje jméno" });
+  nameInput.oninput = () => (drafts.name = nameInput.value);
   const commitName = () => {
     const n = nameInput.value.trim();
+    drafts.name = null;
     if (n && n !== m.name) {
       setName(n);
       net.send({ type: "setName", name: n });
     }
   };
   nameInput.onblur = commitName;
-  nameInput.onkeydown = (e) => e.key === "Enter" && commitName();
+  nameInput.onkeydown = (e) => {
+    if (e.key === "Enter") {
+      commitName();
+      nameInput.blur();
+    }
+  };
 
-  const roomName = h("input", { placeholder: "Název místnosti (nepovinný)", maxLength: 20 });
-  const codeInput = h("input", { placeholder: "KÓD", maxLength: 4, style: "width:90px;text-transform:uppercase;letter-spacing:2px" });
+  const roomName = h("input", { id: "in-room", value: drafts.roomName, placeholder: "Název místnosti (nepovinný)", maxLength: 20 });
+  roomName.oninput = () => (drafts.roomName = roomName.value);
+  const codeInput = h("input", { id: "in-code", value: drafts.code, placeholder: "KÓD", maxLength: 4, style: "width:90px;text-transform:uppercase;letter-spacing:2px" });
+  codeInput.oninput = () => (drafts.code = codeInput.value);
   const join = () => codeInput.value.trim() && (commitName(), net.send({ type: "joinRoom", code: codeInput.value.trim().toUpperCase() }));
   codeInput.onkeydown = (e) => e.key === "Enter" && join();
 

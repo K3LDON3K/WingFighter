@@ -1,26 +1,31 @@
 import {
+  ANGLE_STEP,
   dist,
   hullOf,
+  isRed,
   LOCK_RANGE,
+  makeManeuver,
+  MAX_ANGLE,
   maneuverLabel,
+  parseManeuverId,
   TEAM_COLORS,
   TORPEDO,
   type ActionOrder,
+  type Difficulty,
   type GameState,
-  type Maneuver,
   type Ship,
   type ShipOrders,
   type SpecialOrder,
+  type Torpedo,
 } from "@spacegame/shared";
 import { clear, h } from "../dom.ts";
 
 export interface PlanningCallbacks {
   select(shipId: string): void;
   setOrders(shipId: string, patch: Partial<ShipOrders>): void;
+  setManeuver(shipId: string, speed: number, angle: number, koiogran: boolean): void;
   ready(): void;
   unready(): void;
-  hoverManeuver(man: Maneuver | null): void;
-  pickingTorpedoTarget(on: boolean): void;
 }
 
 export interface PlanningModel {
@@ -33,8 +38,13 @@ export interface PlanningModel {
   animating: boolean;
 }
 
-const GLYPH: Record<string, string> = { "turn-left": "↰", "bank-left": "↖", straight: "↑", "bank-right": "↗", "turn-right": "↱", koiogran: "⟲" };
-const ROWS = ["turn-left", "bank-left", "straight", "bank-right", "turn-right", "koiogran"];
+export const DIFFICULTY_COLOR: Record<Difficulty, string> = { green: "#4ade80", white: "#e2e8f0", red: "#f87171", danger: "#fb923c" };
+export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
+  green: "zelený – odstraní stres",
+  white: "bílý",
+  red: "červený – stres, bez akce",
+  danger: "NEBEZPEČNÝ – stres, bez akce, 1 zranění",
+};
 
 export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks) {
   clear(root);
@@ -53,23 +63,20 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
 
   const o = m.orders.get(ship.id)!;
   const enemies = m.state.ships.filter((s) => s.alive && s.team !== ship.team);
-  const dial = hullOf(ship.loadout).dial;
+  const enemyTorpedoes = m.state.torpedoes.filter((t) => t.team !== ship.team);
+  const profile = hullOf(ship.loadout).profile;
   const locked = m.submitted;
+  const cur = parseManeuverId(o.maneuverId) ?? { speed: 2, angle: 0, koiogran: false };
+  const curMan = makeManeuver(profile, cur.speed, cur.angle, cur.koiogran, ship.speed);
 
   const panel = h("div", { class: "panel" });
 
-  // záložky lodí
   if (my.length > 1) {
     panel.append(
-      h(
-        "div",
-        { class: "ship-tabs" },
-        ...my.map((s) => h("button", { class: s.id === ship.id ? "active" : "", onclick: () => cb.select(s.id) }, s.name)),
-      ),
+      h("div", { class: "ship-tabs" }, ...my.map((s) => h("button", { class: s.id === ship.id ? "active" : "", onclick: () => cb.select(s.id) }, s.name))),
     );
   }
 
-  // statistiky
   panel.append(
     h("h2", { style: `color:${TEAM_COLORS[ship.team]}` }, ship.name),
     h(
@@ -80,54 +87,111 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
       h("div", {}, "Torpéda", h("b", {}, String(ship.ammo.torpedoes))),
       h("div", {}, "Miny", h("b", {}, String(ship.ammo.mines))),
     ),
-    h("div", {}, ship.stress > 0 ? h("div", { style: "color:var(--red);font-size:12px;margin-bottom:6px" }, `Stres ${ship.stress}: jen zelené/bílé manévry, akce až po zeleném manévru.`) : null),
+    h("div", {}, ship.stress > 0 ? h("div", { style: "color:var(--red);font-size:12px;margin-bottom:6px" }, `Stres ${ship.stress}: žádný červený manévr, akce až po zeleném manévru.`) : null),
   );
 
-  // ciferník
-  const dialEl = h("div", { class: "dial" });
-  for (const row of ROWS) {
-    for (let speed = 1; speed <= 5; speed++) {
-      const man = dial.find((d) => (d.side ? `${d.kind}-${d.side}` : d.kind) === row && d.speed === speed);
-      if (!man) {
-        dialEl.append(h("span", {}));
-        continue;
-      }
-      const disabled = locked || (man.difficulty === "red" && ship.stress > 0);
-      const btn = h(
+  /* ---- manévr ---- */
+  const allowed = (speed: number, angle: number, k = false) => {
+    const mm = makeManeuver(profile, speed, angle, k, ship.speed);
+    if (!mm) return null;
+    if (isRed(mm.difficulty) && ship.stress > 0) return null;
+    return mm;
+  };
+  const speedRow = h("div", { class: "choices" });
+  for (let s = 1; s <= profile.maxSpeed; s++) {
+    const mm = allowed(s, cur.koiogran ? 0 : cur.angle, cur.koiogran) ?? allowed(s, 0);
+    const color = mm ? DIFFICULTY_COLOR[mm.difficulty] : undefined;
+    speedRow.append(
+      h(
         "button",
         {
-          class: `${man.difficulty} ${o.maneuverId === man.id ? "active" : ""}`,
-          disabled,
-          title: maneuverLabel(man),
-          onclick: () => cb.setOrders(ship.id, { maneuverId: man.id }),
+          class: cur.speed === s ? "active" : "",
+          disabled: locked || !mm,
+          style: color ? `border-color:${color}` : "",
+          title: `Rychlost ${s}${s === ship.speed ? " (aktuální)" : ""}`,
+          onclick: () => cb.setManeuver(ship.id, s, cur.koiogran ? 0 : cur.angle, cur.koiogran),
         },
-        GLYPH[row],
-        h("small", {}, String(speed)),
-      );
-      btn.onmouseenter = () => cb.hoverManeuver(man);
-      btn.onmouseleave = () => cb.hoverManeuver(null);
-      dialEl.append(btn);
-    }
+        `${s}${s === ship.speed ? "•" : ""}`,
+      ),
+    );
   }
-  dialEl.append(h("div", { class: "label" }, "zelený = odstraní stres · červený = způsobí stres (bez akce)"));
-  panel.append(h("div", { class: "field" }, h("h3", {}, "Manévr"), dialEl));
+  const dirRow = h("div", { class: "choices dir" });
+  for (let a = -MAX_ANGLE; a <= MAX_ANGLE; a += ANGLE_STEP) {
+    const mm = allowed(cur.speed, a);
+    dirRow.append(
+      h(
+        "button",
+        {
+          class: !cur.koiogran && cur.angle === a ? "active" : "",
+          disabled: locked || !mm,
+          style: mm ? `border-color:${DIFFICULTY_COLOR[mm.difficulty]}` : "",
+          title: mm ? maneuverLabel(mm) : "loď to nezvládne",
+          onclick: () => cb.setManeuver(ship.id, cur.speed, a, false),
+        },
+        a === 0 ? "↑" : `${a < 0 ? "↰" : "↱"}${Math.abs(a)}`,
+      ),
+    );
+  }
+  const kList = profile.koiogranSpeeds.map((s) => ({ s, mm: allowed(s, 0, true) }));
+  panel.append(
+    h(
+      "div",
+      { class: "field" },
+      h("h3", {}, "Manévr"),
+      h("div", { class: "muted", style: "font-size:11px;margin-bottom:6px" }, "Rychlost (• = aktuální; změna o 2+ je červená)"),
+      speedRow,
+      h("div", { class: "muted", style: "font-size:11px;margin-bottom:6px" }, "Směr (změna kurzu ve stupních)"),
+      dirRow,
+      h(
+        "div",
+        { class: "choices" },
+        ...kList.map(({ s, mm }) =>
+          h(
+            "button",
+            {
+              class: cur.koiogran && cur.speed === s ? "active" : "",
+              disabled: locked || !mm,
+              style: mm ? `border-color:${DIFFICULTY_COLOR[mm.difficulty]}` : "",
+              onclick: () => cb.setManeuver(ship.id, s, 0, true),
+            },
+            `⟲ otočka ${s}`,
+          ),
+        ),
+      ),
+      curMan
+        ? h(
+            "div",
+            { style: `font-size:12px;color:${DIFFICULTY_COLOR[curMan.difficulty]}` },
+            `${maneuverLabel(curMan)} · ${DIFFICULTY_LABEL[curMan.difficulty]}`,
+          )
+        : h("div", { style: "font-size:12px;color:var(--red)" }, "Neplatný manévr – vyber jiný."),
+      h("div", { class: "muted", style: "font-size:11px;margin-top:4px" }, "Na mapě: klikni na svou loď → pohyb myši = směr, kolečko = rychlost, klik = potvrdit. Nebo táhni od lodi."),
+    ),
+  );
 
-  // akce
+  /* ---- akce ---- */
   const actionBtn = (label: string, active: boolean, onclick: () => void, disabled = false) =>
     h("button", { class: active ? "active" : "", disabled: locked || disabled, onclick }, label);
   const setAction = (action?: ActionOrder) => cb.setOrders(ship.id, { action, special: undefined });
   const setSpecial = (special?: SpecialOrder) => cb.setOrders(ship.id, { special, action: undefined });
   const a = o.action;
   const sp = o.special;
-  const canAct = ship.stress === 0 || dial.find((d) => d.id === o.maneuverId)?.difficulty === "green";
+  const canAct = ship.stress === 0 || curMan?.difficulty === "green";
+  const redChosen = !!curMan && isRed(curMan.difficulty);
 
-  const targetSelect = (value: string | undefined, filter: (s: Ship) => boolean, onchange: (id: string) => void) => {
-    const list = enemies.filter(filter);
+  const targetSelect = (
+    value: string | undefined,
+    ships: Ship[],
+    torps: Torpedo[],
+    onchange: (id: string) => void,
+  ) => {
+    const empty = ships.length + torps.length === 0;
     return h(
       "select",
       { disabled: locked, onchange: (e) => onchange((e.target as HTMLSelectElement).value) },
-      h("option", { value: "", selected: !value }, list.length ? "— vyber cíl —" : "nikdo v dosahu"),
-      ...list.map((s) => h("option", { value: s.id, selected: s.id === value }, `${s.name} (${Math.round(dist(ship, s))})`)),
+      h("option", { value: "", selected: !value }, empty ? "nikdo v dosahu" : "— vyber cíl —"),
+      ...ships.map((s) => h("option", { value: s.id, selected: s.id === value }, `${s.name} (${Math.round(dist(ship, s))})`)),
+      ...torps.map((t) => h("option", { value: t.id, selected: t.id === value }, `Torpédo ${t.id.slice(-3)} (${Math.round(dist(ship, t))})`)),
     );
   };
 
@@ -137,6 +201,7 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
       { class: "field" },
       h("h3", {}, "Akce po pohybu"),
       !canAct ? h("div", { class: "muted", style: "font-size:12px" }, "Stresovaná loď nemůže provést akci.") : null,
+      redChosen ? h("div", { class: "muted", style: "font-size:12px" }, "Po červeném manévru akce nebude.") : null,
       h(
         "div",
         { class: "choices" },
@@ -157,7 +222,8 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
             h("span", { class: "muted", style: "font-size:12px" }, "Cíl zámku:"),
             targetSelect(
               a.targetId,
-              (s) => dist(ship, s) <= LOCK_RANGE,
+              enemies.filter((s) => dist(ship, s) <= LOCK_RANGE),
+              [],
               (id) => setAction(id ? { type: "lock", targetId: id } : undefined),
             ),
           )
@@ -176,7 +242,6 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
           () => {
             const first = enemies.find((s) => dist(ship, s) <= TORPEDO.lockRange);
             setSpecial({ type: "torpedo", targetId: first?.id ?? "" });
-            cb.pickingTorpedoTarget(true);
           },
           !canAct || ship.ammo.torpedoes <= 0,
         ),
@@ -189,12 +254,13 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
             h("span", { class: "muted", style: "font-size:12px" }, "Cíl torpéda:"),
             targetSelect(
               sp.targetId,
-              (s) => dist(ship, s) <= TORPEDO.lockRange,
+              enemies.filter((s) => dist(ship, s) <= TORPEDO.lockRange),
+              enemyTorpedoes.filter((t) => dist(ship, t) <= TORPEDO.lockRange),
               (id) => setSpecial(id ? { type: "torpedo", targetId: id } : undefined),
             ),
           )
         : null,
-      sp?.type === "torpedo" && !sp.targetId ? h("div", { style: "color:var(--yellow);font-size:12px" }, "Vyber cíl v zaměřovacím dostřelu (žlutá kružnice), jinak se torpédo nevypustí.") : null,
+      sp?.type === "torpedo" && !sp.targetId ? h("div", { style: "color:var(--yellow);font-size:12px" }, "Vyber cíl v zaměřovacím dostřelu (žlutá kružnice) – loď nebo nepřátelské torpédo.") : null,
       sp?.type === "mine" ? h("div", { class: "muted", style: "font-size:12px" }, "Mina zůstane na místě, kde loď kolo začínala. Aktivuje se příští kolo – i pro tebe.") : null,
     ),
     h(
@@ -205,18 +271,17 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
         "div",
         { class: "row" },
         actionBtn(o.fire ? "pálit: ano" : "pálit: ne", o.fire, () => cb.setOrders(ship.id, { fire: !o.fire })),
-        h("span", { class: "muted", style: "font-size:12px" }, "preferovaný cíl:"),
-        targetSelect(
-          o.preferredTargetId,
-          () => true,
-          (id) => cb.setOrders(ship.id, { preferredTargetId: id || undefined }),
-        ),
+        h("span", { class: "muted", style: "font-size:12px" }, "cíl:"),
+        targetSelect(o.preferredTargetId, enemies, enemyTorpedoes, (id) => cb.setOrders(ship.id, { preferredTargetId: id || undefined })),
       ),
-      h("div", { class: "muted", style: "font-size:12px;margin-top:4px" }, "Střílí se po pohybu na preferovaný cíl, pokud je ve výseči (±20°, dostřel 300); jinak na nejbližšího nepřítele ve výseči."),
+      h(
+        "div",
+        { class: "muted", style: "font-size:12px;margin-top:4px" },
+        "Výseč ±20°, dostřel 300. Loď jako cíl: když není ve výseči, střílí se na nejbližšího nepřítele. Torpédo jako cíl: střílí se jen na něj.",
+      ),
     ),
   );
 
-  // připraven
   const humans = m.state.players.filter((p) => !p.isBot);
   const waiting = humans.filter((p) => !m.ready.includes(p.id) && m.state.ships.some((s) => s.alive && s.ownerId === p.id));
   panel.append(
@@ -225,7 +290,7 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
       { class: "ready-bar" },
       locked
         ? h("button", { onclick: () => cb.unready() }, "Změnit rozkazy")
-        : h("button", { class: "primary", onclick: () => cb.ready() }, my.length > 1 ? "Odeslat rozkazy všech lodí" : "Připraven"),
+        : h("button", { class: "primary", disabled: !curMan, onclick: () => cb.ready() }, my.length > 1 ? "Odeslat rozkazy všech lodí" : "Připraven"),
       h("div", { class: "waiting" }, waiting.length ? `Čeká se na: ${waiting.map((p) => p.name).join(", ")}` : "Všichni připraveni, vyhodnocuji…"),
     ),
   );
