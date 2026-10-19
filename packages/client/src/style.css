@@ -1499,3 +1499,29 @@ button.px.tiny {
   font-family: var(--txt);
   font-size: 13px;
 }
+
+.lo-hexbuy {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  width: 112px;
+  height: 98px;
+  cursor: pointer;
+  opacity: 1;
+}
+.lo-hexbuy.dis {
+  cursor: default;
+  opacity: 0.55;
+}
+.lo-hexbuy:hover:not(:disabled) {
+  background: transparent;
+}
+.lo-hexbuy:hover:not(:disabled) .hexbg {
+  fill: #1e2a4a;
+}
+.lo-hexbuy:active:not(:disabled) .hexbg {
+  fill: #263660;
+}
+.lo-shop {
+  gap: 2px 4px;
+}

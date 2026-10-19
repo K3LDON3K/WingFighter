@@ -192,16 +192,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       else if (cost + def.price > budget) why = "nestačí rozpočet";
       else if (!firstFreeSlot()) why = "všechny sloty obsazené";
       else if ((t === "shield-whole" && loadout.modules.some((m) => m.type === "shield-segment")) || (t === "shield-segment" && loadout.modules.some((m) => m.type === "shield-whole"))) why = "nelze kombinovat typy štítů";
-      shop.append(
-        h(
-          "button",
-          { class: "lo-buy", style: `--mc:${moduleColor(t)}`, disabled: !!why, title: `${def.name}\n${def.description}\nCena ${def.price} · váha ${def.weight}${def.ammo ? ` + ${def.ammoWeight} × ${def.ammo} munice` : ""}${why ? `\nNelze: ${why}` : ""}`, onclick: () => add(t) },
-          icon(def.icon, "currentColor", 12),
-          h("span", { class: "lo-buyname txt" }, def.name),
-          h("span", { class: "lo-price" }, `${def.price}`),
-          have ? h("span", { class: "lo-have" }, `×${have}`) : null,
-        ),
-      );
+      shop.append(hexBuyButton(t, have, why, () => add(t)));
     }
   }
 
@@ -224,6 +215,31 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   if (!ro) root.append(shop);
   if (err) root.append(h("div", { class: "error" }, err));
   return root;
+}
+
+/** Nákupní tlačítko ve tvaru hexagonu: ikona, název, cena, počet kusů; stejná barva kategorie jako v plástvi. */
+function hexBuyButton(t: ModuleType, have: number, why: string | null, onClick: () => void): HTMLElement {
+  const def = MODULES[t];
+  const col = moduleColor(t);
+  const W = 112;
+  const Hh = 98;
+  const R = 54;
+  const cx = W / 2;
+  const cy = Hh / 2;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${Hh}`, width: W, height: Hh, class: "lo-hexbuy-svg" });
+  const pts = [0, 60, 120, 180, 240, 300].map((a) => `${(cx + R * Math.cos((a * Math.PI) / 180)).toFixed(1)},${(cy + (R * Math.sqrt(3)) / 2 / (Math.sqrt(3) / 2) * Math.sin((a * Math.PI) / 180) * 0.86).toFixed(1)}`).join(" ");
+  svg.append(svgEl("polygon", { points: pts, fill: "#0f172a", stroke: why ? "#334155" : col, "stroke-width": 3, "stroke-linejoin": "miter", class: "hexbg" }));
+  svg.append(svgEl("polygon", { points: pts, fill: why ? "#334155" : col, opacity: 0.16 }));
+  const ic = icon(def.icon, why ? "#64748b" : col, 16);
+  ic.setAttribute("x", String(cx - 8));
+  ic.setAttribute("y", "14");
+  svg.append(ic);
+  const words = def.name.toUpperCase().split(" ");
+  const fs = Math.max(...words.map((w) => w.length)) > 8 ? 9 : 11;
+  words.forEach((w, i) => svg.append(svgEl("text", { x: cx, y: 46 + i * 11, "font-family": "Pix, ui-monospace, monospace", "font-size": fs, fill: why ? "#64748b" : "#f8fafc", "text-anchor": "middle" }, w)));
+  svg.append(svgEl("text", { x: cx, y: 46 + words.length * 11 + 4, "font-family": "PS2P", "font-size": 7, fill: why ? "#64748b" : "#fbbf24", "text-anchor": "middle" }, `${def.price}${have ? ` ×${have}` : ""}`));
+  const btn = h("button", { class: `lo-hexbuy ${why ? "dis" : ""}`, disabled: !!why, title: `${def.name}\n${def.description}\nCena ${def.price} · váha ${def.weight}${def.ammo ? ` + ${def.ammoWeight} × ${def.ammo} munice` : ""}${why ? `\nNelze: ${why}` : ""}`, onclick: onClick }, svg);
+  return btn;
 }
 
 /** Krátký štítek sestavy (pro ostatní hráče). */
