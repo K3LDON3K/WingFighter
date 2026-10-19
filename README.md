@@ -109,6 +109,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.13.2 – oprava: animace salv laserů běží na začátku kola před pohybem (událost pohybu se řadila před lasery).
 - v1.13.1 – lišta: akce ve skupinách Zbraně · Pohyb · Speciální, menší panel manévru, úzké svislé SPUSTIT KOLO; CENTROVAT a INVENTÁŘ přesunuty k tlačítku ladění nad mapou.
 - v1.13 – štíty: segmentový (4 × 2 body, zásah podle směru, akce Úprava štítu) nebo celolodní (zásoba + účinnost
   klesající o 10 % za zásah), volba v místnosti; panel lodi s pixelovou bublinou štítu, CENTROVAT a INVENTÁŘ;

@@ -356,6 +356,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
 
 
   /* ---------- 2. Pohyb (lodě i torpéda současně) ---------- */
+  const preMoveCount = events.length; // akce + lasery patří před událost pohybu
   const shipMovers = new Map<string, Mover>();
   const maneuverOf = new Map<string, Maneuver>();
   for (const ship of state.ships) {
@@ -727,7 +728,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       }
     }
   }
-  events.unshift(...spawnEvents, { type: "move", paths });
+  events.splice(preMoveCount, 0, ...spawnEvents, { type: "move", paths });
   state.torpedoes = state.torpedoes.filter((t) => !removedTorpedoes.has(t.id));
   state.mines = state.mines.filter((m) => !removedMines.has(m.id));
   state.asteroids = state.asteroids.filter((a) => !removedAsteroids.has(a.id));
