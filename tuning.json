@@ -17,12 +17,12 @@
   "agility": 3,
   "torpedoAmmo": 3,
   "mineAmmo": 2,
-  "vision": 960,
+  "vision": 950,
   "laserRange": 300,
   "laserArcDeg": 60,
   "torpedoLockRange": 320,
   "torpedoPointRange": 1200,
-  "torpedoSpeed": 240,
+  "torpedoSpeed": 300,
   "torpedoTurnDeg": 180,
   "torpedoLife": 5,
   "actionPoints": 2,
@@ -33,5 +33,8 @@
   "koiogranSpeedDrop": 2,
   "evadeStressCost": 1,
   "evadePassStress": 1,
-  "evadeDamageReduction": 50
+  "evadeDamageReduction": 50,
+  "wholeEffDrop": 10,
+  "segmentHp": 2,
+  "segmentMax": 3
 }
