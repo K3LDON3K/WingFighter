@@ -28,8 +28,11 @@ import {
   type GameState,
   type Pose,
   type RoomState,
+  laserArcOf,
   laserOdds,
   laserTarget,
+  mineSideOf,
+  mineModule,
   type RoomSummary,
   type Segments,
   type ShipOrders,
@@ -500,7 +503,7 @@ function buildOverlay(view: ViewModel): Overlay {
     const man = resolveManeuver(profile, o.maneuverId, ship.speed);
     if (!man) continue;
     const aiming = g.aimingShipId === ship.id && !g.submitted;
-    overlay.previews.push({ ship: vs, maneuver: man, aiming, fire: !!o.fire });
+    overlay.previews.push({ ship: vs, maneuver: man, aiming, fire: !!o.fire, laserArc: o.fire ? laserArcOf(ship, o.laserModuleId) : undefined });
     const end = maneuverEnd(ship, man);
 
     if (aiming) {
@@ -523,7 +526,7 @@ function buildOverlay(view: ViewModel): Overlay {
       } else {
         overlay.targetId = o.preferredTargetId;
         if (o.fire) {
-          const tgt = laserTarget(g.state, ship, o.preferredTargetId);
+          const tgt = laserTarget(g.state, ship, o.preferredTargetId, o.laserModuleId);
           if (tgt) {
             const odds = laserOdds(ship, tgt);
             const pct = Math.round(odds.hitChance * 100);
@@ -533,12 +536,11 @@ function buildOverlay(view: ViewModel): Overlay {
         }
       }
       if (o.special?.type === "mine") {
-        const side = o.special.side ?? "behind";
+        const side = mineSideOf(mineModule(ship)?.facing);
         if (g.minePick === "side") {
-          for (const sd of ["left", "behind", "right"] as const) {
-            const pos = mineDropPosition(ship, sd);
-            g.icons.push({ id: `mine-side:${sd}`, shipId: ship.id, kind: "mine", x: pos.x, y: pos.y, glyph: "", active: sd === side, disabled: false, hover: g.hoverIcon === `${ship.id}:mine-side:${sd}` });
-          }
+          // strana je daná natočením minového modulu – jen ji ukážeme a jdeme rovnou na čas
+          const pos = mineDropPosition(ship, side);
+          g.icons.push({ id: `mine-side:${side}`, shipId: ship.id, kind: "mine", x: pos.x, y: pos.y, glyph: "", active: true, disabled: false, hover: g.hoverIcon === `${ship.id}:mine-side:${side}` });
         } else {
           const pos = mineDropPosition(ship, side);
           overlay.mineField = { x: pos.x, y: pos.y, timer: o.special.timer };
@@ -911,7 +913,7 @@ function chooseIcon(shipId: string, id: string) {
     return;
   }
   if (id === "mine-back" && o.special?.type === "mine") {
-    g.minePick = "side"; // zpět na výběr místa
+    g.minePick = "timer"; // strana je daná modulem, zpět = znovu čas
     renderSide();
     return;
   }
@@ -937,7 +939,7 @@ function chooseIcon(shipId: string, id: string) {
     g.jettisonPick = next.action?.type === "jettison";
     if (g.jettisonPick) g.inventoryOpen = true;
   }
-  g.minePick = a.id === "mine" && next.special?.type === "mine" ? "side" : null;
+  g.minePick = a.id === "mine" && next.special?.type === "mine" ? "timer" : null;
   renderSide();
 }
 

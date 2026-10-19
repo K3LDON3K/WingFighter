@@ -1,6 +1,7 @@
 import { VISION_REF } from "./fog.ts";
 import { FIGHTER_PROFILE } from "./maneuvers.ts";
-import type { HullDef, ManeuverProfile, ModuleDef, ModuleInstance, ModuleType, PilotDef, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
+import { LASER } from "./constants.ts";
+import type { Facing, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
 
 /**
  * Lodě = trup + pilot + moduly ve slotech.
@@ -44,9 +45,9 @@ export const DEFAULT_LOADOUT: ShipLoadout = {
   hullId: "fighter",
   pilotId: "kadet",
   modules: [
-    { id: "m1", type: "laser", slot: "left" },
-    { id: "m2", type: "torpedo", slot: "front", ammo: 3 },
-    { id: "m3", type: "mine", slot: "back", ammo: 2 },
+    { id: "m1", type: "laser", slot: "left", facing: "front" },
+    { id: "m2", type: "torpedo", slot: "front", ammo: 3, facing: "front" },
+    { id: "m3", type: "mine", slot: "back", ammo: 2, facing: "back" },
     { id: "m4", type: "shield-segment", slot: "right" },
   ],
 };
@@ -57,9 +58,46 @@ export const WEIGHT = {
   perSpeed: 6,
 };
 
+/** Má modul směr (otáčí se)? Štíty ne. */
+export function hasFacing(type: ModuleType): boolean {
+  return type === "laser" || type === "torpedo" || type === "mine";
+}
+
+const OPPOSITE: Record<SlotId, SlotId> = { front: "back", back: "front", left: "right", right: "left" };
+export const FACINGS: Facing[] = ["front", "right", "back", "left"];
+export const FACING_NAMES: Record<Facing, string> = { front: "dopředu", right: "doprava", back: "dozadu", left: "doleva" };
+
+/** Povolené směry modulu ve slotu: všechny kromě „do středu“; miny nesmí dopředu. */
+export function allowedFacings(type: ModuleType, slot: SlotId): Facing[] {
+  if (!hasFacing(type)) return [];
+  return FACINGS.filter((f) => f !== OPPOSITE[slot] && !(type === "mine" && f === "front"));
+}
+
+/** Výchozí směr modulu ve slotu (ven ze slotu; miny na boku do boku). */
+export function defaultFacing(type: ModuleType, slot: SlotId): Facing | undefined {
+  if (!hasFacing(type)) return undefined;
+  const pref: Facing[] = type === "mine" ? [slot, "back"] : ["front", slot];
+  return pref.find((f) => allowedFacings(type, slot).includes(f)) ?? allowedFacings(type, slot)[0];
+}
+
+/** Úhel směru modulu vůči kurzu lodi. */
+export function facingAngle(f: Facing | undefined): number {
+  return f === "right" ? Math.PI / 2 : f === "back" ? Math.PI : f === "left" ? -Math.PI / 2 : 0;
+}
+
+/** Poloviční výseč laserů podle natočení modulu. */
+export function laserHalfArc(f: Facing | undefined): number {
+  return f === "back" ? LASER.halfArcBack : f === "left" || f === "right" ? LASER.halfArcSide : LASER.halfArc;
+}
+
+/** Strana, kam minový modul odhazuje. */
+export function mineSideOf(f: Facing | undefined): MineSide {
+  return f === "left" ? "left" : f === "right" ? "right" : "behind";
+}
+
 export function newModule(type: ModuleType, slot: SlotId, id?: string): ModuleInstance {
   const def = MODULES[type];
-  return { id: id ?? `${type}-${Math.random().toString(36).slice(2, 8)}`, type, slot, ammo: def.ammo };
+  return { id: id ?? `${type}-${Math.random().toString(36).slice(2, 8)}`, type, slot, ammo: def.ammo, facing: defaultFacing(type, slot) };
 }
 
 /** Velký modul zabírá příď + záď (zapisuje se do slotu "front"). */
@@ -134,6 +172,10 @@ export function validateLoadout(loadout: ShipLoadout, limits?: { allowed?: Parti
     ids.add(m.id);
     if (!hull.slots.some((s) => s.id === m.slot)) return `neznámý slot ${m.slot}`;
     if (def.size === "large" && m.slot !== LARGE_SLOTS[0]) return "velký modul patří do spojeného slotu příď + záď";
+    if (m.type === "mine" && m.slot === "front") return "miny nelze uložit na příď";
+    if (hasFacing(m.type)) {
+      if (!m.facing || !allowedFacings(m.type, m.slot).includes(m.facing)) return `${def.name}: neplatné natočení`;
+    } else if (m.facing) return `${def.name}: neotáčí se`;
     for (const sl of occupiedSlots(m)) {
       perSlot[sl] = (perSlot[sl] ?? 0) + 1;
       if (perSlot[sl] > slotCapacity(hull, sl)) return `slot ${hull.slots.find((s) => s.id === sl)?.name} je obsazený`;
@@ -153,7 +195,7 @@ export function validateLoadout(loadout: ShipLoadout, limits?: { allowed?: Parti
 
 /** Obnoví munici modulů na plnou (nová bitva). */
 export function refillLoadout(loadout: ShipLoadout): ShipLoadout {
-  return { ...loadout, modules: loadout.modules.map((m) => ({ ...m, ammo: MODULES[m.type]?.ammo })) };
+  return { ...loadout, modules: loadout.modules.map((m) => ({ ...m, ammo: MODULES[m.type]?.ammo, facing: hasFacing(m.type) ? (m.facing ?? defaultFacing(m.type, m.slot)) : undefined })) };
 }
 
 export function computeStats(loadout: ShipLoadout): ShipStats {
@@ -201,8 +243,8 @@ export function randomLoadout(rng: () => number, allowed: Partial<Record<ModuleT
       if ((allowed[t] ?? 99) <= count || spent + def.price > budget) continue;
       if ((t === "shield-whole" && lo.modules.some((m) => m.type === "shield-segment")) || (t === "shield-segment" && lo.modules.some((m) => m.type === "shield-whole"))) continue;
       if (rng() < 0.35) continue;
-      const slot = freeSlots(lo)[0];
-      if (!slot) break;
+      const slot = freeSlots(lo).find((sl) => !(t === "mine" && sl === "front"));
+      if (!slot) continue;
       lo.modules.push(newModule(t, slot, `b${lo.modules.length + 1}`));
       spent += def.price;
     }

@@ -27,7 +27,13 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { computeStats, MODULES, profileOf } from "./ships.ts";
+import { computeStats, facingAngle, laserHalfArc, mineSideOf, MODULES, profileOf } from "./ships.ts";
+import type { ModuleInstance } from "./types.ts";
+
+/** Pozice lodi natočená podle směru modulu (výseč laserů, výlet torpéda). */
+function aimPose(ship: Pose, mod: ModuleInstance | undefined): Pose {
+  return { x: ship.x, y: ship.y, heading: ship.heading + facingAngle(mod?.facing) };
+}
 import type { Rng } from "./rng.ts";
 import { applyTuning } from "./tuning.ts";
 import type {
@@ -263,11 +269,11 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       } else special = undefined;
     }
     if (special?.type === "mine") {
-      if (ship.ammo.mines <= 0) special = undefined;
+      const mm = mineModule(ship);
+      if (!mm) special = undefined;
       else {
         const t = special.timer;
-        const side = special.side === "left" || special.side === "right" ? special.side : "behind";
-        special = { type: "mine", timer: typeof t === "number" && t >= 1 && t <= 3 ? Math.round(t) : undefined, side };
+        special = { type: "mine", timer: typeof t === "number" && t >= 1 && t <= 3 ? Math.round(t) : undefined, side: mineSideOf(mm.facing) };
       }
     }
 
@@ -420,10 +426,13 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!ship.alive) continue;
     const o = orders.get(ship.id)!;
     if (!o.fire || ship.stats.attack <= 0) continue;
+    const lmod = laserModule(ship, o.laserModuleId);
+    const aim = aimPose(ship, lmod);
+    const arc = laserHalfArc(lmod?.facing);
 
     const deb = state.debris.find((d) => d.id === o.preferredTargetId);
     if (deb && !shotDebris.has(deb.id)) {
-      if (dist(ship, deb) <= LASER.range && inArc(ship, deb, LASER.halfArc) && !lineBlocked(state.asteroids, ship, deb)) {
+      if (dist(ship, deb) <= LASER.range && inArc(aim, deb, arc) && !lineBlocked(state.asteroids, ship, deb)) {
         const rangeBand = clamp(Math.ceil(dist(ship, deb) / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, { attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0), defenseDice: rangeBand === 3 ? 1 : 0, attackerFocus: ship.tokens.focus > 0, attackerLock: false, defenderFocus: false, defenderEvade: false });
         const destroyed = outcome.damage > 0;
@@ -435,7 +444,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
     const torp = torpedoById(state, o.preferredTargetId);
     if (torp && torp.team !== ship.team) {
-      if (dist(ship, torp) <= LASER.range && inArc(ship, torp, LASER.halfArc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, ship, torp)) {
+      if (dist(ship, torp) <= LASER.range && inArc(aim, torp, arc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, ship, torp)) {
         const d = dist(ship, torp);
         const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, {
@@ -454,7 +463,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
 
     const candidates = state.ships.filter(
-      (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(ship, e, LASER.halfArc) && !lineBlocked(state.asteroids, ship, e),
+      (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(aim, e, arc) && !lineBlocked(state.asteroids, ship, e),
     );
     if (candidates.length === 0) continue;
     let target = candidates.find((c) => c.id === o.preferredTargetId);
@@ -527,7 +536,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!target && !point) continue;
     tmod.ammo = (tmod.ammo ?? 1) - 1;
     refreshShip(ship);
-    const f = forward(ship.heading);
+    const launchHeading = ship.heading + facingAngle(tmod.facing);
+    const f = forward(launchHeading);
     const off = ship.stats.radius + TORPEDO.radius + 2;
     const torpedo: Torpedo = {
       id: newId("torp"),
@@ -535,7 +545,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       team: ship.team,
       x: ship.x + f.x * off,
       y: ship.y + f.y * off,
-      heading: ship.heading,
+      heading: normalizeAngle(launchHeading),
       targetId: target?.id,
       targetPoint: target ? undefined : point,
       trackLeft: TORPEDO.trackTurns,
@@ -1006,12 +1016,21 @@ export function checkVictory(state: GameState): GameResult | null {
 }
 
 /** Cíl laserů podle stejných pravidel jako vyhodnocení (preferovaný ve výseči, jinak nejbližší). Pro náhled v plánování. */
-export function laserTarget(state: GameState, ship: Ship, preferredTargetId?: string): Ship | undefined {
+export function laserTarget(state: GameState, ship: Ship, preferredTargetId?: string, laserModuleId?: string): Ship | undefined {
+  const lmod = laserModule(ship, laserModuleId);
+  const aim = aimPose(ship, lmod);
+  const arc = laserHalfArc(lmod?.facing);
   const candidates = state.ships.filter(
-    (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(ship, e, LASER.halfArc) && !lineBlocked(state.asteroids, ship, e),
+    (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(aim, e, arc) && !lineBlocked(state.asteroids, ship, e),
   );
   if (candidates.length === 0) return undefined;
   return candidates.find((c) => c.id === preferredTargetId) ?? candidates.reduce((best, c) => (dist(ship, c) < dist(ship, best) ? c : best));
+}
+
+/** Výseč laserů pro náhled: natočení a poloviční úhel podle modulu. */
+export function laserArcOf(ship: Ship, laserModuleId?: string): { heading: number; halfArc: number } {
+  const lmod = laserModule(ship, laserModuleId);
+  return { heading: ship.heading + facingAngle(lmod?.facing), halfArc: laserHalfArc(lmod?.facing) };
 }
 
 /** Šance laserů na zásah (aspoň jeden čistý zásah) a očekávané zranění proti danému cíli ze současných pozic. */

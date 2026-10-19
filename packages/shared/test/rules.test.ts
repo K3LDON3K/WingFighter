@@ -254,7 +254,7 @@ describe("vyhodnocení kola", () => {
       if (dmg && dmg.type === "damage") {
         hits++;
         expect(dmg.segment).toBe(2); // záď
-        if (dmg.absorbed > 0) expect(dmg.hullAfter).toBe(100);
+        if ((dmg.absorbed ?? 0) > 0) expect(dmg.hullAfter).toBe(100);
       }
       r = fire(r.state);
     }
@@ -605,7 +605,7 @@ describe("inventář a ekonomika", () => {
 
   it("validace sestavy: kapacita slotů, míchání štítů, limity a rozpočet", () => {
     expect(validateLoadout(DEFAULT_LOADOUT)).toBeNull();
-    const full = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules, { id: "x", type: "laser" as const, slot: "front" as const }] };
+    const full = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules, { id: "x", type: "laser" as const, slot: "front" as const, facing: "front" as const }] };
     expect(validateLoadout(full)).toMatch(/obsazený/);
     const mixed = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules.filter((m) => m.type !== "mine"), { id: "x", type: "shield-whole" as const, slot: "back" as const }] };
     expect(validateLoadout(mixed)).toMatch(/kombinovat/);
@@ -660,5 +660,36 @@ describe("ochranná lhůta torpéda", () => {
     expect(r.events.some((e) => e.type === "torpedoHit")).toBe(false);
     expect(r.state.ships[0].hull).toBe(100);
     expect(r.state.torpedoes).toHaveLength(1);
+  });
+});
+
+describe("natočení modulů", () => {
+  it("lasery střílí jen ve výseči podle natočení; miny jen na svou stranu; torpédo vylétá směrem modulu", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g.asteroids = [];
+    const me = g.ships[0];
+    const laser = me.loadout.modules.find((m) => m.type === "laser")!;
+    laser.facing = "right"; // lasery otočené doprava (na levoboku je to povolené)
+    me.stats.agility = 0;
+    g.ships[1].stats.agility = 0;
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 700, 500, Math.PI); // nepřítel přímo před přídí → mimo pravou výseč
+    let r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: true }], createRng(1));
+    expect(r.events.some((e) => e.type === "laser")).toBe(false);
+    place(g, "ship-p2-0", 500, 700, 0); // nepřítel vpravo (y+) → ve výseči
+    r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: true }], createRng(1));
+    expect(r.events.some((e) => e.type === "laser")).toBe(true);
+    // natočení "do středu" je neplatné, miny na příď také
+    expect(validateLoadout({ ...DEFAULT_LOADOUT, modules: [{ id: "a", type: "laser", slot: "left", facing: "right" }] })).toMatch(/natočení/);
+    expect(validateLoadout({ ...DEFAULT_LOADOUT, modules: [{ id: "a", type: "mine", slot: "front", facing: "back" }] })).toMatch(/příď/);
+    // mina: strana se řídí natočením modulu (záď → za sebe), požadavek "vlevo" se ignoruje
+    const fixed = sanitizeOrders(g, "p1", [{ shipId: me.id, maneuverId: "m1a0", fire: false, special: { type: "mine", side: "left" } }]);
+    expect(fixed[0].special).toEqual({ type: "mine", timer: undefined, side: "behind" });
+    // torpédomet otočený dozadu: torpédo vyletí za loď
+    const torp = me.loadout.modules.find((m) => m.type === "torpedo")!;
+    torp.facing = "back";
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: false, special: { type: "torpedo", point: { x: 100, y: 500 } } }], createRng(1));
+    expect(r.state.torpedoes[0].x).toBeLessThan(500);
   });
 });

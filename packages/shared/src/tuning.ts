@@ -31,6 +31,8 @@ export interface Tuning {
   // dosahy a rychlosti
   laserRange: number;
   laserArcDeg: number;
+  laserArcSideDeg: number;
+  laserArcBackDeg: number;
   torpedoLockRange: number;
   torpedoPointRange: number;
   torpedoSpeed: number;
@@ -100,6 +102,8 @@ export const DEFAULT_TUNING: Tuning = {
   vision: 960,
   laserRange: 300,
   laserArcDeg: 20,
+  laserArcSideDeg: 15,
+  laserArcBackDeg: 10,
   torpedoLockRange: 320,
   torpedoPointRange: 1200,
   torpedoSpeed: 240,
@@ -178,7 +182,9 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "laserDice", label: "Kostky útoku", group: "Lasery", min: 0, max: 6, step: 1 },
   { key: "laserPerHit", label: "Zranění za zásah", group: "Lasery", min: 0, max: 100, step: 5 },
   { key: "laserRange", label: "Dostřel", group: "Lasery", min: 50, max: 1000, step: 10 },
-  { key: "laserArcDeg", label: "Výseč ± °", group: "Lasery", min: 5, max: 180, step: 5 },
+  { key: "laserArcDeg", label: "Výseč dopředu ± °", group: "Lasery", min: 5, max: 180, step: 5, hint: "modul natočený na příď" },
+  { key: "laserArcSideDeg", label: "Výseč do boku ± °", group: "Lasery", min: 5, max: 180, step: 5, hint: "modul natočený na levobok / pravobok" },
+  { key: "laserArcBackDeg", label: "Výseč dozadu ± °", group: "Lasery", min: 5, max: 180, step: 5, hint: "modul natočený na záď" },
   { key: "priceLaser", label: "Modul – cena", group: "Lasery", min: 0, max: 2000, step: 10 },
   { key: "weightLaser", label: "Modul – váha", group: "Lasery", min: 0, max: 20, step: 0.5 },
   // --- fázové torpédo ---
@@ -281,6 +287,8 @@ export function applyTuning(t: Tuning): void {
   RULES.segmentMax = t.segmentMax;
   LASER.range = t.laserRange;
   LASER.halfArc = (t.laserArcDeg * Math.PI) / 180;
+  LASER.halfArcSide = (t.laserArcSideDeg * Math.PI) / 180;
+  LASER.halfArcBack = (t.laserArcBackDeg * Math.PI) / 180;
   LASER.band = t.laserRange / 3;
   VISION_REF.value = t.vision;
   HULLS.fighter.hull = t.hull;

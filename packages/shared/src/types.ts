@@ -101,12 +101,17 @@ export interface ModuleDef {
   shields?: number;
 }
 
+/** Směr, kam modul míří (vůči lodi). */
+export type Facing = SlotId;
+
 /** Modul osazený v lodi. */
 export interface ModuleInstance {
   id: string;
   type: ModuleType;
   slot: SlotId;
   ammo?: number;
+  /** Natočení zbraně (lasery: výseč, miny: strana odhozu, torpéda: směr výletu). Štíty směr nemají. */
+  facing?: Facing;
 }
 
 /** Sestavená loď = trup + pilot + moduly → výsledné statistiky. */

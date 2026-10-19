@@ -37,7 +37,7 @@ export interface Overlay {
   selectedShipId?: string;
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
-  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean }[];
+  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; laserArc?: { heading: number; halfArc: number } }[];
   /** Dohled vlastního týmu (fog of war). */
   vision?: { x: number; y: number; r: number }[];
   /** Dosažitelné pozice při zvolené rychlosti (body obarvené náročností). */
@@ -102,7 +102,7 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
-    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire);
+    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArc);
 
     for (const t of view.torpedoes) {
       // plamen motoru
@@ -475,14 +475,14 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawArc(p: Pose, color: string, range = LASER.range) {
+  drawArc(p: Pose, color: string, range = LASER.range, halfArc = LASER.halfArc) {
     const ctx = this.ctx;
     ctx.save();
     ctx.globalAlpha = 0.14;
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
-    ctx.arc(p.x, p.y, range, p.heading - LASER.halfArc, p.heading + LASER.halfArc);
+    ctx.arc(p.x, p.y, range, p.heading - halfArc, p.heading + halfArc);
     ctx.closePath();
     ctx.fill();
     ctx.globalAlpha = 0.5;
@@ -492,7 +492,7 @@ export class Renderer {
     ctx.globalAlpha = 0.25;
     for (let b = 1; b < 3; b++) {
       ctx.beginPath();
-      ctx.arc(p.x, p.y, LASER.band * b, p.heading - LASER.halfArc, p.heading + LASER.halfArc);
+      ctx.arc(p.x, p.y, LASER.band * b, p.heading - halfArc, p.heading + halfArc);
       ctx.stroke();
     }
     ctx.restore();
@@ -516,7 +516,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean) {
+  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArc?: { heading: number; halfArc: number }) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[ship.team];
     const pts = samplePath(maneuverPath(ship, man), 24);
@@ -530,7 +530,7 @@ export class Renderer {
     for (const p of pts) ctx.lineTo(p.x, p.y);
     ctx.stroke();
     ctx.restore();
-    if (fire) this.drawArc(ship, color); // lasery střílí ze startovní pozice, před pohybem
+    if (fire) this.drawArc({ x: ship.x, y: ship.y, heading: laserArc?.heading ?? ship.heading }, color, LASER.range, laserArc?.halfArc ?? LASER.halfArc); // lasery střílí ze startovní pozice, před pohybem
     ctx.save();
     ctx.strokeStyle = shade(color, 1.3);
     ctx.lineWidth = 1;

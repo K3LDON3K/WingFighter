@@ -80,7 +80,8 @@ function cleanLoadout(raw: unknown): ShipLoadout | null {
     if (typeof mm.id !== "string" || typeof mm.type !== "string" || typeof mm.slot !== "string") return null;
     if (!MODULE_TYPES.includes(mm.type as ModuleType)) return null;
     const def = MODULES[mm.type as ModuleType];
-    modules.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: mm.slot as ShipLoadout["modules"][number]["slot"], ammo: def.ammo });
+    const facing = typeof mm.facing === "string" ? (mm.facing as ShipLoadout["modules"][number]["facing"]) : undefined;
+    modules.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: mm.slot as ShipLoadout["modules"][number]["slot"], ammo: def.ammo, facing });
   }
   if (modules.length > 8) return null;
   return { hullId: r.hullId, pilotId: r.pilotId, modules };

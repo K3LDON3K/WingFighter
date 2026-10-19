@@ -2,7 +2,10 @@ import {
   RULES,
   actionList,
   laserOdds,
+  FACING_NAMES,
   loadoutWeight,
+  mineModule,
+  mineSideOf,
   MODULES,
   profileOf,
   laserTarget,
@@ -76,6 +79,7 @@ const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Pohyb", ids: ["evade", "koiogran"] },
   { label: "Speciální", ids: ["shield", "jettison"] },
 ];
+const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
 const ACTION_ICON: Record<string, string> = { laser: "laser", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
@@ -235,7 +239,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     return h(
       "div",
       { class: "segs-btn", title: `Ze kterého modulu (${MODULES[type].name}) – jeden za akci` },
-      ...mods.map((m, i) => seg(`${i + 1}${m.ammo !== undefined ? `·${m.ammo}` : ""}`, m.id === currentId, `${MODULES[type].name} ${i + 1}${m.ammo !== undefined ? ` (munice ${m.ammo})` : ""}`, () => onPick(m.id))),
+      ...mods.map((m, i) => seg(`${i + 1}${FACING_GLYPH[m.facing ?? "front"]}${m.ammo !== undefined ? `·${m.ammo}` : ""}`, m.id === currentId, `${MODULES[type].name} ${i + 1} – ${FACING_NAMES[m.facing ?? "front"]}${m.ammo !== undefined ? ` (munice ${m.ammo})` : ""}`, () => onPick(m.id))),
     );
   };
   if (o.special?.type === "torpedo") {
@@ -253,18 +257,11 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     );
   } else if (o.special?.type === "mine") {
     const timer = o.special.timer;
-    const side: MineSide = o.special.side ?? "behind";
-    const setMine = (patch: Partial<{ timer: number | undefined; side: MineSide }>) =>
-      cb.setOrders(ship.id, { special: { type: "mine", timer: "timer" in patch ? patch.timer : timer, side: patch.side ?? side } });
+    const side: MineSide = mineSideOf(mineModule(ship)?.facing);
+    const setMine = (patch: Partial<{ timer: number | undefined }>) => cb.setOrders(ship.id, { special: { type: "mine", timer: "timer" in patch ? patch.timer : timer, side } });
     details.append(
       icon("mine", "#94a3b8"),
-      h(
-        "div",
-        { class: "segs-btn", title: "Kam minu odhodit" },
-        seg(icon("left", "currentColor", 12), side === "left", "vlevo", () => setMine({ side: "left" })),
-        seg(icon("down", "currentColor", 12), side === "behind", "za sebe", () => setMine({ side: "behind" })),
-        seg(icon("right", "currentColor", 12), side === "right", "vpravo", () => setMine({ side: "right" })),
-      ),
+      h("span", { class: "muted", title: "Stranu určuje natočení minového zásobníku (mění se v místnosti)" }, icon(side === "left" ? "left" : side === "right" ? "right" : "down", "currentColor", 12), " ", label(side === "left" ? "vlevo" : side === "right" ? "vpravo" : "za sebe")),
       h(
         "div",
         { class: "segs-btn", title: "Výbuch: při vstupu do pole, nebo časovaný" },
@@ -275,8 +272,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       ),
     );
     if (timer) details.append(h("span", { class: "muted" }, icon("clock", "#94a3b8", 12), ` ${timer}`));
-    if (m.minePick === "side") details.append(h("span", { class: "warn" }, label("← klikni na mapě, kam minu odhodit")));
-    else if (m.minePick === "timer") details.append(h("span", { class: "warn" }, label("← klikni na mapě na čas výbuchu (✕ = jiné místo)")));
+    if (m.minePick === "timer") details.append(h("span", { class: "warn" }, label("← klikni na mapě na čas výbuchu (✕ = jiné místo)")));
   } else if (o.action?.type === "jettison") {
     const cur = o.action.moduleId;
     const chosen = ship.loadout.modules.find((x) => x.id === cur);
@@ -293,7 +289,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     if (picker) details.append(picker);
     const debrisTarget = o.preferredTargetId ? (m.state.debris ?? []).find((d) => d.id === o.preferredTargetId) : undefined;
     const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? (debrisTarget ? `trosky ${MODULES[debrisTarget.type].short} (+${debrisTarget.value})` : "torpédo")) : null;
-    const target = debrisTarget ? undefined : laserTarget(m.state, ship, o.preferredTargetId);
+    const target = debrisTarget ? undefined : laserTarget(m.state, ship, o.preferredTargetId, o.laserModuleId);
     details.append(icon("target", target ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, tname ?? (target ? `nejbližší: ${target.name}` : "nikdo ve výseči")));
     if (target) {
       const odds = laserOdds(ship, target);

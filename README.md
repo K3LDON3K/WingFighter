@@ -60,7 +60,10 @@ Loď **Stíhač** má 4 malé sloty: příď, záď, levobok, pravobok. Příď 
 0,5 za minu, 2 ks), **Segmentový štít** (120, váha 2), **Celolodní štít** (120, váha 2). Součet váhy snižuje
 max. rychlost: každých 6 váhy = −1 (výchozí sestava má váhu 10 → rychlost max. 4, prázdná loď 5). Vystřelená
 munice loď odlehčí. Loď smí letět i bez modulů. Více modulů stejného typu = víc munice; při střelbě si vybereš,
-ze kterého modulu střílíš (jeden za akci). Pilot: zatím jen **Kadet** (bez schopností).
+ze kterého modulu střílíš (jeden za akci). **Natočení:** lasery, torpédomet a miny míří na jednu ze 4 stran
+(kamkoli kromě „do středu“ svého slotu; miny ne dopředu) – lasery pak střílí jen v té výseči (dopředu ±20°, do
+boku ±15°, dozadu ±10°), miny se odhazují na tu stranu a torpédo tím směrem vylétá. Natáčí se jen v místnosti
+(klik na šipku modulu). Pilot: zatím jen **Kadet** (bez schopností).
 
 **Nákup:** v místnosti má každý rozpočet (ladění → Ekonomika, výchozí 500) a kupuje moduly; host může omezit
 počet kusů každého modulu na hráče a zvolit výbavu botů (výchozí / náhodná / ruční naklikání). Co hráč neutratí,
@@ -127,6 +130,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.2 – **natočení modulů**: lasery, torpédomet a miny mají směr (4 strany, ne „do středu“ slotu); šipka v rohu
+  modulu v editoru (klik otočí), ve hře jen k nahlédnutí v inventáři, soupeř ji nevidí. Lasery střílí ve výseči
+  podle natočení (dopředu ±20°, do boku ±15°, dozadu ±10° – ladění → Lasery), výseč v plánování se kreslí podle
+  vybraného laseru. Miny se odhazují jen na stranu natočení (na příď je nelze dát), torpédo vylétá směrem modulu.
+  Štíty se neotáčejí.
 - v2.1.1 – tlačítka akcí jen pro moduly, které loď skutečně má (bez torpédometu žádné TORPÉDO, po vyhození min
   zmizí MINA, bez segmentového štítu není ŠTÍT; skupina bez akcí se neukáže). Získaný modul tlačítko zase přidá.
 - v2.1 – vyhození modulu přes inventář (akce VYHODIT otevře inventář, klik na modul, POTVRDIT); podobizna pilota

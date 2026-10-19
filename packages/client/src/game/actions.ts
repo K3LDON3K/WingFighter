@@ -1,4 +1,4 @@
-import { RULES, actionCost, makeManeuver, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@spacegame/shared";
+import { RULES, actionCost, makeManeuver, mineModule, mineSideOf, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@spacegame/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -53,10 +53,10 @@ export const ACTIONS: ActionOption[] = [
     id: "mine",
     glyph: "✹",
     label: "Mina (1 akce)",
-    description: "Odhodí minu ze startovní pozice lodi – za sebe nebo do strany; aktivní od příštího kola. Buď reaguje na pole: nepřítel, který v něm na začátku kola stojí, ji odpálí hned, kdokoliv (i ty) při vletu během kola; nebo je časovaná 1–3 kola a vybuchne na začátku kola, kdy odpočet dojde. Zraní všechny v poli a vykousne kráter do asteroidu.",
+    description: "Odhodí minu ze startovní pozice lodi na stranu, kam je minový zásobník natočený (za sebe / do boku); aktivní od příštího kola. Buď reaguje na pole: nepřítel, který v něm na začátku kola stojí, ji odpálí hned, kdokoliv (i ty) při vletu během kola; nebo je časovaná 1–3 kola a vybuchne na začátku kola, kdy odpočet dojde. Zraní všechny v poli a vykousne kráter do asteroidu.",
     disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mine") ? "loď nemá minový zásobník" : ship.ammo.mines > 0 ? noAp(ship, o, o.special?.type === "mine") : "došly miny"),
     active: (o) => o.special?.type === "mine",
-    apply: (o) => ({ special: o.special?.type === "mine" ? undefined : { type: "mine", side: "behind" } }),
+    apply: (o, ship) => ({ special: o.special?.type === "mine" ? undefined : { type: "mine", side: mineSideOf(mineModule(ship)?.facing) } }),
     requiresModule: "mine",
   },
   {

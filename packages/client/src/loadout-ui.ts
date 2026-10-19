@@ -1,5 +1,8 @@
 import {
+  allowedFacings,
+  FACING_NAMES,
   freeSlots,
+  hasFacing,
   HULLS,
   LARGE_SLOTS,
   loadoutWeight,
@@ -11,6 +14,7 @@ import {
   occupiedSlots,
   PILOTS,
   validateLoadout,
+  type Facing,
   type ModuleType,
   type ShipLoadout,
   type SlotId,
@@ -94,6 +98,25 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
       grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "PS2P", "font-size": 10, fill: "#e2e8f0", "text-anchor": "middle" }, label(def.short)));
       if (ammo !== undefined) grp.append(svgEl("text", { x: box.x + box.w - 6, y: box.y + 11, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "end" }, String(ammo)));
+      if (hasFacing(m.type)) {
+        // šipka natočení v levém horním rohu modulu (klik = otočit)
+        const ax = box.x + 10;
+        const ay = box.y + 10;
+        const rot = m.facing === "right" ? 90 : m.facing === "back" ? 180 : m.facing === "left" ? 270 : 0;
+        const arrow = svgEl("g", { class: `lo-arrow ${ro ? "ro" : ""}`, transform: `translate(${ax}, ${ay}) rotate(${rot})` });
+        arrow.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: "#0b1020", stroke: "#fbbf24", "stroke-width": 1 }));
+        arrow.append(svgEl("path", { d: "M0,-5 L5,2 L1.5,2 L1.5,5 L-1.5,5 L-1.5,2 L-5,2 Z", fill: "#fbbf24" }));
+        arrow.append(svgEl("title", {}, `Natočení: ${FACING_NAMES[m.facing ?? "front"]}${ro ? "" : "\nKlik = otočit (jen ven ze slotu)"}`));
+        if (!ro) {
+          arrow.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            const opts = allowedFacings(m.type, m.slot);
+            const next: Facing = opts[(opts.indexOf(m.facing ?? opts[0]) + 1) % opts.length];
+            change({ ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? { ...x, facing: next } : x)) });
+          });
+        }
+        grp.append(arrow);
+      }
       const title = svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${selectable ? "\nKlik = vybrat k vyhození" : ro ? "" : "\nKlik = odebrat (vrátí cenu)"}`);
       grp.append(title);
       if (selectable) grp.addEventListener("click", () => opts.onSelect!(m.id));

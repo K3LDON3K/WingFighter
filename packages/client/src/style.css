@@ -1237,3 +1237,10 @@ button.px.tiny {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.lo-arrow:not(.ro) {
+  cursor: pointer;
+  pointer-events: all;
+}
+.lo-arrow:not(.ro):hover rect {
+  fill: #3b2a0e;
+}

@@ -12,8 +12,10 @@ export const MOVE_UNIT = 45;
 export const MOVE_STEPS = 24;
 
 export const LASER = {
-  /** Poloviční úhel palebné výseče (±20°). */
+  /** Poloviční úhel palebné výseče podle směru modulu: dopředu ±20°, do boku ±15°, dozadu ±10°. */
   halfArc: (20 * Math.PI) / 180,
+  halfArcSide: (15 * Math.PI) / 180,
+  halfArcBack: (10 * Math.PI) / 180,
   /** Maximální dostřel. */
   range: 300,
   /** Délka jednoho dostřelového pásma (pásmo 1 = bonus útočníka, pásmo 3 = bonus obránce). */
