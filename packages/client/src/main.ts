@@ -20,6 +20,7 @@ import {
   TEAM_COLORS,
   TEAM_NAMES,
   TORPEDO,
+  MINE,
   type GameState,
   type Pose,
   type RoomState,
@@ -58,6 +59,8 @@ interface GameSession {
   log: { turn: number; lines: string[] }[];
   /** Čeká se na kliknutí na cíl. */
   picking: "torpedo" | "lock" | null;
+  /** Výběr miny na mapě: nejdřív místo, pak čas výbuchu. */
+  minePick: "side" | "timer" | null;
   hoverId?: string;
   hoverIcon?: string;
   mouse: { x: number; y: number; sx: number; sy: number } | null;
@@ -170,6 +173,7 @@ function startGame(state: GameState) {
     ready: [],
     log: [],
     picking: null,
+    minePick: null,
     mouse: null,
     icons: [],
   };
@@ -190,6 +194,7 @@ function resetOrders() {
   game.aimingShipId = null;
   game.speedLock.clear();
   game.picking = null;
+  game.minePick = null;
   const my = game.state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const s of my) game.orders.set(s.id, defaultOrders(s));
   if (!game.selectedShipId || !my.some((s) => s.id === game!.selectedShipId)) game.selectedShipId = my[0]?.id;
@@ -440,8 +445,35 @@ function buildOverlay(view: ViewModel): Overlay {
         overlay.targetId = o.preferredTargetId;
       }
       if (o.special?.type === "mine") {
-        const pos = mineDropPosition(ship, o.special.side);
-        overlay.mineField = { x: pos.x, y: pos.y, timer: o.special.timer };
+        const side = o.special.side ?? "behind";
+        if (g.minePick === "side") {
+          for (const sd of ["left", "behind", "right"] as const) {
+            const pos = mineDropPosition(ship, sd);
+            g.icons.push({ id: `mine-side:${sd}`, shipId: ship.id, kind: "mine", x: pos.x, y: pos.y, glyph: "", active: sd === side, disabled: false, hover: g.hoverIcon === `${ship.id}:mine-side:${sd}` });
+          }
+        } else {
+          const pos = mineDropPosition(ship, side);
+          overlay.mineField = { x: pos.x, y: pos.y, timer: o.special.timer };
+          if (g.minePick === "timer") {
+            const opts: { id: string; glyph: string; timer: number | undefined }[] = [
+              { id: "mine-timer:0", glyph: "◉", timer: undefined },
+              { id: "mine-timer:1", glyph: "1", timer: 1 },
+              { id: "mine-timer:2", glyph: "2", timer: 2 },
+              { id: "mine-timer:3", glyph: "3", timer: 3 },
+            ];
+            // tlačítka časování na odvrácené straně pole (směrem od lodi), v řadě kolmo na ten směr
+            const step = 32 / Math.min(1, cam!.zoom);
+            const dl = Math.hypot(pos.x - ship.x, pos.y - ship.y) || 1;
+            const dx = (pos.x - ship.x) / dl;
+            const dy = (pos.y - ship.y) / dl;
+            const cx = pos.x + dx * (MINE.radius + 26 / Math.min(1, cam!.zoom));
+            const cy = pos.y + dy * (MINE.radius + 26 / Math.min(1, cam!.zoom));
+            opts.forEach((op, i) => {
+              const k = i - 1.5;
+              g.icons.push({ id: op.id, shipId: ship.id, x: cx + dy * k * step, y: cy - dx * k * step, glyph: op.glyph, active: o.special?.type === "mine" && o.special.timer === op.timer, disabled: false, hover: g.hoverIcon === `${ship.id}:${op.id}` });
+            });
+          }
+        }
       }
     }
   }
@@ -530,6 +562,7 @@ function renderSide() {
       ready: game.ready,
       animating: !!game.anim,
       picking: game.picking ?? undefined,
+      minePick: game.minePick,
     },
     {
       select: (id) => {
@@ -541,6 +574,7 @@ function renderSide() {
         const cur = game!.orders.get(id);
         if (!cur) return;
         game!.orders.set(id, { ...cur, ...patch });
+        if (patch.special?.type === "mine" && game!.minePick === "side") game!.minePick = "timer";
         renderSide();
       },
       chooseAction: (id, actionId) => chooseIcon(id, actionId),
@@ -606,7 +640,7 @@ function entityAt(x: number, y: number): Entity | undefined {
 function iconAt(x: number, y: number): IconSpot | undefined {
   if (!game || !cam) return undefined;
   const r = ICON_RADIUS / Math.min(1, cam.zoom) + 3;
-  return game.icons.find((ic) => Math.hypot(ic.x - x, ic.y - y) <= r);
+  return game.icons.find((ic) => Math.hypot(ic.x - x, ic.y - y) <= (ic.kind === "mine" ? 22 : r));
 }
 
 /** Míření: směr (a bez zámku i rychlost) podle polohy myši vůči lodi. */
@@ -654,6 +688,19 @@ function chooseIcon(shipId: string, id: string) {
   g.selectedShipId = shipId;
   const ship = g.state.ships.find((s) => s.id === shipId)!;
   const o = g.orders.get(shipId)!;
+  if (id.startsWith("mine-side:") && o.special?.type === "mine") {
+    g.orders.set(shipId, { ...o, special: { ...o.special, side: id.slice(10) as "left" | "behind" | "right" } });
+    g.minePick = "timer";
+    renderSide();
+    return;
+  }
+  if (id.startsWith("mine-timer:") && o.special?.type === "mine") {
+    const n = Number(id.slice(11));
+    g.orders.set(shipId, { ...o, special: { ...o.special, timer: n > 0 ? n : undefined } });
+    g.minePick = null;
+    renderSide();
+    return;
+  }
   const a = actionById(id);
   if (!a) return;
   const why = a.disabled(ship, g.state, o);
@@ -664,6 +711,7 @@ function chooseIcon(shipId: string, id: string) {
   const next = { ...o, ...a.apply(o, ship, g.state) };
   g.orders.set(shipId, next);
   g.picking = a.pick && a.active(next) ? a.pick : null;
+  g.minePick = a.id === "mine" && next.special?.type === "mine" ? "side" : null;
   renderSide();
 }
 
@@ -736,6 +784,11 @@ function bindInput(c: HTMLCanvasElement) {
       return;
     }
     const hit = entityAt(w.x, w.y);
+    if (g.minePick) {
+      g.minePick = null; // klik mimo = ponechat aktuální volbu
+      renderSide();
+      return;
+    }
     // 3) vlastní loď: označit a začít kreslit dráhu
     if (hit?.kind === "ship" && hit.ownerId === playerId) {
       g.selectedShipId = hit.id;
@@ -811,7 +864,8 @@ function bindInput(c: HTMLCanvasElement) {
     const cur = o ? parseManeuverId(o.maneuverId) : null;
     if (!id || !cur) return;
     if (e.key === "Escape") {
-      if (game.picking) game.picking = null;
+      if (game.minePick) game.minePick = null;
+      else if (game.picking) game.picking = null;
       else game.aimingShipId = null;
       game.speedLock.delete(id);
       renderSide();

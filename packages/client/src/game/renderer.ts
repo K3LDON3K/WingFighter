@@ -20,6 +20,8 @@ import type { ViewModel, ViewShip } from "./view.ts";
 export interface IconSpot {
   id: string;
   shipId: string;
+  /** "mine" = náhled miny s polem (místo kruhové ikony). */
+  kind?: "icon" | "mine";
   x: number;
   y: number;
   glyph: string;
@@ -428,6 +430,21 @@ export class Renderer {
     const ctx = this.ctx;
     const r = ICON_RADIUS / Math.min(1, cam.zoom); // ikony drží čitelnou velikost i při oddálení
     for (const ic of icons) {
+      if (ic.kind === "mine") {
+        // náhled odhození miny: pole + sprite, aktivní zvýrazněné
+        ctx.save();
+        ctx.globalAlpha = ic.active ? 0.9 : ic.hover ? 0.7 : 0.4;
+        ctx.strokeStyle = ic.active ? "#fbbf24" : "#e2e8f0";
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = ic.active ? 2 : 1;
+        ctx.beginPath();
+        ctx.arc(ic.x, ic.y, MINE.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        drawSprite(ctx, this.sprites.mine(ic.active ? "#fbbf24" : "#94a3b8"), ic.x, ic.y, 0, ic.active ? 1 : 0.6);
+        continue;
+      }
       ctx.save();
       ctx.globalAlpha = ic.disabled ? 0.35 : 1;
       ctx.fillStyle = ic.active ? "#0ea5e9" : "rgba(13,18,34,0.92)";

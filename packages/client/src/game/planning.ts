@@ -35,6 +35,7 @@ export interface PlanningModel {
   ready: string[];
   animating: boolean;
   picking?: "torpedo" | "lock";
+  minePick?: "side" | "timer" | null;
 }
 
 export const DIFFICULTY_COLOR: Record<Difficulty, string> = { green: "#4ade80", white: "#e2e8f0", red: "#f87171", danger: "#fb923c" };
@@ -182,6 +183,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       ),
     );
     if (timer) details.append(h("span", { class: "muted" }, icon("clock", "#94a3b8", 12), ` ${timer}`));
+    if (m.minePick === "side") details.append(h("span", { class: "warn" }, label("← klikni na mapě, kam minu odhodit")));
+    else if (m.minePick === "timer") details.append(h("span", { class: "warn" }, label("← klikni na mapě na čas výbuchu")));
   } else if (o.fire) {
     const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? "torpédo") : null;
     details.append(icon("target", "#4ade80"), h("span", { class: "txt" }, tname ?? "nejbližší ve výseči"), h("span", { class: "muted" }, label("· klik na nepřítele = cíl")));
