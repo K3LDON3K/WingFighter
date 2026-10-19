@@ -49,6 +49,8 @@ export interface Overlay {
   /** Zvýraznit dostřel kolem lodi (žlutá kružnice) a slabší vnější dostřel. */
   rangeCircle?: { radius: number; label: string };
   rangeCircle2?: { radius: number };
+  /** Dosahy skeneru (tyrkysová): sken lodi a hluboký sken. */
+  scanRanges?: { ship: number; deep: number };
   /** Náhled pole miny na startovní pozici lodi. */
   mineField?: { x: number; y: number; timer?: number };
   /** Zvolený cíl (loď / torpédo) a bod pro torpédo. */
@@ -93,6 +95,16 @@ export class Renderer {
     const sel = overlay.selectedShipId ? view.ships.find((x) => x.id === overlay.selectedShipId) : undefined;
     if (sel && overlay.rangeCircle2) this.drawRange(sel, overlay.rangeCircle2.radius, "rgba(251,191,36,0.35)", "");
     if (sel && overlay.rangeCircle) this.drawRange(sel, overlay.rangeCircle.radius, "#fbbf24", overlay.rangeCircle.label);
+    if (sel && overlay.scanRanges) {
+      ctx.save();
+      ctx.fillStyle = "rgba(45,212,191,0.07)";
+      ctx.beginPath();
+      ctx.arc(sel.x, sel.y, overlay.scanRanges.ship, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      this.drawRange(sel, overlay.scanRanges.ship, "#2dd4bf", `sken lodi ${overlay.scanRanges.ship}`, 0.9, 2.5);
+      this.drawRange(sel, overlay.scanRanges.deep, "#5eead4", `hluboký sken ${overlay.scanRanges.deep}`, 0.7, 2);
+    }
     if (overlay.mineField) this.drawMine({ ...overlay.mineField, radius: MINE.radius, team: sel?.team ?? 0, armed: false }, now);
     if (overlay.reachable) {
       for (const d of overlay.reachable) {
@@ -498,13 +510,13 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawRange(s: ViewShip, range: number, color: string, label: string) {
+  private drawRange(s: ViewShip, range: number, color: string, label: string, alpha = 0.5, width = 1.5) {
     const ctx = this.ctx;
     ctx.save();
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = alpha;
     ctx.setLineDash([8, 8]);
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = width;
     ctx.beginPath();
     ctx.arc(s.x, s.y, range, 0, Math.PI * 2);
     ctx.stroke();

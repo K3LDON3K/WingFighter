@@ -133,6 +133,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.4.1 – po kliknutí na SKENER se na mapě tyrkysově ukáže dosah skenu lodi (vyplněný kruh) a hlubokého skenu.
 - v2.4 – **žebříček** po skončení bitvy (a kdykoli z Esc menu → Statistiky): sestřely, poškození uděleno/utrženo,
   vydělané kredity, manévry (zelený/bílý/červený/nebezpečný · otočky), lasery zásahy/salvy, torpéda, miny, skeny.
 - v2.3 – modul **Skener** (malý, 130 cr, váha 1, bez natočení, nebere akci): 2 náboje, +1 za zelený manévr. Sken lodi

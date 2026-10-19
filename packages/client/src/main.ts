@@ -32,6 +32,7 @@ import {
   HULLS,
   PILOTS,
   scannerModule,
+  SCANNER,
   type Ship,
   laserArcOf,
   laserOdds,
@@ -543,6 +544,7 @@ function buildOverlay(view: ViewModel): Overlay {
     }
 
     if (ship.id === g.selectedShipId) {
+      if (g.scanOpen && scannerModule(ship.loadout)) overlay.scanRanges = { ship: SCANNER.range, deep: SCANNER.deepRange };
       if (o.special?.type === "torpedo") {
         overlay.targetId = o.special.targetId;
         overlay.targetPoint = o.special.point;
