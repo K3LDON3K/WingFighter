@@ -407,6 +407,18 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (opts.blast) applyHits(explode(p, TORPEDO.blastRadius, TORPEDO.blastDamage, k), k);
   };
 
+  // --- Miny na začátku kola: časované s odpočtem na nule a miny s nepřítelem v poli vybuchnou hned ---
+  for (const mine of state.mines) {
+    if (!mine.armed || removedMines.has(mine.id)) continue;
+    if (mine.timer !== undefined) {
+      mine.timer--;
+      if (mine.timer <= 0) blastMine(mine, 0);
+      continue;
+    }
+    const enemyInside = state.ships.some((s) => s.alive && s.team !== mine.team && circlesOverlap(s, s.stats.radius, mine, mine.radius));
+    if (enemyInside) blastMine(mine, 0);
+  }
+
   for (let k = 1; k <= MOVE_STEPS; k++) {
     // --- srážky lodí: odmrštění, zranění, pokračování v pohybu ---
     for (let iter = 0; iter < 4; iter++) {
@@ -706,14 +718,6 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   state.torpedoes = state.torpedoes.filter((t) => !shotTorpedoes.has(t.id));
 
   /* ---------- 5. Konec kola ---------- */
-  // časované miny: odpočet; na nule vybuchnou (lodě už stojí na koncových pozicích)
-  for (const mine of state.mines) {
-    if (mine.timer === undefined || removedMines.has(mine.id)) continue;
-    if (!mine.armed) continue; // položena v tomto kole – odpočet začne příště
-    mine.timer--;
-    if (mine.timer <= 0) blastMine(mine, MOVE_STEPS);
-  }
-  state.mines = state.mines.filter((m) => !removedMines.has(m.id));
   for (const mine of state.mines) mine.armed = true;
   for (const ship of state.ships) {
     if (!ship.alive) continue;

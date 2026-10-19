@@ -430,6 +430,20 @@ describe("vyhodnocení kola", () => {
     expect(blast && blast.type === "mineBlast" && blast.hits.some((h) => h.shipId === "ship-p1-0" && h.damage === MINE.damage)).toBe(true);
   });
 
+  it("mina s nepřítelem v poli na začátku kola vybuchne hned (t = 0)", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, Math.PI);
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: false, special: { type: "mine" } }], createRng(1));
+    const mine = r.state.mines[0];
+    // nepřítel se objeví v poli miny (teleport pro test)
+    place(r.state, "ship-p2-0", mine.x + 30, mine.y, 0);
+    r = resolveTurn(r.state, [{ shipId: "ship-p2-0", maneuverId: "m2a0", fire: false }], createRng(1));
+    const blast = r.events.find((e) => e.type === "mineBlast");
+    expect(blast && blast.type === "mineBlast" && blast.t).toBe(0);
+    expect(r.state.mines).toHaveLength(0);
+  });
+
   it("časovaná mina nereaguje na vstup a vybuchne po odpočtu", () => {
     const g = game();
     place(g, "ship-p1-0", 500, 500, 0);
