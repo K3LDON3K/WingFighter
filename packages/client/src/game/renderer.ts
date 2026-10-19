@@ -1,5 +1,6 @@
 import {
   LASER,
+  MINE,
   STRESS,
   TEAM_COLORS,
   TORPEDO,
@@ -40,8 +41,11 @@ export interface Overlay {
   icons?: IconSpot[];
   /** Druhý duch – kam loď skočí přídavným posunem/úskokem. */
   actionGhost?: Pose;
-  /** Zvýraznit dostřel kolem lodi (žlutá kružnice). */
+  /** Zvýraznit dostřel kolem lodi (žlutá kružnice) a slabší vnější dostřel. */
   rangeCircle?: { radius: number; label: string };
+  rangeCircle2?: { radius: number };
+  /** Náhled pole miny na startovní pozici lodi. */
+  mineField?: { x: number; y: number; timer?: number };
   /** Zvolený cíl (loď / torpédo) a bod pro torpédo. */
   targetId?: string;
   targetPoint?: { x: number; y: number };
@@ -79,7 +83,9 @@ export class Renderer {
     for (const m of view.mines) this.drawMine(m, now);
 
     const sel = overlay.selectedShipId ? view.ships.find((x) => x.id === overlay.selectedShipId) : undefined;
+    if (sel && overlay.rangeCircle2) this.drawRange(sel, overlay.rangeCircle2.radius, "rgba(251,191,36,0.35)", "");
     if (sel && overlay.rangeCircle) this.drawRange(sel, overlay.rangeCircle.radius, "#fbbf24", overlay.rangeCircle.label);
+    if (overlay.mineField) this.drawMine({ ...overlay.mineField, radius: MINE.radius, team: sel?.team ?? 0, armed: false }, now);
     if (overlay.reachable) {
       for (const d of overlay.reachable) {
         ctx.fillStyle = d.color;

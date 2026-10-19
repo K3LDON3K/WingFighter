@@ -30,7 +30,7 @@ import { clear, h } from "./dom.ts";
 import { ACTIONS, actionById } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
-import { DIFFICULTY_COLOR, renderPlanning } from "./game/planning.ts";
+import { DIFFICULTY_COLOR, renderBottomBar } from "./game/planning.ts";
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
@@ -271,6 +271,7 @@ let canvas: HTMLCanvasElement | null = null;
 let renderer: Renderer | null = null;
 let cam: Camera | null = null;
 let sideEl: HTMLElement | null = null;
+let barEl: HTMLElement | null = null;
 let hudEl: HTMLElement | null = null;
 let overlayEl: HTMLElement | null = null;
 let tooltipEl: HTMLElement | null = null;
@@ -284,17 +285,19 @@ function mountGame() {
   hudEl = h("div", { class: "hud" });
   overlayEl = h("div");
   tooltipEl = h("div", { class: "tooltip", style: "display:none" });
+  barEl = h("div", { class: "bottombar" });
+  sideEl = h("div", { class: "maplog" });
   mapEl = h(
     "div",
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint" }, "klik na svou loď = kreslit dráhu myší · klik = potvrdit · ikony u konce dráhy = zbraň · klik na nepřítele = cíl · tažení = posun · ⌘/Ctrl+kolečko = zoom · Enter = připraven"),
+    h("div", { class: "hint" }, "klik na svou loď = kreslit dráhu · klik = potvrdit · klik na nepřítele = cíl · tažení = posun · ⌘/Ctrl+kolečko = zoom"),
+    sideEl,
     tooltipEl,
     overlayEl,
   );
-  sideEl = h("div", { class: "side" });
-  app.append(h("div", { class: "game" }, mapEl, sideEl));
+  app.append(h("div", { class: "game" }, h("div", { class: "mapcol" }, mapEl, barEl)));
 
   const ctx = canvas.getContext("2d")!;
   renderer = new Renderer(canvas, ctx);
@@ -333,7 +336,7 @@ function mountGame() {
 function unmountGame() {
   cancelAnimationFrame(raf);
   resizeObs?.disconnect();
-  canvas = renderer = cam = sideEl = hudEl = overlayEl = mapEl = tooltipEl = null;
+  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = null;
   render();
 }
 
@@ -429,10 +432,12 @@ function buildOverlay(view: ViewModel): Overlay {
       if (o.special?.type === "torpedo") {
         overlay.targetId = o.special.targetId;
         overlay.targetPoint = o.special.point;
-        if (g.picking === "torpedo") overlay.rangeCircle = { radius: TORPEDO.lockRange, label: "zaměření lodi 320 · bod až 1200" };
+        overlay.rangeCircle = { radius: TORPEDO.lockRange, label: "torpédo: zaměření 320 · bod až 1200" };
+        overlay.rangeCircle2 = { radius: TORPEDO.pointRange };
       } else {
         overlay.targetId = o.preferredTargetId;
       }
+      if (o.special?.type === "mine") overlay.mineField = { x: ship.x, y: ship.y, timer: o.special.timer };
     }
   }
   overlay.icons = g.icons;
@@ -506,11 +511,10 @@ function renderTooltip() {
 }
 
 function renderSide() {
-  if (!sideEl || !game) return;
+  if (!sideEl || !barEl || !game) return;
   clear(sideEl);
-  const planning = h("div");
-  renderPlanning(
-    planning,
+  renderBottomBar(
+    barEl,
     {
       state: game.state,
       myId: playerId,
@@ -534,7 +538,17 @@ function renderSide() {
         game!.orders.set(id, { ...cur, ...patch });
         renderSide();
       },
+      chooseAction: (id, actionId) => chooseIcon(id, actionId),
+      pickTarget: (id) => {
+        game!.selectedShipId = id;
+        game!.picking = game!.picking === "torpedo" ? null : "torpedo";
+        renderSide();
+      },
       aim: (id) => {
+        if (game!.aimingShipId === id) {
+          confirmManeuver(id);
+          return;
+        }
         game!.aimingShipId = id;
         game!.picking = null;
         game!.selectedShipId = id;
@@ -550,14 +564,17 @@ function renderSide() {
     },
   );
   const log = h("div", { class: "log" });
-  for (const entry of game.log.slice(-12)) {
+  for (const entry of game.log.slice(-6)) {
     log.append(h("div", { class: "turn" }, `Kolo ${entry.turn}`));
     for (const line of entry.lines) log.append(h("div", {}, line));
   }
-  if (game.log.length === 0) log.append(h("div", {}, "Naplánuj manévr a akci, pak dej Připraven. Vše se vyhodnotí najednou."));
-  sideEl.append(planning, log);
-  log.scrollTop = log.scrollHeight;
+  if (game.log.length === 0) log.append(h("div", {}, "Zatím žádné události."));
+  const open = logOpen;
+  sideEl.append(h("button", { class: "log-toggle", onclick: () => ((logOpen = !logOpen), renderSide()) }, open ? "Log ▾" : "Log ▸"));
+  if (open) sideEl.append(log);
+  if (open) log.scrollTop = log.scrollHeight;
 }
+let logOpen = true;
 
 /* ------------------------------------------------------------------ */
 /* Vstup na mapě                                                        */

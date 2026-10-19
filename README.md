@@ -88,6 +88,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.6 – nové UI: spodní lišta (stav lodi, manévr, tlačítka zbraní s časováním/cílem/dostřelem na mapě,
+  velké SPUSTIT KOLO), pravý panel odstraněn, log jako okno v rohu mapy.
 - v1.5 – výseč laserů jen při zapnuté akci lasery; miny na vstup nebo časované 1–3 kola.
 - v1.4 – systém 2 akcí na kolo (úprava pohybu, otočka, lasery, torpédo, mina); lasery jen jako akce.
 - v1.3 – míření jen po označení lodi, zbraně ∅/torpédo/mina (akce po pohybu vypnuté), torpédo startuje
