@@ -47,6 +47,7 @@ import type {
   Mine,
   MineSide,
   MovePath,
+  PlayerStats,
   Segments,
   Ship,
   ShipOrders,
@@ -95,6 +96,13 @@ export function torpedoSafe(t: Torpedo): boolean {
   return TORPEDO.lifeTurns - t.lifeLeft < TORPEDO.safeTurns;
 }
 
+/** Statistiky hráče (vytvoří prázdné, pokud chybí). */
+export function statsOf(state: GameState, playerId: string | undefined): PlayerStats | undefined {
+  if (!playerId) return undefined;
+  if (!state.stats) state.stats = {};
+  return (state.stats[playerId] ??= { damageDealt: 0, damageTaken: 0, kills: 0, deaths: 0, creditsEarned: 0, maneuvers: { green: 0, white: 0, red: 0, danger: 0, koiogran: 0 }, lasersFired: 0, laserHits: 0, torpedoesFired: 0, minesDropped: 0, scans: 0 });
+}
+
 /** Kontext pro připisování kreditů během vyhodnocení (nastavuje resolveTurn). */
 let creditCtx: { state: GameState; events: TurnEvent[] } | null = null;
 
@@ -104,6 +112,11 @@ export function awardCredits(state: GameState, events: TurnEvent[], playerId: st
   const p = state.players.find((x) => x.id === playerId);
   if (!p) return;
   p.credits = (p.credits ?? 0) + delta;
+  const st = statsOf(state, playerId);
+  if (st) {
+    st.creditsEarned += delta;
+    if (reason === "kill") st.kills++;
+  }
   events.push({ type: "credits", playerId, delta, total: p.credits, reason });
 }
 
@@ -129,6 +142,12 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec
     ship.shieldEff = Math.max(0, ship.shieldEff - RULES.wholeEffDrop);
   }
   ship.hull -= amount - absorbed;
+  if (creditCtx) {
+    const dealer = statsOf(creditCtx.state, by);
+    if (dealer && by !== ship.ownerId) dealer.damageDealt += amount;
+    const taker = statsOf(creditCtx.state, ship.ownerId);
+    if (taker) taker.damageTaken += amount;
+  }
   events.push({
     type: "damage",
     shipId: ship.id,
@@ -144,6 +163,10 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec
     ship.hull = 0;
     ship.alive = false;
     events.push({ type: "destroyed", shipId: ship.id, x: ship.x, y: ship.y });
+    if (creditCtx) {
+      const st = statsOf(creditCtx.state, ship.ownerId);
+      if (st) st.deaths++;
+    }
     if (creditCtx && by && by !== ship.ownerId) awardCredits(creditCtx.state, creditCtx.events, by, RULES.creditsPerKill, "kill");
   }
 }
@@ -482,6 +505,11 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     });
     if (useLock) ship.lockTargetId = undefined;
     const damage = outcome.damage * RULES.damagePerHit;
+    const stL = statsOf(state, ship.ownerId);
+    if (stL) {
+      stL.lasersFired++;
+      if (damage > 0) stL.laserHits++;
+    }
     events.push({
       type: "laser",
       shooterId: ship.id,
@@ -537,6 +565,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!target && !point) continue;
     tmod.ammo = (tmod.ammo ?? 1) - 1;
     refreshShip(ship);
+    const stT = statsOf(state, ship.ownerId);
+    if (stT) stT.torpedoesFired++;
     const launchHeading = ship.heading + facingAngle(tmod.facing);
     const f = forward(launchHeading);
     const off = ship.stats.radius + TORPEDO.radius + 2;
@@ -567,6 +597,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!mmod) continue;
     mmod.ammo = (mmod.ammo ?? 1) - 1;
     refreshShip(ship);
+    const stMi = statsOf(state, ship.ownerId);
+    if (stMi) stMi.minesDropped++;
     const sp = startPose.get(ship.id)!;
     const pos = mineDropPosition(sp, o.special.side);
     const mine: Mine = { id: newId("mine"), ownerId: ship.ownerId, team: ship.team, x: pos.x, y: pos.y, radius: MINE.radius, armed: false, timer: o.special.timer };
@@ -887,6 +919,11 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const man = maneuverOf.get(ship.id)!;
     ship.speed = man.koiogran ? Math.max(1, man.speed - RULES.koiogranSpeedDrop) : man.speed;
     const cost = stressCost(man.difficulty);
+    const stM = statsOf(state, ship.ownerId);
+    if (stM) {
+      stM.maneuvers[man.difficulty]++;
+      if (man.koiogran) stM.maneuvers.koiogran++;
+    }
     const before = ship.stressPoints;
     ship.stressPoints = clamp(ship.stressPoints - cost, 0, STRESS.max);
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
@@ -1077,12 +1114,16 @@ export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: 
     if (!target) return { error: "cíl skenu není cizí živá loď" };
     if (dist(ship, target) > SCANNER.range) return { error: `cíl je mimo dosah skeneru (${SCANNER.range})` };
     mod.charges = charges - 1;
+    const st = statsOf(state, ship.ownerId);
+    if (st) st.scans++;
     return { target };
   }
   if (mode === "deep") {
     if (charges < 2) return { error: "hluboký sken potřebuje 2 náboje" };
     mod.charges = 0;
     mod.cooldown = SCANNER.cooldown;
+    const st = statsOf(state, ship.ownerId);
+    if (st) st.scans++;
     state.revealTeams = [...new Set([...(state.revealTeams ?? []), ship.team])];
     return {};
   }

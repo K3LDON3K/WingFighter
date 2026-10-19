@@ -130,6 +130,7 @@ export function createGame(opts: CreateGameOptions): GameState {
     mines: [],
     debris: [],
     players,
+    stats: Object.fromEntries(players.map((p) => [p.id, { damageDealt: 0, damageTaken: 0, kills: 0, deaths: 0, creditsEarned: 0, maneuvers: { green: 0, white: 0, red: 0, danger: 0, koiogran: 0 }, lasersFired: 0, laserHits: 0, torpedoesFired: 0, minesDropped: 0, scans: 0 }])),
     status: "planning",
   };
 }

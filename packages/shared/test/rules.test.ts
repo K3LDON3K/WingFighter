@@ -8,7 +8,6 @@ import {
   validateLoadout,
   applyScan,
   newModule,
-  stateForTeam,
   actionCost,
   classifyManeuver,
   carveCrater,

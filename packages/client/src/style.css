@@ -1399,3 +1399,45 @@ button.px.tiny {
 .scan-slide .sm:disabled .c {
   color: #64748b;
 }
+
+/* ---- žebříček ---- */
+.lb-wrap {
+  text-align: left;
+  overflow: auto;
+  max-width: 100%;
+}
+.lb {
+  border-collapse: collapse;
+  font-size: 7px;
+  width: 100%;
+}
+.lb th {
+  color: var(--muted);
+  font-weight: normal;
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 2px solid var(--bevel-d);
+  white-space: nowrap;
+}
+.lb td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #1e293b;
+  white-space: nowrap;
+}
+.lb td.num {
+  text-align: right;
+  font-family: var(--ui);
+}
+.lb td.txt {
+  font-size: 13px;
+}
+.lb tr.me td {
+  background: rgba(56, 189, 248, 0.08);
+}
+.overlay .card {
+  min-width: 360px;
+  max-width: 900px;
+}
+.scan-card.wide {
+  width: min(900px, 95%);
+}

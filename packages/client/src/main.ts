@@ -623,6 +623,62 @@ function showScanResult(ship: Ship) {
   renderSide();
 }
 
+/** Okno se statistikami během hry (z menu). */
+function showStats() {
+  if (!mapEl || !game) return;
+  mapEl.querySelector(".scan-wrap")?.remove();
+  const wrap = h("div", { class: "scan-wrap" });
+  wrap.append(
+    h(
+      "div",
+      { class: "pnl scan-card wide" },
+      h("div", { class: "bb-head" }, icon("log", "#7dd3fc", 14), h("span", { class: "ttl" }, label(`Statistiky · kolo ${game.state.turn}`)), h("button", { class: "px tiny", style: "margin-left:auto", onclick: () => wrap.remove() }, "✕")),
+      renderLeaderboard(game.state),
+    ),
+  );
+  mapEl.append(wrap);
+  game.menuOpen = false;
+  renderSide();
+}
+
+/** Žebříček: poškození, sestřely, kredity, manévry, zbraně – řazeno podle sestřelů a poškození. */
+function renderLeaderboard(s: GameState): HTMLElement {
+  const stats = s.stats ?? {};
+  const rows = [...s.players]
+    .map((p) => ({ p, st: stats[p.id] }))
+    .filter((x) => x.st)
+    .sort((a, b) => b.st!.kills - a.st!.kills || b.st!.damageDealt - a.st!.damageDealt || b.st!.creditsEarned - a.st!.creditsEarned);
+  const th = (t: string, title?: string) => h("th", { title: title ?? "" }, label(t));
+  const td = (v: string | number, cls = "") => h("td", { class: cls }, String(v));
+  const table = h(
+    "table",
+    { class: "lb" },
+    h("thead", {}, h("tr", {}, th("#"), th("hráč"), th("sestřely"), th("poškození", "Uděleno / utrženo (trup i štít)"), th("kredity", "Vydělané kredity (bez startovního rozpočtu)"), th("manévry", "zelený / bílý / červený / nebezpečný · otočky"), th("lasery", "zásahy / salvy"), th("torp.", "vystřelená torpéda"), th("miny"), th("skeny"))),
+    h(
+      "tbody",
+      {},
+      ...rows.map(({ p, st }, i) => {
+        const m = st!.maneuvers;
+        return h(
+          "tr",
+          { class: p.id === playerId ? "me" : "" },
+          td(i + 1),
+          h("td", { class: "txt", style: `color:${TEAM_COLORS[p.team]}` }, p.name, st!.deaths ? h("span", { class: "muted" }, ` ✕${st!.deaths}`) : null),
+          td(st!.kills, "num"),
+          td(`${st!.damageDealt} / ${st!.damageTaken}`, "num"),
+          td(st!.creditsEarned, "num"),
+          h("td", { class: "num man" }, h("span", { style: "color:#4ade80" }, String(m.green)), " / ", h("span", {}, String(m.white)), " / ", h("span", { style: "color:#f87171" }, String(m.red)), " / ", h("span", { style: "color:#fb923c" }, String(m.danger)), m.koiogran ? h("span", { class: "muted" }, ` · ⟲${m.koiogran}`) : null),
+          td(`${st!.laserHits} / ${st!.lasersFired}`, "num"),
+          td(st!.torpedoesFired, "num"),
+          td(st!.minesDropped, "num"),
+          td(st!.scans, "num"),
+        );
+      }),
+    ),
+  );
+  return h("div", { class: "lb-wrap" }, h("div", { class: "ttl", style: "margin:10px 0 6px" }, label("Žebříček")), table);
+}
+
 function toggleMenu(open?: boolean) {
   if (!game) return;
   game.menuOpen = open ?? !game.menuOpen;
@@ -659,6 +715,7 @@ function renderMenu() {
         " ",
         label("Opustit hru – hlavní menu"),
       ),
+      h("button", { class: "px menu-btn", onclick: () => showStats() }, icon("log", "currentColor", 12), " ", label("Statistiky")),
       h("div", { class: "muted txt menu-note" }, "Esc během plánování nejdřív ruší rozdělanou akci (kreslení dráhy, výběr cíle), prázdný Esc otevře menu."),
     ),
   );
@@ -702,6 +759,7 @@ function renderHud() {
             { class: "card" },
             h("h2", { style: `color:${color}` }, title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()),
             h("div", { class: "muted txt" }, r.reason === "turnLimit" ? "Dosažen limit kol." : "Soupeři zničeni."),
+            renderLeaderboard(s),
             h("div", { style: "margin-top:16px" }, isHost ? h("button", { class: "primary", onclick: () => net.send({ type: "backToLobby" }) }, "Zpět do místnosti") : h("span", { class: "muted" }, "Host může vrátit všechny do místnosti.")),
           ),
         ),

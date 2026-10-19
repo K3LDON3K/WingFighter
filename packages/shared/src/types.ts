@@ -251,6 +251,21 @@ export interface GameResult {
   reason: "elimination" | "turnLimit";
 }
 
+/** Statistiky hráče za bitvu (žebříček). */
+export interface PlayerStats {
+  damageDealt: number;
+  damageTaken: number;
+  kills: number;
+  deaths: number;
+  creditsEarned: number;
+  maneuvers: { green: number; white: number; red: number; danger: number; koiogran: number };
+  lasersFired: number;
+  laserHits: number;
+  torpedoesFired: number;
+  minesDropped: number;
+  scans: number;
+}
+
 export interface GameState {
   turn: number;
   settings: GameSettings;
@@ -266,6 +281,8 @@ export interface GameState {
   players: PlayerInfo[];
   /** Týmy, které mají do konce kola odkrytou mapu (hluboký sken). */
   revealTeams?: number[];
+  /** Statistiky hráčů (klíč = id hráče). */
+  stats?: Record<string, PlayerStats>;
   status: "planning" | "finished";
   result?: GameResult;
 }
