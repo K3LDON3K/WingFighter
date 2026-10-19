@@ -239,10 +239,10 @@ export class Renderer {
     }
     if (m.timer !== undefined) {
       ctx.save();
-      ctx.font = "bold 12px ui-monospace, Menlo, monospace";
+      ctx.font = "8px PS2P, ui-monospace, Menlo, monospace";
       ctx.textAlign = "center";
       ctx.fillStyle = "#fbbf24";
-      ctx.fillText(`⏱${m.timer}`, m.x, m.y - 14);
+      ctx.fillText(`T-${m.timer}`, m.x, m.y - 14);
       ctx.restore();
     }
   }
@@ -308,9 +308,9 @@ export class Renderer {
     drawSprite(ctx, this.sprites.fighter(color), s.x, s.y, s.heading);
 
     ctx.save();
-    ctx.font = "11px ui-monospace, Menlo, monospace";
+    ctx.font = "13px Pix, ui-monospace, Menlo, monospace";
     ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(248,250,252,0.85)";
+    ctx.fillStyle = "rgba(248,250,252,0.9)";
     ctx.fillText(s.name, s.x, s.y - s.radius - 16);
     const bw = 34;
     const bx = s.x - bw / 2;
@@ -384,9 +384,9 @@ export class Renderer {
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle = color;
-    ctx.font = "11px ui-monospace, Menlo, monospace";
+    ctx.font = "8px PS2P, ui-monospace, Menlo, monospace";
     ctx.textAlign = "center";
-    ctx.fillText(label, s.x, s.y - range - 6);
+    ctx.fillText(label.toUpperCase(), s.x, s.y - range - 6);
     ctx.restore();
   }
 
@@ -416,10 +416,10 @@ export class Renderer {
     drawSprite(ctx, this.sprites.fighter(color), end.x, end.y, end.heading, 0.45);
     // popisek manévru u konce dráhy
     ctx.save();
-    ctx.font = "bold 11px ui-monospace, Menlo, monospace";
+    ctx.font = "8px PS2P, ui-monospace, Menlo, monospace";
     ctx.textAlign = "center";
     ctx.fillStyle = DIFFICULTY_COLOR[man.difficulty];
-    const label = man.koiogran ? `otočka ${man.speed}` : `${man.speed} · ${man.angle === 0 ? "rovně" : `${Math.abs(man.angle)}° ${man.angle < 0 ? "L" : "P"}`}`;
+    const label = man.koiogran ? `OTOCKA ${man.speed}` : `${man.speed} · ${man.angle === 0 ? "ROVNE" : `${Math.abs(man.angle)}° ${man.angle < 0 ? "L" : "P"}`}`;
     ctx.fillText(label, end.x, end.y - ship.radius - 10);
     ctx.restore();
   }
@@ -438,7 +438,7 @@ export class Renderer {
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = ic.active ? "#03111c" : "#e2e8f0";
-      ctx.font = `${Math.round(r * 1.1)}px ui-monospace, Menlo, monospace`;
+      ctx.font = `${Math.round(r * 1.1)}px Pix, ui-monospace, Menlo, monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(ic.glyph, ic.x, ic.y + 1);
@@ -501,7 +501,7 @@ export class Renderer {
         ctx.save();
         ctx.globalAlpha = 1 - t * t;
         ctx.fillStyle = e.color;
-        ctx.font = "bold 14px ui-monospace, Menlo, monospace";
+        ctx.font = "9px PS2P, ui-monospace, Menlo, monospace";
         ctx.textAlign = "center";
         ctx.fillText(e.text, e.x, e.y - 30 - t * 25);
         ctx.restore();

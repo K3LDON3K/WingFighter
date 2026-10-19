@@ -28,6 +28,7 @@ import {
   type TurnResult,
 } from "@spacegame/shared";
 import { clear, h } from "./dom.ts";
+import { icon } from "./icons.ts";
 import { ACTIONS, actionById } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
@@ -293,7 +294,7 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint" }, "klik na svou loď = kreslit dráhu · klik = potvrdit · klik na nepřítele = cíl · tažení = posun · ⌘/Ctrl+kolečko = zoom"),
+    h("div", { class: "hint" }, "KLIK NA LOD = KRESLIT DRAHU · KLIK = POTVRDIT · KLIK NA NEPRITELE = CIL · TAZENI = POSUN · CMD/CTRL+KOLECKO = ZOOM"),
     sideEl,
     tooltipEl,
     overlayEl,
@@ -458,10 +459,10 @@ function renderHud() {
     .map((t) => {
       const alive = s.ships.filter((x) => x.team === t && x.alive).length;
       const label = s.settings.mode === "dm" ? (s.players.find((p) => p.team === t)?.name ?? TEAM_NAMES[t]) : TEAM_NAMES[t];
-      return `<span style="color:${TEAM_COLORS[t]}">${label}: ${t === myTeam ? alive : `${alive} v dohledu`}</span>`;
+      return `<span style="color:${TEAM_COLORS[t]}">${label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()}: ${t === myTeam ? alive : `${alive} V DOHLEDU`}</span>`;
     })
     .join(" · ");
-  const html = `<div class="big">Kolo ${game.anim ? game.anim["result"].turn : s.turn}${limit}</div><div>${counts}</div>`;
+  const html = `<div class="big">KOLO ${game.anim ? game.anim["result"].turn : s.turn}${limit}</div><div>${counts}</div>`;
   if (hudEl.innerHTML !== html) hudEl.innerHTML = html;
 
   if (overlayEl) {
@@ -483,8 +484,8 @@ function renderHud() {
           h(
             "div",
             { class: "card" },
-            h("h2", { style: `color:${color}` }, title),
-            h("div", { class: "muted" }, r.reason === "turnLimit" ? "Dosažen limit kol." : "Soupeři zničeni."),
+            h("h2", { style: `color:${color}` }, title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()),
+            h("div", { class: "muted txt" }, r.reason === "turnLimit" ? "Dosažen limit kol." : "Soupeři zničeni."),
             h("div", { style: "margin-top:16px" }, isHost ? h("button", { class: "primary", onclick: () => net.send({ type: "backToLobby" }) }, "Zpět do místnosti") : h("span", { class: "muted" }, "Host může vrátit všechny do místnosti.")),
           ),
         ),
@@ -569,7 +570,7 @@ function renderSide() {
   }
   if (game.log.length === 0) log.append(h("div", {}, "Zatím žádné události."));
   const open = logOpen;
-  sideEl.append(h("button", { class: "log-toggle", onclick: () => ((logOpen = !logOpen), renderSide()) }, open ? "Log ▾" : "Log ▸"));
+  sideEl.append(h("button", { class: "log-toggle", onclick: () => ((logOpen = !logOpen), renderSide()) }, icon("log", "#7dd3fc", 12), open ? "LOG ▾" : "LOG ▸"));
   if (open) sideEl.append(log);
   if (open) log.scrollTop = log.scrollHeight;
 }
@@ -850,6 +851,12 @@ function render() {
 
 render();
 net.connect();
+try {
+  document.fonts?.load("9px PS2P");
+  document.fonts?.load("15px Pix");
+} catch {
+  /* ignore */
+}
 
 // Ladicí přístup ke stavu (pro automatické testy v prohlížeči).
 (window as unknown as { __sg: () => unknown }).__sg = () => ({ game, cam, playerId });

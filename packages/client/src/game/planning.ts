@@ -13,6 +13,7 @@ import {
   type ShipOrders,
 } from "@spacegame/shared";
 import { clear, h } from "../dom.ts";
+import { icon, label, segBar } from "../icons.ts";
 import { ACTIONS } from "./actions.ts";
 
 export interface PlanningCallbacks {
@@ -44,17 +45,7 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   danger: `NEBEZPEČNÝ – stojí 2 body a ${STRESS.dangerHullPercent} % trupu`,
 };
 const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: "bílý", red: "červený", danger: "nebezpečný" };
-
-function bar(icon: string, value: number, max: number, color: string, title: string) {
-  const pct = max > 0 ? Math.max(0, Math.min(100, (100 * value) / max)) : 0;
-  return h(
-    "div",
-    { class: "bar", title },
-    h("span", { class: "bar-icon" }, icon),
-    h("div", { class: "bar-track" }, h("div", { class: "bar-fill", style: `width:${pct}%;background:${color}` })),
-    h("span", { class: "bar-num" }, `${value}`),
-  );
-}
+const ACTION_ICON: Record<string, string> = { laser: "laser", torpedo: "torpedo", mine: "mine", koiogran: "turn" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
   if (koiogran) return "⟲";
@@ -77,9 +68,9 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     root.append(
       h(
         "div",
-        { class: "bb-section bb-status" },
-        h("div", { class: "bb-big" }, m.animating ? "⏵ Vyhodnocení kola" : "◌ Pozorovatel"),
-        h("div", { class: "muted" }, m.animating ? "Sleduj mapu…" : "Všechny tvoje lodě byly zničeny. Bitva pokračuje."),
+        { class: "pnl bb-status" },
+        h("div", { class: "bb-big" }, icon(m.animating ? "play" : "wait", "#7dd3fc", 18), label(m.animating ? "Vyhodnocení kola" : "Pozorovatel")),
+        h("div", { class: "txt muted" }, m.animating ? "Sleduj mapu…" : "Všechny tvoje lodě byly zničeny. Bitva pokračuje."),
       ),
     );
     return;
@@ -93,26 +84,26 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   const aiming = m.aimingShipId === ship.id;
 
   /* ---- 1. loď ---- */
-  const pips = h("div", { class: "pips", title: `Stresové body ${ship.stressPoints}/${STRESS.max}: červený manévr −1, nebezpečný −2, zelený +1` });
-  for (let i = 0; i < STRESS.max; i++) pips.append(h("span", { class: i < ship.stressPoints ? "pip on" : "pip" }));
   const status = h(
     "div",
-    { class: "bb-section bb-ship" },
+    { class: "pnl bb-ship" },
     h(
       "div",
       { class: "bb-head" },
-      h("span", { class: "bb-name", style: `color:${TEAM_COLORS[ship.team]}` }, ship.name),
-      my.length > 1 ? h("div", { class: "ship-tabs" }, ...my.map((s, i) => h("button", { class: s.id === ship.id ? "active" : "", title: s.name, onclick: () => cb.select(s.id) }, String(i + 1)))) : null,
+      h("span", { class: "bb-name txt", style: `color:${TEAM_COLORS[ship.team]}` }, ship.name),
+      my.length > 1
+        ? h("div", { class: "ship-tabs" }, ...my.map((s, i) => h("button", { class: `px ${s.id === ship.id ? "on" : ""}`, title: s.name, onclick: () => cb.select(s.id) }, String(i + 1))))
+        : h("span", { class: "muted", style: "margin-left:auto" }, "1/1"),
     ),
-    bar("⛨", ship.hull, ship.stats.hull, ship.hull <= ship.stats.hull * 0.3 ? "#ef4444" : "#22c55e", `Trup ${ship.hull}/${ship.stats.hull}`),
-    bar("◍", ship.shields, ship.stats.shields, "#60a5fa", `Štíty ${ship.shields}/${ship.stats.shields}`),
+    h("div", { class: "bb-row", title: `Trup ${ship.hull}/${ship.stats.hull}` }, icon("hull", "#4ade80"), segBar(20, Math.round((20 * ship.hull) / ship.stats.hull), ship.hull <= ship.stats.hull * 0.3 ? "#ef4444" : "#22c55e", "#14341f"), h("span", { class: "num" }, String(ship.hull))),
+    h("div", { class: "bb-row", title: `Štíty ${ship.shields}/${ship.stats.shields}` }, icon("shield", "#60a5fa"), segBar(20, Math.round((20 * ship.shields) / Math.max(1, ship.stats.shields)), "#3b82f6", "#132449"), h("span", { class: "num" }, String(ship.shields))),
     h(
       "div",
-      { class: "bb-row bb-stats" },
-      h("span", { class: "stat", title: "Stresové body" }, "⚡", pips),
-      h("span", { class: "stat", title: "Aktuální rychlost" }, "➜", h("b", {}, String(ship.speed))),
-      h("span", { class: "stat", title: "Torpéda" }, "➤", h("b", {}, String(ship.ammo.torpedoes))),
-      h("span", { class: "stat", title: "Miny" }, "✹", h("b", {}, String(ship.ammo.mines))),
+      { class: "bb-row" },
+      h("span", { class: "stat", title: "Stresové body: červený manévr −1, nebezpečný −2, zelený +1" }, icon("stress", "#f472b6"), segBar(STRESS.max, ship.stressPoints, "#f472b6", "#3b1a2e")),
+      h("span", { class: "stat", title: "Aktuální rychlost" }, icon("speed", "#94a3b8"), String(ship.speed)),
+      h("span", { class: "stat", title: "Torpéda" }, icon("torpedo", "#94a3b8"), String(ship.ammo.torpedoes)),
+      h("span", { class: "stat", title: "Miny" }, icon("mine", "#94a3b8"), String(ship.ammo.mines)),
     ),
   );
 
@@ -120,22 +111,22 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   const dcolor = man ? DIFFICULTY_COLOR[man.difficulty] : "#f87171";
   const maneuver = h(
     "div",
-    { class: "bb-section bb-maneuver" },
-    h("div", { class: "bb-title" }, "Manévr"),
+    { class: "pnl bb-maneuver" },
+    h("div", { class: "ttl" }, label("Manévr")),
     h(
       "div",
       { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] : "Neplatný manévr" },
       h("span", { class: "man-glyph", style: `color:${dcolor}` }, angleGlyph(cur.angle, cur.koiogran)),
-      h("div", { class: "man-nums" }, h("span", { class: "man-speed" }, String(cur.speed)), h("span", { class: "man-angle" }, cur.koiogran ? "180°" : `${Math.abs(cur.angle)}°`)),
-      h("span", { class: "man-dot", style: `background:${dcolor}` }),
-      h("span", { class: "man-diff", style: `color:${dcolor}` }, man ? (stressCost(man.difficulty) > ship.stressPoints ? "chybí stres" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný"),
+      h("span", { class: "man-speed" }, String(cur.speed)),
+      h("span", { class: "man-angle" }, cur.koiogran ? "180°" : `${Math.abs(cur.angle)}°`),
+      h("span", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (stressCost(man.difficulty) > ship.stressPoints ? "chybí stres" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
     ),
-    h("button", { class: `bb-btn ${aiming ? "active" : ""}`, disabled: locked, title: "Klikni na loď na mapě, nebo sem. Pohyb myši = dráha, klik = potvrdit.", onclick: () => cb.aim(ship.id) }, aiming ? "✓ potvrdit" : "✎ nakreslit"),
+    h("button", { class: `px ${aiming ? "on" : ""}`, disabled: locked, title: "Klikni na loď na mapě, nebo sem. Pohyb myši = dráha, klik = potvrdit.", onclick: () => cb.aim(ship.id) }, icon(aiming ? "check" : "pen", "currentColor", 12), label(aiming ? "potvrdit" : "nakreslit")),
   );
 
   /* ---- 3. akce ---- */
-  const apips = h("div", { class: "pips" });
-  for (let i = 0; i < ACTION_POINTS; i++) apips.append(h("span", { class: i < acts.length ? "pip ap on" : "pip ap" }));
+  const apips = h("div", { class: "apip" });
+  for (let i = 0; i < ACTION_POINTS; i++) apips.append(h("i", { class: i < acts.length ? "on" : "" }));
   const buttons = h("div", { class: "bb-weapons" });
   for (const a of ACTIONS) {
     const active = a.active(o);
@@ -144,28 +135,28 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       h(
         "button",
         {
-          class: `bb-weapon ${active ? "active" : ""}`,
+          class: `px bb-weapon ${active ? "on" : ""}`,
           disabled: locked || (!!why && !active),
           title: `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`,
           onclick: () => cb.chooseAction(ship.id, a.id),
         },
-        h("span", { class: "glyph" }, a.glyph),
-        h("span", { class: "lbl" }, a.label.replace(/ \(1 akce\)/, "").replace(" 180°", "")),
+        icon(ACTION_ICON[a.id] ?? "target", "currentColor", 24),
+        h("span", { class: "lbl" }, label(a.label.replace(/ \(1 akce\)/, "").replace(" 180°", ""))),
       ),
     );
   }
   const details = h("div", { class: "bb-details" });
-  const seg = (label: string, active: boolean, title: string, onclick: () => void) => h("button", { class: `seg ${active ? "active" : ""}`, disabled: locked, title, onclick }, label);
+  const seg = (content: Node | string, active: boolean, title: string, onclick: () => void) => h("button", { class: `px seg ${active ? "on" : ""}`, disabled: locked, title, onclick }, content);
   if (o.special?.type === "torpedo") {
     const sp = o.special;
     const tname = sp.targetId ? (m.state.ships.find((x) => x.id === sp.targetId)?.name ?? "torpédo") : null;
     details.append(
-      h("span", { class: "det-icon" }, "➤"),
+      icon("target", sp.targetId || sp.point ? "#4ade80" : "#fbbf24"),
       sp.targetId
-        ? h("span", { class: "det-ok" }, `◎ ${tname}`)
+        ? h("span", { class: "txt" }, tname)
         : sp.point
-          ? h("span", { class: "det-ok" }, `✛ [${Math.round(sp.point.x)}, ${Math.round(sp.point.y)}]`)
-          : h("span", { class: "det-warn" }, "klikni na cíl: loď ≤ 320 · bod ≤ 1200"),
+          ? h("span", {}, `[${Math.round(sp.point.x)}, ${Math.round(sp.point.y)}]`)
+          : h("span", { class: "warn" }, label("klikni na cíl: loď ≤ 320 · bod ≤ 1200")),
     );
   } else if (o.special?.type === "mine") {
     const timer = o.special.timer;
@@ -173,33 +164,34 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     const setMine = (patch: Partial<{ timer: number | undefined; side: MineSide }>) =>
       cb.setOrders(ship.id, { special: { type: "mine", timer: "timer" in patch ? patch.timer : timer, side: patch.side ?? side } });
     details.append(
-      h("span", { class: "det-icon" }, "✹"),
+      icon("mine", "#94a3b8"),
       h(
         "div",
-        { class: "segs", title: "Kam minu odhodit" },
-        seg("↙", side === "left", "vlevo", () => setMine({ side: "left" })),
-        seg("↓", side === "behind", "za sebe", () => setMine({ side: "behind" })),
-        seg("↘", side === "right", "vpravo", () => setMine({ side: "right" })),
+        { class: "segs-btn", title: "Kam minu odhodit" },
+        seg(icon("left", "currentColor", 12), side === "left", "vlevo", () => setMine({ side: "left" })),
+        seg(icon("down", "currentColor", 12), side === "behind", "za sebe", () => setMine({ side: "behind" })),
+        seg(icon("right", "currentColor", 12), side === "right", "vpravo", () => setMine({ side: "right" })),
       ),
       h(
         "div",
-        { class: "segs", title: "Výbuch: při vstupu do pole, nebo časovaný" },
-        seg("◉", timer === undefined, "při vstupu do pole", () => setMine({ timer: undefined })),
-        seg("⏱1", timer === 1, "za 1 kolo", () => setMine({ timer: 1 })),
-        seg("⏱2", timer === 2, "za 2 kola", () => setMine({ timer: 2 })),
-        seg("⏱3", timer === 3, "za 3 kola", () => setMine({ timer: 3 })),
+        { class: "segs-btn", title: "Výbuch: při vstupu do pole, nebo časovaný" },
+        seg(icon("target", "currentColor", 12), timer === undefined, "při vstupu do pole", () => setMine({ timer: undefined })),
+        seg("1", timer === 1, "za 1 kolo", () => setMine({ timer: 1 })),
+        seg("2", timer === 2, "za 2 kola", () => setMine({ timer: 2 })),
+        seg("3", timer === 3, "za 3 kola", () => setMine({ timer: 3 })),
       ),
     );
+    if (timer) details.append(h("span", { class: "muted" }, icon("clock", "#94a3b8", 12), ` ${timer}`));
   } else if (o.fire) {
     const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? "torpédo") : null;
-    details.append(h("span", { class: "det-icon" }, "⚡"), h("span", { class: "det-ok" }, tname ? `◎ ${tname}` : "◎ nejbližší ve výseči"), h("span", { class: "muted" }, "· klik na nepřítele = cíl"));
+    details.append(icon("target", "#4ade80"), h("span", { class: "txt" }, tname ?? "nejbližší ve výseči"), h("span", { class: "muted" }, label("· klik na nepřítele = cíl")));
   } else {
     details.append(h("span", { class: "muted" }, "—"));
   }
   const actions = h(
     "div",
-    { class: "bb-section bb-actions" },
-    h("div", { class: "bb-head" }, h("span", { class: "bb-title" }, "Akce"), apips, h("span", { class: "muted bb-acts" }, acts.map((a) => a.label).join(" · "))),
+    { class: "pnl bb-actions" },
+    h("div", { class: "bb-head" }, h("span", { class: "ttl" }, label("Akce")), apips, h("span", { class: "muted bb-acts" }, label(acts.map((a) => a.label).join(" · ")))),
     buttons,
     details,
   );
@@ -207,11 +199,11 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   /* ---- 4. spuštění kola ---- */
   const go = h(
     "div",
-    { class: "bb-section bb-go" },
+    { class: "pnl bb-go" },
     locked
-      ? h("button", { class: "bb-launch waiting", onclick: () => cb.unready() }, h("span", { class: "big" }, "⏳ ČEKÁM"), h("span", { class: "sub" }, "klik = upravit"))
-      : h("button", { class: "bb-launch", onclick: () => cb.ready() }, h("span", { class: "big" }, "▶ SPUSTIT KOLO"), h("span", { class: "sub" }, "Enter")),
-    h("div", { class: "bb-wait muted", title: waiting.map((p) => p.name).join(", ") }, waiting.length ? `čeká: ${waiting.map((p) => p.name).join(", ")}` : "všichni připraveni"),
+      ? h("button", { class: "px bb-launch waiting", onclick: () => cb.unready() }, icon("wait", "#e2e8f0", 20), h("span", { class: "big" }, label("Čekám")), h("span", { class: "sub" }, label("klik = upravit")))
+      : h("button", { class: "px bb-launch", onclick: () => cb.ready() }, icon("play", "#fff", 20), h("span", { class: "big" }, label("Spustit"), h("br"), label("kolo")), h("span", { class: "sub" }, "ENTER")),
+    h("div", { class: "bb-wait muted txt", title: waiting.map((p) => p.name).join(", ") }, waiting.length ? `čeká: ${waiting.map((p) => p.name).join(", ")}` : "všichni připraveni"),
   );
 
   root.append(status, maneuver, actions, go);

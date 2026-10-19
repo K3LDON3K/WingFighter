@@ -1,0 +1,67 @@
+/** Pixelové ikony 8×8 jako SVG (stejný princip jako sprity lodí – šablona ze znaků). */
+const ICONS: Record<string, string[]> = {
+  laser: ["....#...", "...##...", "..##....", ".####...", "...##...", "..##....", "..#.....", "........"],
+  torpedo: ["........", "..#.....", "..##....", "#######.", "########", "#######.", "..##....", "..#....."],
+  mine: ["...#....", ".#.#.#..", "..###...", "#.###.#.", "..###...", ".#.#.#..", "...#....", "........"],
+  turn: ["..####..", ".#....#.", "#......#", "#...#..#", "#...##.#", "....###.", "....#...", "........"],
+  hull: ["#######.", "#.....#.", "#.###.#.", "#.###.#.", "#.....#.", ".#...#..", "..#.#...", "...#...."],
+  shield: ["..####..", ".#....#.", "#..##..#", "#.####.#", "#..##..#", ".#....#.", "..####..", "........"],
+  stress: ["....#...", "...##...", "..###...", ".####...", "...##...", "..##....", "..#.....", "........"],
+  speed: ["........", "#..#....", "##.##...", "######..", "#######.", "######..", "##.##...", "#..#...."],
+  play: ["#.......", "###.....", "#####...", "#######.", "#####...", "###.....", "#.......", "........"],
+  pen: [".....##.", "....#..#", "...#..#.", "..#..#..", ".#..#...", "##.#....", "###.....", "........"],
+  clock: ["..####..", ".#....#.", "#..#...#", "#..#...#", "#..##..#", ".#....#.", "..####..", "........"],
+  target: ["...#....", ".#####..", "#..#..#.", "#######.", "#..#..#.", ".#####..", "...#....", "........"],
+  wait: ["######..", ".#..#...", ".#..#...", "..##....", ".#..#...", ".#..#...", "######..", "........"],
+  left: ["...#....", "..##....", ".#######", "########", ".#######", "..##....", "...#....", "........"],
+  right: ["....#...", "....##..", "#######.", "########", "#######.", "....##..", "....#...", "........"],
+  down: ["...##...", "...##...", "...##...", "...##...", "#######.", ".#####..", "..###...", "...#...."],
+  check: ["......#.", ".....##.", "....##..", "#..##...", "###.....", ".#......", "........", "........"],
+  ship: ["#.......", "##......", "#####...", "#######.", "#####...", "##......", "#.......", "........"],
+  log: ["######..", "#....#..", "#.##.#..", "#....#..", "#.##.#..", "#....#..", "######..", "........"],
+  people: [".##..##.", ".##..##.", "........", "####.###", "####.###", "####.###", "........", "........"],
+  bot: ["...#....", ".#####..", "#.#.#.#.", "#######.", "#.....#.", ".#####..", "..#.#...", "........"],
+};
+
+export function icon(name: string, color = "currentColor", size = 16): SVGSVGElement {
+  const rows = ICONS[name] ?? ICONS.target;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 8 8");
+  svg.setAttribute("width", String(size));
+  svg.setAttribute("height", String(size));
+  svg.setAttribute("fill", color);
+  svg.setAttribute("shape-rendering", "crispEdges");
+  svg.classList.add("pi");
+  rows.forEach((r, y) =>
+    [...r].forEach((c, x) => {
+      if (c !== "#") return;
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", String(x));
+      rect.setAttribute("y", String(y));
+      rect.setAttribute("width", "1");
+      rect.setAttribute("height", "1");
+      svg.append(rect);
+    }),
+  );
+  return svg;
+}
+
+/** Popisky v Press Start 2P: font nemá češtinu, odstraníme diakritiku a dáme velká písmena. */
+export function label(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase();
+}
+
+/** Segmentový pruh (dílky). */
+export function segBar(n: number, filled: number, color: string, dim: string): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "segs";
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement("i");
+    s.style.background = i < filled ? color : dim;
+    el.append(s);
+  }
+  return el;
+}

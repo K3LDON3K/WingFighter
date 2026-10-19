@@ -1,5 +1,6 @@
 import { MAX_TEAMS_TDM, TEAM_COLORS, TEAM_NAMES, type RoomState, type RoomSummary } from "@spacegame/shared";
 import { clear, h } from "./dom.ts";
+import { icon, label } from "./icons.ts";
 import type { Net } from "./net.ts";
 
 export interface LobbyModel {
@@ -19,11 +20,11 @@ export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName:
   const selStart = (document.activeElement as HTMLInputElement | null)?.selectionStart ?? null;
   clear(root);
   root.append(
-    h("div", { class: `status ${m.connected ? "ok" : "bad"}` }, m.connected ? "připojeno" : "odpojeno – připojuji…"),
+    h("div", { class: `status ${m.connected ? "ok" : "bad"}` }, m.connected ? "ONLINE" : "OFFLINE..."),
     h(
       "div",
       { class: "screen" },
-      h("div", { class: "center" }, h("div", { class: "title" }, h("h1", {}, "SPACEGAME"), h("div", { class: "sub" }, "tahová vesmírná střílečka · prototyp v1")), m.room ? roomView(m, net) : lobbyView(m, net, setName)),
+      h("div", { class: "center" }, h("div", { class: "title" }, h("h1", {}, "SPACEGAME"), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)),
     ),
   );
   if (activeId) {
@@ -70,24 +71,24 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
   return h(
     "div",
     { style: "display:grid;gap:16px" },
-    h("div", { class: "card" }, h("h3", {}, "Pilot"), h("div", { class: "row" }, nameInput, h("span", { class: "muted" }, "jméno uvidí ostatní hráči"))),
+    h("div", { class: "card" }, h("h3", {}, label("Pilot")), h("div", { class: "row" }, nameInput, h("span", { class: "muted txt" }, "jméno uvidí ostatní hráči"))),
     h(
       "div",
       { class: "card" },
-      h("h3", {}, "Nová místnost"),
+      h("h3", {}, label("Nová místnost")),
       h(
         "div",
         { class: "row" },
         roomName,
-        h("button", { class: "primary", onclick: () => (commitName(), net.send({ type: "createRoom", name: roomName.value })) }, "Vytvořit místnost"),
+        h("button", { class: "primary", onclick: () => (commitName(), net.send({ type: "createRoom", name: roomName.value })) }, label("Vytvořit místnost")),
       ),
     ),
     h(
       "div",
       { class: "card" },
-      h("div", { class: "row" }, h("h3", {}, "Otevřené místnosti"), h("div", { class: "spacer" }), codeInput, h("button", { onclick: join }, "Připojit kódem")),
+      h("div", { class: "row" }, h("h3", {}, label("Otevřené místnosti")), h("div", { class: "spacer" }), codeInput, h("button", { onclick: join }, label("Připojit kódem"))),
       m.rooms.length === 0
-        ? h("div", { class: "muted", style: "padding:8px 0" }, "Zatím žádná místnost. Vytvoř první!")
+        ? h("div", { class: "muted txt", style: "padding:8px 0" }, "Zatím žádná místnost. Vytvoř první!")
         : h(
             "div",
             { class: "room-list" },
@@ -99,7 +100,7 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
                 h("span", {}, r.name),
                 h("span", { class: "muted" }, `${r.players} hráčů`),
                 h("div", { class: "spacer" }),
-                r.inGame ? h("span", { class: "muted" }, "hra probíhá") : h("button", { onclick: () => (commitName(), net.send({ type: "joinRoom", code: r.code })) }, "Připojit"),
+                r.inGame ? h("span", { class: "muted" }, label("hra probíhá")) : h("button", { onclick: () => (commitName(), net.send({ type: "joinRoom", code: r.code })) }, label("Připojit")),
               ),
             ),
           ),
@@ -107,7 +108,7 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
     ),
     h(
       "div",
-      { class: "card muted", style: "font-size:12px" },
+      { class: "card muted txt" },
       "Hráči na stejné síti otevřou stejnou adresu jako ty (viz výpis serveru). Místnosti vidí všichni, kód slouží k přímému připojení.",
     ),
   );
@@ -124,22 +125,22 @@ function roomView(m: LobbyModel, net: Net) {
     return h(
       "div",
       { class: `team ${me?.team === team ? "mine" : ""}`, style: `--team:${TEAM_COLORS[team]}` },
-      h("h3", {}, TEAM_NAMES[team]),
+      h("h3", {}, label(TEAM_NAMES[team])),
       ...members.map((p) =>
         h(
           "div",
           { class: "player" },
           h("span", { class: `dot ${p.connected ? "" : "off"}` }),
           h("span", {}, p.name),
-          p.id === room.hostId ? h("span", { class: "host" }, "host") : null,
+          p.id === room.hostId ? h("span", { class: "host" }, "HOST") : null,
           p.isBot && isHost ? h("button", { class: "x", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
         ),
       ),
       h(
         "div",
         { class: "row", style: "margin-top:8px" },
-        me?.team !== team ? h("button", { onclick: () => net.send({ type: "setTeam", team }) }, "Přejít sem") : null,
-        isHost ? h("button", { onclick: () => net.send({ type: "addBot", team }) }, "+ bot") : null,
+        me?.team !== team ? h("button", { onclick: () => net.send({ type: "setTeam", team }) }, label("Přejít sem")) : null,
+        isHost ? h("button", { onclick: () => net.send({ type: "addBot", team }) }, icon("bot", "currentColor", 12), label("bot")) : null,
       ),
     );
   };
@@ -157,35 +158,35 @@ function roomView(m: LobbyModel, net: Net) {
         "div",
         { class: "row" },
         h("h2", {}, room.name),
-        h("span", { class: "muted" }, "kód: "),
+        h("span", { class: "muted" }, "KOD "),
         h("span", { class: "code", style: "font-size:22px;font-weight:700;color:var(--accent);letter-spacing:3px" }, room.code),
         h("div", { class: "spacer" }),
-        h("button", { onclick: () => net.send({ type: "leaveRoom" }) }, "Opustit"),
+        h("button", { onclick: () => net.send({ type: "leaveRoom" }) }, label("Opustit")),
       ),
-      h("div", { class: "muted", style: "font-size:12px" }, "Řekni kód ostatním, nebo ať místnost najdou v seznamu."),
+      h("div", { class: "muted txt" }, "Řekni kód ostatním, nebo ať místnost najdou v seznamu."),
     ),
     tdm
       ? h("div", { class: "teams" }, ...Array.from({ length: MAX_TEAMS_TDM }, (_, i) => teamBox(i)))
       : h(
           "div",
           { class: "card" },
-          h("h3", {}, "Hráči (každý sám za sebe)"),
+          h("h3", {}, label("Hráči (každý sám za sebe)")),
           ...room.players.map((p, i) =>
             h(
               "div",
               { class: "player" },
               h("span", { class: `dot ${p.connected ? "" : "off"}` }),
               h("span", { style: `color:${TEAM_COLORS[i % TEAM_COLORS.length]}` }, p.name),
-              p.id === room.hostId ? h("span", { class: "host" }, "host") : null,
+              p.id === room.hostId ? h("span", { class: "host" }, "HOST") : null,
               p.isBot && isHost ? h("button", { class: "x", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
             ),
           ),
-          isHost ? h("div", { class: "row", style: "margin-top:8px" }, h("button", { onclick: () => net.send({ type: "addBot", team: 0 }) }, "+ bot")) : null,
+          isHost ? h("div", { class: "row", style: "margin-top:8px" }, h("button", { onclick: () => net.send({ type: "addBot", team: 0 }) }, icon("bot", "currentColor", 12), label("bot"))) : null,
         ),
     h(
       "div",
       { class: "card settings" },
-      h("h3", {}, "Nastavení bitvy", isHost ? "" : " (mění host)"),
+      h("h3", {}, label("Nastavení bitvy"), isHost ? "" : label(" (mění host)")),
       h(
         "label",
         {},
@@ -217,14 +218,14 @@ function roomView(m: LobbyModel, net: Net) {
           ...[1, 2, 3, 4].map((n) => h("option", { value: String(n), selected: settings.shipsPerPlayer === n }, String(n))),
         ),
       ),
-      h("div", { class: "muted", style: "font-size:12px;margin-top:6px" }, "Při limitu kol vyhrává tým s největším součtem zbývajícího trupu a štítů."),
+      h("div", { class: "muted txt", style: "margin-top:6px" }, "Při limitu kol vyhrává tým s největším součtem zbývajícího trupu a štítů."),
     ),
     h(
       "div",
       { class: "row" },
       h("div", { class: "error" }, m.error),
       h("div", { class: "spacer" }),
-      isHost ? h("button", { class: "primary", onclick: () => net.send({ type: "startGame" }) }, "Zahájit bitvu") : h("span", { class: "muted" }, "Čeká se, až host zahájí bitvu…"),
+      isHost ? h("button", { class: "primary", onclick: () => net.send({ type: "startGame" }) }, icon("play", "currentColor", 12), label("Zahájit bitvu")) : h("span", { class: "muted txt" }, "Čeká se, až host zahájí bitvu…"),
     ),
   );
 }
