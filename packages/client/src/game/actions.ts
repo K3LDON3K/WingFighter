@@ -32,7 +32,7 @@ export const ACTIONS: ActionOption[] = [
     id: "torpedo",
     glyph: "➤",
     label: "Torpédo (1 akce)",
-    description: `Vypustí torpédo hned se začátkem pohybu (letí 240/kolo, zatáčí až 120°/kolo). Cíl zadáš jen na mapě: klikni na viditelnou nepřátelskou loď či torpédo do ${TORPEDO.lockRange} (sleduje ji celý let), nebo na bod do ${TORPEDO.pointRange} – tam vybuchne (poloměr ${TORPEDO.blastRadius}, zranění ${TORPEDO.blastDamage} všem, kráter do asteroidu). Přímý zásah lodi = ${TORPEDO.damage}.`,
+    description: `Fázové torpédo: vyletí rovně z lodi (${TORPEDO.launchDist} j. rychlostí ${TORPEDO.launchSpeed}/kolo), pak se otáčí na cíl a po zaměření zrychlí až na ${TORPEDO.speed}/kolo; při plné rychlosti zatáčí jen mírně a cíl mimo výseč před sebou ztratí. Cíl zadáš jen na mapě: klikni na viditelnou nepřátelskou loď či torpédo do ${TORPEDO.lockRange} (sleduje ji celý let), nebo na bod do ${TORPEDO.pointRange} – tam vybuchne (poloměr ${TORPEDO.blastRadius}, zranění ${TORPEDO.blastDamage} všem, kráter do asteroidu). Přímý zásah lodi = ${TORPEDO.damage}.`,
     disabled: (ship, _s, o) => (ship.ammo.torpedoes > 0 ? noAp(ship, o, o.special?.type === "torpedo") : "došla torpéda"),
     active: (o) => o.special?.type === "torpedo",
     apply: (o) => ({ special: o.special?.type === "torpedo" ? undefined : { type: "torpedo" } }),

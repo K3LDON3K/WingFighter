@@ -195,11 +195,11 @@ describe("vyhodnocení kola", () => {
     expect(r.state.ships[0].stressPoints).toBe(1);
   });
 
-  it("torpédo startuje hned s pohybem a zasáhne cíl v témže kole", () => {
+  it("fázové torpédo: startuje s pohybem, vyletí → zaměří → zrychlí a zasáhne cíl do dvou kol", () => {
     const g = game();
     place(g, "ship-p1-0", 500, 500, 0);
     place(g, "ship-p2-0", 800, 500, Math.PI);
-    const r = resolveTurn(
+    let r = resolveTurn(
       g,
       [
         { shipId: "ship-p1-0", maneuverId: "m1a-45", fire: false, special: { type: "torpedo", targetId: "ship-p2-0" } },
@@ -210,6 +210,19 @@ describe("vyhodnocení kola", () => {
     expect(r.events[0].type).toBe("spawnTorpedo");
     expect(r.events[1].type).toBe("move");
     expect(r.state.ships[0].ammo.torpedoes).toBe(2);
+    // po prvním kole je torpédo ve fázi letu, ale ještě nemá plnou rychlost a cíl nezasáhlo
+    expect(r.state.torpedoes).toHaveLength(1);
+    expect(r.state.torpedoes[0].phase).toBe("cruise");
+    expect(r.state.torpedoes[0].speed).toBeGreaterThan(120);
+    expect(r.state.torpedoes[0].speed).toBeLessThan(240);
+    r = resolveTurn(
+      r.state,
+      [
+        { shipId: "ship-p1-0", maneuverId: "m1a0", fire: false },
+        { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false },
+      ],
+      createRng(2),
+    );
     const hit = r.events.find((e) => e.type === "torpedoHit");
     expect(hit && hit.type === "torpedoHit" && hit.shipId).toBe("ship-p2-0");
     expect(r.state.torpedoes).toHaveLength(0);
@@ -252,7 +265,7 @@ describe("vyhodnocení kola", () => {
     let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m2a0", fire: false }], createRng(3));
     const dmg = r.events.find((e) => e.type === "damage" && e.shipId === "ship-p2-0");
     if (dmg && dmg.type === "damage") {
-      expect(dmg.absorbed).toBe(dmg.amount); // plná účinnost 100 %
+      expect(dmg.absorbed ?? 0).toBe(dmg.amount); // plná účinnost 100 %
       expect(dmg.effAfter).toBe(90);
       expect(dmg.shieldsAfter).toBe(50 - dmg.amount);
     }
@@ -377,7 +390,7 @@ describe("vyhodnocení kola", () => {
   it("torpédo lze sestřelit ručně zaměřeným laserem", () => {
     const g = game();
     place(g, "ship-p1-0", 500, 500, 0);
-    place(g, "ship-p2-0", 1100, 500, Math.PI);
+    place(g, "ship-p2-0", 900, 500, Math.PI);
     let r = resolveTurn(
       g,
       [

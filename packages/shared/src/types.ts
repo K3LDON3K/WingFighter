@@ -139,7 +139,13 @@ export interface Torpedo extends Pose {
   targetPoint?: { x: number; y: number };
   trackLeft: number;
   lifeLeft: number;
+  /** Fázové torpédo: fáze letu, aktuální rychlost (j./kolo), zbývající délka výletu, ztracený cíl. */
+  phase: TorpedoPhase;
+  speed: number;
+  launchLeft: number;
+  lost?: boolean;
 }
+export type TorpedoPhase = "launch" | "lock" | "cruise";
 
 export interface Mine {
   id: string;

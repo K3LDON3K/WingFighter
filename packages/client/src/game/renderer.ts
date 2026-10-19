@@ -106,11 +106,13 @@ export class Renderer {
       // plamen motoru
       const f = forward(t.heading);
       ctx.save();
-      ctx.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(now / 40 + t.x));
-      ctx.fillStyle = "#fbbf24";
+      // délka plamene podle rychlosti (výlet/zaměření = krátký, let = dlouhý); ztracený cíl = bledý plamen
+      const thrust = Math.max(0.25, Math.min(1, (t.speed ?? TORPEDO.speed) / Math.max(1, TORPEDO.speed)));
+      ctx.globalAlpha = (0.5 + 0.5 * Math.abs(Math.sin(now / 40 + t.x))) * (t.lost ? 0.5 : 1);
+      ctx.fillStyle = t.phase === "cruise" ? "#fbbf24" : "#fb923c";
       ctx.beginPath();
       ctx.moveTo(t.x - f.x * 8 - f.y * 2, t.y - f.y * 8 + f.x * 2);
-      ctx.lineTo(t.x - f.x * (16 + 6 * Math.random()), t.y - f.y * (16 + 6 * Math.random()));
+      ctx.lineTo(t.x - f.x * (8 + (8 + 6 * Math.random()) * thrust * 1.6), t.y - f.y * (8 + (8 + 6 * Math.random()) * thrust * 1.6));
       ctx.lineTo(t.x - f.x * 8 + f.y * 2, t.y - f.y * 8 - f.x * 2);
       ctx.closePath();
       ctx.fill();

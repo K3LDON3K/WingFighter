@@ -48,10 +48,18 @@ export const TORPEDO = {
   lockRange: 320,
   /** Max. vzdálenost bodu na mapě, na který lze torpédo vystřelit (celý dolet). */
   pointRange: 1200,
-  /** Ujetá vzdálenost za kolo (musí být víc než nejrychlejší manévr lodi = 5 × MOVE_UNIT). */
+  /** Plná rychlost (ujetá vzdálenost za kolo). */
   speed: 240,
-  /** Maximální změna kurzu za kolo. */
-  maxTurn: (120 * Math.PI) / 180,
+  /** Fázové torpédo – výlet: délka rovného letu z lodi a startovní rychlost (j./kolo). */
+  launchDist: 60,
+  launchSpeed: 120,
+  /** Zaměření: max. otočení (rad/kolo) a úhel, pod kterým je cíl „zaměřen“ (rad). */
+  lockTurn: (90 * Math.PI) / 180,
+  lockAngle: (15 * Math.PI) / 180,
+  /** Let: zrychlení (j./kolo za kolo) na plnou `speed`, zatáčení při letu (rad/kolo), výseč sledování (rad, ±). */
+  accel: 120,
+  maxTurn: (45 * Math.PI) / 180,
+  trackArc: (90 * Math.PI) / 180,
   /** Kolik kol torpédo sleduje cíl. */
   trackTurns: 5,
   /** Celková životnost v kolech. */

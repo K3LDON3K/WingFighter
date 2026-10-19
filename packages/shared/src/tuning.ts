@@ -36,6 +36,12 @@ export interface Tuning {
   torpedoSpeed: number;
   torpedoTurnDeg: number;
   torpedoLife: number;
+  torpedoLaunchDist: number;
+  torpedoLaunchSpeed: number;
+  torpedoLockTurnDeg: number;
+  torpedoLockAngleDeg: number;
+  torpedoAccel: number;
+  torpedoTrackArcDeg: number;
   // akce a stres
   actionPoints: number;
   stressMax: number;
@@ -78,8 +84,14 @@ export const DEFAULT_TUNING: Tuning = {
   torpedoLockRange: 320,
   torpedoPointRange: 1200,
   torpedoSpeed: 240,
-  torpedoTurnDeg: 120,
+  torpedoTurnDeg: 45,
   torpedoLife: 5,
+  torpedoLaunchDist: 60,
+  torpedoLaunchSpeed: 120,
+  torpedoLockTurnDeg: 90,
+  torpedoLockAngleDeg: 15,
+  torpedoAccel: 120,
+  torpedoTrackArcDeg: 90,
   actionPoints: 2,
   stressMax: 3,
   stressCostRed: 1,
@@ -132,9 +144,15 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "laserArcDeg", label: "Laser – výseč ± °", group: "Dosahy", min: 5, max: 180, step: 5 },
   { key: "torpedoLockRange", label: "Torpédo – zaměření lodi", group: "Dosahy", min: 50, max: 2000, step: 10 },
   { key: "torpedoPointRange", label: "Torpédo – dolet na bod", group: "Dosahy", min: 100, max: 4000, step: 50 },
-  { key: "torpedoSpeed", label: "Torpédo – rychlost / kolo", group: "Dosahy", min: 50, max: 800, step: 10 },
-  { key: "torpedoTurnDeg", label: "Torpédo – zatáčení ° / kolo", group: "Dosahy", min: 0, max: 180, step: 5 },
   { key: "torpedoLife", label: "Torpédo – životnost (kola)", group: "Dosahy", min: 1, max: 20, step: 1 },
+  { key: "torpedoLaunchDist", label: "Výlet – délka rovně z lodi", group: "Fázové torpédo", min: 0, max: 300, step: 10, hint: "1. fáze: letí rovně ve směru přídě" },
+  { key: "torpedoLaunchSpeed", label: "Výlet – startovní rychlost / kolo", group: "Fázové torpédo", min: 20, max: 400, step: 10 },
+  { key: "torpedoLockTurnDeg", label: "Zaměření – otáčení ° / kolo", group: "Fázové torpédo", min: 0, max: 360, step: 5, hint: "2. fáze: točí se na cíl startovní rychlostí" },
+  { key: "torpedoLockAngleDeg", label: "Zaměření – hotovo pod úhlem °", group: "Fázové torpédo", min: 1, max: 90, step: 1, hint: "odchylka od cíle, při které končí zaměření" },
+  { key: "torpedoAccel", label: "Let – zrychlení / kolo", group: "Fázové torpédo", min: 10, max: 800, step: 10, hint: "3. fáze: zrychluje na plnou rychlost" },
+  { key: "torpedoSpeed", label: "Let – plná rychlost / kolo", group: "Fázové torpédo", min: 50, max: 800, step: 10 },
+  { key: "torpedoTurnDeg", label: "Let – zatáčení ° / kolo", group: "Fázové torpédo", min: 0, max: 180, step: 5 },
+  { key: "torpedoTrackArcDeg", label: "Let – výseč sledování ± °", group: "Fázové torpédo", min: 10, max: 180, step: 5, hint: "cíl mimo výseč = torpédo ho ztratí a letí rovně" },
   { key: "actionPoints", label: "Akce na kolo", group: "Akce a stres", min: 1, max: 5, step: 1 },
   { key: "stressMax", label: "Stresové body – max", group: "Akce a stres", min: 1, max: 10, step: 1 },
   { key: "stressCostRed", label: "Červený manévr – cena", group: "Akce a stres", min: 0, max: 5, step: 1 },
@@ -172,6 +190,12 @@ export function applyTuning(t: Tuning): void {
   TORPEDO.pointRange = t.torpedoPointRange;
   TORPEDO.speed = t.torpedoSpeed;
   TORPEDO.maxTurn = (t.torpedoTurnDeg * Math.PI) / 180;
+  TORPEDO.launchDist = t.torpedoLaunchDist;
+  TORPEDO.launchSpeed = t.torpedoLaunchSpeed;
+  TORPEDO.lockTurn = (t.torpedoLockTurnDeg * Math.PI) / 180;
+  TORPEDO.lockAngle = (t.torpedoLockAngleDeg * Math.PI) / 180;
+  TORPEDO.accel = t.torpedoAccel;
+  TORPEDO.trackArc = (t.torpedoTrackArcDeg * Math.PI) / 180;
   TORPEDO.lifeTurns = t.torpedoLife;
   TORPEDO.trackTurns = t.torpedoLife;
   MINE.damage = t.mineDamage;

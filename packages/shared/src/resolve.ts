@@ -241,6 +241,50 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
 /* Vyhodnocení kola                                                     */
 /* ------------------------------------------------------------------ */
 
+/** Jemnost simulace torpéda uvnitř kola (násobek MOVE_STEPS). */
+const TORPEDO_SUBSTEPS = MOVE_STEPS * 2;
+
+/**
+ * Fázové torpédo – jedno kolo letu po mikrokrocích:
+ * výlet (rovně, startovní rychlost) → zaměření (otáčí se na cíl) → let (zrychluje, mírně zatáčí, cíl mimo výseč ztratí).
+ * Mění `t.phase/speed/launchLeft/lost`; vrací vzorky (MOVE_STEPS + 1) a ujetou délku.
+ */
+export function simulateTorpedo(t: Torpedo, aimAt: (k: number) => Vec | undefined): { samples: Pose[]; length: number } {
+  const dt = 1 / TORPEDO_SUBSTEPS;
+  let { x, y, heading } = t;
+  let length = 0;
+  const micro: Pose[] = [{ x, y, heading }];
+  for (let i = 0; i < TORPEDO_SUBSTEPS; i++) {
+    const k = Math.min(MOVE_STEPS, Math.round(((i + 1) / TORPEDO_SUBSTEPS) * MOVE_STEPS));
+    const aim = aimAt(k);
+    const err = aim ? normalizeAngle(Math.atan2(aim.y - y, aim.x - x) - heading) : 0;
+    if (t.phase === "launch") {
+      t.speed = TORPEDO.launchSpeed;
+      t.launchLeft -= t.speed * dt;
+      if (t.launchLeft <= 0) t.phase = aim ? "lock" : "cruise";
+    } else if (t.phase === "lock") {
+      t.speed = TORPEDO.launchSpeed;
+      if (!aim || Math.abs(err) <= TORPEDO.lockAngle) t.phase = "cruise";
+      else heading += clamp(err, -TORPEDO.lockTurn * dt, TORPEDO.lockTurn * dt);
+    }
+    if (t.phase === "cruise") {
+      t.speed = Math.min(TORPEDO.speed, t.speed + TORPEDO.accel * dt);
+      if (aim) {
+        if (Math.abs(err) > TORPEDO.trackArc) t.lost = true;
+        else heading += clamp(err, -TORPEDO.maxTurn * dt, TORPEDO.maxTurn * dt);
+      }
+    }
+    const step = t.speed * dt;
+    x += Math.cos(heading) * step;
+    y += Math.sin(heading) * step;
+    length += step;
+    micro.push({ x, y, heading });
+  }
+  const samples: Pose[] = [];
+  for (let i = 0; i <= MOVE_STEPS; i++) samples.push(micro[Math.round((i / MOVE_STEPS) * TORPEDO_SUBSTEPS)]);
+  return { samples, length };
+}
+
 interface Mover {
   samples: Pose[];
   length: number;
@@ -399,6 +443,9 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       targetPoint: target ? undefined : point,
       trackLeft: TORPEDO.trackTurns,
       lifeLeft: TORPEDO.lifeTurns,
+      phase: "launch",
+      speed: TORPEDO.launchSpeed,
+      launchLeft: TORPEDO.launchDist,
     };
     state.torpedoes.push(torpedo);
     spawnEvents.push({ type: "spawnTorpedo", torpedo });
@@ -416,32 +463,21 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     spawnEvents.push({ type: "spawnMine", mine });
   }
 
+  const posAt = (m: Mover, k: number): Pose => m.samples[m.frozenAt !== null ? Math.min(m.frozenAt, k) : k];
   const torpMovers = new Map<string, Mover>();
   for (const t of state.torpedoes) {
-    let delta = 0;
-    let aim: Vec | undefined;
-    if (t.targetPoint) aim = t.targetPoint;
-    else if (t.trackLeft > 0) {
+    const sim = simulateTorpedo(t, (k) => {
+      if (t.targetPoint) return t.targetPoint;
+      if (t.trackLeft <= 0 || t.lost) return undefined;
       const s = shipById(state, t.targetId);
-      aim = s?.alive ? s : torpedoById(state, t.targetId);
-    }
-    if (aim) {
-      const want = normalizeAngle(Math.atan2(aim.y - t.y, aim.x - t.x) - t.heading);
-      delta = clamp(want, -TORPEDO.maxTurn, TORPEDO.maxTurn);
-    }
-    torpMovers.set(t.id, {
-      samples: samplePath(makePath(t, TORPEDO.speed, delta), MOVE_STEPS),
-      length: TORPEDO.speed,
-      frozenAt: null,
-      deflections: 0,
-      collided: false,
+      if (s?.alive) return posAt(shipMovers.get(s.id)!, k);
+      return torpedoById(state, t.targetId);
     });
+    torpMovers.set(t.id, { samples: sim.samples, length: sim.length, frozenAt: null, deflections: 0, collided: false });
   }
   const removedTorpedoes = new Set<string>();
   const removedMines = new Set<string>();
   const removedAsteroids = new Set<string>();
-
-  const posAt = (m: Mover, k: number): Pose => m.samples[m.frozenAt !== null ? Math.min(m.frozenAt, k) : k];
 
   /** Odrazí pohyb od vzorku k: zbytek dráhy pokračuje rovně novým kurzem. */
   const deflect = (m: Mover, k: number, newHeading: number) => {
@@ -683,7 +719,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
         endTorpedo(other, k, { blast: false });
         continue;
       }
-      if (t.targetPoint && dist(p, t.targetPoint) <= TORPEDO.speed / MOVE_STEPS * 0.6) {
+      if (t.targetPoint && dist(p, t.targetPoint) <= Math.max(6, (m.length / MOVE_STEPS) * 0.6)) {
         endTorpedo(t, k, { blast: true });
         continue;
       }

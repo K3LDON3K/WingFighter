@@ -71,8 +71,10 @@ celolodní štít kruh obarvený podle síly, segmentový čtyři oblouky otáč
   **šanci na zásah v %** (aspoň jeden čistý zásah) a průměrné zranění. Střílí na preferovaný cíl, pokud je ve výseči,
   jinak na nejbližšího nepřítele.
   **Nestřílí skrz asteroidy.**
-- **Torpédo** (3 ks, místo akce) – cíl: nepřátelská loď/torpédo do 320 (sleduje 3 kola) **nebo bod na mapě**
-  do 1200 (letí tam a vybuchne). Rychlost 240/kolo, zatáčí max 75°/kolo, žije 5 kol.
+- **Fázové torpédo** (3 ks, 1 akce) – cíl: nepřátelská loď/torpédo do 320 (sleduje celý let) **nebo bod na mapě**
+  do 1200 (letí tam a vybuchne). Let má tři fáze: **výlet** rovně z lodi (60 j. rychlostí 120/kolo) → **zaměření**
+  (otáčí se na cíl až 90°/kolo, hotovo pod 15°) → **let** (zrychluje +120/kolo na 240, zatáčí jen 45°/kolo; cíl
+  mimo výseč ±90° před sebou ztratí a letí rovně). Žije 5 kol. Vše v ladění ve skupině „Fázové torpédo“.
   Přímý zásah lodi = 45. Výbuch (na bodě, o asteroid, na konci doletu) = poloměr 70, zranění 30 všem lodím
   v poli a **kráter do asteroidu**. Sestřelení: torpédo jde ručně označit jako cíl laserů (2 obranné kostky)
   nebo jako cíl jiného torpéda; dvě torpéda, která se potkají, vybuchnou.
@@ -110,6 +112,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.15 – **Fázové torpédo**: výlet rovně z lodi (60 j., 120/kolo) → zaměření (otáčí se 90°/kolo, hotovo pod 15°)
+  → let (zrychluje +120/kolo na 240, zatáčí 45°/kolo, cíl mimo ±90° ztratí). Všechny parametry v ladění
+  (skupina „Fázové torpédo“); plamen torpéda podle rychlosti.
 - v1.14 – úhybný manévr v animaci (varianta E): poloprůhledná loď se sudovým překrutem, pulzující modrý obrys,
   jiskry, bledé kopie; při průletu nepřátelskou lodí vlnky a „PRŮLET −1 STRES“. Lasery: v liště i u cíle na mapě
   se ukazuje šance na zásah v % (přesný výpočet z kostek, pásma, zaměření, zámku a úhybu) a průměrné zranění.

@@ -1,4 +1,4 @@
-import type { Asteroid, GameState, Mine, Pose, Segments, ShieldType, Ship, Torpedo } from "@spacegame/shared";
+import type { Asteroid, GameState, Mine, Pose, Segments, ShieldType, Ship, Torpedo, TorpedoPhase } from "@spacegame/shared";
 
 /** Co se právě kreslí – během plánování kopie stavu, během animace průběžně měněný model. */
 export interface ViewShip extends Pose {
@@ -28,6 +28,10 @@ export interface ViewTorpedo extends Pose {
   id: string;
   team: number;
   targetPoint?: { x: number; y: number };
+  /** Fáze a rychlost (délka plamene). */
+  phase: TorpedoPhase;
+  speed: number;
+  lost?: boolean;
 }
 
 export interface ViewMine {
@@ -85,7 +89,7 @@ export function shipToView(s: Ship): ViewShip {
 }
 
 export function torpedoToView(t: Torpedo): ViewTorpedo {
-  return { id: t.id, team: t.team, x: t.x, y: t.y, heading: t.heading, targetPoint: t.targetPoint };
+  return { id: t.id, team: t.team, x: t.x, y: t.y, heading: t.heading, targetPoint: t.targetPoint, phase: t.phase, speed: t.speed, lost: t.lost };
 }
 
 export function mineToView(m: Mine): ViewMine {
