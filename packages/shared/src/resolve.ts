@@ -83,6 +83,11 @@ export function hitSegment(ship: Pose, from: Vec): number {
  * Celolodní: pohltí `účinnost %` ze zásoby, zbytek do trupu, účinnost klesne.
  * Segmentový: segment se životy pohltí celý zásah a ztratí 1 život; bez životů jde vše do trupu.
  */
+/** Ochranná lhůta torpéda: prvních `safeTurns` kol nemůže zranit vlastníka (ani nárazem, ani výbuchem). */
+export function torpedoSafe(t: Torpedo): boolean {
+  return TORPEDO.lifeTurns - t.lifeLeft < TORPEDO.safeTurns;
+}
+
 /** Kontext pro připisování kreditů během vyhodnocení (nastavuje resolveTurn). */
 let creditCtx: { state: GameState; events: TurnEvent[] } | null = null;
 
@@ -621,10 +626,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   }
 
   /** Plošný výbuch: zraní lodě v poli a vykousne krátery do asteroidů. */
-  const explode = (c: Vec, radius: number, damage: number, k: number, exceptShipId?: string) => {
+  const explode = (c: Vec, radius: number, damage: number, k: number, exceptOwnerId?: string) => {
     const hits: { shipId: string; damage: number }[] = [];
     for (const s of state.ships) {
-      if (!s.alive || s.id === exceptShipId) continue;
+      if (!s.alive || (exceptOwnerId && s.ownerId === exceptOwnerId)) continue;
       if (circlesOverlap(posAt(shipMovers.get(s.id)!, k), s.stats.radius, c, radius)) hits.push({ shipId: s.id, damage: scaleEvade(s, damage) });
     }
     for (const a of state.asteroids) {
@@ -673,7 +678,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       applyDamage(s, scaleEvade(s, TORPEDO.damage), events, p, t.ownerId);
       if (!s.alive) shipMovers.get(s.id)!.frozenAt = k;
     }
-    if (opts.blast) applyHits(explode(p, TORPEDO.blastRadius, TORPEDO.blastDamage, k), k, p, t.ownerId);
+    if (opts.blast) applyHits(explode(p, TORPEDO.blastRadius, TORPEDO.blastDamage, k, torpedoSafe(t) ? t.ownerId : undefined), k, p, t.ownerId);
   };
 
   // --- Miny na začátku kola: časované s odpočtem na nule a miny s nepřítelem v poli vybuchnou hned ---
@@ -794,11 +799,11 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       if (removedTorpedoes.has(t.id)) continue;
       const m = torpMovers.get(t.id)!;
       const p = m.samples[k];
-      const freshOwn = t.lifeLeft === TORPEDO.lifeTurns; // první kolo letu – neporaní vlastníka
+      const safe = torpedoSafe(t); // ochranná lhůta: vlastníkovy lodě torpédo neporaní a proletí jimi
       let hitShip: Ship | undefined;
       for (const s of state.ships) {
         if (!s.alive) continue;
-        if (freshOwn && s.id === t.ownerId) continue;
+        if (safe && s.ownerId === t.ownerId) continue;
         if (circlesOverlap(p, TORPEDO.radius, posAt(shipMovers.get(s.id)!, k), s.stats.radius)) {
           hitShip = s;
           break;

@@ -68,6 +68,8 @@ export const TORPEDO = {
   trackTurns: 5,
   /** Celková životnost v kolech. */
   lifeTurns: 5,
+  /** Kolik kol po vypuštění torpédo nemůže zranit vlastníka. */
+  safeTurns: 2,
   /** Zranění při přímém zásahu lodi (fyzické, bez kostek). */
   damage: 45,
   /** Poloměr pro detekci zásahu. */

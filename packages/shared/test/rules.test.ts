@@ -646,3 +646,19 @@ describe("inventář a ekonomika", () => {
     expect(r.state.players[0].credits).toBe(DEFAULT_TUNING.startBudget - 470 + DEFAULT_TUNING.creditsPerTurn);
   });
 });
+
+describe("ochranná lhůta torpéda", () => {
+  it("vlastní torpédo nemůže 2 kola zranit vlastníka, i když ho loď dožene", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
+    g.asteroids = [];
+    place(g, "ship-p1-0", 300, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, Math.PI);
+    // loď letí rychlostí 4 (180) rovně za pomalým torpédem (výlet 120/kolo) na bod daleko před ní
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m4a0", fire: false, special: { type: "torpedo", point: { x: 1400, y: 500 } } }], createRng(1));
+    expect(r.state.torpedoes).toHaveLength(1);
+    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m4a0", fire: false }], createRng(1));
+    expect(r.events.some((e) => e.type === "torpedoHit")).toBe(false);
+    expect(r.state.ships[0].hull).toBe(100);
+    expect(r.state.torpedoes).toHaveLength(1);
+  });
+});

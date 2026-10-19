@@ -89,7 +89,7 @@ celolodní štít kruh obarvený podle síly, segmentový čtyři oblouky otáč
 - **Fázové torpédo** (3 ks, 1 akce) – cíl: nepřátelská loď/torpédo do 320 (sleduje celý let) **nebo bod na mapě**
   do 1200 (letí tam a vybuchne). Let má tři fáze: **výlet** rovně z lodi (60 j. rychlostí 120/kolo) → **zaměření**
   (otáčí se na cíl až 90°/kolo, hotovo pod 15°) → **let** (zrychluje +120/kolo na 240, zatáčí jen 45°/kolo; cíl
-  mimo výseč ±90° před sebou ztratí a letí rovně). Žije 5 kol. Vše v ladění ve skupině „Fázové torpédo“.
+  mimo výseč ±90° před sebou ztratí a letí rovně). Žije 5 kol; první 2 kola nemůže zranit vlastníka (ochranná lhůta). Vše v ladění ve skupině „Fázové torpédo“.
   Přímý zásah lodi = 45. Výbuch (na bodě, o asteroid, na konci doletu) = poloměr 70, zranění 30 všem lodím
   v poli a **kráter do asteroidu**. Sestřelení: torpédo jde ručně označit jako cíl laserů (2 obranné kostky)
   nebo jako cíl jiného torpéda; dvě torpéda, která se potkají, vybuchnou.
@@ -127,6 +127,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.0.2 – oprava: pomalé fázové torpédo doháněla vlastní loď a hned ve 2. kole do něj narazila. Nově má torpédo
+  **ochrannou lhůtu** (ladění, výchozí 2 kola): vlastníkovy lodě jím proletí a jeho výbuch je nezraní.
 - v2.0.1 – sloty podle schváleného nákresu: 4 malé (příď, záď, levobok, pravobok), příď + záď pod sebou jde spojit
   v 1 velký (žlutý rám); velká pixelová loď se sloty uvnitř siluety v editoru i inventáři.
 - v2.0 – **Inventář, piloti a ekonomika**: loď Stíhač má 4 sloty (boky malé, příď a záď na 1 velký / 2 malé);

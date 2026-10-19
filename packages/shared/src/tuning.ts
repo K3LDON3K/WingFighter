@@ -36,6 +36,7 @@ export interface Tuning {
   torpedoSpeed: number;
   torpedoTurnDeg: number;
   torpedoLife: number;
+  torpedoSafeTurns: number;
   torpedoLaunchDist: number;
   torpedoLaunchSpeed: number;
   torpedoLockTurnDeg: number;
@@ -104,6 +105,7 @@ export const DEFAULT_TUNING: Tuning = {
   torpedoSpeed: 240,
   torpedoTurnDeg: 45,
   torpedoLife: 5,
+  torpedoSafeTurns: 2,
   torpedoLaunchDist: 60,
   torpedoLaunchSpeed: 120,
   torpedoLockTurnDeg: 90,
@@ -187,6 +189,7 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "torpedoLockRange", label: "Zaměření lodi – dosah", group: "Fázové torpédo", min: 50, max: 2000, step: 10 },
   { key: "torpedoPointRange", label: "Dolet na bod", group: "Fázové torpédo", min: 100, max: 4000, step: 50 },
   { key: "torpedoLife", label: "Životnost (kola)", group: "Fázové torpédo", min: 1, max: 20, step: 1 },
+  { key: "torpedoSafeTurns", label: "Ochranná lhůta (kola)", group: "Fázové torpédo", min: 0, max: 10, step: 1, hint: "po vypuštění nemůže zranit vlastníka – proletí jeho loděmi, výbuch je mine" },
   { key: "torpedoLaunchDist", label: "Výlet – délka rovně z lodi", group: "Fázové torpédo", min: 0, max: 300, step: 10, hint: "1. fáze: letí rovně ve směru přídě" },
   { key: "torpedoLaunchSpeed", label: "Výlet – startovní rychlost / kolo", group: "Fázové torpédo", min: 20, max: 400, step: 10 },
   { key: "torpedoLockTurnDeg", label: "Zaměření – otáčení ° / kolo", group: "Fázové torpédo", min: 0, max: 360, step: 5, hint: "2. fáze: točí se na cíl startovní rychlostí" },
@@ -254,6 +257,7 @@ export function applyTuning(t: Tuning): void {
   TORPEDO.accel = t.torpedoAccel;
   TORPEDO.trackArc = (t.torpedoTrackArcDeg * Math.PI) / 180;
   TORPEDO.lifeTurns = t.torpedoLife;
+  TORPEDO.safeTurns = t.torpedoSafeTurns;
   TORPEDO.trackTurns = t.torpedoLife;
   MINE.damage = t.mineDamage;
   MINE.radius = t.mineRadius;
