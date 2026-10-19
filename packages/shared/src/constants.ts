@@ -31,9 +31,9 @@ export const TORPEDO = {
   /** Ujetá vzdálenost za kolo (musí být víc než nejrychlejší manévr lodi = 5 × MOVE_UNIT). */
   speed: 240,
   /** Maximální změna kurzu za kolo. */
-  maxTurn: (75 * Math.PI) / 180,
+  maxTurn: (120 * Math.PI) / 180,
   /** Kolik kol torpédo sleduje cíl. */
-  trackTurns: 3,
+  trackTurns: 5,
   /** Celková životnost v kolech. */
   lifeTurns: 5,
   /** Zranění při přímém zásahu lodi (fyzické, bez kostek). */
@@ -48,6 +48,9 @@ export const TORPEDO = {
 export const MINE = {
   /** Poloměr pole působnosti. */
   radius: 70,
+  /** Jak daleko od startovní pozice lodi se mina odhodí (za sebe / do strany). */
+  dropBehind: 40,
+  dropSide: 70,
   /** Zranění všem lodím v poli. */
   damage: 30,
 };

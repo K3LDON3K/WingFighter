@@ -302,6 +302,7 @@ export class TurnAnimation {
       }
       case "spawnTorpedo":
         v.torpedoes.push(torpedoToView(e.torpedo));
+        v.effects.push({ kind: "launch", x: e.torpedo.x, y: e.torpedo.y, heading: e.torpedo.heading, color: TEAM_COLORS[e.torpedo.team], start: now, duration: 700 });
         break;
       case "spawnMine":
         v.mines.push(mineToView(e.mine));

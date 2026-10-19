@@ -62,7 +62,7 @@ Trup 100, štíty 50 (dobíjejí se 10 za kolo). Jeden čistý zásah laseru = 1
   Přímý zásah lodi = 45. Výbuch (na bodě, o asteroid, na konci doletu) = poloměr 70, zranění 30 všem lodím
   v poli a **kráter do asteroidu**. Sestřelení: torpédo jde ručně označit jako cíl laserů (2 obranné kostky)
   nebo jako cíl jiného torpéda; dvě torpéda, která se potkají, vybuchnou.
-- **Mina** (2 ks, 1 akce) – zůstane na místě, kde loď kolo začala. Buď **na vstup**: od příštího kola ji
+- **Mina** (2 ks, 1 akce) – odhodí se ze startovní pozice lodi **za sebe** (40) nebo **do strany** (70). Buď **na vstup**: od příštího kola ji
   spustí kdokoliv (i vlastní loď) nebo torpédo při vstupu do pole (poloměr 70), nebo **časovaná 1–3 kola**:
   na lodě nereaguje, vybuchne po odpočtu (na mapě ⏱). Zranění 30 všem v poli, kráter do asteroidu.
 - **Asteroidy** mají tvar (48 paprsků); výbuchy z nich vykusují krátery (poloměr 45), malý zbytek se rozpadne.
@@ -88,6 +88,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.7 – torpédo zatáčí 120°/kolo a sleduje celý let, animace vypuštění, cíl torpéda jen klikem na mapě;
+  mina za sebe / vlevo / vpravo; spodní lišta s pevnými rozměry a piktogramy.
 - v1.6 – nové UI: spodní lišta (stav lodi, manévr, tlačítka zbraní s časováním/cílem/dostřelem na mapě,
   velké SPUSTIT KOLO), pravý panel odstraněn, log jako okno v rohu mapy.
 - v1.5 – výseč laserů jen při zapnuté akci lasery; miny na vstup nebo časované 1–3 kola.

@@ -39,6 +39,7 @@ import type {
   GameState,
   Maneuver,
   Mine,
+  MineSide,
   MovePath,
   Ship,
   ShipOrders,
@@ -80,6 +81,15 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[]): void {
     ship.alive = false;
     events.push({ type: "destroyed", shipId: ship.id, x: ship.x, y: ship.y });
   }
+}
+
+/** Kam se mina odhodí vůči startovní pozici lodi. */
+export function mineDropPosition(start: Pose, side: MineSide | undefined): Vec {
+  const f = forward(start.heading);
+  const r = rightOf(start.heading);
+  if (side === "left") return { x: start.x - r.x * MINE.dropSide, y: start.y - r.y * MINE.dropSide };
+  if (side === "right") return { x: start.x + r.x * MINE.dropSide, y: start.y + r.y * MINE.dropSide };
+  return { x: start.x - f.x * MINE.dropBehind, y: start.y - f.y * MINE.dropBehind };
 }
 
 /** Může si loď manévr dovolit (stresové body)? */
@@ -165,7 +175,8 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       if (ship.ammo.mines <= 0) special = undefined;
       else {
         const t = special.timer;
-        special = { type: "mine", timer: typeof t === "number" && t >= 1 && t <= 3 ? Math.round(t) : undefined };
+        const side = special.side === "left" || special.side === "right" ? special.side : "behind";
+        special = { type: "mine", timer: typeof t === "number" && t >= 1 && t <= 3 ? Math.round(t) : undefined, side };
       }
     }
 
@@ -690,7 +701,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       if (ship.ammo.mines <= 0) continue;
       ship.ammo.mines--;
       const sp = startPose.get(ship.id)!;
-      const mine: Mine = { id: newId("mine"), ownerId: ship.ownerId, team: ship.team, x: sp.x, y: sp.y, radius: MINE.radius, armed: false, timer: o.special.timer };
+      const pos = mineDropPosition(sp, o.special.side);
+      const mine: Mine = { id: newId("mine"), ownerId: ship.ownerId, team: ship.team, x: pos.x, y: pos.y, radius: MINE.radius, armed: false, timer: o.special.timer };
       state.mines.push(mine);
       events.push({ type: "spawnMine", mine });
     }

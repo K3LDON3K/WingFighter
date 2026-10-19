@@ -10,6 +10,7 @@ import {
   makePath,
   maneuverEnd,
   MAX_ANGLE,
+  mineDropPosition,
   MOVE_UNIT,
   normalizeAngle,
   parseManeuverId,
@@ -437,7 +438,10 @@ function buildOverlay(view: ViewModel): Overlay {
       } else {
         overlay.targetId = o.preferredTargetId;
       }
-      if (o.special?.type === "mine") overlay.mineField = { x: ship.x, y: ship.y, timer: o.special.timer };
+      if (o.special?.type === "mine") {
+        const pos = mineDropPosition(ship, o.special.side);
+        overlay.mineField = { x: pos.x, y: pos.y, timer: o.special.timer };
+      }
     }
   }
   overlay.icons = g.icons;
@@ -539,11 +543,6 @@ function renderSide() {
         renderSide();
       },
       chooseAction: (id, actionId) => chooseIcon(id, actionId),
-      pickTarget: (id) => {
-        game!.selectedShipId = id;
-        game!.picking = game!.picking === "torpedo" ? null : "torpedo";
-        renderSide();
-      },
       aim: (id) => {
         if (game!.aimingShipId === id) {
           confirmManeuver(id);

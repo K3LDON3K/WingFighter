@@ -33,7 +33,9 @@ export type ActionOrder =
 
 export type SpecialOrder =
   | { type: "torpedo"; targetId?: string; point?: { x: number; y: number } }
-  | { type: "mine"; timer?: number };
+  | { type: "mine"; timer?: number; side?: MineSide };
+
+export type MineSide = "behind" | "left" | "right";
 
 /** Rozkaz pro jednu loď na jedno kolo. */
 export interface ShipOrders {

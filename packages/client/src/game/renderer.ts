@@ -97,6 +97,18 @@ export class Renderer {
     for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire);
 
     for (const t of view.torpedoes) {
+      // plamen motoru
+      const f = forward(t.heading);
+      ctx.save();
+      ctx.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(now / 40 + t.x));
+      ctx.fillStyle = "#fbbf24";
+      ctx.beginPath();
+      ctx.moveTo(t.x - f.x * 8 - f.y * 2, t.y - f.y * 8 + f.x * 2);
+      ctx.lineTo(t.x - f.x * (16 + 6 * Math.random()), t.y - f.y * (16 + 6 * Math.random()));
+      ctx.lineTo(t.x - f.x * 8 + f.y * 2, t.y - f.y * 8 - f.x * 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
       drawSprite(ctx, this.sprites.torpedo(TEAM_COLORS[t.team]), t.x, t.y, t.heading);
       if (t.targetPoint && (t.team === overlay.myTeam || overlay.myTeam === undefined)) this.drawPointMarker(t.targetPoint, TEAM_COLORS[t.team], 0.5);
       if (overlay.targetId === t.id || overlay.hoverId === t.id) {
@@ -492,6 +504,31 @@ export class Renderer {
         ctx.font = "bold 14px ui-monospace, Menlo, monospace";
         ctx.textAlign = "center";
         ctx.fillText(e.text, e.x, e.y - 30 - t * 25);
+        ctx.restore();
+        break;
+      }
+      case "launch": {
+        // záblesk u přídě + oblak výfuku, který se roztahuje dozadu
+        const f = forward(e.heading);
+        ctx.save();
+        ctx.globalAlpha = (1 - t) * 0.9;
+        ctx.fillStyle = "#fff7ed";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 4 + 10 * t, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = (1 - t) * 0.5;
+        ctx.fillStyle = "#cbd5e1";
+        for (let i = 0; i < 5; i++) {
+          const d = 8 + 40 * t * (0.5 + i / 5);
+          const sz = 3 + 4 * t;
+          ctx.fillRect(e.x - f.x * d - sz / 2 + ((i % 2) - 0.5) * 6 * f.y, e.y - f.y * d - sz / 2 - ((i % 2) - 0.5) * 6 * f.x, sz, sz);
+        }
+        ctx.strokeStyle = e.color;
+        ctx.globalAlpha = 1 - t;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 6 + 18 * t, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
         break;
       }
