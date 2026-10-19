@@ -284,14 +284,32 @@ function resetOrders() {
 }
 
 /** Vycentruje kameru na loď. */
-function centerOnShip(shipId: string | undefined) {
+const ZOOM_STEP = 1.1;
+function zoomBy(factor: number) {
+  if (!game || !cam) return;
+  cam.zoomAt(cam.viewW / 2, cam.viewH / 2, factor);
+  cam.clampTo(game.state.width, game.state.height);
+}
+
+/** Vycentrovat na loď se zoomem, při kterém je v okně celý její kruh dohledu; opakovaný stisk přepíná na celou mapu a zpět. */
+function centerOnShip(shipId: string | undefined, force = false) {
   if (!game || !cam || !shipId) return;
   const s = game.state.ships.find((x) => x.id === shipId);
   if (!s) return;
-  cam.x = s.x - cam.viewW / cam.zoom / 2;
-  cam.y = s.y - cam.viewH / cam.zoom / 2;
+  const r = s.stats.vision ?? 960;
+  const z = cam.zoomForRadius(r + 20);
+  // kamera se od posledního centrování nepohnula → druhý stisk = celá mapa
+  const unchanged = lastCenter && Math.abs(cam.zoom - lastCenter.zoom) < 1e-6 && Math.abs(cam.x - lastCenter.x) < 0.5 && Math.abs(cam.y - lastCenter.y) < 0.5;
+  if (unchanged && !force) {
+    cam.fit(game.state.width, game.state.height);
+    lastCenter = null;
+    return;
+  }
+  cam.centerOn(s.x, s.y, z);
   cam.clampTo(game.state.width, game.state.height);
+  lastCenter = { x: cam.x, y: cam.y, zoom: cam.zoom };
 }
+let lastCenter: { x: number; y: number; zoom: number } | null = null;
 
 /** Když je loď mimo záběr, vycentruje na ni kameru. */
 function ensureVisible(shipId: string | undefined) {
@@ -300,11 +318,7 @@ function ensureVisible(shipId: string | undefined) {
   if (!s) return;
   const sp = cam.toScreen(s.x, s.y);
   const m = 120;
-  if (sp.x < m || sp.y < m || sp.x > cam.viewW - m || sp.y > cam.viewH - m) {
-    cam.x = s.x - cam.viewW / cam.zoom / 2;
-    cam.y = s.y - cam.viewH / cam.zoom / 2;
-    cam.clampTo(game.state.width, game.state.height);
-  }
+  if (sp.x < m || sp.y < m || sp.x > cam.viewW - m || sp.y > cam.viewH - m) centerOnShip(shipId, true);
 }
 
 /** Nastaví manévr; úhel ořízne na to, co loď při dané rychlosti zvládne. Vrací true při úspěchu. */
@@ -416,12 +430,18 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint" }, "KLIK NA LOD = KRESLIT DRAHU · KLIK = POTVRDIT · KLIK NA NEPRITELE = CIL · TAZENI = POSUN · CMD/CTRL+KOLECKO = ZOOM"),
+    h("div", { class: "hint" }, "KLIK NA LOD = KRESLIT DRAHU · KLIK = POTVRDIT · KLIK NA NEPRITELE = CIL · TAZENI = POSUN · KOLECKO / +- = ZOOM · C = CENTROVAT"),
     sideEl,
     h(
       "div",
+      { class: "map-zoom" },
+      h("button", { class: "gear", title: "Přiblížit (+)", onclick: () => zoomBy(ZOOM_STEP) }, "+"),
+      h("button", { class: "gear", title: "Oddálit (−)", onclick: () => zoomBy(1 / ZOOM_STEP) }, "−"),
+      h("button", { class: "gear", title: "Vycentrovat na loď se zoomem na její dohled (C); znovu = celá mapa", onclick: () => centerOnShip(game?.selectedShipId) }, icon("center", "currentColor", 12), label("centrovat")),
+    ),
+    h(
+      "div",
       { class: "map-tools" },
-      h("button", { class: "gear", title: "Vycentrovat mapu na vybranou loď", onclick: () => centerOnShip(game?.selectedShipId) }, icon("center", "currentColor", 12), label("centrovat")),
       h("button", { class: "gear", id: "inv-btn", title: "Inventář lodi (připravuje se)", onclick: () => ((game!.inventoryOpen = !game!.inventoryOpen), renderSide()) }, icon("inventory", "currentColor", 12), label("inventář")),
       h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => ((tuningOpen = !tuningOpen), renderSide()) }, icon("target", "currentColor", 12), label("ladění")),
       h("button", { class: "gear", title: "Herní menu (Esc)", onclick: () => toggleMenu() }, icon("log", "currentColor", 12), label("menu")),
@@ -452,12 +472,7 @@ function mountGame() {
   resize();
   cam.fit(game!.state.width, game!.state.height);
   const mine = game!.state.ships.find((s) => s.ownerId === playerId && s.alive);
-  if (mine && cam.zoom < 0.9) {
-    cam.zoom = 0.9;
-    cam.x = mine.x - cam.viewW / cam.zoom / 2;
-    cam.y = mine.y - cam.viewH / cam.zoom / 2;
-    cam.clampTo(game!.state.width, game!.state.height);
-  }
+  if (mine) centerOnShip(mine.id, true);
 
   bindInput(canvas);
   renderSide();
@@ -517,6 +532,7 @@ function buildOverlay(view: ViewModel): Overlay {
   overlay.vision = view.ships
     .filter((s) => s.team === me?.team)
     .map((s) => ({ x: s.x, y: s.y, r: g.state.ships.find((q) => q.id === s.id)?.stats.vision ?? 960 }));
+  overlay.visionRing = true;
   if (g.anim || g.state.status === "finished") return overlay;
   overlay.selectedShipId = g.selectedShipId;
   overlay.picking = g.picking ?? undefined;
@@ -1269,7 +1285,7 @@ function bindInput(c: HTMLCanvasElement) {
         }
         return;
       }
-      cam.zoomAt(sx, sy, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+      cam.zoomAt(sx, sy, e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
       cam.clampTo(game.state.width, game.state.height);
     },
     { passive: false },
@@ -1290,6 +1306,18 @@ function bindInput(c: HTMLCanvasElement) {
     }
     if (e.key === "Enter") {
       if (!game.menuOpen) submitOrders();
+      return;
+    }
+    if (e.key === "+" || e.key === "=") {
+      zoomBy(ZOOM_STEP);
+      return;
+    }
+    if (e.key === "-") {
+      zoomBy(1 / ZOOM_STEP);
+      return;
+    }
+    if (e.key === "c" || e.key === "C") {
+      centerOnShip(game.selectedShipId);
       return;
     }
     const id = game.selectedShipId;

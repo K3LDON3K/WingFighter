@@ -42,6 +42,8 @@ export interface Overlay {
   previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; laserArc?: { heading: number; halfArc: number }; mgArc?: { heading: number; halfArc: number; range: number } }[];
   /** Dohled vlastního týmu (fog of war). */
   vision?: { x: number; y: number; r: number }[];
+  /** Kreslit slabý kruh dohledu kolem vlastních lodí. */
+  visionRing?: boolean;
   /** Dosažitelné pozice při zvolené rychlosti (body obarvené náročností). */
   reachable?: { x: number; y: number; color: string }[];
   /** Věneček ikon akcí kolem konce dráhy. */
@@ -170,6 +172,18 @@ export class Renderer {
       ctx.restore();
     }
     if (overlay.vision) this.drawFog(overlay.vision, cam);
+    if (overlay.vision && overlay.visionRing) {
+      ctx.save(); // stále ve světových souřadnicích
+      ctx.strokeStyle = "rgba(148,163,184,0.28)";
+      ctx.lineWidth = 1.5 / cam.zoom;
+      ctx.setLineDash([6 / cam.zoom, 10 / cam.zoom]);
+      for (const v of overlay.vision) {
+        ctx.beginPath();
+        ctx.arc(v.x, v.y, v.r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     if (overlay.icons) this.drawIcons(overlay.icons, cam);
 
     ctx.restore();

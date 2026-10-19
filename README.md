@@ -143,6 +143,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.4 – zoom: tlačítka + / − / CENTROVAT nahoře uprostřed mapy (krok 10 %, stejně kolečko; klávesy +, −, C).
+  Centrování nastaví zoom tak, aby byl v okně celý kruh dohledu lodi (kreslí se slabou čárkovanou čarou), druhý
+  stisk = celá mapa; stejné centrování při startu bitvy a když loď po kole zmizí ze záběru. Loď u okraje jde
+  vycentrovat (kamera smí vyjet až půl okna za mapu). Inventář/ladění/menu přesunuty vpravo nad log.
 - v3.3.1 – kulomet je v editoru a obchodě červený jako ostatní zbraně.
 - v3.3 – zbraňový modul **Kulomet** (120 cr, váha 1 + 0,02/náboj, 100 nábojů): na začátku kola dávka 10 projektilů
   s rozptylem, každý 3 zranění, šance zásahu 70 % zblízka → 35 % na hranici dosahu 150, výseč ±45°, otočný (ne do
