@@ -88,7 +88,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
-- v1.9.2 – mina se odhazuje na začátku kola s animací letu na zvolené místo.
+- v1.9.2 – mina se odhazuje na začátku kola s animací letu na zvolené místo; ikony zbraní u konce dráhy odstraněny (jen lišta).
 - v1.9 – mina se volí na mapě ve dvou krocích: kam odhodit (tři místa kolem lodi), pak čas výbuchu (✕ = zpět na místo).
 - v1.8 – pixel art UI „Retro konzole“ (přibalené fonty Press Start 2P + Pixelify Sans, pixelové ikony,
   zkosené panely, segmentové pruhy) pro lištu, HUD, log i lobby.

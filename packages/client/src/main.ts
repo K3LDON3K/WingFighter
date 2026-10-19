@@ -30,7 +30,7 @@ import {
 } from "@spacegame/shared";
 import { clear, h } from "./dom.ts";
 import { icon } from "./icons.ts";
-import { ACTIONS, actionById } from "./game/actions.ts";
+import { actionById } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
 import { DIFFICULTY_COLOR, renderBottomBar } from "./game/planning.ts";
@@ -415,24 +415,6 @@ function buildOverlay(view: ViewModel): Overlay {
         dots.push({ x: e.x, y: e.y, color: DIFFICULTY_COLOR[mm.difficulty] });
       }
       overlay.reachable = dots;
-    } else if (!g.submitted) {
-      // ikony zbraní u konce dráhy
-      const n = ACTIONS.length;
-      const ringR = ship.stats.radius + 40 / Math.min(1, cam!.zoom);
-      for (let i = 0; i < n; i++) {
-        const a = ACTIONS[i];
-        const ang = -Math.PI / 2 + ((i - (n - 1) / 2) / n) * Math.PI * 1.1;
-        g.icons.push({
-          id: a.id,
-          shipId: ship.id,
-          x: end.x + Math.cos(ang) * ringR,
-          y: end.y + Math.sin(ang) * ringR,
-          glyph: a.glyph,
-          active: a.active(o),
-          disabled: !!a.disabled(ship, g.state, o),
-          hover: g.hoverIcon === `${ship.id}:${a.id}`,
-        });
-      }
     }
 
     if (ship.id === g.selectedShipId) {
