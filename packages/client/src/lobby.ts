@@ -24,19 +24,22 @@ export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName:
   rerender = () => renderLobby(root, m, net, setName);
   const activeId = (document.activeElement as HTMLElement | null)?.id;
   const selStart = (document.activeElement as HTMLInputElement | null)?.selectionStart ?? null;
+  // při překreslení zachovat posun stránky (jinak každá změna v místnosti skočí nahoru)
+  const prevScreen = root.querySelector<HTMLElement>(".screen");
+  const scrollTop = prevScreen?.scrollTop ?? 0;
   clear(root);
+  const screen = h("div", { class: "screen" });
   root.append(
     h("div", { class: `status ${m.connected ? "ok" : "bad"}` }, m.connected ? "ONLINE" : "OFFLINE..."),
-    h(
-      "div",
-      { class: "screen" },
-      h("div", { class: "center" }, h("div", { class: "title" }, h("h1", {}, "SPACEGAME"), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)),
-    ),
+    screen,
   );
+  screen.append(h("div", { class: "center" }, h("div", { class: "title" }, h("h1", {}, "SPACEGAME"), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)));
+  screen.scrollTop = scrollTop;
+  // obnova fokusu nesmí stránku odrolovat
   if (activeId) {
     const el = document.getElementById(activeId) as HTMLInputElement | null;
     if (el) {
-      el.focus();
+      el.focus({ preventScroll: true });
       if (selStart !== null && typeof el.setSelectionRange === "function") {
         try {
           el.setSelectionRange(selStart, selStart);

@@ -142,6 +142,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.1.2 – oprava: místnost při každé změně (start, výbava, ladění) skákala nahoru – posun stránky se zachová.
 - v3.1.1 – nákupní seznam modulů také jako hexagony s ikonou, názvem, cenou a počtem (barva kategorie).
 - v3.1 – editor výbavy: **hexagonové moduly** v plástvi na větší lodi, plné názvy, barva podle kategorie (zbraně
   červeně, speciální moduly modře); šipky natočení na všech povolených hranách (šedé = možnosti, žlutá = zvolená,
