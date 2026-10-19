@@ -460,6 +460,7 @@ function buildOverlay(view: ViewModel): Overlay {
               { id: "mine-timer:1", glyph: "1", timer: 1 },
               { id: "mine-timer:2", glyph: "2", timer: 2 },
               { id: "mine-timer:3", glyph: "3", timer: 3 },
+              { id: "mine-back", glyph: "✕", timer: -1 },
             ];
             // tlačítka časování na odvrácené straně pole (směrem od lodi), v řadě kolmo na ten směr
             const step = 32 / Math.min(1, cam!.zoom);
@@ -468,9 +469,11 @@ function buildOverlay(view: ViewModel): Overlay {
             const dy = (pos.y - ship.y) / dl;
             const cx = pos.x + dx * (MINE.radius + 26 / Math.min(1, cam!.zoom));
             const cy = pos.y + dy * (MINE.radius + 26 / Math.min(1, cam!.zoom));
+            const sgn = dy < 0 ? -1 : 1; // řada vždy zleva doprava na obrazovce
             opts.forEach((op, i) => {
-              const k = i - 1.5;
-              g.icons.push({ id: op.id, shipId: ship.id, x: cx + dy * k * step, y: cy - dx * k * step, glyph: op.glyph, active: o.special?.type === "mine" && o.special.timer === op.timer, disabled: false, hover: g.hoverIcon === `${ship.id}:${op.id}` });
+              const k = (i - 2) * sgn;
+              const isBack = op.id === "mine-back";
+              g.icons.push({ id: op.id, shipId: ship.id, x: cx + dy * k * step + (isBack ? dy * 6 : 0), y: cy - dx * k * step - (isBack ? dx * 6 : 0), glyph: op.glyph, active: !isBack && o.special?.type === "mine" && o.special.timer === op.timer, disabled: false, hover: g.hoverIcon === `${ship.id}:${op.id}` });
             });
           }
         }
@@ -691,6 +694,11 @@ function chooseIcon(shipId: string, id: string) {
   if (id.startsWith("mine-side:") && o.special?.type === "mine") {
     g.orders.set(shipId, { ...o, special: { ...o.special, side: id.slice(10) as "left" | "behind" | "right" } });
     g.minePick = "timer";
+    renderSide();
+    return;
+  }
+  if (id === "mine-back" && o.special?.type === "mine") {
+    g.minePick = "side"; // zpět na výběr místa
     renderSide();
     return;
   }
