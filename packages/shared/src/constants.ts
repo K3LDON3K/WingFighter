@@ -31,6 +31,12 @@ export const RULES = {
   shieldRecharge: 10,
   /** Počet akcí na kolo. */
   actionPoints: 2,
+  /** O kolik klesne rychlost po otočce o 180°. */
+  koiogranSpeedDrop: 2,
+  /** Úhybný manévr: cena ve stresových bodech, stres pro loď, skrz kterou se proletí, snížení zranění minou/torpédem v %. */
+  evadeStressCost: 1,
+  evadePassStress: 1,
+  evadeDamageReduction: 50,
 };
 
 export const TORPEDO = {

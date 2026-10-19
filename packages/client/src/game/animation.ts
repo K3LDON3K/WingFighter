@@ -72,6 +72,7 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
         break;
       case "action":
         if (!e.ok) lines.push(`${name(e.shipId)}: akce se nepovedla.`);
+        else if (e.action.type === "evade") lines.push(`${name(e.shipId)} provádí úhybný manévr.`);
         break;
       case "destroyed":
         lines.push(`💥 ${name(e.shipId)} byl zničen!`);
@@ -142,7 +143,7 @@ export class TurnAnimation {
           time = moveStart + MOVE_DURATION;
           break;
         case "action":
-          time = actionTime;
+          time = movePassed ? actionTime : 0;
           if (e.ok && e.path) {
             this.tweens.push({ id: e.shipId, kind: "ship", points: e.path, start: actionTime, duration: ACTION_DURATION });
           }
@@ -258,7 +259,7 @@ export class TurnAnimation {
           if (e.action.type === "evade") s.tokens.evade = 1;
           if (e.action.type === "lock") s.lockTargetId = e.action.targetId;
           const label =
-            e.action.type === "focus" ? "zaměření" : e.action.type === "evade" ? "úhyb" : e.action.type === "lock" ? "zámek" : e.action.type === "boost" ? "přídavný posun" : "úskok";
+            e.action.type === "focus" ? "zaměření" : e.action.type === "evade" ? "ÚHYBNÝ MANÉVR" : e.action.type === "lock" ? "zámek" : e.action.type === "boost" ? "přídavný posun" : "úskok";
           v.effects.push({ kind: "text", x: s.x, y: s.y, text: label, color: "#a7f3d0", start: now, duration: 900 });
         } else {
           v.effects.push({ kind: "text", x: s.x, y: s.y, text: "akce zrušena", color: "#fca5a5", start: now, duration: 900 });

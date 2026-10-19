@@ -39,7 +39,9 @@ export function renderTuningPanel(root: HTMLElement, tuning: Tuning, savedTuning
         if (Number.isFinite(v) && v !== tuning[f.key]) onChange({ [f.key]: v } as Partial<Tuning>);
       };
       input.onchange = commit;
-      input.onkeydown = (e) => e.key === "Enter" && commit();
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") commit();
+      };
       box.append(
         h(
           "label",

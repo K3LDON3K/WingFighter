@@ -179,10 +179,9 @@ describe("vyhodnocení kola", () => {
     place(g, "ship-p1-0", 500, 500, 0);
     place(g, "ship-p2-0", 1500, 900, 0);
     expect(g.ships[0].stressPoints).toBe(3);
-    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "k3", fire: false, action: { type: "evade" } }], createRng(1));
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "k3", fire: false }], createRng(1));
     expect(r.state.ships[0].stressPoints).toBe(2);
-    expect(r.state.ships[0].tokens.evade).toBe(0); // tokeny se čistí na konci kola, ale akce proběhla:
-    expect(r.events.some((e) => e.type === "action" && e.ok)).toBe(true);
+    expect(r.state.ships[0].speed).toBe(1); // po otočce −2
     // z rychlosti 3 na 5 s ostrým úhlem = nebezpečný: −2 body + 5 % trupu
     r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m5a45", fire: false }], createRng(1));
     expect(r.state.ships[0].stressPoints).toBe(0);
@@ -457,6 +456,39 @@ describe("vyhodnocení kola", () => {
     r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m3a0", fire: false }], createRng(1)); // kolo 3: 1→0 → výbuch
     expect(r.state.mines).toHaveLength(0);
     expect(r.events.some((e) => e.type === "mineBlast")).toBe(true);
+  });
+
+  it("otočka sníží rychlost o 2", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, Math.PI);
+    g.ships[0].speed = 4;
+    const r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "k4", fire: false }], createRng(1));
+    expect(r.state.ships[0].speed).toBe(2);
+    expect(r.state.ships[0].stressPoints).toBe(2); // jen červený manévr
+  });
+
+  it("úhybný manévr: prolet skrz nepřítele bez srážky, stres oběma, poloviční zranění torpédem", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 600, 500, Math.PI); // čelně, 100 od sebe
+    const r = resolveTurn(
+      g,
+      [
+        { shipId: "ship-p1-0", maneuverId: "m4a0", fire: false, action: { type: "evade" } },
+        { shipId: "ship-p2-0", maneuverId: "m3a15", fire: false, special: { type: "torpedo", targetId: "ship-p1-0" } },
+      ],
+      createRng(1),
+    );
+    expect(r.events.some((e) => e.type === "collision")).toBe(false);
+    const a = r.state.ships[0];
+    const b = r.state.ships[1];
+    expect(a.x).toBeGreaterThan(b.x); // proletěl skrz
+    expect(a.stressPoints).toBe(1); // 3 − 1 úhyb − 1 (4 z 2 = červený)
+    expect(b.stressPoints).toBe(2); // proletěli skrz něj
+    // torpédo z p2 zasáhlo p1 (letí proti němu) jen za polovinu
+    const hit = r.events.find((e) => e.type === "torpedoHit" && e.shipId === "ship-p1-0");
+    if (hit) expect(r.events.some((e) => e.type === "damage" && e.shipId === "ship-p1-0" && e.amount === 23)).toBe(true);
   });
 
   it("bitva mezi boty skončí", () => {

@@ -70,7 +70,9 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
   const codeInput = h("input", { id: "in-code", value: drafts.code, placeholder: "KÓD", maxLength: 4, style: "width:90px;text-transform:uppercase;letter-spacing:2px" });
   codeInput.oninput = () => (drafts.code = codeInput.value);
   const join = () => codeInput.value.trim() && (commitName(), net.send({ type: "joinRoom", code: codeInput.value.trim().toUpperCase() }));
-  codeInput.onkeydown = (e) => e.key === "Enter" && join();
+  codeInput.onkeydown = (e) => {
+    if (e.key === "Enter") join();
+  };
 
   return h(
     "div",

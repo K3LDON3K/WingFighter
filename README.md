@@ -39,8 +39,10 @@ Lodě nikdy nestojí: při srážce s lodí, asteroidem nebo okrajem mapy je lo�
 odchýleným) směrem, dostane 15 zranění, ztratí akci a doletí zbytek pohybu tím směrem.
 
 ### Akce – 2 na kolo
-Každá stojí 1 bod: **úprava pohybu** (jiná rychlost nebo směr než „stejnou rychlostí rovně“), **otočka 180°**,
-**lasery**, **torpédo**, **mina**. Bez akce loď jen letí dál a nestřílí. Ikony u konce dráhy
+Každá stojí 1 bod: **úprava pohybu** (jiná rychlost nebo směr než „stejnou rychlostí rovně“), **otočka 180°**
+(po ní klesne rychlost o 2; stres jen z červeného manévru), **úhybný manévr** (1 stresový bod: proletíš skrz
+nepřátelské lodě – každá ztratí 1 stresový bod – nesmíš s nimi ale skončit v dotyku; zranění minou/torpédem
+v tom kole −50 %), **lasery**, **torpédo**, **mina**. Bez akce loď jen letí dál a nestřílí. Ikony u konce dráhy
 (⚡ lasery · ➤ torpédo · ✹ mina · ⟲ otočka) zapínají/vypínají, panel ukazuje použité akce.
 Staré akce po pohybu (zaměřit, úhyb, zámek, posun, úskok) jsou vypnuté – vrátí se jako schopnosti pilotů.
 Torpédo odstartuje **hned se začátkem pohybu** ze startovní pozice lodi.
@@ -97,6 +99,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.12 – otočka snižuje rychlost o 2; nová akce úhybný manévr; oprava psaní do polí (ladění, kód místnosti).
 - v1.11.1 – ukládání parametrů na server (tuning.json), načtení uložených, oznámení ve hře.
 - v1.11 – lasery střílí na začátku kola ze startovní pozice (výseč se kreslí u lodi), animace: salvy → pohyb.
 - v1.10.1 – miny vybuchují na začátku kola (nepřítel v poli, nebo odpočet na nule), ne až na konci.

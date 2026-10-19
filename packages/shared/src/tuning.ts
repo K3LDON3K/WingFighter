@@ -42,6 +42,11 @@ export interface Tuning {
   stressCostRed: number;
   stressCostDanger: number;
   stressRegenGreen: number;
+  // otočka a úhybný manévr
+  koiogranSpeedDrop: number;
+  evadeStressCost: number;
+  evadePassStress: number;
+  evadeDamageReduction: number;
 }
 
 export const DEFAULT_TUNING: Tuning = {
@@ -76,6 +81,10 @@ export const DEFAULT_TUNING: Tuning = {
   stressCostRed: 1,
   stressCostDanger: 2,
   stressRegenGreen: 1,
+  koiogranSpeedDrop: 2,
+  evadeStressCost: 1,
+  evadePassStress: 1,
+  evadeDamageReduction: 50,
 };
 
 export interface TuningField {
@@ -121,6 +130,10 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "stressCostRed", label: "Červený manévr – cena", group: "Akce a stres", min: 0, max: 5, step: 1 },
   { key: "stressCostDanger", label: "Nebezpečný manévr – cena", group: "Akce a stres", min: 0, max: 5, step: 1 },
   { key: "stressRegenGreen", label: "Zelený manévr – dobití", group: "Akce a stres", min: 0, max: 5, step: 1 },
+  { key: "koiogranSpeedDrop", label: "Otočka – pokles rychlosti po otočce", group: "Akce a stres", min: 0, max: 4, step: 1 },
+  { key: "evadeStressCost", label: "Úhybný manévr – cena (stres)", group: "Akce a stres", min: 0, max: 3, step: 1 },
+  { key: "evadePassStress", label: "Úhyb – stres lodi, skrz kterou proletím", group: "Akce a stres", min: 0, max: 3, step: 1 },
+  { key: "evadeDamageReduction", label: "Úhyb – snížení zranění minou/torpédem %", group: "Akce a stres", min: 0, max: 100, step: 5 },
 ];
 
 /** Ořeže neznámé/nesmyslné hodnoty podle TUNING_FIELDS. */
@@ -164,6 +177,10 @@ export function applyTuning(t: Tuning): void {
   CRATER_RADIUS_REF.value = t.craterRadius;
   RULES.shieldRecharge = t.shieldRecharge;
   RULES.actionPoints = t.actionPoints;
+  RULES.koiogranSpeedDrop = t.koiogranSpeedDrop;
+  RULES.evadeStressCost = t.evadeStressCost;
+  RULES.evadePassStress = t.evadePassStress;
+  RULES.evadeDamageReduction = t.evadeDamageReduction;
   LASER.range = t.laserRange;
   LASER.halfArc = (t.laserArcDeg * Math.PI) / 180;
   LASER.band = t.laserRange / 3;

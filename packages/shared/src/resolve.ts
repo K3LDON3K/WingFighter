@@ -107,13 +107,16 @@ export function defaultOrders(ship: Ship): ShipOrders {
 }
 
 /** Rozpis akcí rozkazu (každá stojí 1 bod). */
-export function actionList(ship: Ship, o: ShipOrders): { id: "move" | "koiogran" | "laser" | "torpedo" | "mine"; label: string }[] {
-  const out: { id: "move" | "koiogran" | "laser" | "torpedo" | "mine"; label: string }[] = [];
+export type ActionId = "move" | "koiogran" | "laser" | "torpedo" | "mine" | "evade";
+
+export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: string }[] {
+  const out: { id: ActionId; label: string }[] = [];
   const m = parseManeuverId(o.maneuverId);
   if (m) {
     if (m.speed !== ship.speed || (!m.koiogran && m.angle !== 0)) out.push({ id: "move", label: "úprava pohybu" });
     if (m.koiogran) out.push({ id: "koiogran", label: "otočka 180°" });
   }
+  if (o.action?.type === "evade") out.push({ id: "evade", label: "úhybný manévr" });
   if (o.fire) out.push({ id: "laser", label: "lasery" });
   if (o.special?.type === "torpedo") out.push({ id: "torpedo", label: "torpédo" });
   if (o.special?.type === "mine") out.push({ id: "mine", label: "mina" });
@@ -153,13 +156,9 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     let man = resolveManeuver(profile, raw.maneuverId, ship.speed);
     if (!man || !canAfford(ship, man)) man = resolveManeuver(profile, def.maneuverId, ship.speed)!;
 
-    let action: ActionOrder | undefined = raw.action;
+    let action: ActionOrder | undefined = raw.action?.type === "evade" ? { type: "evade" } : undefined; // ostatní akce zatím vypnuté
     let special = raw.special;
-    if (special && action) action = undefined; // jedna akce za kolo
-    if (action?.type === "lock") {
-      const t = shipById(state, action.targetId);
-      if (!t || !t.alive || t.team === ship.team || dist(ship, t) > LOCK_RANGE) action = undefined;
-    }
+    if (action && ship.stressPoints < RULES.evadeStressCost) action = undefined;
     if (special?.type === "torpedo") {
       if (ship.ammo.torpedoes <= 0) special = undefined;
       else if (special.targetId) {
@@ -181,8 +180,9 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
 
     const preferredTargetId = enemyTarget(state, ship, raw.preferredTargetId)?.id;
     const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, fire: !!raw.fire, preferredTargetId };
-    // limit akcí: nejdřív padá zbraň, pak lasery, nakonec manévr
+    // limit akcí: nejdřív padá zbraň, pak lasery, pak úhyb, nakonec manévr
     if (actionCost(ship, o) > RULES.actionPoints) o.special = undefined;
+    if (actionCost(ship, o) > RULES.actionPoints) o.action = undefined;
     if (actionCost(ship, o) > RULES.actionPoints) o.fire = false;
     if (actionCost(ship, o) > RULES.actionPoints) o.maneuverId = def.maneuverId;
     out.push(o);
@@ -217,6 +217,21 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   }
   const startPose = new Map<string, Pose>();
   for (const ship of state.ships) startPose.set(ship.id, { x: ship.x, y: ship.y, heading: ship.heading });
+
+  // Úhybný manévr: zaplatí stres hned; po celé kolo snižuje zranění minou/torpédem a dovolí prolétnout nepřáteli.
+  const evading = new Set<string>();
+  for (const ship of state.ships) {
+    const o = orders.get(ship.id);
+    if (!ship.alive || o?.action?.type !== "evade") continue;
+    if (ship.stressPoints < RULES.evadeStressCost) continue;
+    evading.add(ship.id);
+    const before = ship.stressPoints;
+    ship.stressPoints -= RULES.evadeStressCost;
+    if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
+    events.push({ type: "action", shipId: ship.id, action: { type: "evade" }, ok: true });
+  }
+  const scaleEvade = (ship: Ship, dmg: number) => (evading.has(ship.id) ? Math.round(dmg * (1 - RULES.evadeDamageReduction / 100)) : dmg);
+  const passedThrough = new Set<string>(); // "evader:enemy"
 
   /* ---------- 1. Lasery (všichni současně, ze startovních pozic, před pohybem) ---------- */
   const pending = new Map<string, number>();
@@ -422,7 +437,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const hits: { shipId: string; damage: number }[] = [];
     for (const s of state.ships) {
       if (!s.alive || s.id === exceptShipId) continue;
-      if (circlesOverlap(posAt(shipMovers.get(s.id)!, k), s.stats.radius, c, radius)) hits.push({ shipId: s.id, damage });
+      if (circlesOverlap(posAt(shipMovers.get(s.id)!, k), s.stats.radius, c, radius)) hits.push({ shipId: s.id, damage: scaleEvade(s, damage) });
     }
     for (const a of state.asteroids) {
       if (removedAsteroids.has(a.id)) continue;
@@ -467,7 +482,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     });
     if (opts.shipId) {
       const s = shipById(state, opts.shipId)!;
-      applyDamage(s, TORPEDO.damage, events);
+      applyDamage(s, scaleEvade(s, TORPEDO.damage), events);
       if (!s.alive) shipMovers.get(s.id)!.frozenAt = k;
     }
     if (opts.blast) applyHits(explode(p, TORPEDO.blastRadius, TORPEDO.blastDamage, k), k);
@@ -524,6 +539,20 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
             const ov = circlesOverlap(p, r, op, other.stats.radius);
             if (!ov) {
               stillTouching(ship.id, other.id, false);
+              continue;
+            }
+            // úhybný manévr: nepřátelské lodě se prolétají (kromě posledního vzorku – nesmí skončit v dotyku)
+            const enemyPair = other.team !== ship.team;
+            if (enemyPair && k < MOVE_STEPS && (evading.has(ship.id) || evading.has(other.id))) {
+              const evader = evading.has(ship.id) ? ship : other;
+              const victim = evader === ship ? other : ship;
+              const key = `${evader.id}:${victim.id}`;
+              if (!passedThrough.has(key)) {
+                passedThrough.add(key);
+                const before = victim.stressPoints;
+                victim.stressPoints = Math.max(0, victim.stressPoints - RULES.evadePassStress);
+                if (victim.stressPoints !== before) events.push({ type: "stress", shipId: victim.id, stressPoints: victim.stressPoints, delta: victim.stressPoints - before });
+              }
               continue;
             }
             if (stillTouching(ship.id, other.id, true)) continue;
@@ -645,7 +674,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   for (const ship of state.ships) {
     if (!ship.alive) continue;
     const man = maneuverOf.get(ship.id)!;
-    ship.speed = man.speed;
+    ship.speed = man.koiogran ? Math.max(1, man.speed - RULES.koiogranSpeedDrop) : man.speed;
     const cost = stressCost(man.difficulty);
     const before = ship.stressPoints;
     ship.stressPoints = clamp(ship.stressPoints - cost, 0, STRESS.max);
@@ -667,7 +696,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
 
   for (const ship of state.ships) {
     const o = orders.get(ship.id);
-    if (!o?.action || o.special) continue;
+    if (!o?.action || o.action.type === "evade") continue;
     if (!canAct(ship)) {
       events.push({ type: "action", shipId: ship.id, action: o.action, ok: false });
       continue;
@@ -676,10 +705,6 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     switch (a.type) {
       case "focus":
         ship.tokens.focus = 1;
-        events.push({ type: "action", shipId: ship.id, action: a, ok: true });
-        break;
-      case "evade":
-        ship.tokens.evade = 1;
         events.push({ type: "action", shipId: ship.id, action: a, ok: true });
         break;
       case "lock": {

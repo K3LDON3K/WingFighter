@@ -48,10 +48,19 @@ export const ACTIONS: ActionOption[] = [
     apply: (o) => ({ special: o.special?.type === "mine" ? undefined : { type: "mine", side: "behind" } }),
   },
   {
+    id: "evade",
+    glyph: "⤭",
+    label: "Úhybný manévr (1 akce)",
+    description: `Během pohybu proletíš skrz nepřátelské lodě bez srážky (každá z nich ztratí ${RULES.evadePassStress} stresový bod); nesmíš ale skončit v dotyku s nepřítelem – jinak normální srážka. Zranění minou i torpédem je v tomto kole nižší o ${RULES.evadeDamageReduction} %. Stojí ${RULES.evadeStressCost} stresový bod.`,
+    disabled: (ship, _s, o) => (ship.stressPoints < RULES.evadeStressCost ? "chybí stresový bod" : noAp(ship, o, o.action?.type === "evade")),
+    active: (o) => o.action?.type === "evade",
+    apply: (o) => ({ action: o.action?.type === "evade" ? undefined : { type: "evade" } }),
+  },
+  {
     id: "koiogran",
     glyph: "⟲",
     label: "Otočka 180° (1 akce)",
-    description: "Loď poletí rovně a na konci se otočí o 180°. Jde jen při rychlosti 3–4; jiná rychlost než aktuální stojí další akci (úprava pohybu). Otočka je vždy červený manévr (stresový bod).",
+    description: `Loď poletí rovně a na konci se otočí o 180°; její rychlost pak klesne o ${RULES.koiogranSpeedDrop}. Jde jen při rychlosti 3–4; jiná rychlost než aktuální stojí další akci (úprava pohybu). Otočka je červený manévr (1 stresový bod) – jiný postih není.`,
     disabled: (ship, _s, o) => {
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.koiogran) return null;

@@ -46,7 +46,7 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   danger: `NEBEZPEČNÝ – stojí 2 body a ${STRESS.dangerHullPercent} % trupu`,
 };
 const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: "bílý", red: "červený", danger: "nebezpečný" };
-const ACTION_ICON: Record<string, string> = { laser: "laser", torpedo: "torpedo", mine: "mine", koiogran: "turn" };
+const ACTION_ICON: Record<string, string> = { laser: "laser", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
   if (koiogran) return "⟲";
@@ -142,7 +142,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           onclick: () => cb.chooseAction(ship.id, a.id),
         },
         icon(ACTION_ICON[a.id] ?? "target", "currentColor", 24),
-        h("span", { class: "lbl" }, label(a.label.replace(/ \(1 akce\)/, "").replace(" 180°", ""))),
+        h("span", { class: "lbl" }, label(a.label.replace(/ \(1 akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb"))),
       ),
     );
   }
