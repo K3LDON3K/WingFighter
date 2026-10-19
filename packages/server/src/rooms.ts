@@ -20,8 +20,15 @@ import {
   type RoomState,
   type RoomSummary,
   type ServerMessage,
-  type ShieldType,
+  type ShipLoadout,
   type ShipOrders,
+  type ModuleType,
+  DEFAULT_LOADOUT,
+  MODULE_TYPES,
+  MODULES,
+  randomLoadout,
+  refillLoadout,
+  validateLoadout,
 } from "@spacegame/shared";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
@@ -41,7 +48,9 @@ interface RoomMember {
   team: number;
   isBot: boolean;
   ready: boolean;
-  shieldType: ShieldType;
+  loadout: ShipLoadout;
+  /** Bot: výbavu nastavil host ručně (přepíše výchozí/náhodnou při startu). */
+  manualLoadout?: boolean;
 }
 
 interface RunningGame {
@@ -59,6 +68,24 @@ function memoryFor(g: RunningGame, team: number): AsteroidMemory {
 }
 
 /** Tým hráče v běžící hře (v DM má každý vlastní). */
+/** Ověří tvar sestavy od klienta (obsahová pravidla řeší validateLoadout). */
+function cleanLoadout(raw: unknown): ShipLoadout | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.hullId !== "string" || typeof r.pilotId !== "string" || !Array.isArray(r.modules)) return null;
+  const modules: ShipLoadout["modules"] = [];
+  for (const m of r.modules as unknown[]) {
+    if (!m || typeof m !== "object") return null;
+    const mm = m as Record<string, unknown>;
+    if (typeof mm.id !== "string" || typeof mm.type !== "string" || typeof mm.slot !== "string") return null;
+    if (!MODULE_TYPES.includes(mm.type as ModuleType)) return null;
+    const def = MODULES[mm.type as ModuleType];
+    modules.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: mm.slot as ShipLoadout["modules"][number]["slot"], ammo: def.ammo });
+  }
+  if (modules.length > 8) return null;
+  return { hullId: r.hullId, pilotId: r.pilotId, modules };
+}
+
 function teamOf(g: RunningGame, playerId: string): number {
   return g.state.players.find((p) => p.id === playerId)?.team ?? 0;
 }
@@ -67,7 +94,7 @@ class Room {
   code: string;
   name: string;
   hostId: string;
-  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1 };
+  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" };
   tuning: Tuning = initialTuning();
   members = new Map<string, RoomMember>();
   game: RunningGame | null = null;
@@ -97,7 +124,7 @@ class Room {
         team: m.team,
         isBot: m.isBot,
         ready: m.ready,
-        shieldType: m.shieldType,
+        loadout: m.loadout,
         connected: m.isBot ? true : !!clients.get(m.id)?.ws,
       })),
     };
@@ -193,7 +220,7 @@ export class Hub {
         const code = this.newCode();
         const r = new Room(code, cleanName(msg.name) || `Místnost ${client.name}`, client.id);
         this.rooms.set(code, r);
-        r.members.set(client.id, { id: client.id, name: client.name, team: 0, isBot: false, ready: false, shieldType: "segment" });
+        r.members.set(client.id, { id: client.id, name: client.name, team: 0, isBot: false, ready: false, loadout: structuredClone(DEFAULT_LOADOUT) });
         client.roomCode = code;
         this.broadcastRoom(r);
         this.broadcastRooms();
@@ -205,7 +232,7 @@ export class Hub {
         if (r.game) return this.error(client, "V této místnosti už probíhá hra.");
         if (room && room !== r) this.leaveRoom(client);
         const team = r.settings.mode === "tdm" ? this.smallestTeam(r) : 0;
-        r.members.set(client.id, { id: client.id, name: client.name, team, isBot: false, ready: false, shieldType: "segment" });
+        r.members.set(client.id, { id: client.id, name: client.name, team, isBot: false, ready: false, loadout: structuredClone(DEFAULT_LOADOUT) });
         client.roomCode = r.code;
         this.broadcastRoom(r);
         this.broadcastRooms();
@@ -223,11 +250,18 @@ export class Hub {
         this.broadcastRoom(room);
         return;
       }
-      case "setShield": {
+      case "setLoadout": {
         if (!room || room.game) return;
-        const m = room.members.get(client.id);
+        const targetId = msg.botId ?? client.id;
+        const m = room.members.get(targetId);
         if (!m) return;
-        m.shieldType = msg.shieldType === "whole" ? "whole" : "segment";
+        if (msg.botId && (room.hostId !== client.id || !m.isBot)) return;
+        const lo = cleanLoadout(msg.loadout);
+        if (!lo) return this.error(client, "Neplatná výbava.");
+        const err = validateLoadout(lo, { allowed: room.settings.allowedModules, budget: room.tuning.startBudget });
+        if (err) return this.error(client, `Výbava: ${err}.`);
+        m.loadout = lo;
+        if (m.isBot) m.manualLoadout = true;
         this.broadcastRoom(room);
         return;
       }
@@ -237,7 +271,7 @@ export class Hub {
         const id = `bot-${randomBytes(3).toString("hex")}`;
         const used = new Set([...room.members.values()].map((m) => m.name));
         const name = BOT_NAMES.find((n) => !used.has(`Bot ${n}`)) ?? randomBytes(2).toString("hex");
-        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, MAX_TEAMS_TDM - 1), isBot: true, ready: true, shieldType: Math.random() < 0.5 ? "segment" : "whole" });
+        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, MAX_TEAMS_TDM - 1), isBot: true, ready: true, loadout: this.botLoadout(room) });
         this.broadcastRoom(room);
         this.broadcastRooms();
         return;
@@ -256,6 +290,18 @@ export class Hub {
         if (s.mode === "tdm" || s.mode === "dm") room.settings.mode = s.mode;
         if (typeof s.turnLimit === "number") room.settings.turnLimit = clampInt(s.turnLimit, 0, 99);
         if (typeof s.shipsPerPlayer === "number") room.settings.shipsPerPlayer = clampInt(s.shipsPerPlayer, 1, 6);
+        if (s.botLoadout === "default" || s.botLoadout === "random" || s.botLoadout === "manual") {
+          room.settings.botLoadout = s.botLoadout;
+          for (const m of room.members.values()) if (m.isBot && !m.manualLoadout) m.loadout = this.botLoadout(room);
+        }
+        if (s.allowedModules && typeof s.allowedModules === "object") {
+          const out: Partial<Record<ModuleType, number>> = {};
+          for (const t of MODULE_TYPES) {
+            const v = (s.allowedModules as Record<string, unknown>)[t];
+            if (typeof v === "number" && Number.isFinite(v)) out[t] = clampInt(v, 0, 6);
+          }
+          room.settings.allowedModules = out;
+        }
         this.broadcastRoom(room);
         return;
       }
@@ -332,7 +378,12 @@ export class Hub {
     if (room.settings.mode === "tdm" && new Set(members.map((m) => m.team)).size < 2) {
       return this.error(host, "V týmovém módu musí být obsazené alespoň dva týmy.");
     }
-    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, shieldType: m.shieldType }));
+    for (const m of members) {
+      if (m.isBot && !m.manualLoadout) m.loadout = this.botLoadout(room);
+      const err = validateLoadout(m.loadout, { allowed: room.settings.allowedModules, budget: room.tuning.startBudget });
+      if (err) return this.error(host, `${m.name} – výbava: ${err}.`);
+    }
+    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadout) }));
     const state = createGame({ players, settings: room.settings, tuning: room.tuning });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     room.game = { state, orders: new Map(), rng, memory: new Map() };
@@ -347,6 +398,18 @@ export class Hub {
     this.broadcastRooms();
     this.planBots(room);
     this.maybeResolve(room);
+  }
+
+  /** Výbava bota podle nastavení místnosti. */
+  private botLoadout(room: Room): ShipLoadout {
+    applyTuning(room.tuning);
+    const allowed = room.settings.allowedModules;
+    if (room.settings.botLoadout === "random") return randomLoadout(Math.random, allowed, room.tuning.startBudget);
+    // výchozí sestava ořezaná o zakázané moduly a rozpočet
+    const lo = structuredClone(DEFAULT_LOADOUT);
+    lo.modules = lo.modules.filter((m) => (allowed[m.type] ?? 99) > 0);
+    while (lo.modules.reduce((sum, m) => sum + MODULES[m.type].price, 0) > room.tuning.startBudget && lo.modules.length) lo.modules.pop();
+    return lo;
   }
 
   /** Změna parametrů během bitvy: přepočítá maxima lodí a rozešle nové hodnoty. */

@@ -1,4 +1,4 @@
-import type { Asteroid, GameState, Mine, Pose, Segments, ShieldType, Ship, Torpedo, TorpedoPhase } from "@spacegame/shared";
+import type { Asteroid, Debris, GameState, Mine, Pose, Segments, ShieldType, Ship, Torpedo, TorpedoPhase } from "@spacegame/shared";
 
 /** Co se právě kreslí – během plánování kopie stavu, během animace průběžně měněný model. */
 export interface ViewShip extends Pose {
@@ -56,9 +56,12 @@ export type Effect =
   /** Vlnky při průletu úhybu skrz nepřátelskou loď. */
   | { kind: "ripple"; x: number; y: number; color: string; start: number; duration: number };
 
+export type ViewDebris = Debris;
+
 export interface ViewModel {
   ships: ViewShip[];
   torpedoes: ViewTorpedo[];
+  debris: ViewDebris[];
   mines: ViewMine[];
   asteroids: Asteroid[];
   effects: Effect[];
@@ -100,6 +103,7 @@ export function viewFromState(state: GameState): ViewModel {
   return {
     ships: state.ships.filter((s) => s.alive).map(shipToView),
     torpedoes: state.torpedoes.map(torpedoToView),
+    debris: (state.debris ?? []).map((d) => ({ ...d })),
     mines: state.mines.map(mineToView),
     asteroids: structuredClone(state.asteroids),
     effects: [],

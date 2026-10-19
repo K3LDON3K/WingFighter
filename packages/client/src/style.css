@@ -916,3 +916,172 @@ button.px.tiny {
   padding: 2px 5px;
   border: 2px solid currentColor;
 }
+
+/* ---- výbava (lobby + inventář) ---- */
+.loadout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 10px 16px;
+  align-items: start;
+  margin-top: 8px;
+}
+.loadout.compact {
+  grid-template-columns: 1fr;
+}
+.lo-head {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 16px;
+}
+.lo-head label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 8px;
+}
+.lo-diagram {
+  grid-row: 2 / 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.lo-mid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lo-ship {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  transform: rotate(-90deg);
+}
+.lo-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.lo-slotname {
+  font-size: 6px;
+  color: var(--muted);
+}
+.lo-cells {
+  display: flex;
+  gap: 3px;
+}
+.lo-cell {
+  width: 46px;
+  height: 30px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-size: 6px;
+  border: 2px dashed #334155;
+  color: #475569;
+  background: transparent;
+  padding: 0;
+}
+.lo-cell.mod {
+  border: 3px solid;
+  border-color: var(--btn-l) var(--bevel-d) var(--bevel-d) var(--btn-l);
+  background: var(--panel-3);
+  color: var(--text);
+  position: relative;
+}
+.lo-cell.mod.ro {
+  cursor: default;
+  opacity: 1;
+}
+.lo-cell.mod:hover:not(:disabled) {
+  border-color: #f87171;
+  color: #fca5a5;
+}
+.lo-ammo {
+  position: absolute;
+  right: 2px;
+  top: 1px;
+  font-size: 6px;
+  color: #fbbf24;
+}
+.lo-summary {
+  display: flex;
+  gap: 14px;
+  font-size: 8px;
+  align-items: center;
+}
+.lo-shop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  grid-column: 2;
+}
+.loadout.compact .lo-shop,
+.loadout.compact .lo-summary {
+  grid-column: 1;
+}
+.loadout.compact .lo-diagram {
+  grid-row: auto;
+}
+.lo-buy {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 74px;
+  padding: 6px 2px;
+  font-size: 6px;
+}
+.lo-price {
+  color: #fbbf24;
+}
+.lo-have {
+  color: #4ade80;
+}
+.lo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  font-size: 7px;
+  color: #cbd5e1;
+}
+.lo-tagwrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lo-tagwrap button {
+  padding: 3px 6px;
+  font-size: 7px;
+}
+.bot-editor {
+  margin: 4px 0 8px;
+  padding: 6px;
+  border: 2px solid #334155;
+}
+.allowed {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  margin-top: 6px;
+}
+.allowed label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 7px;
+}
+.hud-cr {
+  margin-left: 12px;
+  color: #fbbf24;
+  font-size: 10px;
+}
+.inventory {
+  width: 320px;
+}

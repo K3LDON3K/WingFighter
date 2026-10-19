@@ -1,5 +1,5 @@
 import type { Tuning } from "./tuning.ts";
-import type { GameSettings, GameState, ShieldType, ShipOrders, TurnResult } from "./types.ts";
+import type { GameSettings, GameState, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
 
 /** Stav místnosti v lobby. */
 export interface RoomPlayer {
@@ -9,7 +9,7 @@ export interface RoomPlayer {
   isBot: boolean;
   ready: boolean;
   connected: boolean;
-  shieldType: ShieldType;
+  loadout: ShipLoadout;
 }
 
 export interface RoomState {
@@ -40,7 +40,8 @@ export type ClientMessage =
   | { type: "joinRoom"; code: string }
   | { type: "leaveRoom" }
   | { type: "setTeam"; team: number }
-  | { type: "setShield"; shieldType: ShieldType }
+  /** Vlastní výbava, nebo (host) výbava bota. */
+  | { type: "setLoadout"; loadout: ShipLoadout; botId?: string }
   | { type: "addBot"; team: number }
   | { type: "removeBot"; botId: string }
   | { type: "setSettings"; settings: Partial<GameSettings> }

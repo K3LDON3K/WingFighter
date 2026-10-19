@@ -53,8 +53,22 @@ Každá loď vidí do vzdálenosti **960** (3 × zaměřovací dostřel torpéda
 posílá jen to, co jeho tým vidí (lodě, torpéda, miny). Asteroid, který tým jednou spatřil, zůstává v jeho
 paměti v podobě, v jaké ho naposledy viděl – poškození mimo dohled se neprojeví, dokud ho zase neuvidí.
 
+### Výbava lodi (inventář)
+Loď **Stíhač** má 4 sloty: levobok a pravobok (malé), příď a záď (každý 1 velký nebo 2 malé moduly). Moduly:
+**Lasery** (100 cr, váha 2), **Torpédomet** (150, váha 1 + 1 za torpédo, 3 ks), **Minový zásobník** (100, váha 1 +
+0,5 za minu, 2 ks), **Segmentový štít** (120, váha 2), **Celolodní štít** (120, váha 2). Součet váhy snižuje
+max. rychlost: každých 6 váhy = −1 (výchozí sestava má váhu 10 → rychlost max. 4, prázdná loď 5). Vystřelená
+munice loď odlehčí. Loď smí letět i bez modulů. Více modulů stejného typu = víc munice; při střelbě si vybereš,
+ze kterého modulu střílíš (jeden za akci). Pilot: zatím jen **Kadet** (bez schopností).
+
+**Nákup:** v místnosti má každý rozpočet (ladění → Ekonomika, výchozí 500) a kupuje moduly; host může omezit
+počet kusů každého modulu na hráče a zvolit výbavu botů (výchozí / náhodná / ruční naklikání). Co hráč neutratí,
+má ve hře jako **kredity**; další dostane za sestřel (200) a za každé přežité kolo (10). Akce **Vyhodit modul**
+(1 akce) modul na začátku kola odhodí – loď je lehčí, modul zůstane jako trosky, které jde sestřelit lasery
+(klik na trosky = cíl) za polovinu ceny. Nákupy mezi koly a vylepšení modulů přijdou později.
+
 ### Životy a štíty
-Trup 100. Jeden čistý zásah laseru = 15. Štít si každý hráč volí v místnosti (později půjde o moduly v inventáři):
+Trup 100. Jeden čistý zásah laseru = 15. Štít je modul (segmentový, nebo celolodní – nelze kombinovat):
 - **Segmentový** (výchozí) – čtyři segmenty (předek, pravobok, záď, levobok) po **2 bodech**. Každý zásah
   (salva laserů, torpédo, výbuch, náraz) trefí segment podle směru, odkud přišel, ubere **1 bod** a je pohlcen
   celý; segment na nule už nechrání a zranění jde do trupu. Akce **Úprava štítu** (1 akce) body přesune
@@ -112,6 +126,13 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.0 – **Inventář, piloti a ekonomika**: loď Stíhač má 4 sloty (boky malé, příď a záď na 1 velký / 2 malé);
+  moduly Lasery, Torpédomet (3 ks), Minový zásobník (2 ks), Segmentový štít, Celolodní štít – každý má cenu a váhu,
+  váha snižuje max. rychlost (vystřelená munice odlehčí). Výbava se kupuje v místnosti z rozpočtu (ladění →
+  Ekonomika); host omezuje počty modulů na hráče a volí výbavu botů (výchozí / náhodná / ruční). Pilot „Kadet“.
+  Kredity: zbytek rozpočtu + odměny za sestřel a přežité kolo. Akce **Vyhodit modul** (trosky lze sestřelit
+  lasery za kredity). Inventář ve hře = náhled sestavy. Více modulů stejného typu = výběr, ze kterého se střílí.
+  Ladicí menu přeskupeno (Loď, Akce a stres, Lasery, Fázové torpédo, Miny, Štíty, Ekonomika).
 - v1.15 – **Fázové torpédo**: výlet rovně z lodi (60 j., 120/kolo) → zaměření (otáčí se 90°/kolo, hotovo pod 15°)
   → let (zrychluje +120/kolo na 240, zatáčí 45°/kolo, cíl mimo ±90° ztratí). Všechny parametry v ladění
   (skupina „Fázové torpédo“); plamen torpéda podle rychlosti.

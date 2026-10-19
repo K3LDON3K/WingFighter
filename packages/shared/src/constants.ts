@@ -41,6 +41,10 @@ export const RULES = {
   wholeEffDrop: 10,
   segmentHp: 2,
   segmentMax: 3,
+  /** Ekonomika: odměna za sestřel, za přežité kolo, za sestřelený vyhozený modul (% ceny). */
+  creditsPerKill: 200,
+  creditsPerTurn: 10,
+  debrisRewardPct: 50,
 };
 
 export const TORPEDO = {

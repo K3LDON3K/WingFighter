@@ -4,7 +4,7 @@ import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from ".
 import { isRed, listManeuvers, maneuverEnd, maneuverPath, stressCost } from "./maneuvers.ts";
 import { circleHitsAsteroid } from "./asteroids.ts";
 import type { Rng } from "./rng.ts";
-import { hullOf } from "./ships.ts";
+import { profileOf } from "./ships.ts";
 import type { GameState, Ship, ShipOrders } from "./types.ts";
 
 /**
@@ -16,7 +16,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
   const myShips = state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const ship of myShips) {
     const enemies = state.ships.filter((e) => e.alive && e.team !== ship.team);
-    const dial = listManeuvers(hullOf(ship.loadout).profile, ship.speed).filter((m) => stressCost(m.difficulty) <= ship.stressPoints && m.difficulty !== "danger");
+    const dial = listManeuvers(profileOf(ship.loadout), ship.speed).filter((m) => stressCost(m.difficulty) <= ship.stressPoints && m.difficulty !== "danger");
     let best = dial[0];
     let bestScore = -Infinity;
     for (const man of dial) {

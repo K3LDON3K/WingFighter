@@ -48,6 +48,7 @@ export function stateForTeam(state: GameState, team: number, memory: AsteroidMem
     ships: state.ships.filter((s) => s.team === team || !s.alive || seenBy(eyes, s, s.stats.radius)),
     torpedoes: state.torpedoes.filter((t) => t.team === team || seenBy(eyes, t, TORPEDO.radius)),
     mines: state.mines.filter((m) => m.team === team || seenBy(eyes, m, m.radius)),
+    debris: (state.debris ?? []).filter((d) => seenBy(eyes, d, 12)),
     asteroids: [...memory.values()].map((a) => structuredClone(a)),
   };
 }
@@ -119,6 +120,19 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
         break;
       case "spawnMine":
         if (e.mine.team === team || seenBy(eyes, e.mine, e.mine.radius)) events.push(e);
+        break;
+      case "evadePass":
+        if (visibleShip.has(e.shipId) || visibleShip.has(e.victimId)) events.push(e);
+        break;
+      case "jettison":
+        if (visibleShip.has(e.shipId)) events.push(e);
+        break;
+      case "debrisShot":
+        if (visibleShip.has(e.shooterId) || seenBy(eyes, e, 20)) events.push(e);
+        break;
+      case "credits":
+        // kredity jsou veřejné (tabulka), ale důvod sestřelu vidí všichni stejně
+        events.push(e);
         break;
     }
   }

@@ -31,14 +31,16 @@ export type ActionOrder =
   | { type: "lock"; targetId: string }
   | { type: "boost"; dir: "straight" | "left" | "right" }
   | { type: "shield"; segments: Segments }
+  /** Vyhození modulu z lodi (odlehčení) – modul zůstane jako trosky, které jde sestřelit za odměnu. */
+  | { type: "jettison"; moduleId: string }
   | { type: "barrelRoll"; side: Side };
 
-export type ShieldType = "whole" | "segment";
+export type ShieldType = "whole" | "segment" | "none";
 /** Segmenty štítu: 0 předek, 1 pravobok, 2 záď, 3 levobok. */
 export type Segments = [number, number, number, number];
 
 export type SpecialOrder =
-  | { type: "torpedo"; targetId?: string; point?: { x: number; y: number } }
+  | { type: "torpedo"; targetId?: string; point?: { x: number; y: number }; moduleId?: string }
   | { type: "mine"; timer?: number; side?: MineSide };
 
 export type MineSide = "behind" | "left" | "right";
@@ -50,44 +52,68 @@ export interface ShipOrders {
   action?: ActionOrder;
   special?: SpecialOrder;
   fire: boolean;
+  /** Ze kterého laserového modulu se střílí (když je jich víc). */
+  laserModuleId?: string;
   /** Preferovaný cíl laserů (loď nebo torpédo); když není ve výseči, střílí se na nejbližší nepřátelskou loď. */
   preferredTargetId?: string;
 }
 
-/** Trup lodi – nese moduly. V1 má jen stíhač s pevnou sestavou. */
+/** Sloty stíhače. */
+export type SlotId = "front" | "back" | "left" | "right";
+export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole";
+
+/** Trup lodi – nese moduly ve slotech. */
 export interface HullDef {
   id: string;
   name: string;
+  description: string;
   /** Poloměr pro kolize a vykreslení. */
   radius: number;
   hull: number;
-  /** Nosnost pro moduly (v1 nevyužito, připraveno pro inventář). */
-  capacity: number;
-  slots: { weapon: number; system: number };
+  /** Obratnost (kostky obrany). */
+  agility?: number;
+  /** Sloty: small = 1 malý modul, flex = 1 velký nebo 2 malé. */
+  slots: { id: SlotId; name: string; size: "small" | "flex" }[];
   /** Pohybové možnosti lodi. */
   profile: ManeuverProfile;
 }
 
-export interface ModuleDef {
+export interface PilotDef {
   id: string;
   name: string;
-  slot: "weapon" | "engine" | "shield" | "system";
-  size: number;
-  stats: Partial<{
-    attack: number;
-    agility: number;
-    shields: number;
-    torpedoes: number;
-    mines: number;
-    hull: number;
-    vision: number;
-  }>;
+  description: string;
+  abilities: string[];
 }
 
-/** Sestavená loď = trup + moduly → výsledné statistiky. */
+export interface ModuleDef {
+  id: ModuleType;
+  name: string;
+  short: string;
+  icon: string;
+  size: "small" | "large";
+  weight: number;
+  price: number;
+  description: string;
+  /** Munice na modul a váha jednoho kusu. */
+  ammo?: number;
+  ammoWeight?: number;
+  shieldType?: ShieldType;
+  shields?: number;
+}
+
+/** Modul osazený v lodi. */
+export interface ModuleInstance {
+  id: string;
+  type: ModuleType;
+  slot: SlotId;
+  ammo?: number;
+}
+
+/** Sestavená loď = trup + pilot + moduly → výsledné statistiky. */
 export interface ShipLoadout {
   hullId: string;
-  moduleIds: string[];
+  pilotId: string;
+  modules: ModuleInstance[];
 }
 
 export interface ShipStats {
@@ -100,6 +126,8 @@ export interface ShipStats {
   radius: number;
   /** Dohled (fog of war). */
   vision: number;
+  /** Počet segmentových štítových modulů (životy segmentu = počet × segmentHp). */
+  segmentModules: number;
 }
 
 export interface Ship extends Pose {
@@ -181,7 +209,20 @@ export interface PlayerInfo {
   name: string;
   team: number;
   isBot: boolean;
-  shieldType?: ShieldType;
+  loadout?: ShipLoadout;
+  /** Kredity: zbytek rozpočtu + odměny za sestřely a přežití. */
+  credits?: number;
+}
+
+/** Vyhozený modul plující vesmírem – lze sestřelit laserem za odměnu. */
+export interface Debris {
+  id: string;
+  type: ModuleType;
+  x: number;
+  y: number;
+  team: number;
+  /** Odměna za sestřelení. */
+  value: number;
 }
 
 export interface GameSettings {
@@ -189,6 +230,10 @@ export interface GameSettings {
   /** 0 = bez limitu. */
   turnLimit: number;
   shipsPerPlayer: number;
+  /** Max. kusů modulu na hráče (0 = zakázán; chybí = bez limitu). */
+  allowedModules: Partial<Record<ModuleType, number>>;
+  /** Výbava botů: výchozí sestava, náhodná, nebo ruční (host ji nakliká). */
+  botLoadout: "default" | "random" | "manual";
 }
 
 export interface GameResult {
@@ -209,6 +254,7 @@ export interface GameState {
   ships: Ship[];
   torpedoes: Torpedo[];
   mines: Mine[];
+  debris: Debris[];
   players: PlayerInfo[];
   status: "planning" | "finished";
   result?: GameResult;
@@ -225,6 +271,9 @@ export type TurnEvent =
   | { type: "asteroidHit"; asteroidId: string; x: number; y: number; t: number; profile: number[]; destroyed: boolean }
   | { type: "torpedoExpire"; torpedoId: string; x: number; y: number }
   | { type: "torpedoShot"; torpedoId: string; shooterId: string; x: number; y: number; attackDice: DieFace[]; defenseDice: DieFace[]; destroyed: boolean }
+  | { type: "debrisShot"; debrisId: string; shooterId: string; x: number; y: number; destroyed: boolean; reward: number }
+  | { type: "jettison"; shipId: string; debris: Debris }
+  | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" }
   | { type: "action"; shipId: string; action: ActionOrder; ok: boolean; path?: Pose[] }
   | {
       type: "laser";

@@ -1,8 +1,10 @@
 import {
   RULES,
   actionList,
-  hullOf,
   laserOdds,
+  loadoutWeight,
+  MODULES,
+  profileOf,
   laserTarget,
   parseManeuverId,
   resolveManeuver,
@@ -69,9 +71,9 @@ const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: 
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "torpedo", "mine"] },
   { label: "Pohyb", ids: ["evade", "koiogran"] },
-  { label: "Speciální", ids: ["shield"] },
+  { label: "Speciální", ids: ["shield", "jettison"] },
 ];
-const ACTION_ICON: Record<string, string> = { laser: "laser", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments" };
+const ACTION_ICON: Record<string, string> = { laser: "laser", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
   if (koiogran) return "⟲";
@@ -104,7 +106,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
 
   const o = m.orders.get(ship.id)!;
   const locked = m.submitted;
-  const man = resolveManeuver(hullOf(ship.loadout).profile, o.maneuverId, ship.speed);
+  const man = resolveManeuver(profileOf(ship.loadout), o.maneuverId, ship.speed);
   const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
   const acts = actionList(ship, o);
   const aiming = m.aimingShipId === ship.id;
@@ -151,7 +153,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         "div",
         { class: "bb-row" },
         h("span", { class: "stat", title: "Stresové body: červený manévr −1, nebezpečný −2, zelený +1" }, icon("stress", "#f472b6"), segBar(STRESS.max, ship.stressPoints, "#f472b6", "#3b1a2e")),
-        h("span", { class: "stat", title: "Aktuální rychlost" }, icon("speed", "#94a3b8"), String(ship.speed)),
+        h("span", { class: "stat", title: `Aktuální rychlost / max. s touto váhou (${loadoutWeight(ship.loadout)})` }, icon("speed", "#94a3b8"), `${ship.speed}/${profileOf(ship.loadout).maxSpeed}`),
       ),
       h(
         "div",
@@ -213,7 +215,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
             onclick: () => cb.chooseAction(ship.id, a.id),
           },
           icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
-          h("span", { class: "lbl" }, label(a.label.replace(/ \(1 akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít"))),
+          h("span", { class: "lbl" }, label(a.label.replace(/ \(1 akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit"))),
         ),
       );
     }
@@ -222,9 +224,21 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   }
   const details = h("div", { class: "bb-details" });
   const seg = (content: Node | string, active: boolean, title: string, onclick: () => void) => h("button", { class: `px seg ${active ? "on" : ""}`, disabled: locked, title, onclick }, content);
+  /** Výběr modulu (když je jich víc stejného typu): 1, 2, … s municí. */
+  const modulePicker = (type: "laser" | "torpedo", currentId: string | undefined, onPick: (id: string) => void) => {
+    const mods = ship.loadout.modules.filter((m) => m.type === type);
+    if (mods.length < 2) return null;
+    return h(
+      "div",
+      { class: "segs-btn", title: `Ze kterého modulu (${MODULES[type].name}) – jeden za akci` },
+      ...mods.map((m, i) => seg(`${i + 1}${m.ammo !== undefined ? `·${m.ammo}` : ""}`, m.id === currentId, `${MODULES[type].name} ${i + 1}${m.ammo !== undefined ? ` (munice ${m.ammo})` : ""}`, () => onPick(m.id))),
+    );
+  };
   if (o.special?.type === "torpedo") {
     const sp = o.special;
     const tname = sp.targetId ? (m.state.ships.find((x) => x.id === sp.targetId)?.name ?? "torpédo") : null;
+    const picker = modulePicker("torpedo", sp.moduleId, (id) => cb.setOrders(ship.id, { special: { ...sp, moduleId: id } }));
+    if (picker) details.append(picker);
     details.append(
       icon("target", sp.targetId || sp.point ? "#4ade80" : "#fbbf24"),
       sp.targetId
@@ -259,11 +273,29 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     if (timer) details.append(h("span", { class: "muted" }, icon("clock", "#94a3b8", 12), ` ${timer}`));
     if (m.minePick === "side") details.append(h("span", { class: "warn" }, label("← klikni na mapě, kam minu odhodit")));
     else if (m.minePick === "timer") details.append(h("span", { class: "warn" }, label("← klikni na mapě na čas výbuchu (✕ = jiné místo)")));
+  } else if (o.action?.type === "jettison") {
+    const cur = o.action.moduleId;
+    details.append(icon("debris", "#94a3b8"), h("span", { class: "muted" }, label("vyhodit:")));
+    details.append(
+      h(
+        "div",
+        { class: "segs-btn", title: "Který modul vyhodit (na začátku kola)" },
+        ...ship.loadout.modules.map((mod) => seg(h("span", {}, icon(MODULES[mod.type].icon, "currentColor", 10), ` ${label(MODULES[mod.type].short)}${mod.ammo !== undefined ? `·${mod.ammo}` : ""}`), mod.id === cur, `${MODULES[mod.type].name} – váha ${MODULES[mod.type].weight + (MODULES[mod.type].ammoWeight ?? 0) * (mod.ammo ?? 0)}`, () => cb.setOrders(ship.id, { action: { type: "jettison", moduleId: mod.id } }))),
+      ),
+    );
+    const chosen = ship.loadout.modules.find((x) => x.id === cur);
+    if (chosen) {
+      const after = { ...ship.loadout, modules: ship.loadout.modules.filter((x) => x.id !== cur) };
+      details.append(h("span", { class: "muted" }, label(`· váha ${loadoutWeight(ship.loadout)} → ${loadoutWeight(after)} · max. rychlost ${profileOf(ship.loadout).maxSpeed} → ${profileOf(after).maxSpeed}`)));
+    }
   } else if (o.action?.type === "shield") {
     details.append(icon("segments", "#60a5fa"), h("span", { class: "txt" }, `štít ${o.action.segments.join(" / ")}`), inHand > 0 ? h("span", { class: "warn" }, label(`← rozmísti ${inHand} b. v panelu lodi`)) : h("span", { class: "muted" }, label("· platí od začátku kola")));
   } else if (o.fire) {
-    const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? "torpédo") : null;
-    const target = laserTarget(m.state, ship, o.preferredTargetId);
+    const picker = modulePicker("laser", o.laserModuleId, (id) => cb.setOrders(ship.id, { laserModuleId: id }));
+    if (picker) details.append(picker);
+    const debrisTarget = o.preferredTargetId ? (m.state.debris ?? []).find((d) => d.id === o.preferredTargetId) : undefined;
+    const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? (debrisTarget ? `trosky ${MODULES[debrisTarget.type].short} (+${debrisTarget.value})` : "torpédo")) : null;
+    const target = debrisTarget ? undefined : laserTarget(m.state, ship, o.preferredTargetId);
     details.append(icon("target", target ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, tname ?? (target ? `nejbližší: ${target.name}` : "nikdo ve výseči")));
     if (target) {
       const odds = laserOdds(ship, target);
@@ -276,7 +308,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         ),
         h("span", { class: "muted" }, label(`· průměr ${Math.round(odds.expectedDamage)} zranění`)),
       );
-    } else if (o.preferredTargetId) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
+    } else if (o.preferredTargetId && !debrisTarget) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
     details.append(h("span", { class: "muted" }, label("· klik na nepřítele = cíl")));
   } else {
     details.append(h("span", { class: "muted" }, "—"));

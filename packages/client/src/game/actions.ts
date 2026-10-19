@@ -1,4 +1,4 @@
-import { RULES, actionCost, hullOf, makeManeuver, parseManeuverId, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@spacegame/shared";
+import { RULES, actionCost, makeManeuver, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@spacegame/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -24,18 +24,18 @@ export const ACTIONS: ActionOption[] = [
     glyph: "⚡",
     label: "Lasery (1 akce)",
     description: "Na začátku kola (před pohybem) vystřelí lasery ze současné pozice na cíl ve výseči ±20° do 300 (preferovaný cíl, jinak nejbližší nepřítel; ne skrz asteroid). Bez této akce loď nestřílí.",
-    disabled: (ship, _s, o) => noAp(ship, o, !!o.fire),
+    disabled: (ship, _s, o) => (ship.loadout.modules.some((m) => m.type === "laser") ? noAp(ship, o, !!o.fire) : "loď nemá laserový modul"),
     active: (o) => !!o.fire,
-    apply: (o) => ({ fire: !o.fire }),
+    apply: (o, ship) => ({ fire: !o.fire, laserModuleId: o.fire ? undefined : ship.loadout.modules.find((m) => m.type === "laser")?.id }),
   },
   {
     id: "torpedo",
     glyph: "➤",
     label: "Torpédo (1 akce)",
     description: `Fázové torpédo: vyletí rovně z lodi (${TORPEDO.launchDist} j. rychlostí ${TORPEDO.launchSpeed}/kolo), pak se otáčí na cíl a po zaměření zrychlí až na ${TORPEDO.speed}/kolo; při plné rychlosti zatáčí jen mírně a cíl mimo výseč před sebou ztratí. Cíl zadáš jen na mapě: klikni na viditelnou nepřátelskou loď či torpédo do ${TORPEDO.lockRange} (sleduje ji celý let), nebo na bod do ${TORPEDO.pointRange} – tam vybuchne (poloměr ${TORPEDO.blastRadius}, zranění ${TORPEDO.blastDamage} všem, kráter do asteroidu). Přímý zásah lodi = ${TORPEDO.damage}.`,
-    disabled: (ship, _s, o) => (ship.ammo.torpedoes > 0 ? noAp(ship, o, o.special?.type === "torpedo") : "došla torpéda"),
+    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "torpedo") ? "loď nemá torpédomet" : ship.ammo.torpedoes > 0 ? noAp(ship, o, o.special?.type === "torpedo") : "došla torpéda"),
     active: (o) => o.special?.type === "torpedo",
-    apply: (o) => ({ special: o.special?.type === "torpedo" ? undefined : { type: "torpedo" } }),
+    apply: (o, ship) => ({ special: o.special?.type === "torpedo" ? undefined : { type: "torpedo", moduleId: ship.loadout.modules.find((m) => m.type === "torpedo" && (m.ammo ?? 0) > 0)?.id } }),
     pick: "torpedo",
   },
   {
@@ -43,7 +43,7 @@ export const ACTIONS: ActionOption[] = [
     glyph: "✹",
     label: "Mina (1 akce)",
     description: "Odhodí minu ze startovní pozice lodi – za sebe nebo do strany; aktivní od příštího kola. Buď reaguje na pole: nepřítel, který v něm na začátku kola stojí, ji odpálí hned, kdokoliv (i ty) při vletu během kola; nebo je časovaná 1–3 kola a vybuchne na začátku kola, kdy odpočet dojde. Zraní všechny v poli a vykousne kráter do asteroidu.",
-    disabled: (ship, _s, o) => (ship.ammo.mines > 0 ? noAp(ship, o, o.special?.type === "mine") : "došly miny"),
+    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mine") ? "loď nemá minový zásobník" : ship.ammo.mines > 0 ? noAp(ship, o, o.special?.type === "mine") : "došly miny"),
     active: (o) => o.special?.type === "mine",
     apply: (o) => ({ special: o.special?.type === "mine" ? undefined : { type: "mine", side: "behind" } }),
   },
@@ -61,9 +61,18 @@ export const ACTIONS: ActionOption[] = [
     glyph: "◈",
     label: "Úprava štítu (1 akce)",
     description: `Přerozdělí body segmentového štítu (předek, pravobok, záď, levobok) – stejný součet, max. ${RULES.segmentMax} na segment. Nové rozložení platí od začátku kola, tedy ještě před palbou laserů.`,
-    disabled: (ship, _s, o) => (ship.shieldType !== "segment" ? "jen segmentový štít" : ship.segments.every((x) => x === 0) ? "štít je vybitý" : noAp(ship, o, o.action?.type === "shield")),
+    disabled: (ship, _s, o) => (ship.shieldType !== "segment" ? "jen se segmentovým štítem" : ship.segments.every((x) => x === 0) ? "štít je vybitý" : noAp(ship, o, o.action?.type === "shield")),
     active: (o) => o.action?.type === "shield",
     apply: (o, ship) => ({ action: o.action?.type === "shield" ? undefined : { type: "shield", segments: [...ship.segments] as Segments } }),
+  },
+  {
+    id: "jettison",
+    glyph: "⏏",
+    label: "Vyhodit modul (1 akce)",
+    description: "Na začátku kola vyhodí zvolený modul z lodi – loď je lehčí (vyšší max. rychlost od příštího kola). Modul zůstane za lodí jako trosky; kdo je sestřelí lasery, dostane kredity. Moduly se zatím nedají sebrat zpět.",
+    disabled: (ship, _s, o) => (ship.loadout.modules.length === 0 ? "loď nemá žádný modul" : noAp(ship, o, o.action?.type === "jettison")),
+    active: (o) => o.action?.type === "jettison",
+    apply: (o, ship) => ({ action: o.action?.type === "jettison" ? undefined : { type: "jettison", moduleId: ship.loadout.modules[0].id } }),
   },
   {
     id: "koiogran",
@@ -73,7 +82,7 @@ export const ACTIONS: ActionOption[] = [
     disabled: (ship, _s, o) => {
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.koiogran) return null;
-      const profile = hullOf(ship.loadout).profile;
+      const profile = profileOf(ship.loadout);
       const sp = profile.koiogranSpeeds.includes(ship.speed) ? ship.speed : profile.koiogranSpeeds[0];
       const man = makeManeuver(profile, sp, 0, true, ship.speed);
       if (!man) return "loď otočku nezvládne";
@@ -82,7 +91,7 @@ export const ACTIONS: ActionOption[] = [
     },
     active: (o) => !!parseManeuverId(o.maneuverId)?.koiogran,
     apply: (o, ship) => {
-      const profile = hullOf(ship.loadout).profile;
+      const profile = profileOf(ship.loadout);
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.koiogran) return { maneuverId: makeManeuver(profile, ship.speed, 0, false, ship.speed)?.id ?? o.maneuverId };
       const sp = profile.koiogranSpeeds.includes(ship.speed) ? ship.speed : profile.koiogranSpeeds[0];

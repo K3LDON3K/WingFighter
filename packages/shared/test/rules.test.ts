@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_TUNING,
+  DEFAULT_LOADOUT,
+  loadoutWeight,
+  maxSpeedFor,
+  moduleCost,
+  validateLoadout,
   actionCost,
   classifyManeuver,
   carveCrater,
@@ -33,8 +39,9 @@ const players: PlayerInfo[] = [
   { id: "p2", name: "Beta", team: 1, isBot: false },
 ];
 
+/** Testy pravidel běží s vypnutým vlivem váhy (max. rychlost 5), váha má vlastní test. */
 function game(overrides?: Partial<GameState>): GameState {
-  const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1 } });
+  const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
   g.asteroids = [];
   return { ...g, ...overrides };
 }
@@ -448,7 +455,7 @@ describe("vyhodnocení kola", () => {
   });
 
   it("mina se položí na startovní pozici, aktivuje se další kolo a spustí ji i torpédo", () => {
-    const g = createGame({ players: [...players, { id: "p3", name: "Gama", team: 0, isBot: false }], settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1 } });
+    const g = createGame({ players: [...players, { id: "p3", name: "Gama", team: 0, isBot: false }], settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
     g.asteroids = [];
     place(g, "ship-p1-0", 500, 500, -Math.PI / 2);
     place(g, "ship-p2-0", 900, 500, Math.PI);
@@ -556,7 +563,7 @@ describe("vyhodnocení kola", () => {
       { id: "b2", name: "Bot 2", team: 1, isBot: true },
       { id: "b3", name: "Bot 3", team: 2, isBot: true },
     ];
-    let g = createGame({ players: bots, settings: { mode: "tdm", turnLimit: 40, shipsPerPlayer: 2 } });
+    let g = createGame({ players: bots, settings: { mode: "tdm", turnLimit: 40, shipsPerPlayer: 2, allowedModules: {}, botLoadout: "default" } });
     const rng = createRng(42);
     let turns = 0;
     while (g.status !== "finished" && turns < 100) {
@@ -570,11 +577,72 @@ describe("vyhodnocení kola", () => {
   });
 
   it("deathmatch přiřadí každému hráči vlastní tým a vrací vítěze", () => {
-    const g = createGame({ players: [...players, { id: "p3", name: "Gama", team: 0, isBot: false }], settings: { mode: "dm", turnLimit: 0, shipsPerPlayer: 1 } });
+    const g = createGame({ players: [...players, { id: "p3", name: "Gama", team: 0, isBot: false }], settings: { mode: "dm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
     expect(new Set(g.ships.map((s) => s.team)).size).toBe(3);
     for (const s of g.ships) if (s.ownerId !== "p3") s.alive = false;
     const r = resolveTurn(g, [], createRng(1));
     expect(r.state.status).toBe("finished");
     expect(r.state.result?.winnerPlayerId).toBe("p3");
+  });
+});
+
+describe("inventář a ekonomika", () => {
+  it("váha modulů snižuje max. rychlost; vystřelené torpédo loď odlehčí", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
+    g.asteroids = [];
+    const ship = g.ships[0];
+    expect(loadoutWeight(ship.loadout)).toBe(10); // lasery 2 + torpédomet 1+3 + miny 1+1 + štít 2
+    expect(maxSpeedFor(ship.loadout)).toBe(4);
+    const empty = { ...DEFAULT_LOADOUT, modules: [] };
+    expect(maxSpeedFor(empty)).toBe(5);
+    const fixed = sanitizeOrders(g, "p1", [{ shipId: ship.id, maneuverId: "m5a0", fire: false }]);
+    expect(fixed[0].maneuverId).not.toBe("m5a0");
+    place(g, "ship-p2-0", 1500, 1200, Math.PI);
+    const r = resolveTurn(g, [{ shipId: ship.id, maneuverId: "m2a0", fire: false, special: { type: "torpedo", point: { x: 900, y: 500 } } }], createRng(1));
+    expect(r.state.ships[0].ammo.torpedoes).toBe(2);
+    expect(loadoutWeight(r.state.ships[0].loadout)).toBe(9);
+  });
+
+  it("validace sestavy: kapacita slotů, míchání štítů, limity a rozpočet", () => {
+    expect(validateLoadout(DEFAULT_LOADOUT)).toBeNull();
+    const full = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules, { id: "x", type: "laser" as const, slot: "front" as const }] };
+    expect(validateLoadout(full)).toMatch(/plný/);
+    const mixed = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules, { id: "x", type: "shield-whole" as const, slot: "left" as const }] };
+    expect(validateLoadout(mixed)).toMatch(/kombinovat/);
+    expect(validateLoadout(DEFAULT_LOADOUT, { allowed: { torpedo: 0 } })).toMatch(/zakázán/);
+    expect(moduleCost(DEFAULT_LOADOUT)).toBe(470);
+    expect(validateLoadout(DEFAULT_LOADOUT, { budget: 400 })).toMatch(/rozpočet/);
+  });
+
+  it("vyhození modulu: loď odlehčí, trosky lze sestřelit za kredity; sestřel lodi a přežití dávají kredity", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
+    g.asteroids = [];
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 700, 500, Math.PI);
+    const mineMod = g.ships[0].loadout.modules.find((m) => m.type === "mine")!;
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: false, action: { type: "jettison", moduleId: mineMod.id } }], createRng(1));
+    expect(r.state.ships[0].loadout.modules.some((m) => m.type === "mine")).toBe(false);
+    expect(r.state.ships[0].ammo.mines).toBe(0);
+    expect(r.state.debris).toHaveLength(1);
+    const deb = r.state.debris[0];
+    expect(deb.value).toBe(50);
+    // p2 otočená na trosky (jsou u startovní pozice p1) je sestřelí – zkoušíme seedy
+    const p2 = r.state.ships[1];
+    place(r.state, "ship-p2-0", deb.x + 120, deb.y, Math.PI);
+    const before = r.state.players[1].credits!;
+    let shot = false;
+    for (let seed = 1; seed < 30 && !shot; seed++) {
+      const r2 = resolveTurn(r.state, [{ shipId: p2.id, maneuverId: "m2a0", fire: true, preferredTargetId: deb.id }], createRng(seed));
+      const ev = r2.events.find((e) => e.type === "debrisShot");
+      expect(ev).toBeTruthy();
+      if (ev && ev.type === "debrisShot" && ev.destroyed) {
+        shot = true;
+        expect(r2.state.debris).toHaveLength(0);
+        expect(r2.state.players[1].credits).toBe(before + 50 + DEFAULT_TUNING.creditsPerTurn);
+      }
+    }
+    expect(shot).toBe(true);
+    // přežité kolo = kredity oběma
+    expect(r.state.players[0].credits).toBe(DEFAULT_TUNING.startBudget - 470 + DEFAULT_TUNING.creditsPerTurn);
   });
 });

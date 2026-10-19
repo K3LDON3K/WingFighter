@@ -1,4 +1,5 @@
-import { MAX_TEAMS_TDM, TEAM_COLORS, TEAM_NAMES, type RoomPlayer, type RoomState, type RoomSummary } from "@spacegame/shared";
+import { applyTuning, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@spacegame/shared";
+import { loadoutTag, renderLoadout } from "./loadout-ui.ts";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 import { renderTuningPanel } from "./tuning-panel.ts";
@@ -121,6 +122,8 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
 }
 
 let rerender: () => void = () => {};
+/** Bot, kterému host právě kliká výbavu. */
+let botEdit: string | null = null;
 
 function roomView(m: LobbyModel, net: Net) {
   const room = m.room!;
@@ -145,6 +148,7 @@ function roomView(m: LobbyModel, net: Net) {
           p.isBot && isHost ? h("button", { class: "x", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
         ),
       ),
+      ...members.map((p) => botEditor(p)),
       h(
         "div",
         { class: "row", style: "margin-top:8px" },
@@ -154,18 +158,21 @@ function roomView(m: LobbyModel, net: Net) {
     );
   };
 
-  /** Volba štítu: vlastní řádek = přepínač, ostatní = štítek. */
+  applyTuning(room.tuning);
+  const budget = room.tuning.startBudget;
+  /** Výbava v řádku hráče: vlastní = editor níže, ostatní = štítek; bot v ručním režimu = host může rozkliknout. */
   const shieldPick = (p: RoomPlayer) => {
-    const segment = p.shieldType !== "whole";
-    if (p.id !== m.playerId)
-      return h("span", { class: "shield-tag", title: segment ? "Segmentový štít (4 × 2 body)" : "Celolodní štít (zásoba + účinnost)" }, icon(segment ? "segments" : "shield", "#60a5fa", 10), label(segment ? "segmenty" : "celolodní"));
-    return h(
-      "span",
-      { class: "shield-pick" },
-      h("button", { class: segment ? "on" : "", title: "Čtyři segmenty (předek, pravobok, záď, levobok) po 2 bodech. Každý zásah ubere 1 bod a je pohlcen celý; body jde přesouvat akcí Úprava štítu.", onclick: () => net.send({ type: "setShield", shieldType: "segment" }) }, icon("segments", "currentColor", 10), label("segmenty")),
-      h("button", { class: segment ? "" : "on", title: "Jedna zásoba kolem celé lodi: pohltí část zranění podle účinnosti, ta po každém zásahu klesne o 10 %.", onclick: () => net.send({ type: "setShield", shieldType: "whole" }) }, icon("shield", "currentColor", 10), label("celolodní")),
-    );
+    const tag = loadoutTag(p.loadout);
+    if (p.isBot && isHost && room.settings.botLoadout === "manual") {
+      const open = botEdit === p.id;
+      return h("span", { class: "lo-tagwrap" }, tag, h("button", { class: open ? "on" : "", title: "Naklikat výbavu bota", onclick: () => ((botEdit = open ? null : p.id), rerender()) }, icon("inventory", "currentColor", 10), label(open ? "zavřít" : "výbava")));
+    }
+    return tag;
   };
+  const botEditor = (p: RoomPlayer) =>
+    botEdit === p.id && p.isBot && isHost && room.settings.botLoadout === "manual"
+      ? h("div", { class: "bot-editor" }, renderLoadout({ loadout: p.loadout, budget, allowed: room.settings.allowedModules, compact: true, onChange: (lo) => net.send({ type: "setLoadout", loadout: lo, botId: p.id }) }))
+      : null;
 
   const settings = room.settings;
   const set = (patch: Partial<typeof settings>) => net.send({ type: "setSettings", settings: patch });
@@ -204,8 +211,18 @@ function roomView(m: LobbyModel, net: Net) {
               p.isBot && isHost ? h("button", { class: "x", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
             ),
           ),
+          ...room.players.map((p) => botEditor(p)),
           isHost ? h("div", { class: "row", style: "margin-top:8px" }, h("button", { onclick: () => net.send({ type: "addBot", team: 0 }) }, icon("bot", "currentColor", 12), label("bot"))) : null,
         ),
+    me
+      ? h(
+          "div",
+          { class: "card" },
+          h("h3", {}, icon("inventory", "#7dd3fc", 12), " ", label("Tvoje výbava")),
+          h("div", { class: "muted txt" }, `Rozpočet ${budget} kreditů. Co neutratíš, máš ve hře jako kredity; další získáš za sestřely a přežitá kola. Váha modulů snižuje max. rychlost lodi.`),
+          renderLoadout({ loadout: me.loadout, budget, allowed: room.settings.allowedModules, onChange: (lo) => net.send({ type: "setLoadout", loadout: lo }) }),
+        )
+      : null,
     h(
       "div",
       { class: "card settings" },
@@ -239,6 +256,45 @@ function roomView(m: LobbyModel, net: Net) {
           "select",
           { disabled: !isHost, onchange: (e) => set({ shipsPerPlayer: Number((e.target as HTMLSelectElement).value) }) },
           ...[1, 2, 3, 4].map((n) => h("option", { value: String(n), selected: settings.shipsPerPlayer === n }, String(n))),
+        ),
+      ),
+      h(
+        "label",
+        {},
+        h("span", {}, "Výbava botů"),
+        h(
+          "select",
+          { disabled: !isHost, onchange: (e) => set({ botLoadout: (e.target as HTMLSelectElement).value as "default" | "random" | "manual" }) },
+          h("option", { value: "default", selected: settings.botLoadout === "default" }, "výchozí sestava"),
+          h("option", { value: "random", selected: settings.botLoadout === "random" }, "náhodná"),
+          h("option", { value: "manual", selected: settings.botLoadout === "manual" }, "ruční (naklikám u bota)"),
+        ),
+      ),
+      h("div", { class: "muted txt", style: "margin-top:6px" }, `Rozpočet na výbavu: ${budget} kreditů (mění se v ladění → Ekonomika). Povolené moduly na hráče:`),
+      h(
+        "div",
+        { class: "allowed" },
+        ...MODULE_TYPES.map((t) =>
+          h(
+            "label",
+            { title: MODULES[t].description },
+            h("span", { class: "txt" }, icon(MODULES[t].icon, "currentColor", 10), " ", MODULES[t].name),
+            h(
+              "select",
+              {
+                disabled: !isHost,
+                onchange: (e) => {
+                  const v = (e.target as HTMLSelectElement).value;
+                  const next: Partial<Record<ModuleType, number>> = { ...settings.allowedModules };
+                  if (v === "") delete next[t];
+                  else next[t] = Number(v);
+                  set({ allowedModules: next });
+                },
+              },
+              h("option", { value: "", selected: settings.allowedModules[t] === undefined }, "bez limitu"),
+              ...[0, 1, 2, 3, 4].map((n) => h("option", { value: String(n), selected: settings.allowedModules[t] === n }, n === 0 ? "zakázán" : `max ${n}`)),
+            ),
+          ),
         ),
       ),
       h("div", { class: "muted txt", style: "margin-top:6px" }, "Při limitu kol vyhrává tým s největším součtem zbývajícího trupu a štítů."),

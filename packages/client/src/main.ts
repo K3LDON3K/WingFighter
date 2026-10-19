@@ -4,7 +4,9 @@ import {
   ANGLE_STEP,
   defaultOrders,
   dist,
-  hullOf,
+  profileOf,
+  MODULES,
+  loadoutWeight,
   LOCK_RANGE,
   makeManeuver,
   makePath,
@@ -35,6 +37,7 @@ import {
 } from "@spacegame/shared";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
+import { renderLoadout } from "./loadout-ui.ts";
 import { actionById } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
@@ -280,7 +283,7 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
   const ship = game.state.ships.find((s) => s.id === shipId);
   const o = game.orders.get(shipId);
   if (!ship || !o) return false;
-  const profile = hullOf(ship.loadout).profile;
+  const profile = profileOf(ship.loadout);
   speed = Math.max(1, Math.min(profile.maxSpeed, Math.round(speed)));
   let man = makeManeuver(profile, speed, angle, koiogran, ship.speed);
   if (!man && !koiogran) {
@@ -482,7 +485,7 @@ function buildOverlay(view: ViewModel): Overlay {
     const vs = view.ships.find((s) => s.id === ship.id);
     const o = g.orders.get(ship.id);
     if (!vs || !o) continue;
-    const profile = hullOf(ship.loadout).profile;
+    const profile = profileOf(ship.loadout);
     const man = resolveManeuver(profile, o.maneuverId, ship.speed);
     if (!man) continue;
     const aiming = g.aimingShipId === ship.id && !g.submitted;
@@ -571,7 +574,8 @@ function renderHud() {
       return `<span style="color:${TEAM_COLORS[t]}">${label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()}: ${t === myTeam ? alive : `${alive} V DOHLEDU`}</span>`;
     })
     .join(" · ");
-  const html = `<div class="big">KOLO ${game.anim ? game.anim["result"].turn : s.turn}${limit}</div><div>${counts}</div>`;
+  const credits = s.players.find((p) => p.id === playerId)?.credits;
+  const html = `<div class="big">KOLO ${game.anim ? game.anim["result"].turn : s.turn}${limit}${credits !== undefined ? `<span class="hud-cr" title="Kredity: zbytek rozpočtu + odměny">${credits} CR</span>` : ""}</div><div>${counts}</div>`;
   if (hudEl.innerHTML !== html) hudEl.innerHTML = html;
 
   if (overlayEl) {
@@ -726,8 +730,17 @@ function renderSide() {
         "div",
         { class: "pnl inventory" },
         h("div", { class: "bb-head" }, h("span", { class: "ttl" }, icon("inventory", "#7dd3fc", 12), " ", label("Inventář")), h("button", { class: "px tiny", style: "margin-left:auto", onclick: () => ((game!.inventoryOpen = false), renderSide()) }, "✕")),
-        h("div", { class: "txt muted" }, "Sloty lodi (trup, štít, zbraně, moduly) se připravují. Tady si budeš skládat výbavu – štíty, dobíjení, lepší lasery…"),
-        h("div", { class: "inv-slots" }, ...["TRUP", "STIT", "ZBRAN", "MODUL", "MODUL"].map((n) => h("div", { class: "inv-slot" }, n))),
+        (() => {
+          const sh = game!.state.ships.find((x) => x.id === game!.selectedShipId) ?? game!.state.ships.find((x) => x.ownerId === playerId);
+          const me = game!.state.players.find((p) => p.id === playerId);
+          if (!sh) return h("div", { class: "txt muted" }, "Žádná loď.");
+          return h(
+            "div",
+            {},
+            h("div", { class: "txt muted" }, `${sh.name} · kredity ${me?.credits ?? 0}. Moduly jde během bitvy jen vyhodit (akce Vyhodit modul); nákup a vylepšení přijdou mezi koly.`),
+            renderLoadout({ loadout: sh.loadout, readonly: true, budget: game!.state.tuning.startBudget, allowed: game!.state.settings.allowedModules, compact: true }),
+          );
+        })(),
       ),
     );
   }
@@ -749,7 +762,7 @@ let logOpen = true;
 /* ------------------------------------------------------------------ */
 
 interface Entity {
-  kind: "ship" | "torpedo";
+  kind: "ship" | "torpedo" | "debris";
   id: string;
   team: number;
   ownerId?: string;
@@ -767,6 +780,10 @@ function entityAt(x: number, y: number): Entity | undefined {
   for (const t of view.torpedoes) {
     const d = Math.hypot(t.x - x, t.y - y);
     if (d <= 14 && (!best || d < best.d)) best = { e: { kind: "torpedo", id: t.id, team: t.team }, d };
+  }
+  for (const db of view.debris) {
+    const d = Math.hypot(db.x - x, db.y - y);
+    if (d <= 16 && (!best || d < best.d)) best = { e: { kind: "debris", id: db.id, team: -1 }, d };
   }
   return best?.e;
 }
@@ -806,7 +823,7 @@ function confirmManeuver(id: string): boolean {
   const ship = g.state.ships.find((s) => s.id === id);
   const o = g.orders.get(id);
   if (!ship || !o) return false;
-  const man = resolveManeuver(hullOf(ship.loadout).profile, o.maneuverId, ship.speed);
+  const man = resolveManeuver(profileOf(ship.loadout), o.maneuverId, ship.speed);
   if (!man || stressCost(man.difficulty) > ship.stressPoints) {
     showError("Na tento manévr nemáš dost stresových bodů.");
     return false;
@@ -945,7 +962,12 @@ function bindInput(c: HTMLCanvasElement) {
     const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
     const o = sel && g.orders.get(sel.id);
     if (!sel || !o) return;
-    // 4) výběr cíle pro označenou loď
+    // 4) výběr cíle pro označenou loď (trosky = jen cíl laserů)
+    if (hit && hit.kind === "debris") {
+      g.orders.set(sel.id, { ...o, preferredTargetId: o.preferredTargetId === hit.id ? undefined : hit.id });
+      renderSide();
+      return;
+    }
     if (hit && hit.team !== sel.team) {
       if (o.special?.type === "torpedo" && dist(sel, hitPos(hit)) <= TORPEDO.lockRange) {
         g.orders.set(sel.id, { ...o, special: { type: "torpedo", targetId: hit.id }, preferredTargetId: hit.id });
@@ -1031,7 +1053,7 @@ function bindInput(c: HTMLCanvasElement) {
 
 function hitPos(hit: Entity): { x: number; y: number } {
   const view = game!.view;
-  const s = hit.kind === "ship" ? view.ships.find((x) => x.id === hit.id) : view.torpedoes.find((x) => x.id === hit.id);
+  const s = hit.kind === "ship" ? view.ships.find((x) => x.id === hit.id) : hit.kind === "torpedo" ? view.torpedoes.find((x) => x.id === hit.id) : view.debris.find((x) => x.id === hit.id);
   return s ?? { x: 0, y: 0 };
 }
 

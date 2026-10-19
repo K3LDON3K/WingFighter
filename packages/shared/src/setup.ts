@@ -1,7 +1,7 @@
 import { generateProfile } from "./asteroids.ts";
 import { MAP, RULES } from "./constants.ts";
 import type { Pose } from "./geometry.ts";
-import { computeStats, DEFAULT_LOADOUT } from "./ships.ts";
+import { computeStats, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf } from "./ships.ts";
 import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
 import type { Asteroid, GameSettings, GameState, PlayerInfo, Ship, ShipLoadout } from "./types.ts";
 
@@ -68,8 +68,10 @@ export function createGame(opts: CreateGameOptions): GameState {
   const settings = { ...opts.settings };
   const tuning = sanitizeTuning(opts.tuning ?? DEFAULT_TUNING);
   applyTuning(tuning);
-  const loadout = opts.loadout ?? DEFAULT_LOADOUT;
-  let players = opts.players.map((p) => ({ ...p }));
+  let players = opts.players.map((p) => {
+    const loadout = refillLoadout(p.loadout ?? opts.loadout ?? DEFAULT_LOADOUT);
+    return { ...p, loadout, credits: p.credits ?? Math.max(0, tuning.startBudget - moduleCost(loadout)) };
+  });
   if (settings.mode === "dm") players = players.map((p, i) => ({ ...p, team: i }));
 
   const teams = [...new Set(players.map((p) => p.team))].sort((a, b) => a - b);
@@ -88,22 +90,23 @@ export function createGame(opts: CreateGameOptions): GameState {
     for (const p of members) {
       for (let k = 0; k < Math.max(1, settings.shipsPerPlayer); k++) {
         const offset = (idx - (total - 1) / 2) * spacing;
+        const loadout = structuredClone(p.loadout!);
         const stats = computeStats(loadout);
         ships.push({
           id: `ship-${p.id}-${k}`,
           ownerId: p.id,
           team,
           name: settings.shipsPerPlayer > 1 ? `${p.name} ${k + 1}` : p.name,
-          loadout: structuredClone(loadout),
+          loadout,
           stats,
           x: zone.x + px * offset,
           y: zone.y + py * offset,
           heading: zone.heading,
           hull: stats.hull,
           shields: stats.shields,
-          shieldType: p.shieldType ?? "segment",
+          shieldType: shieldTypeOf(loadout),
           shieldEff: 100,
-          segments: [RULES.segmentHp, RULES.segmentHp, RULES.segmentHp, RULES.segmentHp],
+          segments: [RULES.segmentHp * stats.segmentModules, RULES.segmentHp * stats.segmentModules, RULES.segmentHp * stats.segmentModules, RULES.segmentHp * stats.segmentModules],
           stressPoints: tuning.stressMax,
           speed: 2,
           tokens: { focus: 0, evade: 0 },
@@ -125,6 +128,7 @@ export function createGame(opts: CreateGameOptions): GameState {
     ships,
     torpedoes: [],
     mines: [],
+    debris: [],
     players,
     status: "planning",
   };

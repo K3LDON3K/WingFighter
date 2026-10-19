@@ -4,7 +4,7 @@
  */
 import { CRATER_RADIUS_REF, LASER, MINE, RULES, STRESS, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
-import { HULLS, MODULES } from "./ships.ts";
+import { HULLS, LASER_DICE, MODULES, WEIGHT } from "./ships.ts";
 
 export interface Tuning {
   // zranění
@@ -57,6 +57,24 @@ export interface Tuning {
   wholeEffDrop: number;
   segmentHp: number;
   segmentMax: number;
+  // moduly: ceny a váhy
+  priceLaser: number;
+  priceTorpedo: number;
+  priceMine: number;
+  priceShieldSegment: number;
+  priceShieldWhole: number;
+  weightLaser: number;
+  weightTorpedo: number;
+  weightPerTorpedo: number;
+  weightMine: number;
+  weightPerMine: number;
+  weightShield: number;
+  weightPerSpeed: number;
+  // ekonomika
+  startBudget: number;
+  creditsPerKill: number;
+  creditsPerTurn: number;
+  debrisRewardPct: number;
 }
 
 export const DEFAULT_TUNING: Tuning = {
@@ -104,6 +122,22 @@ export const DEFAULT_TUNING: Tuning = {
   wholeEffDrop: 10,
   segmentHp: 2,
   segmentMax: 3,
+  priceLaser: 100,
+  priceTorpedo: 150,
+  priceMine: 100,
+  priceShieldSegment: 120,
+  priceShieldWhole: 120,
+  weightLaser: 2,
+  weightTorpedo: 1,
+  weightPerTorpedo: 1,
+  weightMine: 1,
+  weightPerMine: 0.5,
+  weightShield: 2,
+  weightPerSpeed: 6,
+  startBudget: 500,
+  creditsPerKill: 200,
+  creditsPerTurn: 10,
+  debrisRewardPct: 50,
 };
 
 export interface TuningField {
@@ -118,33 +152,41 @@ export interface TuningField {
 
 /** Popis polí pro UI (pořadí = pořadí v menu). */
 export const TUNING_FIELDS: TuningField[] = [
-  { key: "laserPerHit", label: "Laser – zranění za zásah", group: "Zranění", min: 0, max: 100, step: 5 },
-  { key: "torpedoDirect", label: "Torpédo – přímý zásah", group: "Zranění", min: 0, max: 200, step: 5 },
-  { key: "torpedoBlast", label: "Torpédo – plošný výbuch", group: "Zranění", min: 0, max: 200, step: 5 },
-  { key: "torpedoBlastRadius", label: "Torpédo – poloměr výbuchu", group: "Zranění", min: 10, max: 300, step: 10 },
-  { key: "mineDamage", label: "Mina – zranění", group: "Zranění", min: 0, max: 200, step: 5 },
-  { key: "mineRadius", label: "Mina – poloměr pole", group: "Zranění", min: 10, max: 300, step: 10 },
-  { key: "collisionShip", label: "Náraz loď–loď", group: "Zranění", min: 0, max: 100, step: 5 },
-  { key: "collisionAsteroid", label: "Náraz do asteroidu", group: "Zranění", min: 0, max: 100, step: 5 },
-  { key: "collisionEdge", label: "Náraz do okraje mapy", group: "Zranění", min: 0, max: 100, step: 5 },
-  { key: "dangerHullPercent", label: "Nebezpečný manévr – % trupu", group: "Zranění", min: 0, max: 50, step: 1 },
-  { key: "craterRadius", label: "Kráter v asteroidu – poloměr", group: "Zranění", min: 0, max: 150, step: 5 },
+  // --- loď ---
   { key: "hull", label: "Trup lodi", group: "Loď", min: 10, max: 1000, step: 10 },
-  { key: "shields", label: "Celolodní štít – zásoba", group: "Štíty", min: 0, max: 500, step: 10 },
-  { key: "shieldRecharge", label: "Celolodní štít – dobíjení za kolo", group: "Štíty", min: 0, max: 100, step: 5 },
-  { key: "wholeEffDrop", label: "Celolodní štít – pokles účinnosti za zásah %", group: "Štíty", min: 0, max: 50, step: 5 },
-  { key: "segmentHp", label: "Segment – výchozí životy", group: "Štíty", min: 0, max: 4, step: 1, hint: "projeví se u nových lodí" },
-  { key: "segmentMax", label: "Segment – max životů (úprava štítu)", group: "Štíty", min: 1, max: 6, step: 1 },
-  { key: "laserDice", label: "Laser – kostky útoku", group: "Loď", min: 0, max: 6, step: 1 },
   { key: "agility", label: "Obratnost (kostky obrany)", group: "Loď", min: 0, max: 6, step: 1 },
-  { key: "torpedoAmmo", label: "Torpéda na bitvu", group: "Loď", min: 0, max: 20, step: 1, hint: "projeví se u nových lodí" },
-  { key: "mineAmmo", label: "Miny na bitvu", group: "Loď", min: 0, max: 20, step: 1, hint: "projeví se u nových lodí" },
   { key: "vision", label: "Dohled (fog of war)", group: "Loď", min: 100, max: 4000, step: 50 },
-  { key: "laserRange", label: "Laser – dostřel", group: "Dosahy", min: 50, max: 1000, step: 10 },
-  { key: "laserArcDeg", label: "Laser – výseč ± °", group: "Dosahy", min: 5, max: 180, step: 5 },
-  { key: "torpedoLockRange", label: "Torpédo – zaměření lodi", group: "Dosahy", min: 50, max: 2000, step: 10 },
-  { key: "torpedoPointRange", label: "Torpédo – dolet na bod", group: "Dosahy", min: 100, max: 4000, step: 50 },
-  { key: "torpedoLife", label: "Torpédo – životnost (kola)", group: "Dosahy", min: 1, max: 20, step: 1 },
+  { key: "weightPerSpeed", label: "Váha na −1 max. rychlosti", group: "Loď", min: 1, max: 30, step: 1, hint: "součet váhy modulů / tato hodnota = o kolik klesne max. rychlost" },
+  { key: "collisionShip", label: "Náraz loď–loď", group: "Loď", min: 0, max: 100, step: 5 },
+  { key: "collisionAsteroid", label: "Náraz do asteroidu", group: "Loď", min: 0, max: 100, step: 5 },
+  { key: "collisionEdge", label: "Náraz do okraje mapy", group: "Loď", min: 0, max: 100, step: 5 },
+  { key: "craterRadius", label: "Kráter v asteroidu – poloměr", group: "Loď", min: 0, max: 150, step: 5 },
+  // --- akce a stres ---
+  { key: "actionPoints", label: "Akce na kolo", group: "Akce a stres", min: 1, max: 5, step: 1 },
+  { key: "stressMax", label: "Stresové body – max", group: "Akce a stres", min: 1, max: 10, step: 1 },
+  { key: "stressCostRed", label: "Červený manévr – cena", group: "Akce a stres", min: 0, max: 5, step: 1 },
+  { key: "stressCostDanger", label: "Nebezpečný manévr – cena", group: "Akce a stres", min: 0, max: 5, step: 1 },
+  { key: "dangerHullPercent", label: "Nebezpečný manévr – % trupu", group: "Akce a stres", min: 0, max: 50, step: 1 },
+  { key: "stressRegenGreen", label: "Zelený manévr – dobití", group: "Akce a stres", min: 0, max: 5, step: 1 },
+  { key: "koiogranSpeedDrop", label: "Otočka 180° – pokles rychlosti", group: "Akce a stres", min: 0, max: 4, step: 1 },
+  { key: "evadeStressCost", label: "Úhyb – cena (stres)", group: "Akce a stres", min: 0, max: 5, step: 1 },
+  { key: "evadePassStress", label: "Úhyb – stres lodi, kterou proletí", group: "Akce a stres", min: 0, max: 5, step: 1 },
+  { key: "evadeDamageReduction", label: "Úhyb – snížení zranění minou/torpédem %", group: "Akce a stres", min: 0, max: 100, step: 5 },
+  // --- lasery ---
+  { key: "laserDice", label: "Kostky útoku", group: "Lasery", min: 0, max: 6, step: 1 },
+  { key: "laserPerHit", label: "Zranění za zásah", group: "Lasery", min: 0, max: 100, step: 5 },
+  { key: "laserRange", label: "Dostřel", group: "Lasery", min: 50, max: 1000, step: 10 },
+  { key: "laserArcDeg", label: "Výseč ± °", group: "Lasery", min: 5, max: 180, step: 5 },
+  { key: "priceLaser", label: "Modul – cena", group: "Lasery", min: 0, max: 2000, step: 10 },
+  { key: "weightLaser", label: "Modul – váha", group: "Lasery", min: 0, max: 20, step: 0.5 },
+  // --- fázové torpédo ---
+  { key: "torpedoAmmo", label: "Torpéd na modul", group: "Fázové torpédo", min: 0, max: 20, step: 1, hint: "projeví se u nových lodí" },
+  { key: "torpedoDirect", label: "Přímý zásah", group: "Fázové torpédo", min: 0, max: 200, step: 5 },
+  { key: "torpedoBlast", label: "Plošný výbuch – zranění", group: "Fázové torpédo", min: 0, max: 200, step: 5 },
+  { key: "torpedoBlastRadius", label: "Plošný výbuch – poloměr", group: "Fázové torpédo", min: 10, max: 300, step: 10 },
+  { key: "torpedoLockRange", label: "Zaměření lodi – dosah", group: "Fázové torpédo", min: 50, max: 2000, step: 10 },
+  { key: "torpedoPointRange", label: "Dolet na bod", group: "Fázové torpédo", min: 100, max: 4000, step: 50 },
+  { key: "torpedoLife", label: "Životnost (kola)", group: "Fázové torpédo", min: 1, max: 20, step: 1 },
   { key: "torpedoLaunchDist", label: "Výlet – délka rovně z lodi", group: "Fázové torpédo", min: 0, max: 300, step: 10, hint: "1. fáze: letí rovně ve směru přídě" },
   { key: "torpedoLaunchSpeed", label: "Výlet – startovní rychlost / kolo", group: "Fázové torpédo", min: 20, max: 400, step: 10 },
   { key: "torpedoLockTurnDeg", label: "Zaměření – otáčení ° / kolo", group: "Fázové torpédo", min: 0, max: 360, step: 5, hint: "2. fáze: točí se na cíl startovní rychlostí" },
@@ -153,15 +195,30 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "torpedoSpeed", label: "Let – plná rychlost / kolo", group: "Fázové torpédo", min: 50, max: 800, step: 10 },
   { key: "torpedoTurnDeg", label: "Let – zatáčení ° / kolo", group: "Fázové torpédo", min: 0, max: 180, step: 5 },
   { key: "torpedoTrackArcDeg", label: "Let – výseč sledování ± °", group: "Fázové torpédo", min: 10, max: 180, step: 5, hint: "cíl mimo výseč = torpédo ho ztratí a letí rovně" },
-  { key: "actionPoints", label: "Akce na kolo", group: "Akce a stres", min: 1, max: 5, step: 1 },
-  { key: "stressMax", label: "Stresové body – max", group: "Akce a stres", min: 1, max: 10, step: 1 },
-  { key: "stressCostRed", label: "Červený manévr – cena", group: "Akce a stres", min: 0, max: 5, step: 1 },
-  { key: "stressCostDanger", label: "Nebezpečný manévr – cena", group: "Akce a stres", min: 0, max: 5, step: 1 },
-  { key: "stressRegenGreen", label: "Zelený manévr – dobití", group: "Akce a stres", min: 0, max: 5, step: 1 },
-  { key: "koiogranSpeedDrop", label: "Otočka – pokles rychlosti po otočce", group: "Akce a stres", min: 0, max: 4, step: 1 },
-  { key: "evadeStressCost", label: "Úhybný manévr – cena (stres)", group: "Akce a stres", min: 0, max: 3, step: 1 },
-  { key: "evadePassStress", label: "Úhyb – stres lodi, skrz kterou proletím", group: "Akce a stres", min: 0, max: 3, step: 1 },
-  { key: "evadeDamageReduction", label: "Úhyb – snížení zranění minou/torpédem %", group: "Akce a stres", min: 0, max: 100, step: 5 },
+  { key: "priceTorpedo", label: "Modul – cena", group: "Fázové torpédo", min: 0, max: 2000, step: 10 },
+  { key: "weightTorpedo", label: "Modul – váha (prázdný)", group: "Fázové torpédo", min: 0, max: 20, step: 0.5 },
+  { key: "weightPerTorpedo", label: "Váha jednoho torpéda", group: "Fázové torpédo", min: 0, max: 10, step: 0.5 },
+  // --- miny ---
+  { key: "mineAmmo", label: "Min na modul", group: "Miny", min: 0, max: 20, step: 1, hint: "projeví se u nových lodí" },
+  { key: "mineDamage", label: "Zranění", group: "Miny", min: 0, max: 200, step: 5 },
+  { key: "mineRadius", label: "Poloměr pole", group: "Miny", min: 10, max: 300, step: 10 },
+  { key: "priceMine", label: "Modul – cena", group: "Miny", min: 0, max: 2000, step: 10 },
+  { key: "weightMine", label: "Modul – váha (prázdný)", group: "Miny", min: 0, max: 20, step: 0.5 },
+  { key: "weightPerMine", label: "Váha jedné miny", group: "Miny", min: 0, max: 10, step: 0.5 },
+  // --- štíty ---
+  { key: "shields", label: "Celolodní – zásoba na modul", group: "Štíty", min: 0, max: 500, step: 10 },
+  { key: "shieldRecharge", label: "Celolodní – dobíjení za kolo", group: "Štíty", min: 0, max: 100, step: 5 },
+  { key: "wholeEffDrop", label: "Celolodní – pokles účinnosti za zásah %", group: "Štíty", min: 0, max: 50, step: 5 },
+  { key: "segmentHp", label: "Segmentový – životy segmentu na modul", group: "Štíty", min: 0, max: 4, step: 1, hint: "projeví se u nových lodí" },
+  { key: "segmentMax", label: "Segmentový – max životů (úprava štítu)", group: "Štíty", min: 1, max: 6, step: 1 },
+  { key: "priceShieldSegment", label: "Segmentový – cena", group: "Štíty", min: 0, max: 2000, step: 10 },
+  { key: "priceShieldWhole", label: "Celolodní – cena", group: "Štíty", min: 0, max: 2000, step: 10 },
+  { key: "weightShield", label: "Štít – váha modulu", group: "Štíty", min: 0, max: 20, step: 0.5 },
+  // --- ekonomika ---
+  { key: "startBudget", label: "Rozpočet na výbavu", group: "Ekonomika", min: 0, max: 5000, step: 50, hint: "co hráč neutratí, má jako kredity ve hře" },
+  { key: "creditsPerKill", label: "Odměna za sestřel", group: "Ekonomika", min: 0, max: 5000, step: 10 },
+  { key: "creditsPerTurn", label: "Odměna za přežité kolo", group: "Ekonomika", min: 0, max: 500, step: 5 },
+  { key: "debrisRewardPct", label: "Sestřelený vyhozený modul – % ceny", group: "Ekonomika", min: 0, max: 200, step: 10 },
 ];
 
 /** Ořeže neznámé/nesmyslné hodnoty podle TUNING_FIELDS. */
@@ -223,9 +280,25 @@ export function applyTuning(t: Tuning): void {
   LASER.band = t.laserRange / 3;
   VISION_REF.value = t.vision;
   HULLS.fighter.hull = t.hull;
-  MODULES["shield-mk1"].stats.shields = t.shields;
-  MODULES["laser-mk1"].stats.attack = t.laserDice;
-  MODULES["engine-mk1"].stats.agility = t.agility;
-  MODULES["torpedo-rack"].stats.torpedoes = t.torpedoAmmo;
-  MODULES["mine-layer"].stats.mines = t.mineAmmo;
+  HULLS.fighter.agility = t.agility;
+  LASER_DICE.value = t.laserDice;
+  MODULES["shield-whole"].shields = t.shields;
+  MODULES.torpedo.ammo = t.torpedoAmmo;
+  MODULES.mine.ammo = t.mineAmmo;
+  MODULES.laser.price = t.priceLaser;
+  MODULES.torpedo.price = t.priceTorpedo;
+  MODULES.mine.price = t.priceMine;
+  MODULES["shield-segment"].price = t.priceShieldSegment;
+  MODULES["shield-whole"].price = t.priceShieldWhole;
+  MODULES.laser.weight = t.weightLaser;
+  MODULES.torpedo.weight = t.weightTorpedo;
+  MODULES.torpedo.ammoWeight = t.weightPerTorpedo;
+  MODULES.mine.weight = t.weightMine;
+  MODULES.mine.ammoWeight = t.weightPerMine;
+  MODULES["shield-segment"].weight = t.weightShield;
+  MODULES["shield-whole"].weight = t.weightShield;
+  WEIGHT.perSpeed = t.weightPerSpeed;
+  RULES.creditsPerKill = t.creditsPerKill;
+  RULES.creditsPerTurn = t.creditsPerTurn;
+  RULES.debrisRewardPct = t.debrisRewardPct;
 }

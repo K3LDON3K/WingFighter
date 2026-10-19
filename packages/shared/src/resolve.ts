@@ -27,12 +27,13 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
+import { computeStats, MODULES, profileOf } from "./ships.ts";
 import type { Rng } from "./rng.ts";
-import { hullOf } from "./ships.ts";
 import { applyTuning } from "./tuning.ts";
 import type {
   ActionOrder,
   Asteroid,
+  Debris,
   GameResult,
   GameState,
   Maneuver,
@@ -82,7 +83,25 @@ export function hitSegment(ship: Pose, from: Vec): number {
  * Celolodní: pohltí `účinnost %` ze zásoby, zbytek do trupu, účinnost klesne.
  * Segmentový: segment se životy pohltí celý zásah a ztratí 1 život; bez životů jde vše do trupu.
  */
-function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec): void {
+/** Kontext pro připisování kreditů během vyhodnocení (nastavuje resolveTurn). */
+let creditCtx: { state: GameState; events: TurnEvent[] } | null = null;
+
+/** Připíše hráči kredity a zapíše událost. */
+export function awardCredits(state: GameState, events: TurnEvent[], playerId: string | undefined, delta: number, reason: "kill" | "survive" | "debris"): void {
+  if (!playerId || delta <= 0) return;
+  const p = state.players.find((x) => x.id === playerId);
+  if (!p) return;
+  p.credits = (p.credits ?? 0) + delta;
+  events.push({ type: "credits", playerId, delta, total: p.credits, reason });
+}
+
+/** Přepočítá statistiky a souhrn munice po změně modulů. */
+export function refreshShip(ship: Ship): void {
+  ship.stats = computeStats(ship.loadout);
+  ship.ammo = { torpedoes: ship.stats.torpedoes, mines: ship.stats.mines };
+}
+
+function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec, by?: string): void {
   if (amount <= 0 || !ship.alive) return;
   let absorbed = 0;
   let segment: number | undefined;
@@ -113,6 +132,7 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec
     ship.hull = 0;
     ship.alive = false;
     events.push({ type: "destroyed", shipId: ship.id, x: ship.x, y: ship.y });
+    if (creditCtx && by && by !== ship.ownerId) awardCredits(creditCtx.state, creditCtx.events, by, RULES.creditsPerKill, "kill");
   }
 }
 
@@ -142,7 +162,7 @@ export function canAfford(ship: Ship, man: Maneuver): boolean {
 
 /** Výchozí rozkaz (bez akcí): stejná rychlost rovně, nestřílí. */
 export function defaultOrders(ship: Ship): ShipOrders {
-  const profile = hullOf(ship.loadout).profile;
+  const profile = profileOf(ship.loadout);
   const candidates = [ship.speed, 2, ship.speed - 1, ship.speed + 1, 1, 3];
   for (const sp of candidates) {
     const man = makeManeuver(profile, sp, 0, false, ship.speed);
@@ -152,7 +172,7 @@ export function defaultOrders(ship: Ship): ShipOrders {
 }
 
 /** Rozpis akcí rozkazu (každá stojí 1 bod). */
-export type ActionId = "move" | "koiogran" | "laser" | "torpedo" | "mine" | "evade" | "shield";
+export type ActionId = "move" | "koiogran" | "laser" | "torpedo" | "mine" | "evade" | "shield" | "jettison";
 
 export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: string }[] {
   const out: { id: ActionId; label: string }[] = [];
@@ -163,6 +183,7 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
   }
   if (o.action?.type === "evade") out.push({ id: "evade", label: "úhybný manévr" });
   if (o.action?.type === "shield") out.push({ id: "shield", label: "úprava štítu" });
+  if (o.action?.type === "jettison") out.push({ id: "jettison", label: "vyhození modulu" });
   if (o.fire) out.push({ id: "laser", label: "lasery" });
   if (o.special?.type === "torpedo") out.push({ id: "torpedo", label: "torpédo" });
   if (o.special?.type === "mine") out.push({ id: "mine", label: "mina" });
@@ -174,6 +195,21 @@ export function actionCost(ship: Ship, o: ShipOrders): number {
 }
 
 /** Je cíl (loď nebo torpédo) nepřátelský a existující? */
+/** Torpédový modul s municí (zadaný, nebo první s municí). */
+export function torpedoModule(ship: Ship, moduleId?: string) {
+  const mods = ship.loadout.modules.filter((m) => m.type === "torpedo" && (m.ammo ?? 0) > 0);
+  return mods.find((m) => m.id === moduleId) ?? mods[0];
+}
+/** Minový modul s municí. */
+export function mineModule(ship: Ship) {
+  return ship.loadout.modules.find((m) => m.type === "mine" && (m.ammo ?? 0) > 0);
+}
+/** Laserový modul (zadaný, nebo první). */
+export function laserModule(ship: Ship, moduleId?: string) {
+  const mods = ship.loadout.modules.filter((m) => m.type === "laser");
+  return mods.find((m) => m.id === moduleId) ?? mods[0];
+}
+
 function enemyTarget(state: GameState, ship: Ship, id: string | undefined): Ship | Torpedo | undefined {
   if (!id) return undefined;
   const s = shipById(state, id);
@@ -198,22 +234,27 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       out.push(def);
       continue;
     }
-    const profile = hullOf(ship.loadout).profile;
+    const profile = profileOf(ship.loadout);
     let man = resolveManeuver(profile, raw.maneuverId, ship.speed);
     if (!man || !canAfford(ship, man)) man = resolveManeuver(profile, def.maneuverId, ship.speed)!;
 
     let action: ActionOrder | undefined;
     if (raw.action?.type === "evade") action = ship.stressPoints >= RULES.evadeStressCost ? { type: "evade" } : undefined;
     else if (raw.action?.type === "shield") action = validShieldAction(ship, raw.action.segments) ? { type: "shield", segments: raw.action.segments.map((n) => Math.round(Number(n))) as Segments } : undefined;
+    else if (raw.action?.type === "jettison") {
+      const wantedId = raw.action.moduleId;
+      action = ship.loadout.modules.some((m) => m.id === wantedId) ? { type: "jettison", moduleId: wantedId } : undefined;
+    }
     let special = raw.special;
     if (special?.type === "torpedo") {
-      if (ship.ammo.torpedoes <= 0) special = undefined;
+      const mod = torpedoModule(ship, special.moduleId);
+      if (!mod) special = undefined;
       else if (special.targetId) {
         const t = enemyTarget(state, ship, special.targetId);
-        special = t && dist(ship, t) <= TORPEDO.lockRange ? { type: "torpedo", targetId: t.id } : undefined;
+        special = t && dist(ship, t) <= TORPEDO.lockRange ? { type: "torpedo", targetId: t.id, moduleId: mod.id } : undefined;
       } else if (special.point && Number.isFinite(special.point.x) && Number.isFinite(special.point.y)) {
         const p = { x: clamp(special.point.x, 0, state.width), y: clamp(special.point.y, 0, state.height) };
-        special = dist(ship, p) <= TORPEDO.pointRange ? { type: "torpedo", point: p } : undefined;
+        special = dist(ship, p) <= TORPEDO.pointRange ? { type: "torpedo", point: p, moduleId: mod.id } : undefined;
       } else special = undefined;
     }
     if (special?.type === "mine") {
@@ -225,8 +266,9 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       }
     }
 
-    const preferredTargetId = enemyTarget(state, ship, raw.preferredTargetId)?.id;
-    const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, fire: !!raw.fire, preferredTargetId };
+    const preferredTargetId = enemyTarget(state, ship, raw.preferredTargetId)?.id ?? state.debris.find((d) => d.id === raw.preferredTargetId)?.id;
+    const laserMod = laserModule(ship, raw.laserModuleId);
+    const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, fire: !!raw.fire && !!laserMod, laserModuleId: laserMod?.id, preferredTargetId };
     // limit akcí: nejdřív padá zbraň, pak lasery, pak úhyb, nakonec manévr
     if (actionCost(ship, o) > RULES.actionPoints) o.special = undefined;
     if (actionCost(ship, o) > RULES.actionPoints) o.action = undefined;
@@ -297,8 +339,10 @@ interface Mover {
 export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng): TurnResult {
   if (input.tuning) applyTuning(input.tuning);
   const state: GameState = structuredClone(input);
+  if (!state.debris) state.debris = [];
   const events: TurnEvent[] = [];
   const turn = state.turn;
+  creditCtx = { state, events };
 
   const orders = new Map<string, ShipOrders>();
   for (const ship of state.ships) {
@@ -329,17 +373,61 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     ship.segments = [...o.action.segments] as Segments;
     events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
   }
+  // Vyhození modulu: hned na začátku kola; modul zůstane za lodí jako trosky.
+  for (const ship of state.ships) {
+    const o = orders.get(ship.id);
+    if (!ship.alive || o?.action?.type !== "jettison") continue;
+    const wanted = o.action.moduleId;
+    const idx = ship.loadout.modules.findIndex((m) => m.id === wanted);
+    if (idx < 0) continue;
+    const [mod] = ship.loadout.modules.splice(idx, 1);
+    refreshShip(ship);
+    if (ship.shieldType !== "none" && ship.stats.segmentModules === 0 && ship.stats.shields === 0) {
+      ship.shieldType = "none";
+      ship.segments = [0, 0, 0, 0];
+      ship.shields = 0;
+    } else if (ship.shieldType === "segment") {
+      const cap = RULES.segmentHp * ship.stats.segmentModules;
+      ship.segments = ship.segments.map((v) => Math.min(v, cap)) as Segments;
+    } else if (ship.shieldType === "whole") ship.shields = Math.min(ship.shields, ship.stats.shields);
+    const f = forward(ship.heading);
+    const back = ship.stats.radius + 14;
+    const debris: Debris = {
+      id: `debris-${turn}-${ship.id}-${mod.id}`,
+      type: mod.type,
+      x: clamp(ship.x - f.x * back, 0, state.width),
+      y: clamp(ship.y - f.y * back, 0, state.height),
+      team: ship.team,
+      value: Math.round((MODULES[mod.type].price * RULES.debrisRewardPct) / 100),
+    };
+    state.debris.push(debris);
+    events.push({ type: "jettison", shipId: ship.id, debris });
+    events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
+  }
   const scaleEvade = (ship: Ship, dmg: number) => (evading.has(ship.id) ? Math.round(dmg * (1 - RULES.evadeDamageReduction / 100)) : dmg);
   const passedThrough = new Set<string>(); // "evader:enemy"
 
   /* ---------- 1. Lasery (všichni současně, ze startovních pozic, před pohybem) ---------- */
-  const pending = new Map<string, { dmg: number; from: Vec }>();
+  const pending = new Map<string, { dmg: number; from: Vec; by: string }>();
   const shotTorpedoes = new Set<string>();
+  const shotDebris = new Set<string>();
   for (const ship of state.ships) {
     if (!ship.alive) continue;
     const o = orders.get(ship.id)!;
     if (!o.fire || ship.stats.attack <= 0) continue;
 
+    const deb = state.debris.find((d) => d.id === o.preferredTargetId);
+    if (deb && !shotDebris.has(deb.id)) {
+      if (dist(ship, deb) <= LASER.range && inArc(ship, deb, LASER.halfArc) && !lineBlocked(state.asteroids, ship, deb)) {
+        const rangeBand = clamp(Math.ceil(dist(ship, deb) / LASER.band), 1, 3);
+        const outcome = resolveAttack(rng, { attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0), defenseDice: rangeBand === 3 ? 1 : 0, attackerFocus: ship.tokens.focus > 0, attackerLock: false, defenderFocus: false, defenderEvade: false });
+        const destroyed = outcome.damage > 0;
+        if (destroyed) shotDebris.add(deb.id);
+        events.push({ type: "debrisShot", debrisId: deb.id, shooterId: ship.id, x: deb.x, y: deb.y, destroyed, reward: destroyed ? deb.value : 0 });
+        if (destroyed) awardCredits(state, events, ship.ownerId, deb.value, "debris");
+      }
+      continue;
+    }
     const torp = torpedoById(state, o.preferredTargetId);
     if (torp && torp.team !== ship.team) {
       if (dist(ship, torp) <= LASER.range && inArc(ship, torp, LASER.halfArc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, ship, torp)) {
@@ -393,10 +481,11 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       rangeBand,
     });
     const prev = pending.get(target.id);
-    pending.set(target.id, { dmg: (prev?.dmg ?? 0) + damage, from: prev?.from ?? { x: ship.x, y: ship.y } });
+    pending.set(target.id, { dmg: (prev?.dmg ?? 0) + damage, from: prev?.from ?? { x: ship.x, y: ship.y }, by: prev?.by ?? ship.ownerId });
   }
-  for (const [id, { dmg, from }] of pending) applyDamage(shipById(state, id)!, dmg, events, from);
+  for (const [id, { dmg, from, by }] of pending) applyDamage(shipById(state, id)!, dmg, events, from, by);
   state.torpedoes = state.torpedoes.filter((t) => !shotTorpedoes.has(t.id));
+  state.debris = state.debris.filter((d) => !shotDebris.has(d.id));
 
 
   /* ---------- 2. Pohyb (lodě i torpéda současně) ---------- */
@@ -406,7 +495,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   for (const ship of state.ships) {
     if (!ship.alive) continue;
     const o = orders.get(ship.id)!;
-    const profile = hullOf(ship.loadout).profile;
+    const profile = profileOf(ship.loadout);
     let man = resolveManeuver(profile, o.maneuverId, ship.speed);
     if (!man || !canAfford(ship, man)) man = resolveManeuver(profile, defaultOrders(ship).maneuverId, ship.speed)!;
     maneuverOf.set(ship.id, man);
@@ -425,11 +514,14 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   const spawnEvents: TurnEvent[] = [];
   for (const ship of state.ships) {
     const o = orders.get(ship.id);
-    if (!ship.alive || o?.special?.type !== "torpedo" || ship.ammo.torpedoes <= 0) continue;
+    if (!ship.alive || o?.special?.type !== "torpedo") continue;
+    const tmod = torpedoModule(ship, o.special.moduleId);
+    if (!tmod) continue;
     const target = enemyTarget(state, ship, o.special.targetId);
     const point = o.special.point;
     if (!target && !point) continue;
-    ship.ammo.torpedoes--;
+    tmod.ammo = (tmod.ammo ?? 1) - 1;
+    refreshShip(ship);
     const f = forward(ship.heading);
     const off = ship.stats.radius + TORPEDO.radius + 2;
     const torpedo: Torpedo = {
@@ -454,8 +546,11 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   // Miny se odhazují ze startovní pozice hned na začátku kola (aktivní až od příštího kola).
   for (const ship of state.ships) {
     const o = orders.get(ship.id);
-    if (!ship.alive || o?.special?.type !== "mine" || ship.ammo.mines <= 0) continue;
-    ship.ammo.mines--;
+    if (!ship.alive || o?.special?.type !== "mine") continue;
+    const mmod = mineModule(ship);
+    if (!mmod) continue;
+    mmod.ammo = (mmod.ammo ?? 1) - 1;
+    refreshShip(ship);
     const sp = startPose.get(ship.id)!;
     const pos = mineDropPosition(sp, o.special.side);
     const mine: Mine = { id: newId("mine"), ownerId: ship.ownerId, team: ship.team, x: pos.x, y: pos.y, radius: MINE.radius, armed: false, timer: o.special.timer };
@@ -542,10 +637,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
     return hits;
   };
-  const applyHits = (hits: { shipId: string; damage: number }[], k: number, from: Vec) => {
+  const applyHits = (hits: { shipId: string; damage: number }[], k: number, from: Vec, by?: string) => {
     for (const hhit of hits) {
       const s = shipById(state, hhit.shipId)!;
-      applyDamage(s, hhit.damage, events, from);
+      applyDamage(s, hhit.damage, events, from, by);
       if (!s.alive) shipMovers.get(s.id)!.frozenAt = k;
     }
   };
@@ -554,7 +649,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     removedMines.add(mine.id);
     const hits = explode(mine, mine.radius, MINE.damage, k);
     events.push({ type: "mineBlast", mineId: mine.id, x: mine.x, y: mine.y, t: k / MOVE_STEPS, hits });
-    applyHits(hits, k, mine);
+    applyHits(hits, k, mine, mine.ownerId);
   };
 
   /** Konec torpéda: přímý zásah lodi (bez plošného výbuchu) nebo výbuch (na bodě / o asteroid / vypršení). */
@@ -575,10 +670,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     });
     if (opts.shipId) {
       const s = shipById(state, opts.shipId)!;
-      applyDamage(s, scaleEvade(s, TORPEDO.damage), events, p);
+      applyDamage(s, scaleEvade(s, TORPEDO.damage), events, p, t.ownerId);
       if (!s.alive) shipMovers.get(s.id)!.frozenAt = k;
     }
-    if (opts.blast) applyHits(explode(p, TORPEDO.blastRadius, TORPEDO.blastDamage, k), k, p);
+    if (opts.blast) applyHits(explode(p, TORPEDO.blastRadius, TORPEDO.blastDamage, k), k, p, t.ownerId);
   };
 
   // --- Miny na začátku kola: časované s odpočtem na nule a miny s nepřítelem v poli vybuchnou hned ---
@@ -852,6 +947,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     ship.tokens.evade = 0;
     if (ship.lockTargetId && !shipById(state, ship.lockTargetId)?.alive) ship.lockTargetId = undefined;
   }
+  for (const p of state.players) if (state.ships.some((s) => s.alive && s.ownerId === p.id)) awardCredits(state, events, p.id, RULES.creditsPerTurn, "survive");
+  creditCtx = null;
   state.turn = turn + 1;
 
   const result = checkVictory(state);

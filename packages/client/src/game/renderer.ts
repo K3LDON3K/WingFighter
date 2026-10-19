@@ -12,12 +12,13 @@ import {
   type Maneuver,
   type Pose,
   RULES,
+  MODULES,
 } from "@spacegame/shared";
 import type { Camera } from "./camera.ts";
 import { segmentColor, strengthColor } from "./shield-ui.ts";
 import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
-import type { ViewModel, ViewShip } from "./view.ts";
+import type { ViewDebris, ViewModel, ViewShip } from "./view.ts";
 
 export interface IconSpot {
   id: string;
@@ -87,6 +88,7 @@ export class Renderer {
     this.drawGrid(state);
     for (const a of view.asteroids) this.drawAsteroid(a);
     for (const m of view.mines) this.drawMine(m, now);
+    for (const d of view.debris) this.drawDebris(d, overlay, now);
 
     const sel = overlay.selectedShipId ? view.ships.find((x) => x.id === overlay.selectedShipId) : undefined;
     if (sel && overlay.rangeCircle2) this.drawRange(sel, overlay.rangeCircle2.radius, "rgba(251,191,36,0.35)", "");
@@ -288,6 +290,38 @@ export class Renderer {
     ctx.arc(p.x, p.y, TORPEDO.blastRadius, 0, Math.PI * 2);
     ctx.globalAlpha = alpha * 0.5;
     ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Vyhozený modul: pomalu rotující šedý blok s ikonou; jde zaměřit lasery. */
+  private drawDebris(d: ViewDebris, overlay: Overlay, now: number) {
+    const ctx = this.ctx;
+    const targeted = overlay.targetId === d.id;
+    const hovered = overlay.hoverId === d.id;
+    ctx.save();
+    ctx.translate(d.x, d.y);
+    ctx.rotate(now / 2500 + d.x);
+    ctx.fillStyle = "#475569";
+    ctx.fillRect(-7, -7, 14, 14);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(-5, -5, 10, 10);
+    ctx.fillStyle = TEAM_COLORS[d.team];
+    ctx.fillRect(-2, -2, 4, 4);
+    ctx.restore();
+    if (targeted || hovered) {
+      ctx.save();
+      ctx.strokeStyle = targeted ? "#fbbf24" : "rgba(248,250,252,0.6)";
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, 14, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.font = "7px PS2P, ui-monospace, Menlo, monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillText(`${MODULES[d.type]?.short ?? "?"} +${d.value}`, d.x, d.y + 22);
     ctx.restore();
   }
 

@@ -1,4 +1,4 @@
-import { MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@spacegame/shared";
+import { MODULES, MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@spacegame/shared";
 import { mineToView, shipToView, torpedoToView, viewFromState, type ViewModel } from "./view.ts";
 
 const MOVE_DURATION = 2200;
@@ -77,6 +77,15 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "evadePass":
         lines.push(`  ${name(e.shipId)} proletěl skrz ${name(e.victimId)}.`);
         break;
+      case "jettison":
+        lines.push(`${name(e.shipId)} vyhodil modul ${MODULES[e.debris.type]?.name ?? e.debris.type} (sestřelení = +${e.debris.value} kreditů).`);
+        break;
+      case "debrisShot":
+        lines.push(e.destroyed ? `  ${name(e.shooterId)} sestřelil vyhozený modul: +${e.reward} kreditů.` : `  ${name(e.shooterId)} minul vyhozený modul.`);
+        break;
+      case "credits":
+        if (e.reason === "kill") lines.push(`  ${owner(e.playerId)}: +${e.delta} kreditů za sestřel (celkem ${e.total}).`);
+        break;
       case "action":
         if (!e.ok) lines.push(`${name(e.shipId)}: akce se nepovedla.`);
         else if (e.action.type === "evade") lines.push(`${name(e.shipId)} provádí úhybný manévr.`);
@@ -151,6 +160,22 @@ export class TurnAnimation {
           break;
         case "evadePass":
           time = moveStart + e.t * MOVE_DURATION;
+          break;
+        case "jettison":
+          time = 0;
+          break;
+        case "debrisShot":
+          if (!movePassed) {
+            time = preCount * LASER_GAP;
+            preCount++;
+          } else {
+            time = lasersStart + laserCount * LASER_GAP;
+            laserCount++;
+            laserTime = time;
+          }
+          break;
+        case "credits":
+          time = e.reason === "survive" ? moveStart + MOVE_DURATION + 300 : lastTime + 80;
           break;
         case "action":
           time = movePassed ? actionTime : 0;
@@ -249,6 +274,30 @@ export class TurnAnimation {
       case "collision": {
         const s = v.ships.find((x) => x.id === e.shipId);
         if (s) v.effects.push({ kind: "ring", x: s.x, y: s.y, radius: 30, color: "#f8fafc", start: now, duration: 500 });
+        break;
+      }
+      case "jettison": {
+        const sh = v.ships.find((x) => x.id === e.shipId);
+        v.debris.push({ ...e.debris });
+        if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: `VYHOZEN ${MODULES[e.debris.type]?.short ?? ""}`, color: "#94a3b8", start: now, duration: 1000 });
+        break;
+      }
+      case "debrisShot": {
+        const shooter = v.ships.find((x) => x.id === e.shooterId);
+        const color = shooter ? TEAM_COLORS[shooter.team] : "#fff";
+        if (shooter) v.effects.push({ kind: "laser", from: { x: shooter.x, y: shooter.y, heading: shooter.heading }, to: { x: e.x, y: e.y, heading: 0 }, color, start: now, duration: 420, hit: e.destroyed });
+        if (e.destroyed) {
+          v.debris = v.debris.filter((d) => d.id !== e.debrisId);
+          v.effects.push({ kind: "explosion", x: e.x, y: e.y, size: 20, start: now + 200, duration: 600, color: "#94a3b8" });
+          v.effects.push({ kind: "text", x: e.x, y: e.y, text: `+${e.reward} CR`, color: "#fbbf24", start: now + 250, duration: 1000 });
+        }
+        break;
+      }
+      case "credits": {
+        if (e.reason === "kill") {
+          const sh = v.ships.find((x) => x.alive && this.result.state.ships.find((q) => q.id === x.id)?.ownerId === e.playerId);
+          if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: `+${e.delta} CR`, color: "#fbbf24", start: now, duration: 1100 });
+        }
         break;
       }
       case "evadePass": {
