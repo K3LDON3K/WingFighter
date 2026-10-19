@@ -14,6 +14,15 @@ export interface ActionOption {
   apply(o: ShipOrders, ship: Ship, state: GameState): Partial<ShipOrders>;
   /** Po výběru čeká na kliknutí na cíl na mapě. */
   pick?: "torpedo";
+  /** Akce je k dispozici jen s tímto modulem na lodi (jinak se tlačítko vůbec nezobrazí). */
+  requiresModule?: import("@spacegame/shared").ModuleType;
+}
+
+/** Je akce pro loď vůbec k dispozici (má potřebný modul)? */
+export function actionAvailable(a: ActionOption, ship: Ship): boolean {
+  if (a.id === "shield") return ship.loadout.modules.some((m) => m.type === "shield-segment");
+  if (a.id === "jettison") return ship.loadout.modules.length > 0;
+  return !a.requiresModule || ship.loadout.modules.some((m) => m.type === a.requiresModule);
 }
 
 const noAp = (ship: Ship, o: ShipOrders, active: boolean) => (!active && actionCost(ship, o) >= RULES.actionPoints ? `žádná volná akce (max. ${RULES.actionPoints} za kolo)` : null);
@@ -27,6 +36,7 @@ export const ACTIONS: ActionOption[] = [
     disabled: (ship, _s, o) => (ship.loadout.modules.some((m) => m.type === "laser") ? noAp(ship, o, !!o.fire) : "loď nemá laserový modul"),
     active: (o) => !!o.fire,
     apply: (o, ship) => ({ fire: !o.fire, laserModuleId: o.fire ? undefined : ship.loadout.modules.find((m) => m.type === "laser")?.id }),
+    requiresModule: "laser",
   },
   {
     id: "torpedo",
@@ -37,6 +47,7 @@ export const ACTIONS: ActionOption[] = [
     active: (o) => o.special?.type === "torpedo",
     apply: (o, ship) => ({ special: o.special?.type === "torpedo" ? undefined : { type: "torpedo", moduleId: ship.loadout.modules.find((m) => m.type === "torpedo" && (m.ammo ?? 0) > 0)?.id } }),
     pick: "torpedo",
+    requiresModule: "torpedo",
   },
   {
     id: "mine",
@@ -46,6 +57,7 @@ export const ACTIONS: ActionOption[] = [
     disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mine") ? "loď nemá minový zásobník" : ship.ammo.mines > 0 ? noAp(ship, o, o.special?.type === "mine") : "došly miny"),
     active: (o) => o.special?.type === "mine",
     apply: (o) => ({ special: o.special?.type === "mine" ? undefined : { type: "mine", side: "behind" } }),
+    requiresModule: "mine",
   },
   {
     id: "evade",

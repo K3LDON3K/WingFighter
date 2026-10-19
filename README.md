@@ -127,6 +127,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.1.1 – tlačítka akcí jen pro moduly, které loď skutečně má (bez torpédometu žádné TORPÉDO, po vyhození min
+  zmizí MINA, bez segmentového štítu není ŠTÍT; skupina bez akcí se neukáže). Získaný modul tlačítko zase přidá.
 - v2.1 – vyhození modulu přes inventář (akce VYHODIT otevře inventář, klik na modul, POTVRDIT); podobizna pilota
   ve svislém sloupci vedle SPUSTIT KOLO s pixelovou bublinou schopností; inventář bez řádku loď/pilot; ladicí menu se záložkami podle
   kategorií a bez ztráty rozepsané hodnoty při překreslení (políčko už nepřepisuje, co právě píšeš).

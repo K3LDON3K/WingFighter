@@ -19,7 +19,7 @@ import {
 } from "@spacegame/shared";
 import { clear, h } from "../dom.ts";
 import { icon, label, segBar } from "../icons.ts";
-import { ACTIONS } from "./actions.ts";
+import { ACTIONS, actionAvailable } from "./actions.ts";
 import { SEGMENT_NAMES, shieldBubble, strengthColor } from "./shield-ui.ts";
 import { pilotBadge } from "../pilot-ui.ts";
 
@@ -202,10 +202,11 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   for (let i = 0; i < RULES.actionPoints; i++) apips.append(h("i", { class: i < acts.length ? "on" : "" }));
   const buttons = h("div", { class: "bb-weapons" });
   for (const grp of ACTION_GROUPS) {
+    const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
+    if (avail.length === 0) continue; // skupina bez dostupných akcí (např. žádné zbraně) se neukazuje
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
-    for (const id of grp.ids) {
-      const a = ACTIONS.find((x) => x.id === id)!;
+    for (const a of avail) {
       const active = a.active(o);
       const why = a.disabled(ship, m.state, o);
       row.append(
