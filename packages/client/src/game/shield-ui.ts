@@ -65,13 +65,14 @@ function text(x: number, y: number, str: string, color: string, size = 8) {
  * Segmentový: čtyři výseče, vrstvy = body; `planned` = plánované rozložení (úprava štítu):
  * odebrané body se kreslí jako oranžové duté vrstvy.
  */
-export function shieldBubble(ship: BubbleShip, teamColor: string, planned?: Segments, size = 118): SVGSVGElement {
+export function shieldBubble(ship: BubbleShip, teamColor: string, planned?: Segments, size = 118, storm = false): SVGSVGElement {
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("viewBox", "0 0 118 118");
   svg.setAttribute("width", String(size));
   svg.setAttribute("height", String(size));
   svg.setAttribute("shape-rendering", "crispEdges");
   svg.classList.add("bubble");
+  if (storm) svg.classList.add("storm");
   const cx = 59;
   const cy = 59;
   const D = Math.PI / 180;
@@ -124,5 +125,14 @@ export function shieldBubble(ship: BubbleShip, teamColor: string, planned?: Segm
     }),
   );
   svg.append(g);
+  if (storm) {
+    // tečky zešednou a problikávají fialově (CSS animace), přes bublinu nápis
+    svg.querySelectorAll("rect").forEach((r, i) => {
+      if (r.parentNode === g) return;
+      r.classList.add("sd", `sd${i % 5}`);
+    });
+    svg.append(rect(12, 50, 94, 18, "rgba(5,7,15,0.85)", "#a855f7"));
+    svg.append(text(cx, 62, "ŠTÍT VYPNUT ⚡", "#e879f9", 6));
+  }
   return svg;
 }

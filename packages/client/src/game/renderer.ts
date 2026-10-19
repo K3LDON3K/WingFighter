@@ -345,6 +345,19 @@ export class Renderer {
   /** Štít na mapě: celolodní = kruh obarvený podle síly; segmentový = 4 oblouky otáčející se s lodí. */
   private drawShield(s: ViewShip, now: number) {
     const ctx = this.ctx;
+    if (this.stormsRef && pointInStorm(this.stormsRef, s)) {
+      // v bouři štít nefunguje: jen slabý fialový tečkovaný obrys tam, kde býval
+      if (s.shieldType === "none") return;
+      ctx.save();
+      ctx.strokeStyle = "rgba(168,85,247,0.45)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([2, 6]);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.radius + 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     if (s.shieldType === "whole") {
       if (s.shields <= 0) return;
       const frac = s.shields / Math.max(1, s.maxShields);
@@ -462,7 +475,7 @@ export class Renderer {
     ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
     const segTotal = s.segments[0] + s.segments[1] + s.segments[2] + s.segments[3];
     const sw = s.shieldType === "segment" ? (bw * Math.min(1, segTotal / (4 * RULES.segmentHp))) : s.maxShields > 0 ? (bw * s.shields) / s.maxShields : 0;
-    ctx.fillStyle = "#60a5fa";
+    ctx.fillStyle = this.stormsRef && pointInStorm(this.stormsRef, s) ? "rgba(96,165,250,0.3)" : "#60a5fa";
     ctx.fillRect(bx, by, sw, 2);
     const hw = (bw * s.hull) / Math.max(1, s.maxHull);
     ctx.fillStyle = s.hull <= s.maxHull * 0.3 ? "#ef4444" : "#22c55e";

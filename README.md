@@ -142,6 +142,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.2 – loď v bouři: štít na mapě zmizí (jen fialový tečkovaný obrys), bublina štítu v panelu zešedne a probliká
+  fialově s nápisem „ŠTÍT VYPNUT ⚡“, řádek štítu přeškrtnutý; tlačítka LASERY, ŠTÍT a SKENER fialově šrafovaná
+  s bleskem a vypnutá; pod akcemi shrnutí, co v bouři nefunguje.
 - v3.1.2 – oprava: místnost při každé změně (start, výbava, ladění) skákala nahoru – posun stránky se zachová.
 - v3.1.1 – nákupní seznam modulů také jako hexagony s ikonou, názvem, cenou a počtem (barva kategorie).
 - v3.1 – editor výbavy: **hexagonové moduly** v plástvi na větší lodi, plné názvy, barva podle kategorie (zbraně

@@ -133,7 +133,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   const inHand = shieldInHand(ship, o);
   const editing = !!m.shieldEdit && !!planned && !locked;
   const teamColor = TEAM_COLORS[ship.team];
-  const bubble = h("div", { class: `bubble-box ${editing ? "editing" : ""}`, title: ship.shieldType === "whole" ? `Celolodní štít: zásoba ${ship.shields}/${ship.stats.shields}, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Každý zásah ubere 1 bod a je pohlcen celý; při 0 jde zranění do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned));
+  const stormed = inStorm(m.state, ship);
+  const bubble = h("div", { class: `bubble-box ${editing ? "editing" : ""}`, title: ship.shieldType === "whole" ? `Celolodní štít: zásoba ${ship.shields}/${ship.stats.shields}, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Každý zásah ubere 1 bod a je pohlcen celý; při 0 jde zranění do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, 118, stormed));
   if (planned && !editing) bubble.append(h("span", { class: "bubble-tag" }, label("plán")));
   const right = h("div", { class: "bb-shipinfo" });
   if (editing && planned) {
@@ -160,7 +161,9 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     );
   } else {
     const shieldRow =
-      ship.shieldType === "whole"
+      stormed && ship.shieldType !== "none"
+        ? h("div", { class: "bb-row dim" }, icon("shield", "#64748b"), h("s", { class: "num" }, ship.shieldType === "whole" ? `${Math.round((100 * ship.shields) / Math.max(1, ship.stats.shields))} %` : ship.segments.join("·")), h("span", { class: "pv" }, label("vypnuto")))
+        : ship.shieldType === "whole"
         ? h("div", { class: "bb-row" }, icon("shield", strengthColor(ship.shields / Math.max(1, ship.stats.shields))), h("span", { class: "num" }, `${Math.round((100 * ship.shields) / Math.max(1, ship.stats.shields))} %`), h("span", { class: "muted", title: "Účinnost: kolik % zranění štít pohltí (po každém zásahu −" + RULES.wholeEffDrop + " %)" }, label(`· úč. ${ship.shieldEff} %`)))
         : h("div", { class: "bb-row", title: "Štít: předek / pravobok / záď / levobok" }, icon("shield", "#60a5fa"), h("span", { class: "num" }, ship.segments.join("·")), planned ? h("span", { style: "color:#fb923c" }, label("→ " + planned.join("·"))) : null);
     right.append(
@@ -223,18 +226,20 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
       const active = a.active(o);
-      const why = a.disabled(ship, m.state, o);
+      const stormOff = stormed && (a.id === "laser" || a.id === "shield");
+      const why = stormOff ? "systém je v bouři mimo provoz" : a.disabled(ship, m.state, o);
       row.append(
         h(
           "button",
           {
-            class: `px bb-weapon ${active ? "on" : ""}`,
-            disabled: locked || (!!why && !active),
+            class: `px bb-weapon ${active && !stormOff ? "on" : ""} ${stormOff ? "stormed" : ""}`,
+            disabled: locked || stormOff || (!!why && !active),
             title: `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`,
             onclick: () => cb.chooseAction(ship.id, a.id),
           },
           icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
           h("span", { class: "lbl" }, label(a.label.replace(/ \(1 akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit"))),
+          stormOff ? h("span", { class: "sb" }, "⚡") : null,
         ),
       );
     }
@@ -250,17 +255,18 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           h(
             "button",
             {
-              class: `px bb-weapon scan-btn ${m.scanOpen ? "on" : ""} ${cd > 0 ? "cool" : ""}`,
-              disabled: locked,
+              class: `px bb-weapon scan-btn ${m.scanOpen && !stormed ? "on" : ""} ${cd > 0 ? "cool" : ""} ${stormed ? "stormed" : ""}`,
+              disabled: locked || stormed,
               title: `${MODULES.scanner.name}\n${MODULES.scanner.description}\n${cd > 0 ? `Cooldown: ${cd} kol (pak plné náboje).` : `Náboje: ${charges}/${SCANNER.charges}.`}`,
               onclick: () => cb.scanToggle(ship.id),
             },
             icon("scan", "currentColor", 22),
             h("span", { class: "lbl" }, label("Skener")),
             pips,
+            stormed ? h("span", { class: "sb" }, "⚡") : null,
           ),
         );
-        if (m.scanOpen && cd === 0) {
+        if (m.scanOpen && cd === 0 && !stormed) {
           const forceLen = Math.max(1, SCANNER.cooldown - charges);
           row.append(
             h(
@@ -358,6 +364,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       );
     } else if (o.preferredTargetId && !debrisTarget) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
     details.append(h("span", { class: "muted" }, label("· klik na nepřítele = cíl")));
+  } else if (stormed) {
+    details.append(h("span", { class: "pv" }, label("⚡ v bouři: lasery, štít a skener dočasně mimo provoz · torpéda letí rovně")));
   } else {
     details.append(h("span", { class: "muted" }, "—"));
   }

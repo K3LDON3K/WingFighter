@@ -1525,3 +1525,57 @@ button.px.tiny {
 .lo-shop {
   gap: 2px 4px;
 }
+
+/* ---- bouře v UI ---- */
+.bb-weapon.stormed {
+  background: repeating-linear-gradient(135deg, #3b1a5c 0 6px, #2a1240 6px 12px);
+  border-color: #a855f7 #3b0764 #3b0764 #a855f7;
+  color: #d8b4fe;
+  opacity: 1;
+}
+.bb-weapon .sb {
+  position: absolute;
+  right: 3px;
+  top: 2px;
+  font-size: 9px;
+  color: #fde047;
+  text-shadow: 1px 1px #000;
+}
+.bb-weapon {
+  position: relative;
+}
+.pv {
+  color: #e879f9;
+}
+.bb-row.dim {
+  color: #64748b;
+}
+.bubble.storm rect.sd {
+  fill: #334155;
+  animation: shortflick 1.6s steps(2, end) infinite;
+}
+.bubble.storm rect.sd1 {
+  animation-delay: 0.3s;
+}
+.bubble.storm rect.sd2 {
+  animation-delay: 0.7s;
+}
+.bubble.storm rect.sd3 {
+  animation-delay: 1.1s;
+}
+.bubble.storm rect.sd4 {
+  animation-delay: 0.5s;
+  animation-duration: 2.3s;
+}
+@keyframes shortflick {
+  0%,
+  70% {
+    fill: #334155;
+  }
+  85% {
+    fill: #7e22ce;
+  }
+  100% {
+    fill: #334155;
+  }
+}
