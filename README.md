@@ -21,7 +21,8 @@ Stejný příkaz funguje jako **dedikovaný server** na jakémkoli stroji s Node
 - Každé kolo **všichni tajně naplánují** manévr (rychlost + směr), akci po pohybu *nebo* speciální zbraň
   a cíl laserů. Po „Připraven“ od všech se kolo **vyhodnotí najednou** a přehraje.
 - Pořadí vyhodnocení: **lasery** (všichni naráz, ze startovních pozic) → start torpéd a odhození min →
-  výbuch min (nepřítel v poli / odpočet) → pohyb lodí a torpéd (srážky, vlet do min) → dobití štítů.
+  výbuch min (nepřítel v poli / odpočet) → pohyb lodí a torpéd (srážky, vlet do min). Úprava štítu
+  a úhybný manévr platí od úplného začátku kola (ještě před lasery).
 
 ### Manévry
 Manévr = **rychlost 1–5** + **změna kurzu** (po 15°, max ±90°; čím rychleji, tím menší povolený úhel)
@@ -52,8 +53,17 @@ Každá loď vidí do vzdálenosti **960** (3 × zaměřovací dostřel torpéda
 posílá jen to, co jeho tým vidí (lodě, torpéda, miny). Asteroid, který tým jednou spatřil, zůstává v jeho
 paměti v podobě, v jaké ho naposledy viděl – poškození mimo dohled se neprojeví, dokud ho zase neuvidí.
 
-### Životy
-Trup 100, štíty 50 (dobíjejí se 10 za kolo). Jeden čistý zásah laseru = 15.
+### Životy a štíty
+Trup 100. Jeden čistý zásah laseru = 15. Štít si každý hráč volí v místnosti (později půjde o moduly v inventáři):
+- **Segmentový** (výchozí) – čtyři segmenty (předek, pravobok, záď, levobok) po **2 bodech**. Každý zásah
+  (salva laserů, torpédo, výbuch, náraz) trefí segment podle směru, odkud přišel, ubere **1 bod** a je pohlcen
+  celý; segment na nule už nechrání a zranění jde do trupu. Akce **Úprava štítu** (1 akce) body přesune
+  (stejný součet, max. 3 na segment) – v panelu lodi –/+ u segmentů, odebrané body „v ruce“ je nutné rozmístit.
+- **Celolodní** – zásoba 50 kolem celé lodi; pohltí **účinnost %** zranění (začíná na 100 %), zbytek jde do
+  trupu, po každém zásahu účinnost klesne o 10 %.
+Štíty se zatím nedobíjejí (dobíjení přinesou moduly). V liště je loď s pixelovou bublinou štítu (barva podle
+síly: modrá / žlutá / červená) a tlačítka CENTROVAT (mapa na loď) a INVENTÁŘ (zatím ukázka). Na mapě má
+celolodní štít kruh obarvený podle síly, segmentový čtyři oblouky otáčející se s lodí.
 
 ### Zbraně
 - **Lasery** (1 akce) – střílí **na začátku kola ze startovní pozice**, výseč ±20° před přídí, dostřel 300
@@ -99,6 +109,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.13 – štíty: segmentový (4 × 2 body, zásah podle směru, akce Úprava štítu) nebo celolodní (zásoba + účinnost
+  klesající o 10 % za zásah), volba v místnosti; panel lodi s pixelovou bublinou štítu, CENTROVAT a INVENTÁŘ;
+  štíty na mapě; kývání lodi při úhybném manévru.
 - v1.12 – otočka snižuje rychlost o 2; nová akce úhybný manévr; oprava psaní do polí (ladění, kód místnosti).
 - v1.11.1 – ukládání parametrů na server (tuning.json), načtení uložených, oznámení ve hře.
 - v1.11 – lasery střílí na začátku kola ze startovní pozice (výseč se kreslí u lodi), animace: salvy → pohyb.

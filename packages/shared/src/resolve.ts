@@ -39,6 +39,7 @@ import type {
   Mine,
   MineSide,
   MovePath,
+  Segments,
   Ship,
   ShipOrders,
   Torpedo,
@@ -67,13 +68,47 @@ function hitsAsteroid(state: GameState, p: Vec, r: number): Asteroid | undefined
   return undefined;
 }
 
-/** Odečte zranění (štíty první). Vrací událost zranění + případně zničení. */
-function applyDamage(ship: Ship, amount: number, events: TurnEvent[]): void {
+/** Který segment štítu zásah trefí: podle směru, odkud přišel (0 předek, 1 pravobok, 2 záď, 3 levobok). */
+export function hitSegment(ship: Pose, from: Vec): number {
+  const rel = normalizeAngle(Math.atan2(from.y - ship.y, from.x - ship.x) - ship.heading);
+  const a = Math.abs(rel);
+  if (a <= Math.PI / 4) return 0;
+  if (a >= (3 * Math.PI) / 4) return 2;
+  return rel > 0 ? 1 : 3;
+}
+
+/**
+ * Odečte zranění přes štít. `from` = odkud zásah přišel (undefined = vnitřní, např. nebezpečný manévr → rovnou trup).
+ * Celolodní: pohltí `účinnost %` ze zásoby, zbytek do trupu, účinnost klesne.
+ * Segmentový: segment se životy pohltí celý zásah a ztratí 1 život; bez životů jde vše do trupu.
+ */
+function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec): void {
   if (amount <= 0 || !ship.alive) return;
-  const fromShields = Math.min(ship.shields, amount);
-  ship.shields -= fromShields;
-  ship.hull -= amount - fromShields;
-  events.push({ type: "damage", shipId: ship.id, amount, shieldsAfter: ship.shields, hullAfter: Math.max(0, ship.hull) });
+  let absorbed = 0;
+  let segment: number | undefined;
+  if (from && ship.shieldType === "segment") {
+    segment = hitSegment(ship, from);
+    if (ship.segments[segment] > 0) {
+      ship.segments[segment]--;
+      absorbed = amount;
+    }
+  } else if (from && ship.shieldType === "whole" && ship.shields > 0) {
+    absorbed = Math.min(ship.shields, Math.round((amount * ship.shieldEff) / 100));
+    ship.shields -= absorbed;
+    ship.shieldEff = Math.max(0, ship.shieldEff - RULES.wholeEffDrop);
+  }
+  ship.hull -= amount - absorbed;
+  events.push({
+    type: "damage",
+    shipId: ship.id,
+    amount,
+    absorbed,
+    segment,
+    shieldsAfter: ship.shields,
+    hullAfter: Math.max(0, ship.hull),
+    segmentsAfter: [...ship.segments] as Segments,
+    effAfter: ship.shieldEff,
+  });
   if (ship.hull <= 0) {
     ship.hull = 0;
     ship.alive = false;
@@ -88,6 +123,16 @@ export function mineDropPosition(start: Pose, side: MineSide | undefined): Vec {
   if (side === "left") return { x: start.x - r.x * MINE.dropSide, y: start.y - r.y * MINE.dropSide };
   if (side === "right") return { x: start.x + r.x * MINE.dropSide, y: start.y + r.y * MINE.dropSide };
   return { x: start.x - f.x * MINE.dropBehind, y: start.y - f.y * MINE.dropBehind };
+}
+
+/** Úprava štítu: stejný součet jako teď, nic záporného, žádný segment nad max. */
+export function validShieldAction(ship: Ship, segments: unknown): segments is Segments {
+  if (ship.shieldType !== "segment" || !Array.isArray(segments) || segments.length !== 4) return false;
+  const vals = segments.map((n) => Math.round(Number(n)));
+  if (vals.some((n) => !Number.isFinite(n) || n < 0 || n > RULES.segmentMax)) return false;
+  const sum = vals.reduce((a, b) => a + b, 0);
+  const cur = ship.segments.reduce((a, b) => a + b, 0);
+  return sum === cur;
 }
 
 /** Může si loď manévr dovolit (stresové body)? */
@@ -107,7 +152,7 @@ export function defaultOrders(ship: Ship): ShipOrders {
 }
 
 /** Rozpis akcí rozkazu (každá stojí 1 bod). */
-export type ActionId = "move" | "koiogran" | "laser" | "torpedo" | "mine" | "evade";
+export type ActionId = "move" | "koiogran" | "laser" | "torpedo" | "mine" | "evade" | "shield";
 
 export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: string }[] {
   const out: { id: ActionId; label: string }[] = [];
@@ -117,6 +162,7 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
     if (m.koiogran) out.push({ id: "koiogran", label: "otočka 180°" });
   }
   if (o.action?.type === "evade") out.push({ id: "evade", label: "úhybný manévr" });
+  if (o.action?.type === "shield") out.push({ id: "shield", label: "úprava štítu" });
   if (o.fire) out.push({ id: "laser", label: "lasery" });
   if (o.special?.type === "torpedo") out.push({ id: "torpedo", label: "torpédo" });
   if (o.special?.type === "mine") out.push({ id: "mine", label: "mina" });
@@ -156,9 +202,10 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     let man = resolveManeuver(profile, raw.maneuverId, ship.speed);
     if (!man || !canAfford(ship, man)) man = resolveManeuver(profile, def.maneuverId, ship.speed)!;
 
-    let action: ActionOrder | undefined = raw.action?.type === "evade" ? { type: "evade" } : undefined; // ostatní akce zatím vypnuté
+    let action: ActionOrder | undefined;
+    if (raw.action?.type === "evade") action = ship.stressPoints >= RULES.evadeStressCost ? { type: "evade" } : undefined;
+    else if (raw.action?.type === "shield") action = validShieldAction(ship, raw.action.segments) ? { type: "shield", segments: raw.action.segments.map((n) => Math.round(Number(n))) as Segments } : undefined;
     let special = raw.special;
-    if (action && ship.stressPoints < RULES.evadeStressCost) action = undefined;
     if (special?.type === "torpedo") {
       if (ship.ammo.torpedoes <= 0) special = undefined;
       else if (special.targetId) {
@@ -230,11 +277,19 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
     events.push({ type: "action", shipId: ship.id, action: { type: "evade" }, ok: true });
   }
+  // Úprava štítu: přerozdělení segmentů hned na začátku kola.
+  for (const ship of state.ships) {
+    const o = orders.get(ship.id);
+    if (!ship.alive || o?.action?.type !== "shield") continue;
+    if (!validShieldAction(ship, o.action.segments)) continue;
+    ship.segments = [...o.action.segments] as Segments;
+    events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
+  }
   const scaleEvade = (ship: Ship, dmg: number) => (evading.has(ship.id) ? Math.round(dmg * (1 - RULES.evadeDamageReduction / 100)) : dmg);
   const passedThrough = new Set<string>(); // "evader:enemy"
 
   /* ---------- 1. Lasery (všichni současně, ze startovních pozic, před pohybem) ---------- */
-  const pending = new Map<string, number>();
+  const pending = new Map<string, { dmg: number; from: Vec }>();
   const shotTorpedoes = new Set<string>();
   for (const ship of state.ships) {
     if (!ship.alive) continue;
@@ -293,9 +348,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       damage,
       rangeBand,
     });
-    pending.set(target.id, (pending.get(target.id) ?? 0) + damage);
+    const prev = pending.get(target.id);
+    pending.set(target.id, { dmg: (prev?.dmg ?? 0) + damage, from: prev?.from ?? { x: ship.x, y: ship.y } });
   }
-  for (const [id, dmg] of pending) applyDamage(shipById(state, id)!, dmg, events);
+  for (const [id, { dmg, from }] of pending) applyDamage(shipById(state, id)!, dmg, events, from);
   state.torpedoes = state.torpedoes.filter((t) => !shotTorpedoes.has(t.id));
 
 
@@ -449,10 +505,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
     return hits;
   };
-  const applyHits = (hits: { shipId: string; damage: number }[], k: number) => {
+  const applyHits = (hits: { shipId: string; damage: number }[], k: number, from: Vec) => {
     for (const hhit of hits) {
       const s = shipById(state, hhit.shipId)!;
-      applyDamage(s, hhit.damage, events);
+      applyDamage(s, hhit.damage, events, from);
       if (!s.alive) shipMovers.get(s.id)!.frozenAt = k;
     }
   };
@@ -461,7 +517,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     removedMines.add(mine.id);
     const hits = explode(mine, mine.radius, MINE.damage, k);
     events.push({ type: "mineBlast", mineId: mine.id, x: mine.x, y: mine.y, t: k / MOVE_STEPS, hits });
-    applyHits(hits, k);
+    applyHits(hits, k, mine);
   };
 
   /** Konec torpéda: přímý zásah lodi (bez plošného výbuchu) nebo výbuch (na bodě / o asteroid / vypršení). */
@@ -482,10 +538,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     });
     if (opts.shipId) {
       const s = shipById(state, opts.shipId)!;
-      applyDamage(s, scaleEvade(s, TORPEDO.damage), events);
+      applyDamage(s, scaleEvade(s, TORPEDO.damage), events, p);
       if (!s.alive) shipMovers.get(s.id)!.frozenAt = k;
     }
-    if (opts.blast) applyHits(explode(p, TORPEDO.blastRadius, TORPEDO.blastDamage, k), k);
+    if (opts.blast) applyHits(explode(p, TORPEDO.blastRadius, TORPEDO.blastDamage, k), k, p);
   };
 
   // --- Miny na začátku kola: časované s odpočtem na nule a miny s nepřítelem v poli vybuchnou hned ---
@@ -563,7 +619,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               deflect(om, k, h2);
               touching.get(other.id)!.add(ship.id);
               events.push({ type: "collision", shipId: other.id, with: "ship", otherId: ship.id, t, newHeading: h2 });
-              applyDamage(other, RULES.collisionShip, events);
+              applyDamage(other, RULES.collisionShip, events, p);
               if (!other.alive) om.frozenAt = k - 1;
             }
             break;
@@ -573,7 +629,13 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
           deflect(m, k, hit.heading);
           touching.get(ship.id)!.add(hit.otherId ?? "edge");
           events.push({ type: "collision", shipId: ship.id, with: hit.with, otherId: hit.otherId, t, newHeading: hit.heading });
-          applyDamage(ship, hit.with === "ship" ? RULES.collisionShip : hit.with === "asteroid" ? RULES.collisionAsteroid : RULES.collisionEdge, events);
+          const src: Vec =
+            hit.with === "ship"
+              ? posAt(shipMovers.get(hit.otherId!)!, k)
+              : hit.with === "asteroid"
+                ? state.asteroids.find((a) => a.id === hit!.otherId)!
+                : { x: p.x < r ? p.x - 10 : p.x > state.width - r ? p.x + 10 : p.x, y: p.y < r ? p.y - 10 : p.y > state.height - r ? p.y + 10 : p.y };
+          applyDamage(ship, hit.with === "ship" ? RULES.collisionShip : hit.with === "asteroid" ? RULES.collisionAsteroid : RULES.collisionEdge, events, src);
           if (!ship.alive) m.frozenAt = k - 1;
           changed = true;
         }
@@ -696,7 +758,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
 
   for (const ship of state.ships) {
     const o = orders.get(ship.id);
-    if (!o?.action || o.action.type === "evade") continue;
+    if (!o?.action || o.action.type === "evade" || o.action.type === "shield") continue;
     if (!canAct(ship)) {
       events.push({ type: "action", shipId: ship.id, action: o.action, ok: false });
       continue;
@@ -747,7 +809,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   for (const mine of state.mines) mine.armed = true;
   for (const ship of state.ships) {
     if (!ship.alive) continue;
-    ship.shields = Math.min(ship.stats.shields, ship.shields + RULES.shieldRecharge);
+    if (ship.shieldType === "whole") ship.shields = Math.min(ship.stats.shields, ship.shields + RULES.shieldRecharge);
     ship.tokens.focus = 0;
     ship.tokens.evade = 0;
     if (ship.lockTargetId && !shipById(state, ship.lockTargetId)?.alive) ship.lockTargetId = undefined;

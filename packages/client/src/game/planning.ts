@@ -10,11 +10,13 @@ import {
   type Difficulty,
   type GameState,
   type MineSide,
+  type Segments,
   type ShipOrders,
 } from "@spacegame/shared";
 import { clear, h } from "../dom.ts";
 import { icon, label, segBar } from "../icons.ts";
 import { ACTIONS } from "./actions.ts";
+import { SEGMENT_NAMES, shieldBubble, strengthColor } from "./shield-ui.ts";
 
 export interface PlanningCallbacks {
   select(shipId: string): void;
@@ -23,6 +25,11 @@ export interface PlanningCallbacks {
   aim(shipId: string): void;
   ready(): void;
   unready(): void;
+  /** Úprava štítu: změna bodů segmentu o ±1, potvrzení rozložení. */
+  shieldDelta(shipId: string, segment: number, delta: number): void;
+  shieldConfirm(shipId: string): void;
+  centerOn(shipId: string): void;
+  inventory(): void;
 }
 
 export interface PlanningModel {
@@ -36,6 +43,16 @@ export interface PlanningModel {
   animating: boolean;
   picking?: "torpedo" | "lock";
   minePick?: "side" | "timer" | null;
+  /** Otevřený režim úpravy štítu (–/+ u segmentů). */
+  shieldEdit?: boolean;
+  inventoryOpen?: boolean;
+}
+
+/** Kolik bodů štítu je "v ruce" (odebráno, ale ještě nerozmístěno). */
+export function shieldInHand(ship: { segments: Segments }, o: ShipOrders): number {
+  if (o.action?.type !== "shield") return 0;
+  const sum = (a: Segments) => a[0] + a[1] + a[2] + a[3];
+  return sum(ship.segments) - sum(o.action.segments);
 }
 
 export const DIFFICULTY_COLOR: Record<Difficulty, string> = { green: "#4ade80", white: "#e2e8f0", red: "#f87171", danger: "#fb923c" };
@@ -46,7 +63,7 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   danger: `NEBEZPEČNÝ – stojí 2 body a ${STRESS.dangerHullPercent} % trupu`,
 };
 const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: "bílý", red: "červený", danger: "nebezpečný" };
-const ACTION_ICON: Record<string, string> = { laser: "laser", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade" };
+const ACTION_ICON: Record<string, string> = { laser: "laser", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
   if (koiogran) return "⟲";
@@ -84,28 +101,76 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   const acts = actionList(ship, o);
   const aiming = m.aimingShipId === ship.id;
 
-  /* ---- 1. loď ---- */
+  /* ---- 1. loď: pixelová bublina štítu + stav ---- */
+  const planned = o.action?.type === "shield" ? o.action.segments : undefined;
+  const inHand = shieldInHand(ship, o);
+  const editing = !!m.shieldEdit && !!planned && !locked;
+  const teamColor = TEAM_COLORS[ship.team];
+  const bubble = h("div", { class: `bubble-box ${editing ? "editing" : ""}`, title: ship.shieldType === "whole" ? `Celolodní štít: zásoba ${ship.shields}/${ship.stats.shields}, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Každý zásah ubere 1 bod a je pohlcen celý; při 0 jde zranění do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned));
+  if (planned && !editing) bubble.append(h("span", { class: "bubble-tag" }, label("plán")));
+  const right = h("div", { class: "bb-shipinfo" });
+  if (editing && planned) {
+    for (let i = 0; i < 4; i++) {
+      const v = planned[i];
+      right.append(
+        h(
+          "div",
+          { class: "bb-row seg-edit" },
+          h("span", { class: "seg-name" }, label(SEGMENT_NAMES[i])),
+          h("button", { class: "px tiny", disabled: v <= 0, title: "odebrat bod", onclick: () => cb.shieldDelta(ship.id, i, -1) }, "–"),
+          h("span", { class: "num", style: `color:${v === 0 ? "#f87171" : v > ship.segments[i] ? "#4ade80" : v < ship.segments[i] ? "#fb923c" : "#e2e8f0"}` }, String(v)),
+          h("button", { class: "px tiny", disabled: inHand <= 0 || v >= RULES.segmentMax, title: inHand <= 0 ? "nejdřív bod někde odeber" : `přidat bod (max. ${RULES.segmentMax})`, onclick: () => cb.shieldDelta(ship.id, i, 1) }, "+"),
+        ),
+      );
+    }
+    right.append(
+      h(
+        "div",
+        { class: "bb-row" },
+        h("span", { class: `hand ${inHand > 0 ? "warn" : ""}`, title: "Odebrané body, které musíš znovu rozmístit" }, label(`v ruce ${inHand}`)),
+        h("button", { class: "px tiny", disabled: inHand > 0, title: inHand > 0 ? "Nejdřív rozmísti všechny body" : "Potvrdit rozložení (Esc = zpět na původní)", onclick: () => cb.shieldConfirm(ship.id) }, icon("check", "currentColor", 12), label("potvrdit")),
+      ),
+    );
+  } else {
+    const shieldRow =
+      ship.shieldType === "whole"
+        ? h("div", { class: "bb-row" }, icon("shield", strengthColor(ship.shields / Math.max(1, ship.stats.shields))), h("span", { class: "num" }, `${Math.round((100 * ship.shields) / Math.max(1, ship.stats.shields))} %`), h("span", { class: "muted", title: "Účinnost: kolik % zranění štít pohltí (po každém zásahu −" + RULES.wholeEffDrop + " %)" }, label(`· úč. ${ship.shieldEff} %`)))
+        : h("div", { class: "bb-row", title: "Štít: předek / pravobok / záď / levobok" }, icon("shield", "#60a5fa"), h("span", { class: "num" }, ship.segments.join("·")), planned ? h("span", { style: "color:#fb923c" }, label("→ " + planned.join("·"))) : null);
+    right.append(
+      h("div", { class: "bb-row", title: `Trup ${ship.hull}/${ship.stats.hull}` }, icon("hull", "#4ade80"), segBar(10, Math.round((10 * ship.hull) / ship.stats.hull), ship.hull <= ship.stats.hull * 0.3 ? "#ef4444" : "#22c55e", "#14341f"), h("span", { class: "num" }, String(ship.hull))),
+      shieldRow,
+      h(
+        "div",
+        { class: "bb-row" },
+        h("span", { class: "stat", title: "Stresové body: červený manévr −1, nebezpečný −2, zelený +1" }, icon("stress", "#f472b6"), segBar(STRESS.max, ship.stressPoints, "#f472b6", "#3b1a2e")),
+        h("span", { class: "stat", title: "Aktuální rychlost" }, icon("speed", "#94a3b8"), String(ship.speed)),
+      ),
+      h(
+        "div",
+        { class: "bb-row" },
+        h("span", { class: "stat", title: "Torpéda" }, icon("torpedo", "#94a3b8"), String(ship.ammo.torpedoes)),
+        h("span", { class: "stat", title: "Miny" }, icon("mine", "#94a3b8"), String(ship.ammo.mines)),
+      ),
+      h(
+        "div",
+        { class: "bb-row bb-shipbtns" },
+        h("button", { class: "px", title: "Vycentrovat mapu na loď", onclick: () => cb.centerOn(ship.id) }, icon("center", "currentColor", 12), label("centrovat")),
+        h("button", { class: `px ${m.inventoryOpen ? "on" : ""}`, title: "Inventář lodi (připravuje se)", onclick: () => cb.inventory() }, icon("inventory", "currentColor", 12), label("inventář")),
+      ),
+    );
+  }
   const status = h(
     "div",
     { class: "pnl bb-ship" },
     h(
       "div",
       { class: "bb-head" },
-      h("span", { class: "bb-name txt", style: `color:${TEAM_COLORS[ship.team]}` }, ship.name),
+      h("span", { class: "bb-name txt", style: `color:${teamColor}` }, ship.name),
       my.length > 1
         ? h("div", { class: "ship-tabs" }, ...my.map((s, i) => h("button", { class: `px ${s.id === ship.id ? "on" : ""}`, title: s.name, onclick: () => cb.select(s.id) }, String(i + 1))))
         : h("span", { class: "muted", style: "margin-left:auto" }, "1/1"),
     ),
-    h("div", { class: "bb-row", title: `Trup ${ship.hull}/${ship.stats.hull}` }, icon("hull", "#4ade80"), segBar(20, Math.round((20 * ship.hull) / ship.stats.hull), ship.hull <= ship.stats.hull * 0.3 ? "#ef4444" : "#22c55e", "#14341f"), h("span", { class: "num" }, String(ship.hull))),
-    h("div", { class: "bb-row", title: `Štíty ${ship.shields}/${ship.stats.shields}` }, icon("shield", "#60a5fa"), segBar(20, Math.round((20 * ship.shields) / Math.max(1, ship.stats.shields)), "#3b82f6", "#132449"), h("span", { class: "num" }, String(ship.shields))),
-    h(
-      "div",
-      { class: "bb-row" },
-      h("span", { class: "stat", title: "Stresové body: červený manévr −1, nebezpečný −2, zelený +1" }, icon("stress", "#f472b6"), segBar(STRESS.max, ship.stressPoints, "#f472b6", "#3b1a2e")),
-      h("span", { class: "stat", title: "Aktuální rychlost" }, icon("speed", "#94a3b8"), String(ship.speed)),
-      h("span", { class: "stat", title: "Torpéda" }, icon("torpedo", "#94a3b8"), String(ship.ammo.torpedoes)),
-      h("span", { class: "stat", title: "Miny" }, icon("mine", "#94a3b8"), String(ship.ammo.mines)),
-    ),
+    h("div", { class: "bb-shipbody" }, bubble, right),
   );
 
   /* ---- 2. manévr ---- */
@@ -130,6 +195,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   for (let i = 0; i < RULES.actionPoints; i++) apips.append(h("i", { class: i < acts.length ? "on" : "" }));
   const buttons = h("div", { class: "bb-weapons" });
   for (const a of ACTIONS) {
+    if (a.id === "shield" && ship.shieldType !== "segment") continue;
     const active = a.active(o);
     const why = a.disabled(ship, m.state, o);
     buttons.append(
@@ -142,7 +208,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           onclick: () => cb.chooseAction(ship.id, a.id),
         },
         icon(ACTION_ICON[a.id] ?? "target", "currentColor", 24),
-        h("span", { class: "lbl" }, label(a.label.replace(/ \(1 akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb"))),
+        h("span", { class: "lbl" }, label(a.label.replace(/ \(1 akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít"))),
       ),
     );
   }
@@ -185,6 +251,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     if (timer) details.append(h("span", { class: "muted" }, icon("clock", "#94a3b8", 12), ` ${timer}`));
     if (m.minePick === "side") details.append(h("span", { class: "warn" }, label("← klikni na mapě, kam minu odhodit")));
     else if (m.minePick === "timer") details.append(h("span", { class: "warn" }, label("← klikni na mapě na čas výbuchu (✕ = jiné místo)")));
+  } else if (o.action?.type === "shield") {
+    details.append(icon("segments", "#60a5fa"), h("span", { class: "txt" }, `štít ${o.action.segments.join(" / ")}`), inHand > 0 ? h("span", { class: "warn" }, label(`← rozmísti ${inHand} b. v panelu lodi`)) : h("span", { class: "muted" }, label("· platí od začátku kola")));
   } else if (o.fire) {
     const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? "torpédo") : null;
     details.append(icon("target", "#4ade80"), h("span", { class: "txt" }, tname ?? "nejbližší ve výseči"), h("span", { class: "muted" }, label("· střílí na začátku kola · klik na nepřítele = cíl")));
@@ -205,7 +273,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     { class: "pnl bb-go" },
     locked
       ? h("button", { class: "px bb-launch waiting", onclick: () => cb.unready() }, icon("wait", "#e2e8f0", 20), h("span", { class: "big" }, label("Čekám")), h("span", { class: "sub" }, label("klik = upravit")))
-      : h("button", { class: "px bb-launch", onclick: () => cb.ready() }, icon("play", "#fff", 20), h("span", { class: "big" }, label("Spustit"), h("br"), label("kolo")), h("span", { class: "sub" }, "ENTER")),
+      : h("button", { class: "px bb-launch", disabled: inHand > 0, title: inHand > 0 ? "Nejdřív rozmísti body štítu" : "", onclick: () => cb.ready() }, icon("play", "#fff", 20), h("span", { class: "big" }, label("Spustit"), h("br"), label("kolo")), h("span", { class: "sub" }, "ENTER")),
     h("div", { class: "bb-wait muted txt", title: waiting.map((p) => p.name).join(", ") }, waiting.length ? `čeká: ${waiting.map((p) => p.name).join(", ")}` : "všichni připraveni"),
   );
 

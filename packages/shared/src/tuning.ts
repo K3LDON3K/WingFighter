@@ -47,6 +47,10 @@ export interface Tuning {
   evadeStressCost: number;
   evadePassStress: number;
   evadeDamageReduction: number;
+  // štíty
+  wholeEffDrop: number;
+  segmentHp: number;
+  segmentMax: number;
 }
 
 export const DEFAULT_TUNING: Tuning = {
@@ -63,7 +67,7 @@ export const DEFAULT_TUNING: Tuning = {
   craterRadius: 45,
   hull: 100,
   shields: 50,
-  shieldRecharge: 10,
+  shieldRecharge: 0,
   laserDice: 2,
   agility: 3,
   torpedoAmmo: 3,
@@ -85,6 +89,9 @@ export const DEFAULT_TUNING: Tuning = {
   evadeStressCost: 1,
   evadePassStress: 1,
   evadeDamageReduction: 50,
+  wholeEffDrop: 10,
+  segmentHp: 2,
+  segmentMax: 3,
 };
 
 export interface TuningField {
@@ -111,8 +118,11 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "dangerHullPercent", label: "Nebezpečný manévr – % trupu", group: "Zranění", min: 0, max: 50, step: 1 },
   { key: "craterRadius", label: "Kráter v asteroidu – poloměr", group: "Zranění", min: 0, max: 150, step: 5 },
   { key: "hull", label: "Trup lodi", group: "Loď", min: 10, max: 1000, step: 10 },
-  { key: "shields", label: "Štíty lodi", group: "Loď", min: 0, max: 500, step: 10 },
-  { key: "shieldRecharge", label: "Dobíjení štítů za kolo", group: "Loď", min: 0, max: 100, step: 5 },
+  { key: "shields", label: "Celolodní štít – zásoba", group: "Štíty", min: 0, max: 500, step: 10 },
+  { key: "shieldRecharge", label: "Celolodní štít – dobíjení za kolo", group: "Štíty", min: 0, max: 100, step: 5 },
+  { key: "wholeEffDrop", label: "Celolodní štít – pokles účinnosti za zásah %", group: "Štíty", min: 0, max: 50, step: 5 },
+  { key: "segmentHp", label: "Segment – výchozí životy", group: "Štíty", min: 0, max: 4, step: 1, hint: "projeví se u nových lodí" },
+  { key: "segmentMax", label: "Segment – max životů (úprava štítu)", group: "Štíty", min: 1, max: 6, step: 1 },
   { key: "laserDice", label: "Laser – kostky útoku", group: "Loď", min: 0, max: 6, step: 1 },
   { key: "agility", label: "Obratnost (kostky obrany)", group: "Loď", min: 0, max: 6, step: 1 },
   { key: "torpedoAmmo", label: "Torpéda na bitvu", group: "Loď", min: 0, max: 20, step: 1, hint: "projeví se u nových lodí" },
@@ -181,6 +191,9 @@ export function applyTuning(t: Tuning): void {
   RULES.evadeStressCost = t.evadeStressCost;
   RULES.evadePassStress = t.evadePassStress;
   RULES.evadeDamageReduction = t.evadeDamageReduction;
+  RULES.wholeEffDrop = t.wholeEffDrop;
+  RULES.segmentHp = t.segmentHp;
+  RULES.segmentMax = t.segmentMax;
   LASER.range = t.laserRange;
   LASER.halfArc = (t.laserArcDeg * Math.PI) / 180;
   LASER.band = t.laserRange / 3;

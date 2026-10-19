@@ -1,4 +1,4 @@
-import { MAX_TEAMS_TDM, TEAM_COLORS, TEAM_NAMES, type RoomState, type RoomSummary } from "@spacegame/shared";
+import { MAX_TEAMS_TDM, TEAM_COLORS, TEAM_NAMES, type RoomPlayer, type RoomState, type RoomSummary } from "@spacegame/shared";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 import { renderTuningPanel } from "./tuning-panel.ts";
@@ -141,6 +141,7 @@ function roomView(m: LobbyModel, net: Net) {
           h("span", { class: `dot ${p.connected ? "" : "off"}` }),
           h("span", {}, p.name),
           p.id === room.hostId ? h("span", { class: "host" }, "HOST") : null,
+          shieldPick(p),
           p.isBot && isHost ? h("button", { class: "x", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
         ),
       ),
@@ -150,6 +151,19 @@ function roomView(m: LobbyModel, net: Net) {
         me?.team !== team ? h("button", { onclick: () => net.send({ type: "setTeam", team }) }, label("Přejít sem")) : null,
         isHost ? h("button", { onclick: () => net.send({ type: "addBot", team }) }, icon("bot", "currentColor", 12), label("bot")) : null,
       ),
+    );
+  };
+
+  /** Volba štítu: vlastní řádek = přepínač, ostatní = štítek. */
+  const shieldPick = (p: RoomPlayer) => {
+    const segment = p.shieldType !== "whole";
+    if (p.id !== m.playerId)
+      return h("span", { class: "shield-tag", title: segment ? "Segmentový štít (4 × 2 body)" : "Celolodní štít (zásoba + účinnost)" }, icon(segment ? "segments" : "shield", "#60a5fa", 10), label(segment ? "segmenty" : "celolodní"));
+    return h(
+      "span",
+      { class: "shield-pick" },
+      h("button", { class: segment ? "on" : "", title: "Čtyři segmenty (předek, pravobok, záď, levobok) po 2 bodech. Každý zásah ubere 1 bod a je pohlcen celý; body jde přesouvat akcí Úprava štítu.", onclick: () => net.send({ type: "setShield", shieldType: "segment" }) }, icon("segments", "currentColor", 10), label("segmenty")),
+      h("button", { class: segment ? "" : "on", title: "Jedna zásoba kolem celé lodi: pohltí část zranění podle účinnosti, ta po každém zásahu klesne o 10 %.", onclick: () => net.send({ type: "setShield", shieldType: "whole" }) }, icon("shield", "currentColor", 10), label("celolodní")),
     );
   };
 
@@ -186,6 +200,7 @@ function roomView(m: LobbyModel, net: Net) {
               h("span", { class: `dot ${p.connected ? "" : "off"}` }),
               h("span", { style: `color:${TEAM_COLORS[i % TEAM_COLORS.length]}` }, p.name),
               p.id === room.hostId ? h("span", { class: "host" }, "HOST") : null,
+              shieldPick(p),
               p.isBot && isHost ? h("button", { class: "x", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
             ),
           ),

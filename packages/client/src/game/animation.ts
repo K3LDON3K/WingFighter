@@ -50,9 +50,13 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "stress":
         lines.push(`${name(e.shipId)}: stresové body ${e.delta > 0 ? "+" : ""}${e.delta} → ${e.stressPoints}.`);
         break;
-      case "damage":
-        lines.push(`  ${name(e.shipId)} −${e.amount} (štíty ${e.shieldsAfter}, trup ${e.hullAfter}).`);
+      case "damage": {
+        const abs = e.absorbed ?? 0;
+        const segName = ["předek", "pravobok", "záď", "levobok"];
+        const where = e.segment !== undefined ? ` do ${segName[e.segment]}` : "";
+        lines.push(abs >= e.amount ? `  ${name(e.shipId)}: štít${where} pohltil ${e.amount}.` : `  ${name(e.shipId)} −${e.amount - abs} do trupu${where}${abs ? ` (štít ${abs})` : ""} → trup ${e.hullAfter}.`);
         break;
+      }
       case "torpedoShot":
         lines.push(`${name(e.shooterId)} pálí na torpédo: ${e.attackDice.map(die).join(" ")} vs ${e.defenseDice.map(die).join(" ")} → ${e.destroyed ? "sestřeleno!" : "minul"}.`);
         break;
@@ -199,6 +203,13 @@ export class TurnAnimation {
         ent.x = pose.x;
         ent.y = pose.y;
         ent.heading = pose.heading;
+        // kývání při úhybném manévru: zatočení ±14° a vlnění do stran, utlumí se ke konci dráhy
+        if (tw.kind === "ship" && (ent as { evading?: boolean }).evading && p < 1) {
+          const w = Math.sin(t / 55) * (1 - p * 0.6);
+          ent.heading += w * 0.25;
+          ent.x += -Math.sin(pose.heading) * w * 10;
+          ent.y += Math.cos(pose.heading) * w * 10;
+        }
       }
     }
 
@@ -255,6 +266,7 @@ export class TurnAnimation {
         const s = v.ships.find((x) => x.id === e.shipId);
         if (!s) break;
         if (e.ok) {
+          if (e.action.type === "evade") s.evading = true;
           if (e.action.type === "focus") s.tokens.focus = 1;
           if (e.action.type === "evade") s.tokens.evade = 1;
           if (e.action.type === "lock") s.lockTargetId = e.action.targetId;
@@ -303,11 +315,18 @@ export class TurnAnimation {
       case "damage": {
         const s = v.ships.find((x) => x.id === e.shipId);
         if (!s) break;
-        const shieldLoss = s.shields - e.shieldsAfter;
         s.shields = e.shieldsAfter;
         s.hull = e.hullAfter;
-        if (shieldLoss > 0) v.effects.push({ kind: "shield", shipId: s.id, start: now, duration: 500 });
-        v.effects.push({ kind: "text", x: s.x, y: s.y, text: `−${e.amount}`, color: "#fca5a5", start: now, duration: 900 });
+        if (e.segmentsAfter) s.segments = [...e.segmentsAfter] as import("@spacegame/shared").Segments;
+        if (e.effAfter !== undefined) s.shieldEff = e.effAfter;
+        const absorbed = e.absorbed ?? 0;
+        if (absorbed > 0) {
+          if (e.segment !== undefined) v.effects.push({ kind: "segmentHit", shipId: s.id, segment: e.segment, start: now, duration: 600 });
+          else v.effects.push({ kind: "shield", shipId: s.id, start: now, duration: 500 });
+        }
+        const hullDmg = e.amount - absorbed;
+        const txt = hullDmg > 0 ? `−${hullDmg}` : "ŠTÍT";
+        v.effects.push({ kind: "text", x: s.x, y: s.y, text: txt, color: hullDmg > 0 ? "#fca5a5" : "#7dd3fc", start: now, duration: 900 });
         break;
       }
       case "destroyed": {

@@ -213,9 +213,55 @@ describe("vyhodnocení kola", () => {
     const hit = r.events.find((e) => e.type === "torpedoHit");
     expect(hit && hit.type === "torpedoHit" && hit.shipId).toBe("ship-p2-0");
     expect(r.state.torpedoes).toHaveLength(0);
-    // 45 zranění: štít 50 → 5, trup 100; dobití → štít 15
+    // segmentový štít: přední segment pohltí celý zásah (2 → 1), trup beze změny
     expect(r.state.ships[1].hull).toBe(100);
-    expect(r.state.ships[1].shields).toBe(15);
+    expect(r.state.ships[1].segments[0]).toBe(1);
+  });
+
+  it("segmentový štít: zásah podle směru, po vyčerpání segmentu jde vše do trupu", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 700, 500, 0); // p2 míří pryč, p1 ji střílí do zádi
+    g.ships[1].stats.agility = 0; // ať se trefí spolehlivě
+    g.ships[0].stats.attack = 4;
+    let seed = 1;
+    const fire = (st: GameState) =>
+      resolveTurn(st, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m2a0", fire: false }], createRng(seed++));
+    let r = fire(g);
+    let hits = 0;
+    for (let i = 0; i < 12 && r.state.ships[1].alive; i++) {
+      const dmg = r.events.find((e) => e.type === "damage" && e.shipId === "ship-p2-0");
+      if (dmg && dmg.type === "damage") {
+        hits++;
+        expect(dmg.segment).toBe(2); // záď
+        if (dmg.absorbed > 0) expect(dmg.hullAfter).toBe(100);
+      }
+      r = fire(r.state);
+    }
+    const b = r.state.ships[1];
+    expect(b.segments[2]).toBe(0);
+    expect(b.segments[0]).toBe(2); // ostatní segmenty nedotčené
+    expect(b.hull).toBeLessThan(100);
+  });
+
+  it("celolodní štít pohltí účinnost % a účinnost klesá; úprava štítu přerozdělí segmenty", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 700, 500, 0);
+    g.ships[1].shieldType = "whole";
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m2a0", fire: false }], createRng(3));
+    const dmg = r.events.find((e) => e.type === "damage" && e.shipId === "ship-p2-0");
+    if (dmg && dmg.type === "damage") {
+      expect(dmg.absorbed).toBe(dmg.amount); // plná účinnost 100 %
+      expect(dmg.effAfter).toBe(90);
+      expect(dmg.shieldsAfter).toBe(50 - dmg.amount);
+    }
+    // úprava štítu u p1: záď → předek
+    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: false, action: { type: "shield", segments: [3, 2, 1, 2] } }], createRng(1));
+    expect(r.state.ships[0].segments).toEqual([3, 2, 1, 2]);
+    // neplatné rozložení (součet) sanitizace zahodí
+    const fixed = sanitizeOrders(r.state, "p1", [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: false, action: { type: "shield", segments: [3, 3, 3, 3] } }]);
+    expect(fixed[0].action).toBeUndefined();
   });
 
   it("akce: 2 na kolo – úprava pohybu, otočka, lasery, torpédo, mina; sanitizace přebytek ořeže", () => {

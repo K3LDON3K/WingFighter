@@ -1,5 +1,5 @@
 import { generateProfile } from "./asteroids.ts";
-import { MAP, STRESS } from "./constants.ts";
+import { MAP, RULES } from "./constants.ts";
 import type { Pose } from "./geometry.ts";
 import { computeStats, DEFAULT_LOADOUT } from "./ships.ts";
 import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
@@ -101,6 +101,9 @@ export function createGame(opts: CreateGameOptions): GameState {
           heading: zone.heading,
           hull: stats.hull,
           shields: stats.shields,
+          shieldType: p.shieldType ?? "segment",
+          shieldEff: 100,
+          segments: [RULES.segmentHp, RULES.segmentHp, RULES.segmentHp, RULES.segmentHp],
           stressPoints: tuning.stressMax,
           speed: 2,
           tokens: { focus: 0, evade: 0 },

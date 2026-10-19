@@ -1,4 +1,4 @@
-import { RULES, actionCost, hullOf, makeManeuver, parseManeuverId, TORPEDO, type GameState, type Ship, type ShipOrders } from "@spacegame/shared";
+import { RULES, actionCost, hullOf, makeManeuver, parseManeuverId, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@spacegame/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -55,6 +55,15 @@ export const ACTIONS: ActionOption[] = [
     disabled: (ship, _s, o) => (ship.stressPoints < RULES.evadeStressCost ? "chybí stresový bod" : noAp(ship, o, o.action?.type === "evade")),
     active: (o) => o.action?.type === "evade",
     apply: (o) => ({ action: o.action?.type === "evade" ? undefined : { type: "evade" } }),
+  },
+  {
+    id: "shield",
+    glyph: "◈",
+    label: "Úprava štítu (1 akce)",
+    description: `Přerozdělí body segmentového štítu (předek, pravobok, záď, levobok) – stejný součet, max. ${RULES.segmentMax} na segment. Nové rozložení platí od začátku kola, tedy ještě před palbou laserů.`,
+    disabled: (ship, _s, o) => (ship.shieldType !== "segment" ? "jen segmentový štít" : ship.segments.every((x) => x === 0) ? "štít je vybitý" : noAp(ship, o, o.action?.type === "shield")),
+    active: (o) => o.action?.type === "shield",
+    apply: (o, ship) => ({ action: o.action?.type === "shield" ? undefined : { type: "shield", segments: [...ship.segments] as Segments } }),
   },
   {
     id: "koiogran",

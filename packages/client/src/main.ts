@@ -27,6 +27,7 @@ import {
   type Pose,
   type RoomState,
   type RoomSummary,
+  type Segments,
   type ShipOrders,
   type TurnResult,
 } from "@spacegame/shared";
@@ -35,7 +36,7 @@ import { icon, label } from "./icons.ts";
 import { actionById } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
-import { DIFFICULTY_COLOR, renderBottomBar } from "./game/planning.ts";
+import { DIFFICULTY_COLOR, renderBottomBar, shieldInHand } from "./game/planning.ts";
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
@@ -64,6 +65,9 @@ interface GameSession {
   picking: "torpedo" | "lock" | null;
   /** Výběr miny na mapě: nejdřív místo, pak čas výbuchu. */
   minePick: "side" | "timer" | null;
+  /** Otevřená úprava štítu (–/+ u segmentů v panelu lodi). */
+  shieldEdit: boolean;
+  inventoryOpen: boolean;
   hoverId?: string;
   hoverIcon?: string;
   mouse: { x: number; y: number; sx: number; sy: number } | null;
@@ -214,6 +218,8 @@ function startGame(state: GameState) {
     log: [],
     picking: null,
     minePick: null,
+    shieldEdit: false,
+    inventoryOpen: false,
     mouse: null,
     icons: [],
   };
@@ -304,7 +310,18 @@ function pumpQueue() {
 
 function submitOrders() {
   if (!game || game.submitted) return;
+  for (const [id, o] of game.orders) {
+    const ship = game.state.ships.find((x) => x.id === id);
+    if (ship && shieldInHand(ship, o) > 0) {
+      showError(`${ship.name}: nejdřív rozmísti všechny body štítu.`);
+      game.selectedShipId = id;
+      game.shieldEdit = true;
+      renderSide();
+      return;
+    }
+  }
   game.aimingShipId = null;
+  game.shieldEdit = false;
   net.send({ type: "submitOrders", orders: [...game.orders.values()] });
   game.submitted = true;
   game.picking = null;
@@ -613,6 +630,8 @@ function renderSide() {
       animating: !!game.anim,
       picking: game.picking ?? undefined,
       minePick: game.minePick,
+      shieldEdit: game.shieldEdit,
+      inventoryOpen: game.inventoryOpen,
     },
     {
       select: (id) => {
@@ -645,8 +664,51 @@ function renderSide() {
         game!.submitted = false;
         renderSide();
       },
+      shieldDelta: (id, seg, d) => {
+        const g = game!;
+        const o = g.orders.get(id);
+        const ship = g.state.ships.find((x) => x.id === id);
+        if (!o || !ship || o.action?.type !== "shield") return;
+        const segs = [...o.action.segments] as Segments;
+        const next = segs[seg] + d;
+        if (next < 0 || next > RULES.segmentMax) return;
+        if (d > 0 && shieldInHand(ship, o) <= 0) return;
+        segs[seg] = next;
+        g.orders.set(id, { ...o, action: { type: "shield", segments: segs } });
+        renderSide();
+      },
+      shieldConfirm: (id) => {
+        const g = game!;
+        const o = g.orders.get(id);
+        const ship = g.state.ships.find((x) => x.id === id);
+        if (!o || !ship || shieldInHand(ship, o) > 0) return;
+        g.shieldEdit = false;
+        renderSide();
+      },
+      centerOn: (id) => {
+        const s = game!.state.ships.find((x) => x.id === id);
+        if (!s || !cam) return;
+        cam.x = s.x - cam.viewW / cam.zoom / 2;
+        cam.y = s.y - cam.viewH / cam.zoom / 2;
+        cam.clampTo(game!.state.width, game!.state.height);
+      },
+      inventory: () => {
+        game!.inventoryOpen = !game!.inventoryOpen;
+        renderSide();
+      },
     },
   );
+  if (game.inventoryOpen) {
+    sideEl.append(
+      h(
+        "div",
+        { class: "pnl inventory" },
+        h("div", { class: "bb-head" }, h("span", { class: "ttl" }, icon("inventory", "#7dd3fc", 12), " ", label("Inventář")), h("button", { class: "px tiny", style: "margin-left:auto", onclick: () => ((game!.inventoryOpen = false), renderSide()) }, "✕")),
+        h("div", { class: "txt muted" }, "Sloty lodi (trup, štít, zbraně, moduly) se připravují. Tady si budeš skládat výbavu – štíty, dobíjení, lepší lasery…"),
+        h("div", { class: "inv-slots" }, ...["TRUP", "STIT", "ZBRAN", "MODUL", "MODUL"].map((n) => h("div", { class: "inv-slot" }, n))),
+      ),
+    );
+  }
   const log = h("div", { class: "log" });
   for (const entry of game.log.slice(-6)) {
     log.append(h("div", { class: "turn" }, `Kolo ${entry.turn}`));
@@ -766,6 +828,7 @@ function chooseIcon(shipId: string, id: string) {
   const next = { ...o, ...a.apply(o, ship, g.state) };
   g.orders.set(shipId, next);
   g.picking = a.pick && a.active(next) ? a.pick : null;
+  g.shieldEdit = a.id === "shield" && next.action?.type === "shield";
   g.minePick = a.id === "mine" && next.special?.type === "mine" ? "side" : null;
   renderSide();
 }
@@ -919,7 +982,11 @@ function bindInput(c: HTMLCanvasElement) {
     const cur = o ? parseManeuverId(o.maneuverId) : null;
     if (!id || !cur) return;
     if (e.key === "Escape") {
-      if (game.minePick) game.minePick = null;
+      if (game.shieldEdit) {
+        // zpět na původní rozložení = akce se zruší
+        game.shieldEdit = false;
+        if (o && o.action?.type === "shield") game.orders.set(id, { ...o, action: undefined });
+      } else if (game.minePick) game.minePick = null;
       else if (game.picking) game.picking = null;
       else game.aimingShipId = null;
       game.speedLock.delete(id);

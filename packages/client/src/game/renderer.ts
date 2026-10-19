@@ -11,8 +11,10 @@ import {
   type GameState,
   type Maneuver,
   type Pose,
+  RULES,
 } from "@spacegame/shared";
 import type { Camera } from "./camera.ts";
+import { segmentColor, strengthColor } from "./shield-ui.ts";
 import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
 import type { ViewModel, ViewShip } from "./view.ts";
@@ -270,6 +272,51 @@ export class Renderer {
     ctx.restore();
   }
 
+  /** Štít na mapě: celolodní = kruh obarvený podle síly; segmentový = 4 oblouky otáčející se s lodí. */
+  private drawShield(s: ViewShip, now: number) {
+    const ctx = this.ctx;
+    if (s.shieldType === "whole") {
+      if (s.shields <= 0) return;
+      const frac = s.shields / Math.max(1, s.maxShields);
+      const col = strengthColor(frac);
+      ctx.save();
+      ctx.globalAlpha = 0.1 + 0.1 * frac;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.radius + 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.45 + 0.35 * frac;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 3]);
+      ctx.lineDashOffset = -now / 60;
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    const r = s.radius + 6;
+    const half = (40 * Math.PI) / 180;
+    ctx.save();
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 4; i++) {
+      const hp = s.segments[i] ?? 0;
+      const mid = s.heading + (i * Math.PI) / 2;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, mid - half, mid + half);
+      if (hp <= 0) {
+        ctx.strokeStyle = "rgba(239,68,68,0.35)";
+        ctx.setLineDash([2, 4]);
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.strokeStyle = segmentColor(hp);
+        ctx.setLineDash([]);
+        ctx.lineWidth = hp >= 3 ? 4 : 3;
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   private drawShip(s: ViewShip, overlay: Overlay, now: number) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[s.team];
@@ -288,15 +335,7 @@ export class Renderer {
       ctx.restore();
     }
 
-    if (s.shields > 0) {
-      ctx.save();
-      ctx.globalAlpha = 0.12 + 0.08 * (s.shields / Math.max(1, s.maxShields));
-      ctx.fillStyle = "#60a5fa";
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.radius + 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
+    this.drawShield(s, now);
 
     const f = forward(s.heading);
     ctx.save();
@@ -319,7 +358,8 @@ export class Renderer {
     const by = s.y - s.radius - 12;
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
-    const sw = s.maxShields > 0 ? (bw * s.shields) / s.maxShields : 0;
+    const segTotal = s.segments[0] + s.segments[1] + s.segments[2] + s.segments[3];
+    const sw = s.shieldType === "segment" ? (bw * Math.min(1, segTotal / (4 * RULES.segmentHp))) : s.maxShields > 0 ? (bw * s.shields) / s.maxShields : 0;
     ctx.fillStyle = "#60a5fa";
     ctx.fillRect(bx, by, sw, 2);
     const hw = (bw * s.hull) / Math.max(1, s.maxHull);
@@ -568,6 +608,21 @@ export class Renderer {
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(e.x, e.y, 6 + 18 * t, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
+      case "segmentHit": {
+        const s = view.ships.find((x) => x.id === e.shipId);
+        if (!s) return;
+        const mid = s.heading + (e.segment * Math.PI) / 2;
+        const half = (40 * Math.PI) / 180;
+        ctx.save();
+        ctx.globalAlpha = 1 - t;
+        ctx.strokeStyle = "#f8fafc";
+        ctx.lineWidth = 5 + 6 * t;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius + 6 + 4 * t, mid - half, mid + half);
         ctx.stroke();
         ctx.restore();
         break;

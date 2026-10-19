@@ -1,4 +1,4 @@
-import type { Asteroid, GameState, Mine, Pose, Ship, Torpedo } from "@spacegame/shared";
+import type { Asteroid, GameState, Mine, Pose, Segments, ShieldType, Ship, Torpedo } from "@spacegame/shared";
 
 /** Co se právě kreslí – během plánování kopie stavu, během animace průběžně měněný model. */
 export interface ViewShip extends Pose {
@@ -9,6 +9,11 @@ export interface ViewShip extends Pose {
   maxHull: number;
   shields: number;
   maxShields: number;
+  shieldType: ShieldType;
+  shieldEff: number;
+  segments: Segments;
+  /** Úhybný manévr – kývání (nastavuje animace). */
+  evading?: boolean;
   stressPoints: number;
   radius: number;
   alive: boolean;
@@ -41,7 +46,8 @@ export type Effect =
   | { kind: "text"; x: number; y: number; text: string; color: string; start: number; duration: number }
   | { kind: "shield"; shipId: string; start: number; duration: number }
   | { kind: "launch"; x: number; y: number; heading: number; color: string; start: number; duration: number }
-  | { kind: "drop"; from: { x: number; y: number }; to: { x: number; y: number }; color: string; start: number; duration: number };
+  | { kind: "drop"; from: { x: number; y: number }; to: { x: number; y: number }; color: string; start: number; duration: number }
+  | { kind: "segmentHit"; shipId: string; segment: number; start: number; duration: number };
 
 export interface ViewModel {
   ships: ViewShip[];
@@ -63,6 +69,9 @@ export function shipToView(s: Ship): ViewShip {
     maxHull: s.stats.hull,
     shields: s.shields,
     maxShields: s.stats.shields,
+    shieldType: s.shieldType,
+    shieldEff: s.shieldEff,
+    segments: [...s.segments] as Segments,
     stressPoints: s.stressPoints,
     radius: s.stats.radius,
     alive: s.alive,

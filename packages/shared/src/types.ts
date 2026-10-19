@@ -30,7 +30,12 @@ export type ActionOrder =
   | { type: "evade" }
   | { type: "lock"; targetId: string }
   | { type: "boost"; dir: "straight" | "left" | "right" }
+  | { type: "shield"; segments: Segments }
   | { type: "barrelRoll"; side: Side };
+
+export type ShieldType = "whole" | "segment";
+/** Segmenty štítu: 0 předek, 1 pravobok, 2 záď, 3 levobok. */
+export type Segments = [number, number, number, number];
 
 export type SpecialOrder =
   | { type: "torpedo"; targetId?: string; point?: { x: number; y: number } }
@@ -105,7 +110,13 @@ export interface Ship extends Pose {
   loadout: ShipLoadout;
   stats: ShipStats;
   hull: number;
+  /** Celolodní štít: zásoba. */
   shields: number;
+  shieldType: ShieldType;
+  /** Celolodní štít: účinnost v % (kolik zranění pohltí); po každém zásahu klesá. */
+  shieldEff: number;
+  /** Segmentový štít: životy segmentů (předek, pravobok, záď, levobok). */
+  segments: Segments;
   /** Zásoba stresových bodů (červený manévr −1, nebezpečný −2, zelený +1). */
   stressPoints: number;
   /** Rychlost posledního manévru (prudká změna o 2+ = červený manévr). */
@@ -164,6 +175,7 @@ export interface PlayerInfo {
   name: string;
   team: number;
   isBot: boolean;
+  shieldType?: ShieldType;
 }
 
 export interface GameSettings {
@@ -223,7 +235,18 @@ export type TurnEvent =
     }
   | { type: "spawnTorpedo"; torpedo: Torpedo }
   | { type: "spawnMine"; mine: Mine }
-  | { type: "damage"; shipId: string; amount: number; shieldsAfter: number; hullAfter: number }
+  | {
+      type: "damage";
+      shipId: string;
+      amount: number;
+      shieldsAfter: number;
+      hullAfter: number;
+      /** Kolik pohltil štít a který segment (u segmentového). */
+      absorbed?: number;
+      segment?: number;
+      segmentsAfter?: Segments;
+      effAfter?: number;
+    }
   | { type: "destroyed"; shipId: string; x: number; y: number }
   | { type: "stress"; shipId: string; stressPoints: number; delta: number };
 

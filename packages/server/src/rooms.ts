@@ -20,6 +20,7 @@ import {
   type RoomState,
   type RoomSummary,
   type ServerMessage,
+  type ShieldType,
   type ShipOrders,
 } from "@spacegame/shared";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -40,6 +41,7 @@ interface RoomMember {
   team: number;
   isBot: boolean;
   ready: boolean;
+  shieldType: ShieldType;
 }
 
 interface RunningGame {
@@ -95,6 +97,7 @@ class Room {
         team: m.team,
         isBot: m.isBot,
         ready: m.ready,
+        shieldType: m.shieldType,
         connected: m.isBot ? true : !!clients.get(m.id)?.ws,
       })),
     };
@@ -190,7 +193,7 @@ export class Hub {
         const code = this.newCode();
         const r = new Room(code, cleanName(msg.name) || `Místnost ${client.name}`, client.id);
         this.rooms.set(code, r);
-        r.members.set(client.id, { id: client.id, name: client.name, team: 0, isBot: false, ready: false });
+        r.members.set(client.id, { id: client.id, name: client.name, team: 0, isBot: false, ready: false, shieldType: "segment" });
         client.roomCode = code;
         this.broadcastRoom(r);
         this.broadcastRooms();
@@ -202,7 +205,7 @@ export class Hub {
         if (r.game) return this.error(client, "V této místnosti už probíhá hra.");
         if (room && room !== r) this.leaveRoom(client);
         const team = r.settings.mode === "tdm" ? this.smallestTeam(r) : 0;
-        r.members.set(client.id, { id: client.id, name: client.name, team, isBot: false, ready: false });
+        r.members.set(client.id, { id: client.id, name: client.name, team, isBot: false, ready: false, shieldType: "segment" });
         client.roomCode = r.code;
         this.broadcastRoom(r);
         this.broadcastRooms();
@@ -220,13 +223,21 @@ export class Hub {
         this.broadcastRoom(room);
         return;
       }
+      case "setShield": {
+        if (!room || room.game) return;
+        const m = room.members.get(client.id);
+        if (!m) return;
+        m.shieldType = msg.shieldType === "whole" ? "whole" : "segment";
+        this.broadcastRoom(room);
+        return;
+      }
       case "addBot": {
         if (!room || room.game || room.hostId !== client.id) return;
         if (room.members.size >= 12) return this.error(client, "Místnost je plná.");
         const id = `bot-${randomBytes(3).toString("hex")}`;
         const used = new Set([...room.members.values()].map((m) => m.name));
         const name = BOT_NAMES.find((n) => !used.has(`Bot ${n}`)) ?? randomBytes(2).toString("hex");
-        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, MAX_TEAMS_TDM - 1), isBot: true, ready: true });
+        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, MAX_TEAMS_TDM - 1), isBot: true, ready: true, shieldType: Math.random() < 0.5 ? "segment" : "whole" });
         this.broadcastRoom(room);
         this.broadcastRooms();
         return;
@@ -321,7 +332,7 @@ export class Hub {
     if (room.settings.mode === "tdm" && new Set(members.map((m) => m.team)).size < 2) {
       return this.error(host, "V týmovém módu musí být obsazené alespoň dva týmy.");
     }
-    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot }));
+    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, shieldType: m.shieldType }));
     const state = createGame({ players, settings: room.settings, tuning: room.tuning });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     room.game = { state, orders: new Map(), rng, memory: new Map() };

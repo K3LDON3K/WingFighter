@@ -28,7 +28,7 @@ export const RULES = {
   collisionShip: 15,
   collisionAsteroid: 15,
   collisionEdge: 15,
-  shieldRecharge: 10,
+  shieldRecharge: 0,
   /** Počet akcí na kolo. */
   actionPoints: 2,
   /** O kolik klesne rychlost po otočce o 180°. */
@@ -37,6 +37,10 @@ export const RULES = {
   evadeStressCost: 1,
   evadePassStress: 1,
   evadeDamageReduction: 50,
+  /** Štíty: pokles účinnosti celolodního štítu za zásah (%), výchozí a max. životy segmentu. */
+  wholeEffDrop: 10,
+  segmentHp: 2,
+  segmentMax: 3,
 };
 
 export const TORPEDO = {
