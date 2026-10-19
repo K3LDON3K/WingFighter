@@ -127,6 +127,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v2.1 – vyhození modulu přes inventář (akce VYHODIT otevře inventář, klik na modul, POTVRDIT); podobizna pilota
+  ve svislém sloupci vedle SPUSTIT KOLO s pixelovou bublinou schopností; inventář bez řádku loď/pilot; ladicí menu se záložkami podle
+  kategorií a bez ztráty rozepsané hodnoty při překreslení (políčko už nepřepisuje, co právě píšeš).
 - v2.0.2 – oprava: pomalé fázové torpédo doháněla vlastní loď a hned ve 2. kole do něj narazila. Nově má torpédo
   **ochrannou lhůtu** (ladění, výchozí 2 kola): vlastníkovy lodě jím proletí a jeho výbuch je nezraní.
 - v2.0.1 – sloty podle schváleného nákresu: 4 malé (příď, záď, levobok, pravobok), příď + záď pod sebou jde spojit

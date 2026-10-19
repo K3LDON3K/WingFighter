@@ -21,6 +21,7 @@ import { clear, h } from "../dom.ts";
 import { icon, label, segBar } from "../icons.ts";
 import { ACTIONS } from "./actions.ts";
 import { SEGMENT_NAMES, shieldBubble, strengthColor } from "./shield-ui.ts";
+import { pilotBadge } from "../pilot-ui.ts";
 
 export interface PlanningCallbacks {
   select(shipId: string): void;
@@ -29,6 +30,8 @@ export interface PlanningCallbacks {
   aim(shipId: string): void;
   ready(): void;
   unready(): void;
+  /** Otevře inventář s výběrem modulu k vyhození. */
+  jettisonPick(shipId: string): void;
   /** Úprava štítu: změna bodů segmentu o ±1, potvrzení rozložení. */
   shieldDelta(shipId: string, segment: number, delta: number): void;
   shieldConfirm(shipId: string): void;
@@ -275,19 +278,13 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     else if (m.minePick === "timer") details.append(h("span", { class: "warn" }, label("← klikni na mapě na čas výbuchu (✕ = jiné místo)")));
   } else if (o.action?.type === "jettison") {
     const cur = o.action.moduleId;
-    details.append(icon("debris", "#94a3b8"), h("span", { class: "muted" }, label("vyhodit:")));
-    details.append(
-      h(
-        "div",
-        { class: "segs-btn", title: "Který modul vyhodit (na začátku kola)" },
-        ...ship.loadout.modules.map((mod) => seg(h("span", {}, icon(MODULES[mod.type].icon, "currentColor", 10), ` ${label(MODULES[mod.type].short)}${mod.ammo !== undefined ? `·${mod.ammo}` : ""}`), mod.id === cur, `${MODULES[mod.type].name} – váha ${MODULES[mod.type].weight + (MODULES[mod.type].ammoWeight ?? 0) * (mod.ammo ?? 0)}`, () => cb.setOrders(ship.id, { action: { type: "jettison", moduleId: mod.id } }))),
-      ),
-    );
     const chosen = ship.loadout.modules.find((x) => x.id === cur);
+    details.append(icon("debris", "#94a3b8"));
     if (chosen) {
       const after = { ...ship.loadout, modules: ship.loadout.modules.filter((x) => x.id !== cur) };
-      details.append(h("span", { class: "muted" }, label(`· váha ${loadoutWeight(ship.loadout)} → ${loadoutWeight(after)} · max. rychlost ${profileOf(ship.loadout).maxSpeed} → ${profileOf(after).maxSpeed}`)));
-    }
+      details.append(h("span", { class: "txt" }, `vyhodit: ${MODULES[chosen.type].name}`), h("span", { class: "muted" }, label(`· váha ${loadoutWeight(ship.loadout)} → ${loadoutWeight(after)} · max. rychlost ${profileOf(ship.loadout).maxSpeed} → ${profileOf(after).maxSpeed}`)));
+    } else details.append(h("span", { class: "warn" }, label("← vyber modul v inventáři")));
+    details.append(h("button", { class: "px tiny", disabled: locked, onclick: () => cb.jettisonPick(ship.id) }, icon("inventory", "currentColor", 10), " ", label(chosen ? "změnit" : "inventář")));
   } else if (o.action?.type === "shield") {
     details.append(icon("segments", "#60a5fa"), h("span", { class: "txt" }, `štít ${o.action.segments.join(" / ")}`), inHand > 0 ? h("span", { class: "warn" }, label(`← rozmísti ${inHand} b. v panelu lodi`)) : h("span", { class: "muted" }, label("· platí od začátku kola")));
   } else if (o.fire) {
@@ -331,5 +328,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     h("div", { class: "bb-wait muted txt", title: waiting.map((p) => p.name).join(", ") }, waiting.length ? `čeká: ${waiting.map((p) => p.name).join(", ")}` : "všichni připraveni"),
   );
 
-  root.append(status, maneuver, actions, go);
+  /* ---- 5. pilot (svislý sloupec vedle spuštění kola) ---- */
+  const pilot = h("div", { class: "pnl bb-pilot" }, pilotBadge(ship.loadout.pilotId, true));
+
+  root.append(status, maneuver, actions, pilot, go);
 }

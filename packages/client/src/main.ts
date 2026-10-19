@@ -73,6 +73,8 @@ interface GameSession {
   /** Otevřená úprava štítu (–/+ u segmentů v panelu lodi). */
   shieldEdit: boolean;
   inventoryOpen: boolean;
+  /** Inventář v režimu výběru modulu k vyhození. */
+  jettisonPick: boolean;
   hoverId?: string;
   hoverIcon?: string;
   mouse: { x: number; y: number; sx: number; sy: number } | null;
@@ -225,6 +227,7 @@ function startGame(state: GameState) {
     minePick: null,
     shieldEdit: false,
     inventoryOpen: false,
+    jettisonPick: false,
     mouse: null,
     icons: [],
   };
@@ -327,6 +330,14 @@ function submitOrders() {
   if (!game || game.submitted) return;
   for (const [id, o] of game.orders) {
     const ship = game.state.ships.find((x) => x.id === id);
+    if (ship && o.action?.type === "jettison" && !ship.loadout.modules.some((m) => m.id === (o.action as { moduleId: string }).moduleId)) {
+      showError(`${ship.name}: vyber v inventáři modul k vyhození (nebo akci zruš).`);
+      game.selectedShipId = id;
+      game.inventoryOpen = true;
+      game.jettisonPick = true;
+      renderSide();
+      return;
+    }
     if (ship && shieldInHand(ship, o) > 0) {
       showError(`${ship.name}: nejdřív rozmísti všechny body štítu.`);
       game.selectedShipId = id;
@@ -717,6 +728,12 @@ function renderSide() {
         renderSide();
       },
       centerOn: (id) => centerOnShip(id),
+      jettisonPick: (id) => {
+        game!.selectedShipId = id;
+        game!.inventoryOpen = true;
+        game!.jettisonPick = true;
+        renderSide();
+      },
       inventory: () => {
         game!.inventoryOpen = !game!.inventoryOpen;
         renderSide();
@@ -729,17 +746,65 @@ function renderSide() {
       h(
         "div",
         { class: "pnl inventory" },
-        h("div", { class: "bb-head" }, h("span", { class: "ttl" }, icon("inventory", "#7dd3fc", 12), " ", label("Inventář")), h("button", { class: "px tiny", style: "margin-left:auto", onclick: () => ((game!.inventoryOpen = false), renderSide()) }, "✕")),
+        h("div", { class: "bb-head" }, h("span", { class: "ttl" }, icon("inventory", "#7dd3fc", 12), " ", label("Inventář")), h("button", { class: "px tiny", style: "margin-left:auto", onclick: () => ((game!.inventoryOpen = false), (game!.jettisonPick = false), renderSide()) }, "✕")),
         (() => {
-          const sh = game!.state.ships.find((x) => x.id === game!.selectedShipId) ?? game!.state.ships.find((x) => x.ownerId === playerId);
-          const me = game!.state.players.find((p) => p.id === playerId);
+          const g = game!;
+          const sh = g.state.ships.find((x) => x.id === g.selectedShipId) ?? g.state.ships.find((x) => x.ownerId === playerId);
+          const me = g.state.players.find((p) => p.id === playerId);
           if (!sh) return h("div", { class: "txt muted" }, "Žádná loď.");
-          return h(
-            "div",
-            {},
-            h("div", { class: "txt muted" }, `${sh.name} · kredity ${me?.credits ?? 0}. Moduly jde během bitvy jen vyhodit (akce Vyhodit modul); nákup a vylepšení přijdou mezi koly.`),
-            renderLoadout({ loadout: sh.loadout, readonly: true, budget: game!.state.tuning.startBudget, allowed: game!.state.settings.allowedModules, compact: true }),
-          );
+          const o = g.orders.get(sh.id);
+          const picking = g.jettisonPick && o?.action?.type === "jettison" && !g.submitted;
+          const chosenId = o?.action?.type === "jettison" ? o.action.moduleId : undefined;
+          const chosen = sh.loadout.modules.find((m) => m.id === chosenId);
+          const wrap = h("div", {});
+          if (picking) {
+            wrap.append(h("div", { class: "txt warn-txt" }, chosen ? `Vyhodit: ${MODULES[chosen.type].name}. Potvrď, nebo klikni na jiný modul.` : "Klikni na modul, který chceš na začátku kola vyhodit."));
+            wrap.append(
+              renderLoadout({
+                loadout: sh.loadout,
+                readonly: true,
+                hideHead: true,
+                budget: g.state.tuning.startBudget,
+                allowed: g.state.settings.allowedModules,
+                compact: true,
+                selectedId: chosenId,
+                onSelect: (id) => {
+                  const cur = g.orders.get(sh.id);
+                  if (!cur) return;
+                  g.orders.set(sh.id, { ...cur, action: { type: "jettison", moduleId: id } });
+                  renderSide();
+                },
+              }),
+            );
+            wrap.append(
+              h(
+                "div",
+                { class: "row", style: "margin-top:8px;gap:6px" },
+                h("button", { class: "px", disabled: !chosen, onclick: () => ((g.jettisonPick = false), (g.inventoryOpen = false), renderSide()) }, icon("check", "currentColor", 10), " ", label("potvrdit vyhození")),
+                h(
+                  "button",
+                  {
+                    class: "px",
+                    onclick: () => {
+                      const cur = g.orders.get(sh.id);
+                      if (cur) g.orders.set(sh.id, { ...cur, action: undefined });
+                      g.jettisonPick = false;
+                      renderSide();
+                    },
+                  },
+                  label("zrušit"),
+                ),
+              ),
+            );
+          } else {
+            wrap.append(
+              h("div", { class: "txt muted" }, `${sh.name} · kredity ${me?.credits ?? 0}.${chosen ? ` Na začátku kola vyhodí ${MODULES[chosen.type].name}.` : ""}`),
+              renderLoadout({ loadout: sh.loadout, readonly: true, hideHead: true, budget: g.state.tuning.startBudget, allowed: g.state.settings.allowedModules, compact: true, selectedId: chosenId }),
+            );
+            if (!g.submitted && g.state.status !== "finished" && sh.ownerId === playerId)
+              wrap.append(h("div", { class: "row", style: "margin-top:8px" }, h("button", { class: "px", onclick: () => (chosen ? ((g.jettisonPick = true), renderSide()) : chooseIcon(sh.id, "jettison")) }, icon("debris", "currentColor", 10), " ", label(chosen ? "změnit vyhození" : "vyhodit modul (1 akce)"))));
+          }
+          return wrap;
         })(),
       ),
     );
@@ -868,6 +933,10 @@ function chooseIcon(shipId: string, id: string) {
   g.orders.set(shipId, next);
   g.picking = a.pick && a.active(next) ? a.pick : null;
   g.shieldEdit = a.id === "shield" && next.action?.type === "shield";
+  if (a.id === "jettison") {
+    g.jettisonPick = next.action?.type === "jettison";
+    if (g.jettisonPick) g.inventoryOpen = true;
+  }
   g.minePick = a.id === "mine" && next.special?.type === "mine" ? "side" : null;
   renderSide();
 }

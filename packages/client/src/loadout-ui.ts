@@ -28,6 +28,11 @@ export interface LoadoutEditorOptions {
   ammoOf?: (moduleId: string) => number | undefined;
   onChange?: (loadout: ShipLoadout) => void;
   compact?: boolean;
+  /** Bez řádku loď / pilot (inventář ve hře). */
+  hideHead?: boolean;
+  /** Výběr modulu (např. vyhození): klik na modul ho označí místo odebrání. */
+  onSelect?: (moduleId: string) => void;
+  selectedId?: string;
 }
 
 const NS = "http://www.w3.org/2000/svg";
@@ -81,15 +86,18 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     const def = m ? MODULES[m.type] : undefined;
     const large = def?.size === "large";
     const stroke = large ? "#fbbf24" : "#7dd3fc";
-    const grp = svgEl("g", { class: `lo-g ${m ? "mod" : "empty"} ${ro ? "ro" : ""}` });
-    grp.append(svgEl("rect", { x: box.x, y: box.y, width: box.w, height: box.h, fill: m ? "#1e2a4a" : "rgba(5,7,15,0.55)", stroke, "stroke-width": 3, ...(m ? {} : { "stroke-dasharray": "6 4" }) }));
+    const selectable = !!m && !!opts.onSelect;
+    const selected = !!m && opts.selectedId === m.id;
+    const grp = svgEl("g", { class: `lo-g ${m ? "mod" : "empty"} ${ro && !selectable ? "ro" : ""} ${selected ? "sel" : ""}` });
+    grp.append(svgEl("rect", { x: box.x, y: box.y, width: box.w, height: box.h, fill: selected ? "#4a2a1e" : m ? "#1e2a4a" : "rgba(5,7,15,0.55)", stroke: selected ? "#fb923c" : stroke, "stroke-width": 3, ...(m ? {} : { "stroke-dasharray": "6 4" }) }));
     if (m && def) {
       const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
       grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "PS2P", "font-size": 10, fill: "#e2e8f0", "text-anchor": "middle" }, label(def.short)));
       if (ammo !== undefined) grp.append(svgEl("text", { x: box.x + box.w - 6, y: box.y + 11, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "end" }, String(ammo)));
-      const title = svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${ro ? "" : "\nKlik = odebrat (vrátí cenu)"}`);
+      const title = svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${selectable ? "\nKlik = vybrat k vyhození" : ro ? "" : "\nKlik = odebrat (vrátí cenu)"}`);
       grp.append(title);
-      if (!ro) grp.addEventListener("click", () => remove(m.id));
+      if (selectable) grp.addEventListener("click", () => opts.onSelect!(m.id));
+      else if (!ro) grp.addEventListener("click", () => remove(m.id));
     } else {
       const name = hull.slots.find((x) => x.id === slot)?.name ?? slot;
       grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 3, "font-family": "PS2P", "font-size": 6, fill: stroke, "text-anchor": "middle" }, label(name)));
@@ -157,7 +165,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     h("span", { title: "Součet váhy modulů (včetně munice). Každých " + "N" + " váhy = −1 max. rychlost" }, icon("weight", "#94a3b8", 10), ` ${weight}`),
     h("span", { title: "Maximální rychlost lodi s touto výbavou" }, icon("speed", "#94a3b8", 10), ` ${maxSpeed}`),
   );
-  const root = h("div", { class: `loadout ${opts.compact ? "compact" : ""}` }, head, diagram, summary);
+  const root = h("div", { class: `loadout ${opts.compact ? "compact" : ""}` }, opts.hideHead ? null : head, diagram, summary);
   if (!ro) root.append(shop);
   if (err) root.append(h("div", { class: "error" }, err));
   return root;

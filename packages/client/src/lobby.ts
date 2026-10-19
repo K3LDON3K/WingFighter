@@ -122,6 +122,8 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
 }
 
 let rerender: () => void = () => {};
+/** Trvalý prvek ladicího panelu – při překreslení lobby se nestaví znovu (neztrácí rozepsané hodnoty). */
+const lobbyTunePanel = h("div", { style: "margin-top:10px" });
 /** Bot, kterému host právě kliká výbavu. */
 let botEdit: string | null = null;
 
@@ -304,7 +306,7 @@ function roomView(m: LobbyModel, net: Net) {
       const toggle = h("button", { onclick: () => ((tuningOpen = !tuningOpen), rerender()) }, icon("target", "currentColor", 12), label(tuningOpen ? "Skrýt ladění" : "Ladění parametrů"));
       wrap.append(toggle);
       if (tuningOpen) {
-        const panel = h("div", { style: "margin-top:10px" });
+        const panel = lobbyTunePanel;
         renderTuningPanel(panel, room.tuning, room.savedTuning, isHost, {
           onChange: (patch) => net.send({ type: "setTuning", tuning: patch }),
           onReset: () => net.send({ type: "resetTuning" }),
