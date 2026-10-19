@@ -9,4 +9,5 @@ export * from "./resolve.ts";
 export * from "./setup.ts";
 export * from "./bot.ts";
 export * from "./asteroids.ts";
+export * from "./fog.ts";
 export * from "./protocol.ts";

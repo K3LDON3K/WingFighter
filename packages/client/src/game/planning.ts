@@ -18,7 +18,7 @@ import { activeAction } from "./actions.ts";
 export interface PlanningCallbacks {
   select(shipId: string): void;
   setOrders(shipId: string, patch: Partial<ShipOrders>): void;
-  reaim(shipId: string): void;
+  aim(shipId: string): void;
   ready(): void;
   unready(): void;
 }
@@ -27,7 +27,7 @@ export interface PlanningModel {
   state: GameState;
   myId: string;
   orders: Map<string, ShipOrders>;
-  confirmed: Set<string>;
+  aimingShipId: string | null;
   selectedShipId?: string;
   submitted: boolean;
   ready: string[];
@@ -64,7 +64,7 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
   const profile = hullOf(ship.loadout).profile;
   const locked = m.submitted;
   const man = resolveManeuver(profile, o.maneuverId, ship.speed);
-  const confirmed = m.confirmed.has(ship.id);
+  const aiming = m.aimingShipId === ship.id;
   const act = activeAction(o);
 
   const panel = h("div", { class: "panel" });
@@ -74,7 +74,7 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
       h(
         "div",
         { class: "ship-tabs" },
-        ...my.map((s) => h("button", { class: `${s.id === ship.id ? "active" : ""} ${m.confirmed.has(s.id) ? "done" : ""}`, onclick: () => cb.select(s.id) }, s.name)),
+        ...my.map((s) => h("button", { class: s.id === ship.id ? "active" : "", onclick: () => cb.select(s.id) }, s.name)),
       ),
     );
   }
@@ -113,9 +113,9 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
       h(
         "div",
         { class: "muted", style: "font-size:11px;margin-top:4px" },
-        confirmed
-          ? "Manévr potvrzen. Klikni na loď, pokud ho chceš změnit."
-          : "Pohyb myši u lodi kreslí dráhu: směr podle polohy, rychlost podle vzdálenosti (nebo kolečko / klávesy 1–5, K = otočka). Kliknutím potvrď.",
+        aiming
+          ? "Míříš: pohyb myši kreslí dráhu (směr podle polohy, rychlost podle vzdálenosti; kolečko / 1–5 rychlost zamkne, K = otočka). Kliknutím potvrď, Esc zruší."
+          : "Klikni na svou loď a nakresli dráhu myší. Bez označení loď poletí tak, jak je nakresleno.",
       ),
       h(
         "div",
@@ -125,7 +125,7 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
         h("span", { style: `color:${DIFFICULTY_COLOR.red}` }, "■ červený −1"),
         h("span", { style: `color:${DIFFICULTY_COLOR.danger}` }, `■ nebezpečný −2, −${STRESS.dangerHullPercent} % trupu`),
       ),
-      !locked && confirmed ? h("button", { style: "margin-top:6px", onclick: () => cb.reaim(ship.id) }, "Změnit manévr") : null,
+      !locked && !aiming ? h("button", { style: "margin-top:6px", onclick: () => cb.aim(ship.id) }, "Nakreslit manévr") : null,
     ),
   );
 
@@ -145,17 +145,15 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
     h(
       "div",
       { class: "field" },
-      h("h3", {}, "2 · Akce po pohybu"),
-      confirmed
-        ? h(
-            "div",
-            {},
-            h("div", { style: "font-size:13px" }, h("b", {}, chosen)),
-            h("div", { class: "muted", style: "font-size:12px;margin-top:2px" }, act.description),
-            m.picking === "torpedo" ? h("div", { style: "color:var(--yellow);font-size:12px;margin-top:4px" }, "Klikni na nepřátelskou loď/torpédo (žlutý dostřel 320) nebo na bod mapy (do 1200).") : null,
-            m.picking === "lock" ? h("div", { style: "color:var(--yellow);font-size:12px;margin-top:4px" }, "Klikni na nepřátelskou loď v dosahu 300.") : null,
-          )
-        : h("div", { class: "muted", style: "font-size:12px" }, "Nejdřív potvrď manévr – ikony akcí se objeví u konce dráhy. Najetím myší zobrazíš vysvětlení."),
+      h("h3", {}, "2 · Zbraň"),
+      h(
+        "div",
+        {},
+        h("div", { style: "font-size:13px" }, h("b", {}, chosen)),
+        h("div", { class: "muted", style: "font-size:12px;margin-top:2px" }, act.description),
+        m.picking === "torpedo" ? h("div", { style: "color:var(--yellow);font-size:12px;margin-top:4px" }, "Klikni na nepřátelskou loď/torpédo (žlutý dostřel 320) nebo na bod mapy (do 1200).") : null,
+        h("div", { class: "muted", style: "font-size:11px;margin-top:4px" }, "Ikony u konce dráhy: ∅ nic · ➤ torpédo · ✹ mina. Najetím myší zobrazíš vysvětlení."),
+      ),
     ),
   );
 
@@ -189,14 +187,13 @@ export function renderPlanning(root: HTMLElement, m: PlanningModel, cb: Planning
 
   const humans = m.state.players.filter((p) => !p.isBot);
   const waiting = humans.filter((p) => !m.ready.includes(p.id) && m.state.ships.some((s) => s.alive && s.ownerId === p.id));
-  const allConfirmed = my.every((s) => m.confirmed.has(s.id));
   panel.append(
     h(
       "div",
       { class: "ready-bar" },
       locked
         ? h("button", { onclick: () => cb.unready() }, "Změnit rozkazy")
-        : h("button", { class: "primary", disabled: !allConfirmed, title: allConfirmed ? "" : "Nejdřív potvrď manévr všech lodí", onclick: () => cb.ready() }, my.length > 1 ? "Odeslat rozkazy všech lodí (Enter)" : "Připraven (Enter)"),
+        : h("button", { class: "primary", onclick: () => cb.ready() }, my.length > 1 ? "Odeslat rozkazy všech lodí (Enter)" : "Připraven (Enter)"),
       h("div", { class: "waiting" }, waiting.length ? `Čeká se na: ${waiting.map((p) => p.name).join(", ")}` : "Všichni připraveni, vyhodnocuji…"),
     ),
   );

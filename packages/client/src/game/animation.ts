@@ -21,7 +21,14 @@ interface Tween {
 
 /** Textový popis událostí kola pro log. */
 export function describeEvents(result: TurnResult, prev: GameState): string[] {
-  const name = (id: string) => prev.ships.find((s) => s.id === id)?.name ?? result.state.ships.find((s) => s.id === id)?.name ?? id;
+  const name = (id: string) => {
+    const known = prev.ships.find((s) => s.id === id)?.name ?? result.state.ships.find((s) => s.id === id)?.name;
+    if (known) return known;
+    // loď mimo dohled: jméno odvodíme z id "ship-<hráč>-<n>"
+    const m = /^ship-(.+)-(\d+)$/.exec(id);
+    const owner = m ? result.state.players.find((p) => p.id === m[1]) : undefined;
+    return owner ? `${owner.name} (mimo dohled)` : "neznámá loď";
+  };
   const owner = (id: string) => result.state.players.find((p) => p.id === id)?.name ?? "?";
   const die = (f: string) =>
     f === "hit" ? "●" : f === "crit" ? "✸" : f === "focus" ? "◉" : f === "evade" ? "◇" : "○";
@@ -106,12 +113,14 @@ export class TurnAnimation {
     let laserCount = 0;
     const actionCount = ev.filter((e) => e.type === "action" && e.ok && e.path).length;
     const lasersStart = MOVE_DURATION + (actionCount > 0 ? ACTION_DURATION + 200 : 200);
+    let movePassed = false;
 
     for (const e of ev) {
       let time: number;
       switch (e.type) {
         case "move":
           time = 0;
+          movePassed = true;
           for (const p of e.paths) this.tweens.push({ id: p.id, kind: p.kind, points: p.points, start: 0, duration: MOVE_DURATION });
           break;
         case "collision":
@@ -143,6 +152,8 @@ export class TurnAnimation {
           time = lastTime + 60;
           break;
         case "spawnTorpedo":
+          time = movePassed ? Math.max(lasersStart, laserTime + LASER_GAP) + 150 : 0;
+          break;
         case "spawnMine":
           time = Math.max(lasersStart, laserTime + LASER_GAP) + 150;
           break;
@@ -160,6 +171,12 @@ export class TurnAnimation {
     }
     const t = now - this.startedAt;
 
+    for (const s of this.schedule) {
+      if (s.fired || s.time > t) continue;
+      if (s.event.type !== "spawnTorpedo" || s.time !== 0) continue;
+      s.fired = true;
+      this.fire(s.event, now);
+    }
     for (const tw of this.tweens) {
       const p = Math.min(1, Math.max(0, (t - tw.start) / tw.duration));
       if (p <= 0) continue;

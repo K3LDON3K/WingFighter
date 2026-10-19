@@ -15,7 +15,9 @@ import {
   planBot,
   resolveAttack,
   resolveTurn,
+  resultForTeam,
   sanitizeOrders,
+  stateForTeam,
   TORPEDO,
   type Asteroid,
   type GameState,
@@ -193,34 +195,71 @@ describe("vyhodnocení kola", () => {
     expect(r.state.ships[0].stressPoints).toBe(1);
   });
 
-  it("torpédo se vypustí, letí a zasáhne cíl", () => {
+  it("torpédo startuje hned s pohybem a zasáhne cíl v témže kole", () => {
     const g = game();
     place(g, "ship-p1-0", 500, 500, 0);
     place(g, "ship-p2-0", 800, 500, Math.PI);
-    let r = resolveTurn(
+    const r = resolveTurn(
       g,
       [
-        { shipId: "ship-p1-0", maneuverId: "m1a0", fire: false, special: { type: "torpedo", targetId: "ship-p2-0" } },
+        { shipId: "ship-p1-0", maneuverId: "m1a-45", fire: false, special: { type: "torpedo", targetId: "ship-p2-0" } },
         { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false },
       ],
       createRng(1),
     );
-    expect(r.state.torpedoes).toHaveLength(1);
+    expect(r.events[0].type).toBe("spawnTorpedo");
+    expect(r.events[1].type).toBe("move");
     expect(r.state.ships[0].ammo.torpedoes).toBe(2);
-    r = resolveTurn(
-      r.state,
-      [
-        { shipId: "ship-p1-0", maneuverId: "m1a-45", fire: false },
-        { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false },
-      ],
-      createRng(1),
-    );
     const hit = r.events.find((e) => e.type === "torpedoHit");
     expect(hit && hit.type === "torpedoHit" && hit.shipId).toBe("ship-p2-0");
     expect(r.state.torpedoes).toHaveLength(0);
     // 45 zranění: štít 50 → 5, trup 100; dobití → štít 15
     expect(r.state.ships[1].hull).toBe(100);
     expect(r.state.ships[1].shields).toBe(15);
+  });
+
+  it("laser nestřílí skrz asteroid", () => {
+    const g = game({ asteroids: [ast("a", 700, 500, 40)] });
+    place(g, "ship-p1-0", 550, 500, 0);
+    place(g, "ship-p2-0", 850, 500, 0);
+    const r = resolveTurn(
+      g,
+      [
+        { shipId: "ship-p1-0", maneuverId: "m1a0", fire: true },
+        { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false },
+      ],
+      createRng(1),
+    );
+    expect(r.events.some((e) => e.type === "laser")).toBe(false);
+    expect(r.events.some((e) => e.type === "collision")).toBe(false);
+  });
+
+  it("fog of war: nepřátelská loď mimo dohled není ve stavu, asteroid zůstává v paměti tak, jak byl viděn", () => {
+    const g = game({ asteroids: [ast("far", 2200, 1400, 40), ast("near", 700, 500, 40)] });
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 2000, 1400, Math.PI);
+    const memory = new Map();
+    const seen = stateForTeam(g, 0, memory);
+    expect(seen.ships.map((s) => s.id)).toEqual(["ship-p1-0"]);
+    expect(seen.asteroids.map((a) => a.id)).toEqual(["near"]);
+    // p2 vybuchne torpédo u "near", p1 to vidí → paměť se aktualizuje
+    const r = resolveTurn(
+      g,
+      [
+        { shipId: "ship-p1-0", maneuverId: "m1a0", fire: false },
+        { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false },
+      ],
+      createRng(1),
+    );
+    // ručně vykousneme kráter do stavu a předstíráme, že to tým 0 neviděl (loď daleko)
+    const r2 = { ...r, state: structuredClone(r.state) };
+    const far = r2.state.asteroids.find((a) => a.id === "near")!;
+    far.profile = far.profile.map((x) => x * 0.5);
+    far.version++;
+    place(r2.state, "ship-p1-0", 2300, 100, 0);
+    const seen2 = resultForTeam(r2, g, 0, memory);
+    const remembered = seen2.state.asteroids.find((a) => a.id === "near")!;
+    expect(remembered.profile[0]).toBe(40); // stará podoba
   });
 
   it("torpédo vystřelené na bod tam vybuchne, zraní lodě v okolí a vykousne kráter do asteroidu", () => {
@@ -235,10 +274,8 @@ describe("vyhodnocení kola", () => {
       ],
       createRng(1),
     );
-    expect(r.state.torpedoes).toHaveLength(1);
-    expect(r.state.torpedoes[0].targetPoint).toEqual({ x: 1000, y: 500 });
     const before = [...g.asteroids[0].profile];
-    let blast;
+    let blast = r.events.find((e) => e.type === "torpedoHit" && e.blast);
     for (let i = 0; i < 4 && !blast; i++) {
       r = resolveTurn(
         r.state,
@@ -276,7 +313,7 @@ describe("vyhodnocení kola", () => {
   it("torpédo lze sestřelit ručně zaměřeným laserem", () => {
     const g = game();
     place(g, "ship-p1-0", 500, 500, 0);
-    place(g, "ship-p2-0", 1100, 500, Math.PI);
+    place(g, "ship-p2-0", 1300, 500, Math.PI);
     let r = resolveTurn(
       g,
       [
@@ -285,8 +322,9 @@ describe("vyhodnocení kola", () => {
       ],
       createRng(1),
     );
+    expect(r.state.torpedoes).toHaveLength(1);
     const torpId = r.state.torpedoes[0].id;
-    // p2 stojí proti torpédu; torpédo po pohybu bude ~ 300 před ní – zaměří ho
+    // p2 stojí proti torpédu; torpédo po dalším pohybu bude před ní – zaměří ho
     let shot = false;
     for (let seed = 1; seed < 40 && !shot; seed++) {
       const r2 = resolveTurn(
@@ -354,8 +392,7 @@ describe("vyhodnocení kola", () => {
     expect(r.state.mines[0].armed).toBe(true);
     expect(r.state.ships[0].ammo.mines).toBe(1);
     expect(r.state.torpedoes).toHaveLength(1);
-    // torpédo letí po y=500 doleva na p3 a proletí minou na x=500
-    r = go(r.state);
+    // torpédo letí po y=500 doleva na p3 a v dalším kole proletí minou na x=500
     r = go(r.state);
     const blast = r.events.find((e) => e.type === "mineBlast");
     expect(blast).toBeTruthy();

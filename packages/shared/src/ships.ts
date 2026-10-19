@@ -1,3 +1,4 @@
+import { VISION_RADIUS } from "./fog.ts";
 import { FIGHTER_PROFILE } from "./maneuvers.ts";
 import type { HullDef, ModuleDef, ShipLoadout, ShipStats } from "./types.ts";
 
@@ -42,6 +43,7 @@ export function computeStats(loadout: ShipLoadout): ShipStats {
     torpedoes: 0,
     mines: 0,
     radius: hull.radius,
+    vision: VISION_RADIUS,
   };
   for (const id of loadout.moduleIds) {
     const mod = MODULES[id];

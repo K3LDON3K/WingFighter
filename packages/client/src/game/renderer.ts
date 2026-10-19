@@ -18,6 +18,7 @@ import type { ViewModel, ViewShip } from "./view.ts";
 
 export interface IconSpot {
   id: string;
+  shipId: string;
   x: number;
   y: number;
   glyph: string;
@@ -29,12 +30,12 @@ export interface IconSpot {
 export interface Overlay {
   selectedShipId?: string;
   hoverId?: string;
-  /** Náhled manévru vybrané lodi. */
-  preview?: { ship: ViewShip; maneuver: Maneuver };
+  /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
+  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean }[];
+  /** Dohled vlastního týmu (fog of war). */
+  vision?: { x: number; y: number; r: number }[];
   /** Dosažitelné pozice při zvolené rychlosti (body obarvené náročností). */
   reachable?: { x: number; y: number; color: string }[];
-  /** Právě se míří myší (manévr ještě nepotvrzen). */
-  aiming?: boolean;
   /** Věneček ikon akcí kolem konce dráhy. */
   icons?: IconSpot[];
   /** Druhý duch – kam loď skočí přídavným posunem/úskokem. */
@@ -87,7 +88,7 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
-    if (overlay.preview) this.drawPreview(overlay.preview.ship, overlay.preview.maneuver, overlay);
+    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming);
 
     for (const t of view.torpedoes) {
       drawSprite(ctx, this.sprites.torpedo(TEAM_COLORS[t.team]), t.x, t.y, t.heading);
@@ -108,8 +109,59 @@ export class Renderer {
       drawSprite(ctx, this.sprites.fighter(TEAM_COLORS[sel.team]), overlay.actionGhost.x, overlay.actionGhost.y, overlay.actionGhost.heading, 0.3);
     }
     for (const e of view.effects) this.drawEffect(e, view, now);
+    if (overlay.vision) this.drawFog(overlay.vision, cam);
     if (overlay.icons) this.drawIcons(overlay.icons, cam);
 
+    ctx.restore();
+  }
+
+  private fogCanvas: HTMLCanvasElement | null = null;
+
+  /** Fog of war: ztmaví vše mimo dohled vlastních lodí. */
+  private drawFog(vision: { x: number; y: number; r: number }[], cam: Camera) {
+    const ctx = this.ctx;
+    const w = Math.ceil(cam.viewW);
+    const h = Math.ceil(cam.viewH);
+    if (!this.fogCanvas) this.fogCanvas = document.createElement("canvas");
+    const fc = this.fogCanvas;
+    if (fc.width !== w || fc.height !== h) {
+      fc.width = w;
+      fc.height = h;
+    }
+    const f = fc.getContext("2d")!;
+    f.setTransform(1, 0, 0, 1, 0, 0);
+    f.globalCompositeOperation = "source-over";
+    f.clearRect(0, 0, w, h);
+    f.fillStyle = "rgba(2,4,10,0.78)";
+    f.fillRect(0, 0, w, h);
+    f.globalCompositeOperation = "destination-out";
+    for (const v of vision) {
+      const c = cam.toScreen(v.x, v.y);
+      const r = v.r * cam.zoom;
+      const grad = f.createRadialGradient(c.x, c.y, r * 0.85, c.x, c.y, r);
+      grad.addColorStop(0, "rgba(0,0,0,1)");
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      f.fillStyle = grad;
+      f.beginPath();
+      f.arc(c.x, c.y, r, 0, Math.PI * 2);
+      f.fill();
+    }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const dpr = this.canvas.width / w;
+    ctx.scale(dpr, dpr);
+    ctx.drawImage(fc, 0, 0);
+    ctx.restore();
+    // hranice dohledu
+    ctx.save();
+    ctx.strokeStyle = "rgba(148,163,184,0.25)";
+    ctx.setLineDash([4, 8]);
+    ctx.lineWidth = 1;
+    for (const v of vision) {
+      ctx.beginPath();
+      ctx.arc(v.x, v.y, v.r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -312,15 +364,15 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPreview(ship: ViewShip, man: Maneuver, overlay: Overlay) {
+  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[ship.team];
     const pts = samplePath(maneuverPath(ship, man), 24);
     const end = pts[pts.length - 1];
     ctx.save();
     ctx.strokeStyle = DIFFICULTY_COLOR[man.difficulty];
-    ctx.lineWidth = overlay.aiming ? 3 : 2;
-    ctx.setLineDash(overlay.aiming ? [] : [6, 4]);
+    ctx.lineWidth = aiming ? 3 : 2;
+    ctx.setLineDash(aiming ? [] : [6, 4]);
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (const p of pts) ctx.lineTo(p.x, p.y);

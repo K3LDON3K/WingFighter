@@ -104,3 +104,23 @@ export function asteroidMass(a: Asteroid): number {
 export function asteroidDestroyed(a: Asteroid): boolean {
   return asteroidMass(a) < 0.12 || Math.max(...a.profile) < 10;
 }
+
+/** Je přímá dráha mezi dvěma body blokovaná asteroidem? (vzorkuje úsečku) */
+export function lineBlocked(asteroids: Asteroid[], a: Vec, b: Vec, step = 6): boolean {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  const n = Math.max(1, Math.ceil(len / step));
+  for (const ast of asteroids) {
+    // hrubý test: vzdálenost středu od úsečky
+    const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((ast.x - a.x) * dx + (ast.y - a.y) * dy) / (len * len)));
+    const px = a.x + dx * t;
+    const py = a.y + dy * t;
+    if (Math.hypot(ast.x - px, ast.y - py) > ast.radius) continue;
+    for (let i = 1; i < n; i++) {
+      const s = i / n;
+      if (pointInAsteroid(ast, { x: a.x + dx * s, y: a.y + dy * s })) return true;
+    }
+  }
+  return false;
+}

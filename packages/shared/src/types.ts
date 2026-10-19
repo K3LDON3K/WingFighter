@@ -72,6 +72,7 @@ export interface ModuleDef {
     torpedoes: number;
     mines: number;
     hull: number;
+    vision: number;
   }>;
 }
 
@@ -89,6 +90,8 @@ export interface ShipStats {
   torpedoes: number;
   mines: number;
   radius: number;
+  /** Dohled (fog of war). */
+  vision: number;
 }
 
 export interface Ship extends Pose {

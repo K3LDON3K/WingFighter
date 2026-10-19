@@ -44,8 +44,8 @@ interface GameSession {
   anim: TurnAnimation | null;
   queue: TurnResult[];
   orders: Map<string, ShipOrders>;
-  /** Lodě s potvrzeným manévrem (pak se vybírá akce). */
-  confirmed: Set<string>;
+  /** Loď, které se právě kreslí dráha myší (null = nic). */
+  aimingShipId: string | null;
   /** Rychlost zamknutá kolečkem/klávesou – myš pak mění jen směr. */
   speedLock: Map<string, number>;
   selectedShipId?: string;
@@ -160,7 +160,7 @@ function startGame(state: GameState) {
     anim: null,
     queue: [],
     orders: new Map(),
-    confirmed: new Set(),
+    aimingShipId: null,
     speedLock: new Map(),
     submitted: false,
     ready: [],
@@ -183,7 +183,7 @@ function leaveGame() {
 function resetOrders() {
   if (!game) return;
   game.orders.clear();
-  game.confirmed.clear();
+  game.aimingShipId = null;
   game.speedLock.clear();
   game.picking = null;
   const my = game.state.ships.filter((s) => s.alive && s.ownerId === playerId);
@@ -253,8 +253,7 @@ function pumpQueue() {
 
 function submitOrders() {
   if (!game || game.submitted) return;
-  const my = game.state.ships.filter((s) => s.alive && s.ownerId === playerId);
-  if (!my.every((s) => game!.confirmed.has(s.id))) return;
+  game.aimingShipId = null;
   net.send({ type: "submitOrders", orders: [...game.orders.values()] });
   game.submitted = true;
   game.picking = null;
@@ -287,7 +286,7 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint" }, "myš u lodi = dráha · klik = potvrdit · pak ikony akcí · klik na nepřítele = cíl · tažení = posun · ⌘/Ctrl+kolečko = zoom · Enter = připraven"),
+    h("div", { class: "hint" }, "klik na svou loď = kreslit dráhu myší · klik = potvrdit · ikony u konce dráhy = zbraň · klik na nepřítele = cíl · tažení = posun · ⌘/Ctrl+kolečko = zoom · Enter = připraven"),
     tooltipEl,
     overlayEl,
   );
@@ -346,7 +345,7 @@ function frame(now: number) {
   }
   const view = game.anim ? game.anim.view : game.view;
   const overlay = buildOverlay(view);
-  if (game.hoverIcon && !game.icons.some((i) => i.id === game!.hoverIcon)) game.hoverIcon = undefined;
+  if (game.hoverIcon && !game.icons.some((i) => `${i.shipId}:${i.id}` === game!.hoverIcon)) game.hoverIcon = undefined;
   renderer.draw(game.state, view, cam, overlay, now, window.devicePixelRatio || 1);
   renderHud();
   renderTooltip();
@@ -373,64 +372,68 @@ function buildOverlay(view: ViewModel): Overlay {
   const me = g.state.players.find((p) => p.id === playerId);
   const overlay: Overlay = { myTeam: me?.team, hoverId: g.hoverId };
   g.icons = [];
+  // fog of war: dohled vlastního týmu (během animace z aktuálních pozic)
+  overlay.vision = view.ships
+    .filter((s) => s.team === me?.team)
+    .map((s) => ({ x: s.x, y: s.y, r: g.state.ships.find((q) => q.id === s.id)?.stats.vision ?? 960 }));
   if (g.anim || g.state.status === "finished") return overlay;
-  const sel = view.ships.find((s) => s.id === g.selectedShipId);
-  if (!sel) return overlay;
-  overlay.selectedShipId = sel.id;
-  const o = g.orders.get(sel.id);
-  const ship = g.state.ships.find((s) => s.id === sel.id)!;
-  const profile = hullOf(ship.loadout).profile;
-  const man = o ? resolveManeuver(profile, o.maneuverId, ship.speed) : null;
-  if (!o || !man) return overlay;
-  const confirmed = g.confirmed.has(sel.id);
-  overlay.preview = { ship: sel, maneuver: man };
-  overlay.aiming = !confirmed && !g.submitted;
+  overlay.selectedShipId = g.selectedShipId;
   overlay.picking = g.picking ?? undefined;
+  overlay.previews = [];
 
-  if (!g.submitted && !confirmed) {
-    const dots: { x: number; y: number; color: string }[] = [];
-    for (let a = -MAX_ANGLE; a <= MAX_ANGLE; a += ANGLE_STEP) {
-      const mm = makeManeuver(profile, man.speed, a, false, ship.speed);
-      if (!mm || stressCost(mm.difficulty) > ship.stressPoints) continue;
-      const e = maneuverEnd(ship, mm);
-      dots.push({ x: e.x, y: e.y, color: DIFFICULTY_COLOR[mm.difficulty] });
+  const my = g.state.ships.filter((s) => s.alive && s.ownerId === playerId);
+  for (const ship of my) {
+    const vs = view.ships.find((s) => s.id === ship.id);
+    const o = g.orders.get(ship.id);
+    if (!vs || !o) continue;
+    const profile = hullOf(ship.loadout).profile;
+    const man = resolveManeuver(profile, o.maneuverId, ship.speed);
+    if (!man) continue;
+    const aiming = g.aimingShipId === ship.id && !g.submitted;
+    overlay.previews.push({ ship: vs, maneuver: man, aiming });
+    const end = maneuverEnd(ship, man);
+
+    if (aiming) {
+      const dots: { x: number; y: number; color: string }[] = [];
+      for (let a = -MAX_ANGLE; a <= MAX_ANGLE; a += ANGLE_STEP) {
+        const mm = makeManeuver(profile, man.speed, a, false, ship.speed);
+        if (!mm || stressCost(mm.difficulty) > ship.stressPoints) continue;
+        const e = maneuverEnd(ship, mm);
+        dots.push({ x: e.x, y: e.y, color: DIFFICULTY_COLOR[mm.difficulty] });
+      }
+      overlay.reachable = dots;
+    } else if (!g.submitted) {
+      // ikony zbraní u konce dráhy
+      const n = ACTIONS.length;
+      const ringR = ship.stats.radius + 40 / Math.min(1, cam!.zoom);
+      const active = activeAction(o);
+      for (let i = 0; i < n; i++) {
+        const a = ACTIONS[i];
+        const ang = -Math.PI / 2 + ((i - (n - 1) / 2) / n) * Math.PI * 1.1;
+        g.icons.push({
+          id: a.id,
+          shipId: ship.id,
+          x: end.x + Math.cos(ang) * ringR,
+          y: end.y + Math.sin(ang) * ringR,
+          glyph: a.glyph,
+          active: a.id === active.id,
+          disabled: !!a.disabled(ship, g.state),
+          hover: g.hoverIcon === `${ship.id}:${a.id}`,
+        });
+      }
     }
-    overlay.reachable = dots;
-  }
 
-  const end = maneuverEnd(ship, man);
-  if (confirmed && !g.submitted) {
-    overlay.actionGhost = actionGhost(end, o);
-    // věneček ikon kolem konce dráhy
-    const n = ACTIONS.length;
-    const ringR = ship.stats.radius + 48 / Math.min(1, cam!.zoom);
-    const active = activeAction(o);
-    for (let i = 0; i < n; i++) {
-      const a = ACTIONS[i];
-      const ang = -Math.PI / 2 + (i / n) * Math.PI * 2;
-      g.icons.push({
-        id: a.id,
-        x: end.x + Math.cos(ang) * ringR,
-        y: end.y + Math.sin(ang) * ringR,
-        glyph: a.glyph,
-        active: a.id === active.id,
-        disabled: !!a.disabled(ship, g.state),
-        hover: g.hoverIcon === a.id,
-      });
+    if (ship.id === g.selectedShipId) {
+      if (o.special?.type === "torpedo") {
+        overlay.targetId = o.special.targetId;
+        overlay.targetPoint = o.special.point;
+        if (g.picking === "torpedo") overlay.rangeCircle = { radius: TORPEDO.lockRange, label: "zaměření lodi 320 · bod až 1200" };
+      } else {
+        overlay.targetId = o.preferredTargetId;
+      }
     }
-    overlay.icons = g.icons;
   }
-
-  if (o.special?.type === "torpedo") {
-    overlay.targetId = o.special.targetId;
-    overlay.targetPoint = o.special.point;
-    if (g.picking === "torpedo") overlay.rangeCircle = { radius: TORPEDO.lockRange, label: "zaměření lodi 320 · bod až 1200" };
-  } else if (o.action?.type === "lock") {
-    overlay.targetId = o.action.targetId;
-    if (g.picking === "lock") overlay.rangeCircle = { radius: LOCK_RANGE, label: "zámek 300" };
-  } else {
-    overlay.targetId = o.preferredTargetId;
-  }
+  overlay.icons = g.icons;
   return overlay;
 }
 
@@ -438,12 +441,13 @@ function renderHud() {
   if (!hudEl || !game) return;
   const s = game.state;
   const limit = s.settings.turnLimit ? ` / ${s.settings.turnLimit}` : "";
-  const teams = [...new Set(s.ships.map((x) => x.team))].sort((a, b) => a - b);
+  const myTeam = s.players.find((p) => p.id === playerId)?.team;
+  const teams = [...new Set(s.players.map((x) => x.team))].sort((a, b) => a - b);
   const counts = teams
     .map((t) => {
       const alive = s.ships.filter((x) => x.team === t && x.alive).length;
       const label = s.settings.mode === "dm" ? (s.players.find((p) => p.team === t)?.name ?? TEAM_NAMES[t]) : TEAM_NAMES[t];
-      return `<span style="color:${TEAM_COLORS[t]}">${label}: ${alive}</span>`;
+      return `<span style="color:${TEAM_COLORS[t]}">${label}: ${t === myTeam ? alive : `${alive} v dohledu`}</span>`;
     })
     .join(" · ");
   const html = `<div class="big">Kolo ${game.anim ? game.anim["result"].turn : s.turn}${limit}</div><div>${counts}</div>`;
@@ -482,8 +486,9 @@ function renderHud() {
 
 function renderTooltip() {
   if (!tooltipEl || !game || !mapEl) return;
-  const a = game.hoverIcon ? actionById(game.hoverIcon) : undefined;
-  const sel = game.state.ships.find((s) => s.id === game!.selectedShipId);
+  const [hShip, hAct] = (game.hoverIcon ?? "").split(":");
+  const a = hAct ? actionById(hAct) : undefined;
+  const sel = game.state.ships.find((s) => s.id === hShip);
   if (!a || !game.mouse || !sel) {
     tooltipEl.style.display = "none";
     return;
@@ -508,7 +513,7 @@ function renderSide() {
       state: game.state,
       myId: playerId,
       orders: game.orders,
-      confirmed: game.confirmed,
+      aimingShipId: game.aimingShipId,
       selectedShipId: game.selectedShipId,
       submitted: game.submitted,
       ready: game.ready,
@@ -527,10 +532,11 @@ function renderSide() {
         game!.orders.set(id, { ...cur, ...patch });
         renderSide();
       },
-      reaim: (id) => {
-        game!.confirmed.delete(id);
+      aim: (id) => {
+        game!.aimingShipId = id;
         game!.picking = null;
         game!.selectedShipId = id;
+        ensureVisible(id);
         renderSide();
       },
       ready: submitOrders,
@@ -588,8 +594,8 @@ function iconAt(x: number, y: number): IconSpot | undefined {
 function aimAt(wx: number, wy: number) {
   const g = game;
   if (!g || g.submitted) return;
-  const id = g.selectedShipId;
-  if (!id || g.confirmed.has(id)) return;
+  const id = g.aimingShipId;
+  if (!id) return;
   const ship = g.state.ships.find((s) => s.id === id);
   const o = g.orders.get(id);
   if (!ship || !o) return;
@@ -618,14 +624,15 @@ function confirmManeuver(id: string): boolean {
     showError("Na tento manévr nemáš dost stresových bodů.");
     return false;
   }
-  g.confirmed.add(id);
+  g.aimingShipId = null;
+  g.speedLock.delete(id);
   renderSide();
   return true;
 }
 
-function chooseIcon(id: string) {
+function chooseIcon(shipId: string, id: string) {
   const g = game!;
-  const shipId = g.selectedShipId!;
+  g.selectedShipId = shipId;
   const ship = g.state.ships.find((s) => s.id === shipId)!;
   const o = g.orders.get(shipId)!;
   const a = actionById(id);
@@ -679,9 +686,9 @@ function bindInput(c: HTMLCanvasElement) {
     const w = worldPos(e);
     game.mouse = w;
     const ic = iconAt(w.x, w.y);
-    game.hoverIcon = ic?.id;
+    game.hoverIcon = ic ? `${ic.shipId}:${ic.id}` : undefined;
     game.hoverId = ic ? undefined : entityAt(w.x, w.y)?.id;
-    if (!ic && !game.anim) aimAt(w.x, w.y);
+    if (!ic && !game.anim && game.aimingShipId) aimAt(w.x, w.y);
   });
 
   window.addEventListener("mouseup", () => {
@@ -692,40 +699,34 @@ function bindInput(c: HTMLCanvasElement) {
     if (moved || !cam || !game || game.anim || game.submitted) return;
     const g = game;
     const w = worldPos(e);
-    const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
-    const o = sel && g.orders.get(sel.id);
 
-    // 1) ikona akce
+    // 1) míření: klik kamkoliv potvrdí dráhu
+    if (g.aimingShipId) {
+      confirmManeuver(g.aimingShipId);
+      return;
+    }
+    // 2) ikona zbraně
     const ic = iconAt(w.x, w.y);
     if (ic) {
-      chooseIcon(ic.id);
+      chooseIcon(ic.shipId, ic.id);
       return;
     }
     const hit = entityAt(w.x, w.y);
-
-    // 2) vlastní loď: vybrat / znovu mířit
+    // 3) vlastní loď: označit a začít kreslit dráhu
     if (hit?.kind === "ship" && hit.ownerId === playerId) {
-      if (g.selectedShipId === hit.id && g.confirmed.has(hit.id)) g.confirmed.delete(hit.id);
       g.selectedShipId = hit.id;
+      g.aimingShipId = hit.id;
       g.picking = null;
       renderSide();
       return;
     }
+    const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
+    const o = sel && g.orders.get(sel.id);
     if (!sel || !o) return;
-
-    // 3) míření: klik potvrdí manévr
-    if (!g.confirmed.has(sel.id)) {
-      confirmManeuver(sel.id);
-      return;
-    }
-
-    // 4) výběr cíle
+    // 4) výběr cíle pro označenou loď
     if (hit && hit.team !== sel.team) {
       if (o.special?.type === "torpedo" && dist(sel, hitPos(hit)) <= TORPEDO.lockRange) {
         g.orders.set(sel.id, { ...o, special: { type: "torpedo", targetId: hit.id }, preferredTargetId: hit.id });
-        g.picking = null;
-      } else if (o.action?.type === "lock" && hit.kind === "ship" && dist(sel, hitPos(hit)) <= LOCK_RANGE) {
-        g.orders.set(sel.id, { ...o, action: { type: "lock", targetId: hit.id }, preferredTargetId: hit.id });
         g.picking = null;
       } else {
         g.orders.set(sel.id, { ...o, preferredTargetId: hit.id });
@@ -733,7 +734,7 @@ function bindInput(c: HTMLCanvasElement) {
       renderSide();
       return;
     }
-    if (!hit && o.special?.type === "torpedo") {
+    if (!hit && o.special?.type === "torpedo" && (g.picking === "torpedo" || !o.special.targetId)) {
       if (dist(sel, w) <= TORPEDO.pointRange) {
         g.orders.set(sel.id, { ...o, special: { type: "torpedo", point: { x: Math.round(w.x), y: Math.round(w.y) } } });
         g.picking = null;
@@ -750,9 +751,8 @@ function bindInput(c: HTMLCanvasElement) {
       const rect = c.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
-      const id = game.selectedShipId;
-      const aiming = id && !game.confirmed.has(id) && !game.submitted && !game.anim;
-      if (aiming && !(e.ctrlKey || e.metaKey)) {
+      const id = game.aimingShipId;
+      if (id && !game.submitted && !game.anim && !(e.ctrlKey || e.metaKey)) {
         const o = game.orders.get(id);
         const cur = o && parseManeuverId(o.maneuverId);
         if (cur) {
@@ -783,22 +783,24 @@ function bindInput(c: HTMLCanvasElement) {
     if (!id || !cur) return;
     if (e.key === "Escape") {
       if (game.picking) game.picking = null;
-      else game.confirmed.delete(id);
+      else game.aimingShipId = null;
       game.speedLock.delete(id);
       renderSide();
     } else if (/^[1-5]$/.test(e.key)) {
-      game.confirmed.delete(id);
       game.speedLock.set(id, Number(e.key));
       setManeuver(id, Number(e.key), cur.koiogran ? 0 : cur.angle, cur.koiogran);
     } else if (e.key === "k" || e.key === "K") {
-      game.confirmed.delete(id);
       const ship = game.state.ships.find((s) => s.id === id)!;
       const ks = hullOf(ship.loadout).profile.koiogranSpeeds;
       const sp = ks.includes(cur.speed) ? cur.speed : ks[0];
       if (!cur.koiogran) game.speedLock.set(id, sp);
       setManeuver(id, sp, 0, !cur.koiogran);
     } else if (e.key === " ") {
-      if (!game.confirmed.has(id)) confirmManeuver(id);
+      if (game.aimingShipId) confirmManeuver(game.aimingShipId);
+      else {
+        game.aimingShipId = id;
+        renderSide();
+      }
     } else return;
     e.preventDefault();
   });

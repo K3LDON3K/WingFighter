@@ -45,12 +45,6 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
         orders.special = { type: "torpedo", targetId: torpTarget.id };
       } else if (ship.ammo.mines > 0 && nearest && dist(ship, nearest) < 200 && Math.abs(bearingTo(ship, nearest)) > Math.PI / 2 && rng.next() < 0.5) {
         orders.special = { type: "mine" };
-      } else if (willHaveTarget) {
-        orders.action = { type: "focus" };
-      } else if (nearest && dist(end, nearest) <= 300 && rng.next() < 0.6) {
-        orders.action = { type: "lock", targetId: nearest.id };
-      } else {
-        orders.action = { type: "evade" };
       }
     }
     out.push(orders);

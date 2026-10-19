@@ -1,4 +1,4 @@
-import { asteroidDestroyed, carveCrater, circleHitsAsteroid } from "./asteroids.ts";
+import { asteroidDestroyed, carveCrater, circleHitsAsteroid, lineBlocked } from "./asteroids.ts";
 import {
   COLLISION_DAMAGE,
   COLLISION_SCATTER,
@@ -194,6 +194,35 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       deflections: 0,
       collided: false,
     });
+  }
+
+  // Torpéda se vypouštějí hned se začátkem pohybu (ze startovní pozice lodi) – letí rychleji než loď.
+  let seq = 0;
+  const newId = (prefix: string) => `${prefix}-${turn}-${seq++}`;
+  const spawnEvents: TurnEvent[] = [];
+  for (const ship of state.ships) {
+    const o = orders.get(ship.id);
+    if (!ship.alive || o?.special?.type !== "torpedo" || ship.ammo.torpedoes <= 0) continue;
+    const target = enemyTarget(state, ship, o.special.targetId);
+    const point = o.special.point;
+    if (!target && !point) continue;
+    ship.ammo.torpedoes--;
+    const f = forward(ship.heading);
+    const off = ship.stats.radius + TORPEDO.radius + 2;
+    const torpedo: Torpedo = {
+      id: newId("torp"),
+      ownerId: ship.ownerId,
+      team: ship.team,
+      x: ship.x + f.x * off,
+      y: ship.y + f.y * off,
+      heading: ship.heading,
+      targetId: target?.id,
+      targetPoint: target ? undefined : point,
+      trackLeft: TORPEDO.trackTurns,
+      lifeLeft: TORPEDO.lifeTurns,
+    };
+    state.torpedoes.push(torpedo);
+    spawnEvents.push({ type: "spawnTorpedo", torpedo });
   }
 
   const torpMovers = new Map<string, Mover>();
@@ -476,7 +505,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       }
     }
   }
-  events.unshift({ type: "move", paths });
+  events.unshift(...spawnEvents, { type: "move", paths });
   state.torpedoes = state.torpedoes.filter((t) => !removedTorpedoes.has(t.id));
   state.mines = state.mines.filter((m) => !removedMines.has(m.id));
   state.asteroids = state.asteroids.filter((a) => !removedAsteroids.has(a.id));
@@ -568,7 +597,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
 
     const torp = torpedoById(state, o.preferredTargetId);
     if (torp && torp.team !== ship.team) {
-      if (dist(ship, torp) <= LASER.range && inArc(ship, torp, LASER.halfArc) && !shotTorpedoes.has(torp.id)) {
+      if (dist(ship, torp) <= LASER.range && inArc(ship, torp, LASER.halfArc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, ship, torp)) {
         const d = dist(ship, torp);
         const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, {
@@ -586,7 +615,9 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       continue;
     }
 
-    const candidates = state.ships.filter((e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(ship, e, LASER.halfArc));
+    const candidates = state.ships.filter(
+      (e) => e.alive && e.team !== ship.team && dist(ship, e) <= LASER.range && inArc(ship, e, LASER.halfArc) && !lineBlocked(state.asteroids, ship, e),
+    );
     if (candidates.length === 0) continue;
     let target = candidates.find((c) => c.id === o.preferredTargetId);
     if (!target) target = candidates.reduce((best, c) => (dist(ship, c) < dist(ship, best) ? c : best));
@@ -621,36 +652,11 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   for (const [id, dmg] of pending) applyDamage(shipById(state, id)!, dmg, events);
   state.torpedoes = state.torpedoes.filter((t) => !shotTorpedoes.has(t.id));
 
-  /* ---------- 4. Vypuštění torpéd a min ---------- */
-  let seq = 0;
-  const newId = (prefix: string) => `${prefix}-${turn}-${seq++}`;
+  /* ---------- 4. Položení min ---------- */
   for (const ship of state.ships) {
     const o = orders.get(ship.id);
     if (!o?.special || !ship.alive) continue;
-    if (!canAct(ship)) continue;
-    if (o.special.type === "torpedo") {
-      if (ship.ammo.torpedoes <= 0) continue;
-      const target = enemyTarget(state, ship, o.special.targetId);
-      const point = o.special.point;
-      if (!target && !point) continue;
-      ship.ammo.torpedoes--;
-      const f = forward(ship.heading);
-      const off = ship.stats.radius + TORPEDO.radius + 2;
-      const torpedo: Torpedo = {
-        id: newId("torp"),
-        ownerId: ship.ownerId,
-        team: ship.team,
-        x: ship.x + f.x * off,
-        y: ship.y + f.y * off,
-        heading: ship.heading,
-        targetId: target?.id,
-        targetPoint: target ? undefined : point,
-        trackLeft: TORPEDO.trackTurns,
-        lifeLeft: TORPEDO.lifeTurns,
-      };
-      state.torpedoes.push(torpedo);
-      events.push({ type: "spawnTorpedo", torpedo });
-    } else if (o.special.type === "mine") {
+    if (o.special.type === "mine") {
       if (ship.ammo.mines <= 0) continue;
       ship.ammo.mines--;
       const sp = startPose.get(ship.id)!;

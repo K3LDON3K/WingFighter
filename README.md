@@ -25,9 +25,10 @@ Stejný příkaz funguje jako **dedikovaný server** na jakémkoli stroji s Node
 
 ### Manévry
 Manévr = **rychlost 1–5** + **změna kurzu** (po 15°, max ±90°; čím rychleji, tím menší povolený úhel)
-nebo **otočka o 180°** (rychlost 3–4). Nastavuje se jen myší u lodi: pohyb myši kreslí dráhu
-(směr podle polohy, rychlost podle vzdálenosti; kolečko nebo klávesy 1–5 rychlost zamknou, K = otočka),
-**klik potvrdí**. Kolem lodi jsou tečky dosažitelných pozic obarvené podle náročnosti.
+nebo **otočka o 180°** (rychlost 3–4). Nastavuje se jen myší: **klik na vlastní loď** zapne kreslení dráhy
+(směr podle polohy myši, rychlost podle vzdálenosti; kolečko nebo klávesy 1–5 rychlost zamknou, K = otočka),
+**další klik potvrdí** a loď se pustí. Kolem lodi jsou tečky dosažitelných pozic obarvené podle náročnosti.
+Bez označení loď poletí tak, jak má nakresleno (výchozí = stejná rychlost rovně).
 
 **Stresové body** (3 na loď, vidí je všichni): bílý manévr nic, **zelený** (mírný) vrátí 1 bod,
 **červený** (ostrý úhel ≥75°, při rychlosti 4+ už ≥45°, *nebo* změna rychlosti o 2+) stojí 1 bod,
@@ -37,9 +38,14 @@ Akce po pohybu zůstává vždy povolená.
 Lodě nikdy nestojí: při srážce s lodí, asteroidem nebo okrajem mapy je loď **odmrštěna** novým (náhodně
 odchýleným) směrem, dostane 15 zranění, ztratí akci a doletí zbytek pohybu tím směrem.
 
-### Akce (jedna za kolo) – ikony u konce dráhy, najetím myší vysvětlení
-zaměřit (oči na kostkách = zásah/úhyb) · úhyb (+1 úhyb) · zámek cíle (přehození kostek)
-· přídavný posun (rovně/oblouk 1) · úskok do strany · torpédo · mina
+### Zbraň kola – ikony u konce dráhy (∅ nic · ➤ torpédo · ✹ mina), najetím myší vysvětlení
+Akce po pohybu (zaměřit, úhyb, zámek, posun, úskok) jsou ve hře vypnuté – vrátí se jako schopnosti pilotů.
+Torpédo odstartuje **hned se začátkem pohybu** ze startovní pozice lodi.
+
+### Fog of war
+Každá loď vidí do vzdálenosti **960** (3 × zaměřovací dostřel torpéda); tým dohled sdílí. Server každému
+posílá jen to, co jeho tým vidí (lodě, torpéda, miny). Asteroid, který tým jednou spatřil, zůstává v jeho
+paměti v podobě, v jaké ho naposledy viděl – poškození mimo dohled se neprojeví, dokud ho zase neuvidí.
 
 ### Životy
 Trup 100, štíty 50 (dobíjejí se 10 za kolo). Jeden čistý zásah laseru = 15.
@@ -47,6 +53,7 @@ Trup 100, štíty 50 (dobíjejí se 10 za kolo). Jeden čistý zásah laseru = 1
 ### Zbraně
 - **Lasery** – každé kolo zdarma, výseč ±20° před přídí, dostřel 300 (3 pásma: blízko +1 kostka útoku,
   daleko +1 kostka obrany). Střílí na preferovaný cíl, pokud je ve výseči, jinak na nejbližšího nepřítele.
+  **Nestřílí skrz asteroidy.**
 - **Torpédo** (3 ks, místo akce) – cíl: nepřátelská loď/torpédo do 320 (sleduje 3 kola) **nebo bod na mapě**
   do 1200 (letí tam a vybuchne). Rychlost 240/kolo, zatáčí max 75°/kolo, žije 5 kol.
   Přímý zásah lodi = 45. Výbuch (na bodě, o asteroid, na konci doletu) = poloměr 70, zranění 30 všem lodím
@@ -78,6 +85,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.3 – míření jen po označení lodi, zbraně ∅/torpédo/mina (akce po pohybu vypnuté), torpédo startuje
+  s pohybem, fog of war s pamětí asteroidů, lasery nestřílí skrz asteroidy.
 - v1.2 – ovládání jen myší u lodi (bez tlačítek), ikony akcí s vysvětlením u konce dráhy, stresové body,
   životy 100/50, torpédo na bod mapy s plošným výbuchem, krátery v asteroidech.
 - v1.1 – manévr myší (rychlost + úhel místo ciferníku), odmrštění při srážce, sestřelování torpéd,

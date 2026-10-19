@@ -4,7 +4,10 @@ import {
   MAX_TEAMS_TDM,
   planBot,
   resolveTurn,
+  resultForTeam,
   sanitizeOrders,
+  stateForTeam,
+  type AsteroidMemory,
   type ClientMessage,
   type GameSettings,
   type GameState,
@@ -37,6 +40,19 @@ interface RunningGame {
   state: GameState;
   orders: Map<string, ShipOrders[]>;
   rng: ReturnType<typeof createRng>;
+  /** Fog of war: paměť asteroidů každého týmu. */
+  memory: Map<number, AsteroidMemory>;
+}
+
+function memoryFor(g: RunningGame, team: number): AsteroidMemory {
+  let m = g.memory.get(team);
+  if (!m) g.memory.set(team, (m = new Map()));
+  return m;
+}
+
+/** Tým hráče v běžící hře (v DM má každý vlastní). */
+function teamOf(g: RunningGame, playerId: string): number {
+  return g.state.players.find((p) => p.id === playerId)?.team ?? 0;
 }
 
 class Room {
@@ -113,7 +129,8 @@ export class Hub {
       if (member) member.name = client.name;
       this.broadcastRoom(room);
       if (room.game) {
-        this.send(client, { type: "gameState", state: room.game.state, ready: this.readyList(room) });
+        const g = room.game;
+        this.send(client, { type: "gameState", state: stateForTeam(g.state, teamOf(g, client.id), memoryFor(g, teamOf(g, client.id))), ready: this.readyList(room) });
       }
     } else {
       client.roomCode = null;
@@ -273,10 +290,15 @@ export class Hub {
     const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot }));
     const state = createGame({ players, settings: room.settings });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
-    room.game = { state, orders: new Map(), rng };
+    room.game = { state, orders: new Map(), rng, memory: new Map() };
+    const g = room.game;
     for (const m of room.members.values()) m.ready = m.isBot;
     this.broadcastRoom(room);
-    this.broadcast(room, { type: "gameStart", state });
+    for (const m of room.members.values()) {
+      if (m.isBot) continue;
+      const c = this.clients.get(m.id);
+      if (c) this.send(c, { type: "gameStart", state: stateForTeam(state, teamOf(g, m.id), memoryFor(g, teamOf(g, m.id))) });
+    }
     this.broadcastRooms();
     this.planBots(room);
     this.maybeResolve(room);
@@ -310,11 +332,22 @@ export class Hub {
     if (!g || g.state.status === "finished") return;
     if (this.waitingFor(room).length > 0) return;
     const orders = [...g.orders.values()].flat();
+    const prev = g.state;
     const result = resolveTurn(g.state, orders, g.rng);
     g.state = result.state;
     g.orders.clear();
     for (const m of room.members.values()) m.ready = m.isBot;
-    this.broadcast(room, { type: "turnResult", result });
+    // každý tým dostane jen to, co viděl
+    const perTeam = new Map<number, ReturnType<typeof resultForTeam>>();
+    for (const m of room.members.values()) {
+      if (m.isBot) continue;
+      const c = this.clients.get(m.id);
+      if (!c) continue;
+      const team = teamOf(g, m.id);
+      let r = perTeam.get(team);
+      if (!r) perTeam.set(team, (r = resultForTeam(result, prev, team, memoryFor(g, team))));
+      this.send(c, { type: "turnResult", result: r });
+    }
     if (g.state.status !== "finished") {
       this.planBots(room);
       // pokud už nikdo nemusí nic poslat (např. všichni lidé odpojeni), pokračujeme automaticky
