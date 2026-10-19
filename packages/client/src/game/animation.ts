@@ -31,11 +31,20 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "collision":
         lines.push(
           e.with === "ship"
-            ? `${name(e.shipId)} se srazil s ${name(e.otherId!)} a byl odmrštěn (−1).`
+            ? `${name(e.shipId)} se srazil s ${name(e.otherId!)} a byl odmrštěn.`
             : e.with === "asteroid"
-              ? `${name(e.shipId)} narazil do asteroidu a byl odmrštěn (−1).`
-              : `${name(e.shipId)} narazil do okraje mapy (−1).`,
+              ? `${name(e.shipId)} narazil do asteroidu a byl odmrštěn.`
+              : `${name(e.shipId)} narazil do okraje mapy.`,
         );
+        break;
+      case "asteroidHit":
+        lines.push(e.destroyed ? `Asteroid se rozpadl!` : `Výbuch vykousl kus asteroidu.`);
+        break;
+      case "stress":
+        lines.push(`${name(e.shipId)}: stresové body ${e.delta > 0 ? "+" : ""}${e.delta} → ${e.stressPoints}.`);
+        break;
+      case "damage":
+        lines.push(`  ${name(e.shipId)} −${e.amount} (štíty ${e.shieldsAfter}, trup ${e.hullAfter}).`);
         break;
       case "torpedoShot":
         lines.push(`${name(e.shooterId)} pálí na torpédo: ${e.attackDice.map(die).join(" ")} vs ${e.defenseDice.map(die).join(" ")} → ${e.destroyed ? "sestřeleno!" : "minul"}.`);
@@ -44,7 +53,7 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
         lines.push(`Výbuch miny: ${e.hits.map((h) => `${name(h.shipId)} −${h.damage}`).join(", ")}.`);
         break;
       case "torpedoHit":
-        lines.push(e.shipId ? `Torpédo zasáhlo ${name(e.shipId)} (−${e.damage}).` : `Torpédo se roztříštilo.`);
+        lines.push(e.shipId ? `Torpédo zasáhlo ${name(e.shipId)}.` : e.blast ? `Torpédo vybuchlo.` : `Torpédo se roztříštilo.`);
         break;
       case "torpedoExpire":
         lines.push(`Torpédu došlo palivo.`);
@@ -108,6 +117,7 @@ export class TurnAnimation {
         case "collision":
         case "mineBlast":
         case "torpedoHit":
+        case "asteroidHit":
           time = e.t * MOVE_DURATION;
           break;
         case "torpedoExpire":
@@ -188,8 +198,19 @@ export class TurnAnimation {
         break;
       case "torpedoHit":
         v.torpedoes = v.torpedoes.filter((t) => t.id !== e.torpedoId);
-        v.effects.push({ kind: "explosion", x: e.x, y: e.y, size: e.shipId ? 40 : 18, start: now, duration: 600 });
+        v.effects.push({ kind: "explosion", x: e.x, y: e.y, size: e.blast ? 70 : e.shipId ? 40 : 18, start: now, duration: e.blast ? 800 : 600, color: e.blast ? "#f97316" : undefined });
+        if (e.blast) v.effects.push({ kind: "ring", x: e.x, y: e.y, radius: 80, color: "#fb923c", start: now, duration: 600 });
         break;
+      case "asteroidHit": {
+        const a = v.asteroids.find((x) => x.id === e.asteroidId);
+        if (a) {
+          a.profile = [...e.profile];
+          a.version++;
+          if (e.destroyed) v.asteroids = v.asteroids.filter((x) => x.id !== e.asteroidId);
+        }
+        v.effects.push({ kind: "explosion", x: e.x, y: e.y, size: 30, start: now, duration: 700, color: "#a8a29e" });
+        break;
+      }
       case "torpedoExpire":
         v.torpedoes = v.torpedoes.filter((t) => t.id !== e.torpedoId);
         v.effects.push({ kind: "explosion", x: e.x, y: e.y, size: 10, start: now, duration: 400, color: "#94a3b8" });
@@ -211,7 +232,10 @@ export class TurnAnimation {
       }
       case "stress": {
         const s = v.ships.find((x) => x.id === e.shipId);
-        if (s) s.stress = e.stress;
+        if (s) {
+          s.stressPoints = e.stressPoints;
+          v.effects.push({ kind: "text", x: s.x, y: s.y + 20, text: `stres ${e.delta > 0 ? "+" : ""}${e.delta}`, color: "#f472b6", start: now, duration: 900 });
+        }
         break;
       }
       case "laser": {

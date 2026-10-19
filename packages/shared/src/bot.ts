@@ -1,6 +1,7 @@
 import { LASER, TORPEDO } from "./constants.ts";
 import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from "./geometry.ts";
-import { isRed, listManeuvers, maneuverEnd, maneuverPath } from "./maneuvers.ts";
+import { isRed, listManeuvers, maneuverEnd, maneuverPath, stressCost } from "./maneuvers.ts";
+import { circleHitsAsteroid } from "./asteroids.ts";
 import type { Rng } from "./rng.ts";
 import { hullOf } from "./ships.ts";
 import type { GameState, Ship, ShipOrders } from "./types.ts";
@@ -14,7 +15,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
   const myShips = state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const ship of myShips) {
     const enemies = state.ships.filter((e) => e.alive && e.team !== ship.team);
-    const dial = listManeuvers(hullOf(ship.loadout).profile, ship.speed).filter((m) => !(isRed(m.difficulty) && ship.stress > 0) && m.difficulty !== "danger");
+    const dial = listManeuvers(hullOf(ship.loadout).profile, ship.speed).filter((m) => stressCost(m.difficulty) <= ship.stressPoints && m.difficulty !== "danger");
     let best = dial[0];
     let bestScore = -Infinity;
     for (const man of dial) {
@@ -24,10 +25,10 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
       for (const p of samplePath(maneuverPath(ship, man), 8)) {
         const r = ship.stats.radius + 4;
         if (p.x < r || p.y < r || p.x > state.width - r || p.y > state.height - r) score -= 15;
-        for (const a of state.asteroids) if (circlesOverlap(p, r, a, a.radius)) score -= 15;
+        for (const a of state.asteroids) if (circleHitsAsteroid(a, p, r)) score -= 15;
       }
       if (isRed(man.difficulty)) score -= 3;
-      if (man.difficulty === "green" && ship.stress > 0) score += 4;
+      if (man.difficulty === "green" && ship.stressPoints < 3) score += 2;
       if (score > bestScore) {
         bestScore = score;
         best = man;
@@ -38,8 +39,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
     const willHaveTarget = enemies.some((e) => inArc(end, e, LASER.halfArc * 2) && dist(end, e) <= LASER.range);
 
     const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, fire: true, preferredTargetId: nearest?.id };
-    const canAct = ship.stress === 0 || best.difficulty === "green";
-    if (canAct && !isRed(best.difficulty)) {
+    {
       const torpTarget = enemies.find((e) => dist(ship, e) <= TORPEDO.lockRange);
       if (ship.ammo.torpedoes > 0 && torpTarget && rng.next() < 0.45) {
         orders.special = { type: "torpedo", targetId: torpTarget.id };
@@ -62,7 +62,7 @@ function scorePose(state: GameState, ship: Ship, end: Pose, enemies: Ship[]): nu
   let score = 0;
   const r = ship.stats.radius;
   if (end.x < r + 30 || end.y < r + 30 || end.x > state.width - r - 30 || end.y > state.height - r - 30) score -= 50;
-  for (const a of state.asteroids) if (circlesOverlap(end, r + 10, a, a.radius)) score -= 40;
+  for (const a of state.asteroids) if (circleHitsAsteroid(a, end, r + 10)) score -= 40;
   for (const o of state.ships) if (o !== ship && o.alive && circlesOverlap(end, r + 12, o, o.stats.radius)) score -= 25;
   for (const e of enemies) {
     const d = dist(end, e);

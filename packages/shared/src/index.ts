@@ -8,4 +8,5 @@ export * from "./rng.ts";
 export * from "./resolve.ts";
 export * from "./setup.ts";
 export * from "./bot.ts";
+export * from "./asteroids.ts";
 export * from "./protocol.ts";

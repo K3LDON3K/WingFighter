@@ -11,7 +11,7 @@ export const HULLS: Record<string, HullDef> = {
     id: "fighter",
     name: "Stíhač",
     radius: 16,
-    hull: 3,
+    hull: 100,
     capacity: 6,
     slots: { weapon: 2, system: 1 },
     profile: FIGHTER_PROFILE,
@@ -23,7 +23,7 @@ export const MODULES: Record<string, ModuleDef> = {
   "torpedo-rack": { id: "torpedo-rack", name: "Torpédomet", slot: "weapon", size: 1, stats: { torpedoes: 3 } },
   "mine-layer": { id: "mine-layer", name: "Minový zásobník", slot: "system", size: 1, stats: { mines: 2 } },
   "engine-mk1": { id: "engine-mk1", name: "Motor Mk1", slot: "engine", size: 1, stats: { agility: 3 } },
-  "shield-mk1": { id: "shield-mk1", name: "Generátor štítů Mk1", slot: "shield", size: 1, stats: { shields: 2 } },
+  "shield-mk1": { id: "shield-mk1", name: "Generátor štítů Mk1", slot: "shield", size: 1, stats: { shields: 50 } },
 };
 
 export const DEFAULT_LOADOUT: ShipLoadout = {

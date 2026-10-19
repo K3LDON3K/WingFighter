@@ -1,3 +1,5 @@
+import { radiusAt, type Asteroid } from "@spacegame/shared";
+
 /**
  * Procedurální pixel art. Každý sprite se nakreslí do malého offscreen canvasu
  * a při vykreslení se zvětší bez vyhlazování. Všechny šablony míří doprava (+x).
@@ -97,30 +99,19 @@ export function mineSprite(teamColor: string): Sprite {
   return { canvas, scale: 3, cx: 3, cy: 3 };
 }
 
-/** Asteroid: nepravidelný tvar z deterministického seedu, se stínováním. */
-export function asteroidSprite(radius: number, seed: number): Sprite {
+/** Asteroid: tvar z paprskového profilu (krátery ho mění), se stínováním. */
+export function asteroidSprite(a: Asteroid): Sprite {
   const scale = 3;
-  const r = Math.ceil(radius / scale);
+  const r = Math.ceil(a.radius / scale);
   const size = r * 2 + 2;
   const c = document.createElement("canvas");
   c.width = size;
   c.height = size;
   const ctx = c.getContext("2d")!;
-  let s = seed * 9301 + 49297;
+  let s = a.seed * 9301 + 49297;
   const rnd = () => {
     s = (s * 1103515245 + 12345) & 0x7fffffff;
     return s / 0x7fffffff;
-  };
-  // obrys: poloměr kolísá podle úhlu
-  const bumps = 7 + Math.floor(rnd() * 4);
-  const offsets = Array.from({ length: bumps }, () => 0.78 + rnd() * 0.24);
-  const radiusAt = (a: number) => {
-    const f = ((a / (Math.PI * 2)) % 1 + 1) % 1;
-    const i = Math.floor(f * bumps);
-    const t = f * bumps - i;
-    const r0 = offsets[i];
-    const r1 = offsets[(i + 1) % bumps];
-    return r * (r0 + (r1 - r0) * (0.5 - 0.5 * Math.cos(Math.PI * t)));
   };
   const cx = r + 1;
   const cy = r + 1;
@@ -129,11 +120,9 @@ export function asteroidSprite(radius: number, seed: number): Sprite {
       const dx = x + 0.5 - cx;
       const dy = y + 0.5 - cy;
       const d = Math.hypot(dx, dy);
-      const a = Math.atan2(dy, dx);
-      const rr = radiusAt(a);
+      const rr = radiusAt(a, Math.atan2(dy, dx)) / scale;
       if (d > rr) continue;
-      // stínování: světlo zleva shora
-      const light = (-dx - dy) / (rr * 1.5);
+      const light = (-dx - dy) / (Math.max(1, rr) * 1.5);
       const n = rnd();
       let base = 0.55 + light * 0.3 + (n - 0.5) * 0.15;
       if (d > rr - 1.2) base -= 0.2;
@@ -143,13 +132,13 @@ export function asteroidSprite(radius: number, seed: number): Sprite {
       ctx.fillRect(x, y, 1, 1);
     }
   }
-  // pár kráterů
   const craters = 2 + Math.floor(rnd() * 3);
   for (let i = 0; i < craters; i++) {
-    const a = rnd() * Math.PI * 2;
+    const ang = rnd() * Math.PI * 2;
     const dd = rnd() * r * 0.6;
-    const px = Math.round(cx + Math.cos(a) * dd);
-    const py = Math.round(cy + Math.sin(a) * dd);
+    const px = Math.round(cx + Math.cos(ang) * dd);
+    const py = Math.round(cy + Math.sin(ang) * dd);
+    if (Math.hypot(px - cx, py - cy) * scale > radiusAt(a, Math.atan2(py - cy, px - cx)) - 4) continue;
     const cr = 1 + Math.floor(rnd() * Math.max(1, r / 5));
     ctx.fillStyle = "rgba(40,35,30,0.55)";
     ctx.beginPath();
@@ -206,10 +195,14 @@ export class SpriteCache {
     if (!s) this.mines.set(color, (s = mineSprite(color)));
     return s;
   }
-  asteroid(radius: number, seed: number): Sprite {
-    const key = `${radius}:${seed}`;
+  asteroid(a: Asteroid): Sprite {
+    const key = `${a.id}:${a.version}`;
     let s = this.asteroids.get(key);
-    if (!s) this.asteroids.set(key, (s = asteroidSprite(radius, seed)));
+    if (!s) {
+      // starší verze téhož asteroidu zahodit
+      for (const k of [...this.asteroids.keys()]) if (k.startsWith(`${a.id}:`)) this.asteroids.delete(k);
+      this.asteroids.set(key, (s = asteroidSprite(a)));
+    }
     return s;
   }
 }

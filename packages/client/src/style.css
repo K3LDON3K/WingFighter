@@ -414,3 +414,46 @@ h3 {
     grid-template-columns: 1fr;
   }
 }
+.pips {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
+}
+.pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: rgba(244, 114, 182, 0.25);
+}
+.pip.on {
+  background: #f472b6;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  margin-top: 6px;
+}
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  max-width: 280px;
+  background: rgba(13, 18, 34, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  z-index: 5;
+}
+.tooltip b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--accent);
+}
+.tooltip .warn {
+  color: var(--yellow);
+}
+.stats {
+  grid-template-columns: repeat(3, 1fr);
+}

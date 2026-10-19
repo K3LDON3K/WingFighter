@@ -20,9 +20,14 @@ export const LASER = {
   band: 100,
 };
 
+/** Zranění za jeden čistý zásah laserem (zásahy − úhyby). */
+export const DAMAGE_PER_HIT = 15;
+
 export const TORPEDO = {
-  /** Zaměřovací dostřel při plánování (měří se z pozic na začátku kola). */
+  /** Zaměřovací dostřel na loď/torpédo při plánování (měří se z pozic na začátku kola). */
   lockRange: 320,
+  /** Max. vzdálenost bodu na mapě, na který lze torpédo vystřelit (celý dolet). */
+  pointRange: 1200,
   /** Ujetá vzdálenost za kolo (musí být víc než nejrychlejší manévr lodi = 5 × MOVE_UNIT). */
   speed: 240,
   /** Maximální změna kurzu za kolo. */
@@ -31,23 +36,38 @@ export const TORPEDO = {
   trackTurns: 3,
   /** Celková životnost v kolech. */
   lifeTurns: 5,
-  /** Zranění při zásahu (fyzické, bez kostek). */
-  damage: 3,
+  /** Zranění při přímém zásahu lodi (fyzické, bez kostek). */
+  damage: 45,
   /** Poloměr pro detekci zásahu. */
   radius: 5,
+  /** Plošný výbuch (na bodě, o asteroid, na konci života): poloměr a zranění všem lodím v poli. */
+  blastRadius: 70,
+  blastDamage: 30,
 };
 
 export const MINE = {
   /** Poloměr pole působnosti. */
   radius: 70,
   /** Zranění všem lodím v poli. */
-  damage: 2,
+  damage: 30,
 };
 
-export const SHIELD_RECHARGE_PER_TURN = 1;
+/** Kráter, který výbuch torpéda/miny vykousne z asteroidu. */
+export const CRATER_RADIUS = 45;
+
+export const SHIELD_RECHARGE_PER_TURN = 10;
 
 /** Zranění za náraz (do asteroidu, okraje mapy i jiné lodi). */
-export const COLLISION_DAMAGE = 1;
+export const COLLISION_DAMAGE = 15;
+
+/** Stresové body: zásoba, cena manévrů, dobití za zelený manévr, poškození za nebezpečný (% trupu). */
+export const STRESS = {
+  max: 3,
+  costRed: 1,
+  costDanger: 2,
+  regenGreen: 1,
+  dangerHullPercent: 5,
+};
 /** Max. náhodná odchylka směru po odmrštění (radiány). */
 export const COLLISION_SCATTER = (40 * Math.PI) / 180;
 /** Kolikrát se loď může v jednom kole odrazit, než se zastaví. */

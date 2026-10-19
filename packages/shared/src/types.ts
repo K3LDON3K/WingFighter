@@ -31,7 +31,9 @@ export type ActionOrder =
   | { type: "boost"; dir: "straight" | "left" | "right" }
   | { type: "barrelRoll"; side: Side };
 
-export type SpecialOrder = { type: "torpedo"; targetId: string } | { type: "mine" };
+export type SpecialOrder =
+  | { type: "torpedo"; targetId?: string; point?: { x: number; y: number } }
+  | { type: "mine" };
 
 /** Rozkaz pro jednu loď na jedno kolo. */
 export interface ShipOrders {
@@ -98,7 +100,8 @@ export interface Ship extends Pose {
   stats: ShipStats;
   hull: number;
   shields: number;
-  stress: number;
+  /** Zásoba stresových bodů (červený manévr −1, nebezpečný −2, zelený +1). */
+  stressPoints: number;
   /** Rychlost posledního manévru (prudká změna o 2+ = červený manévr). */
   speed: number;
   tokens: { focus: number; evade: number };
@@ -113,7 +116,10 @@ export interface Torpedo extends Pose {
   id: string;
   ownerId: string;
   team: number;
-  targetId: string;
+  /** Sledovaný cíl (loď nebo torpédo) … */
+  targetId?: string;
+  /** … nebo bod na mapě, kde má vybuchnout. */
+  targetPoint?: { x: number; y: number };
   trackLeft: number;
   lifeLeft: number;
 }
@@ -132,12 +138,17 @@ export interface Asteroid {
   id: string;
   x: number;
   y: number;
+  /** Nominální (největší) poloměr – hrubý test kolizí. */
   radius: number;
   /** Rychlost za kolo – pro budoucí pohyblivé asteroidy (v1 = 0). */
   vx: number;
   vy: number;
-  /** Seed pro vykreslení tvaru. */
+  /** Seed tvaru. */
   seed: number;
+  /** Tvar: vzdálenost okraje od středu pro ASTEROID_SEGMENTS úhlů (0 = díra). Výbuchy ho vykusují. */
+  profile: number[];
+  /** Zvýší se při každé změně tvaru (klient podle toho překreslí sprite). */
+  version: number;
 }
 
 export interface PlayerInfo {
@@ -182,7 +193,8 @@ export type TurnEvent =
   | { type: "move"; paths: MovePath[] }
   | { type: "collision"; shipId: string; with: "ship" | "asteroid" | "edge"; otherId?: string; t: number; newHeading: number }
   | { type: "mineBlast"; mineId: string; x: number; y: number; t: number; hits: { shipId: string; damage: number }[] }
-  | { type: "torpedoHit"; torpedoId: string; shipId?: string; x: number; y: number; t: number; damage: number }
+  | { type: "torpedoHit"; torpedoId: string; shipId?: string; x: number; y: number; t: number; damage: number; blast: boolean }
+  | { type: "asteroidHit"; asteroidId: string; x: number; y: number; t: number; profile: number[]; destroyed: boolean }
   | { type: "torpedoExpire"; torpedoId: string; x: number; y: number }
   | { type: "torpedoShot"; torpedoId: string; shooterId: string; x: number; y: number; attackDice: DieFace[]; defenseDice: DieFace[]; destroyed: boolean }
   | { type: "action"; shipId: string; action: ActionOrder; ok: boolean; path?: Pose[] }
@@ -203,7 +215,7 @@ export type TurnEvent =
   | { type: "spawnMine"; mine: Mine }
   | { type: "damage"; shipId: string; amount: number; shieldsAfter: number; hullAfter: number }
   | { type: "destroyed"; shipId: string; x: number; y: number }
-  | { type: "stress"; shipId: string; stress: number };
+  | { type: "stress"; shipId: string; stressPoints: number; delta: number };
 
 export interface MovePath {
   id: string;

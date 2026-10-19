@@ -25,28 +25,37 @@ Stejný příkaz funguje jako **dedikovaný server** na jakémkoli stroji s Node
 
 ### Manévry
 Manévr = **rychlost 1–5** + **změna kurzu** (po 15°, max ±90°; čím rychleji, tím menší povolený úhel)
-nebo **otočka o 180°** (rychlost 3–4). Nastavuje se myší přímo u lodi: klik na loď → pohyb myši = směr,
-kolečko = rychlost, klik = potvrdit; nebo tažením od lodi (vzdálenost = rychlost). Klávesy 1–5, šipky, K.
-Barva manévru: **zelený** (mírný; odstraní stres), **bílý**, **červený** (ostrý úhel *nebo* změna rychlosti
-o 2 a víc; způsobí stres → bez akce, příště žádný červený), **nebezpečný** (změna rychlosti o 2+ *a* ostrý
-úhel; jako červený + 1 zranění). Kolem lodi se zobrazují dosažitelné pozice obarvené podle náročnosti.
+nebo **otočka o 180°** (rychlost 3–4). Nastavuje se jen myší u lodi: pohyb myši kreslí dráhu
+(směr podle polohy, rychlost podle vzdálenosti; kolečko nebo klávesy 1–5 rychlost zamknou, K = otočka),
+**klik potvrdí**. Kolem lodi jsou tečky dosažitelných pozic obarvené podle náročnosti.
+
+**Stresové body** (3 na loď, vidí je všichni): bílý manévr nic, **zelený** (mírný) vrátí 1 bod,
+**červený** (ostrý úhel ≥75°, při rychlosti 4+ už ≥45°, *nebo* změna rychlosti o 2+) stojí 1 bod,
+**nebezpečný** (změna rychlosti o 2+ *a* ostrý úhel) stojí 2 body a 5 % trupu. Bez bodů manévr nejde vybrat.
+Akce po pohybu zůstává vždy povolená.
 
 Lodě nikdy nestojí: při srážce s lodí, asteroidem nebo okrajem mapy je loď **odmrštěna** novým (náhodně
-odchýleným) směrem, dostane 1 zranění, ztratí akci a doletí zbytek pohybu tím směrem.
+odchýleným) směrem, dostane 15 zranění, ztratí akci a doletí zbytek pohybu tím směrem.
 
-### Akce (jedna za kolo)
+### Akce (jedna za kolo) – ikony u konce dráhy, najetím myší vysvětlení
 zaměřit (oči na kostkách = zásah/úhyb) · úhyb (+1 úhyb) · zámek cíle (přehození kostek)
-· přídavný posun (rovně/oblouk 1) · úskok do strany
+· přídavný posun (rovně/oblouk 1) · úskok do strany · torpédo · mina
+
+### Životy
+Trup 100, štíty 50 (dobíjejí se 10 za kolo). Jeden čistý zásah laseru = 15.
 
 ### Zbraně
 - **Lasery** – každé kolo zdarma, výseč ±20° před přídí, dostřel 300 (3 pásma: blízko +1 kostka útoku,
   daleko +1 kostka obrany). Střílí na preferovaný cíl, pokud je ve výseči, jinak na nejbližšího nepřítele.
-- **Torpédo** (3 ks, místo akce) – cíl (loď nebo nepřátelské torpédo) musí být v zaměřovacím dostřelu 320.
-  Letí rychlostí 240/kolo, zatáčí max 75°/kolo, cíl sleduje 3 kola, žije 5 kol, zranění 3. Vybuchne o cokoliv.
-  **Sestřelení:** torpédo jde ručně označit jako cíl laserů (2 obranné kostky, každý zásah ho zničí)
-  nebo jako cíl jiného torpéda.
+- **Torpédo** (3 ks, místo akce) – cíl: nepřátelská loď/torpédo do 320 (sleduje 3 kola) **nebo bod na mapě**
+  do 1200 (letí tam a vybuchne). Rychlost 240/kolo, zatáčí max 75°/kolo, žije 5 kol.
+  Přímý zásah lodi = 45. Výbuch (na bodě, o asteroid, na konci doletu) = poloměr 70, zranění 30 všem lodím
+  v poli a **kráter do asteroidu**. Sestřelení: torpédo jde ručně označit jako cíl laserů (2 obranné kostky)
+  nebo jako cíl jiného torpéda; dvě torpéda, která se potkají, vybuchnou.
 - **Mina** (2 ks, místo akce) – zůstane na místě, kde loď kolo začala. Aktivní od příštího kola,
-  spustí ji kdokoliv (i vlastní loď) nebo torpédo při vstupu do pole (poloměr 70), zranění 2 všem v poli.
+  spustí ji kdokoliv (i vlastní loď) nebo torpédo při vstupu do pole (poloměr 70), zranění 30 všem v poli,
+  kráter do asteroidu.
+- **Asteroidy** mají tvar (48 paprsků); výbuchy z nich vykusují krátery (poloměr 45), malý zbytek se rozpadne.
 
 Všechna čísla jsou v `packages/shared/src/constants.ts` a `ships.ts`.
 
@@ -69,6 +78,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v1.2 – ovládání jen myší u lodi (bez tlačítek), ikony akcí s vysvětlením u konce dráhy, stresové body,
+  životy 100/50, torpédo na bod mapy s plošným výbuchem, krátery v asteroidech.
 - v1.1 – manévr myší (rychlost + úhel místo ciferníku), odmrštění při srážce, sestřelování torpéd,
   torpéda spouští miny, větší mapa (2400×1600), oprava zadávání jména.
 - v1 – první hratelný prototyp.

@@ -1,4 +1,4 @@
-import { MOVE_UNIT } from "./constants.ts";
+import { MOVE_UNIT, STRESS } from "./constants.ts";
 import { makePath, type Pose } from "./geometry.ts";
 import type { Difficulty, Maneuver, ManeuverProfile } from "./types.ts";
 
@@ -106,4 +106,9 @@ export function maneuverLabel(man: Maneuver): string {
   if (man.koiogran) return `Otočka ${man.speed}`;
   if (man.angle === 0) return `Rovně ${man.speed}`;
   return `Rychlost ${man.speed}, ${Math.abs(man.angle)}° ${man.angle < 0 ? "vlevo" : "vpravo"}`;
+}
+
+/** Kolik stresových bodů manévr stojí (záporné = dobije). */
+export function stressCost(d: Difficulty): number {
+  return d === "danger" ? STRESS.costDanger : d === "red" ? STRESS.costRed : d === "green" ? -STRESS.regenGreen : 0;
 }

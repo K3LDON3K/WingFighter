@@ -1,4 +1,4 @@
-import type { GameState, Mine, Pose, Ship, Torpedo } from "@spacegame/shared";
+import type { Asteroid, GameState, Mine, Pose, Ship, Torpedo } from "@spacegame/shared";
 
 /** Co se právě kreslí – během plánování kopie stavu, během animace průběžně měněný model. */
 export interface ViewShip extends Pose {
@@ -9,7 +9,7 @@ export interface ViewShip extends Pose {
   maxHull: number;
   shields: number;
   maxShields: number;
-  stress: number;
+  stressPoints: number;
   radius: number;
   alive: boolean;
   tokens: { focus: number; evade: number };
@@ -21,6 +21,7 @@ export interface ViewShip extends Pose {
 export interface ViewTorpedo extends Pose {
   id: string;
   team: number;
+  targetPoint?: { x: number; y: number };
 }
 
 export interface ViewMine {
@@ -43,6 +44,7 @@ export interface ViewModel {
   ships: ViewShip[];
   torpedoes: ViewTorpedo[];
   mines: ViewMine[];
+  asteroids: Asteroid[];
   effects: Effect[];
 }
 
@@ -58,7 +60,7 @@ export function shipToView(s: Ship): ViewShip {
     maxHull: s.stats.hull,
     shields: s.shields,
     maxShields: s.stats.shields,
-    stress: s.stress,
+    stressPoints: s.stressPoints,
     radius: s.stats.radius,
     alive: s.alive,
     tokens: { ...s.tokens },
@@ -68,7 +70,7 @@ export function shipToView(s: Ship): ViewShip {
 }
 
 export function torpedoToView(t: Torpedo): ViewTorpedo {
-  return { id: t.id, team: t.team, x: t.x, y: t.y, heading: t.heading };
+  return { id: t.id, team: t.team, x: t.x, y: t.y, heading: t.heading, targetPoint: t.targetPoint };
 }
 
 export function mineToView(m: Mine): ViewMine {
@@ -80,6 +82,7 @@ export function viewFromState(state: GameState): ViewModel {
     ships: state.ships.filter((s) => s.alive).map(shipToView),
     torpedoes: state.torpedoes.map(torpedoToView),
     mines: state.mines.map(mineToView),
+    asteroids: structuredClone(state.asteroids),
     effects: [],
   };
 }

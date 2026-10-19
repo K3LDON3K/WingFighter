@@ -1,5 +1,6 @@
 import {
   LASER,
+  STRESS,
   TEAM_COLORS,
   TORPEDO,
   forward,
@@ -11,28 +12,44 @@ import {
   type Pose,
 } from "@spacegame/shared";
 import type { Camera } from "./camera.ts";
+import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
 import type { ViewModel, ViewShip } from "./view.ts";
-import { DIFFICULTY_COLOR } from "./planning.ts";
+
+export interface IconSpot {
+  id: string;
+  x: number;
+  y: number;
+  glyph: string;
+  active: boolean;
+  disabled: boolean;
+  hover: boolean;
+}
 
 export interface Overlay {
   selectedShipId?: string;
-  hoverShipId?: string;
+  hoverId?: string;
   /** Náhled manévru vybrané lodi. */
   preview?: { ship: ViewShip; maneuver: Maneuver };
   /** Dosažitelné pozice při zvolené rychlosti (body obarvené náročností). */
   reachable?: { x: number; y: number; color: string }[];
-  /** Právě se míří myší. */
+  /** Právě se míří myší (manévr ještě nepotvrzen). */
   aiming?: boolean;
-  /** Zvýraznit zaměřovací dostřel torpéd (při výběru cíle). */
-  showTorpedoRange?: boolean;
-  /** Zvýraznit lasery výseč u vybrané lodi. */
-  showArc?: boolean;
-  /** Id cíle, který hráč vybral (torpédo / preferovaný). */
+  /** Věneček ikon akcí kolem konce dráhy. */
+  icons?: IconSpot[];
+  /** Druhý duch – kam loď skočí přídavným posunem/úskokem. */
+  actionGhost?: Pose;
+  /** Zvýraznit dostřel kolem lodi (žlutá kružnice). */
+  rangeCircle?: { radius: number; label: string };
+  /** Zvolený cíl (loď / torpédo) a bod pro torpédo. */
   targetId?: string;
-  /** Id týmu místního hráče – pro odlišení přátel/nepřátel. */
+  targetPoint?: { x: number; y: number };
+  /** Právě se vybírá cíl kliknutím. */
+  picking?: "torpedo" | "lock";
   myTeam?: number;
 }
+
+export const ICON_RADIUS = 13;
 
 export class Renderer {
   readonly sprites = new SpriteCache();
@@ -57,9 +74,11 @@ export class Renderer {
 
     this.drawBackground(state, cam);
     this.drawGrid(state);
-    for (const a of state.asteroids) this.drawAsteroid(a);
+    for (const a of view.asteroids) this.drawAsteroid(a);
     for (const m of view.mines) this.drawMine(m, now);
 
+    const sel = overlay.selectedShipId ? view.ships.find((x) => x.id === overlay.selectedShipId) : undefined;
+    if (sel && overlay.rangeCircle) this.drawRange(sel, overlay.rangeCircle.radius, "#fbbf24", overlay.rangeCircle.label);
     if (overlay.reachable) {
       for (const d of overlay.reachable) {
         ctx.fillStyle = d.color;
@@ -69,17 +88,11 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
     if (overlay.preview) this.drawPreview(overlay.preview.ship, overlay.preview.maneuver, overlay);
-    if (overlay.selectedShipId) {
-      const s = view.ships.find((x) => x.id === overlay.selectedShipId);
-      if (s) {
-        if (overlay.showArc && !overlay.preview) this.drawArc(s, TEAM_COLORS[s.team]);
-        if (overlay.showTorpedoRange) this.drawRange(s, TORPEDO.lockRange, "#fbbf24");
-      }
-    }
 
     for (const t of view.torpedoes) {
       drawSprite(ctx, this.sprites.torpedo(TEAM_COLORS[t.team]), t.x, t.y, t.heading);
-      if (overlay.targetId === t.id || overlay.hoverShipId === t.id) {
+      if (t.targetPoint && (t.team === overlay.myTeam || overlay.myTeam === undefined)) this.drawPointMarker(t.targetPoint, TEAM_COLORS[t.team], 0.5);
+      if (overlay.targetId === t.id || overlay.hoverId === t.id) {
         ctx.save();
         ctx.strokeStyle = overlay.targetId === t.id ? "#fbbf24" : "rgba(248,250,252,0.5)";
         ctx.setLineDash([3, 3]);
@@ -90,7 +103,12 @@ export class Renderer {
       }
     }
     for (const s of view.ships) this.drawShip(s, overlay, now);
+    if (overlay.targetPoint) this.drawPointMarker(overlay.targetPoint, "#fbbf24", 1, now);
+    if (overlay.actionGhost && sel) {
+      drawSprite(ctx, this.sprites.fighter(TEAM_COLORS[sel.team]), overlay.actionGhost.x, overlay.actionGhost.y, overlay.actionGhost.heading, 0.3);
+    }
     for (const e of view.effects) this.drawEffect(e, view, now);
+    if (overlay.icons) this.drawIcons(overlay.icons, cam);
 
     ctx.restore();
   }
@@ -104,12 +122,9 @@ export class Renderer {
     const vh = cam.viewH / cam.zoom;
     ctx.fillRect(cam.x, cam.y, vw, vh);
     ctx.restore();
-    // hranice mapy
     ctx.strokeStyle = "rgba(148,163,184,0.35)";
     ctx.lineWidth = 2;
     ctx.strokeRect(0, 0, state.width, state.height);
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.fillRect(cam.x - 10, cam.y - 10, vw + 20, Math.max(0, -cam.y + 10));
   }
 
   private drawGrid(state: GameState) {
@@ -129,7 +144,7 @@ export class Renderer {
   }
 
   private drawAsteroid(a: Asteroid) {
-    drawSprite(this.ctx, this.sprites.asteroid(a.radius, a.seed), a.x, a.y, 0);
+    drawSprite(this.ctx, this.sprites.asteroid(a), a.x, a.y, 0);
   }
 
   private drawMine(m: { x: number; y: number; radius: number; team: number; armed: boolean }, now: number) {
@@ -154,11 +169,32 @@ export class Renderer {
     }
   }
 
+  private drawPointMarker(p: { x: number; y: number }, color: string, alpha: number, now = 0) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    const r = 10 + (now ? 3 * Math.sin(now / 200) : 0);
+    ctx.beginPath();
+    ctx.moveTo(p.x - r, p.y);
+    ctx.lineTo(p.x + r, p.y);
+    ctx.moveTo(p.x, p.y - r);
+    ctx.lineTo(p.x, p.y + r);
+    ctx.stroke();
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, TORPEDO.blastRadius, 0, Math.PI * 2);
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   private drawShip(s: ViewShip, overlay: Overlay, now: number) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[s.team];
     const selected = overlay.selectedShipId === s.id;
-    const hovered = overlay.hoverShipId === s.id;
+    const hovered = overlay.hoverId === s.id;
     const targeted = overlay.targetId === s.id;
 
     if (selected || hovered || targeted) {
@@ -172,7 +208,6 @@ export class Renderer {
       ctx.restore();
     }
 
-    // štítová aura
     if (s.shields > 0) {
       ctx.save();
       ctx.globalAlpha = 0.12 + 0.08 * (s.shields / Math.max(1, s.maxShields));
@@ -183,7 +218,6 @@ export class Renderer {
       ctx.restore();
     }
 
-    // motory – jemné blikání
     const f = forward(s.heading);
     ctx.save();
     ctx.globalAlpha = 0.6 + 0.3 * Math.sin(now / 90 + s.x);
@@ -195,7 +229,6 @@ export class Renderer {
 
     drawSprite(ctx, this.sprites.fighter(color), s.x, s.y, s.heading);
 
-    // jméno a pruhy
     ctx.save();
     ctx.font = "11px ui-monospace, Menlo, monospace";
     ctx.textAlign = "center";
@@ -206,37 +239,34 @@ export class Renderer {
     const by = s.y - s.radius - 12;
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
-    // štíty
     const sw = s.maxShields > 0 ? (bw * s.shields) / s.maxShields : 0;
     ctx.fillStyle = "#60a5fa";
     ctx.fillRect(bx, by, sw, 2);
-    // trup
     const hw = (bw * s.hull) / Math.max(1, s.maxHull);
-    ctx.fillStyle = s.hull <= 1 ? "#ef4444" : "#22c55e";
+    ctx.fillStyle = s.hull <= s.maxHull * 0.3 ? "#ef4444" : "#22c55e";
     ctx.fillRect(bx, by + 3, hw, 2);
-    // tokeny
+    // stresové body (jen vlastní tým vidí detail; ostatní také – informace není tajná)
+    for (let i = 0; i < STRESS.max; i++) {
+      ctx.fillStyle = i < s.stressPoints ? "#f472b6" : "rgba(244,114,182,0.25)";
+      ctx.fillRect(s.x + s.radius + 6 + i * 5, s.y - s.radius - 10, 3, 3);
+    }
     let tx = s.x + s.radius + 6;
-    const ty = s.y - s.radius - 6;
+    const ty = s.y - s.radius + 2;
     ctx.font = "10px ui-monospace, Menlo, monospace";
     ctx.textAlign = "left";
-    if (s.stress > 0) {
-      ctx.fillStyle = "#f87171";
-      ctx.fillText("S".repeat(s.stress), tx, ty);
-      tx += 8 * s.stress;
-    }
     if (s.tokens.focus) {
       ctx.fillStyle = "#4ade80";
-      ctx.fillText("F", tx, ty);
-      tx += 8;
+      ctx.fillText("◎", tx, ty);
+      tx += 10;
     }
     if (s.tokens.evade) {
       ctx.fillStyle = "#86efac";
-      ctx.fillText("E", tx, ty);
-      tx += 8;
+      ctx.fillText("◇", tx, ty);
+      tx += 10;
     }
     if (s.lockTargetId) {
       ctx.fillStyle = "#fbbf24";
-      ctx.fillText("L", tx, ty);
+      ctx.fillText("⌖", tx, ty);
     }
     ctx.restore();
   }
@@ -255,7 +285,6 @@ export class Renderer {
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.stroke();
-    // pásma dostřelu
     ctx.globalAlpha = 0.25;
     for (let b = 1; b < 3; b++) {
       ctx.beginPath();
@@ -265,7 +294,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawRange(s: ViewShip, range: number, color: string) {
+  private drawRange(s: ViewShip, range: number, color: string, label: string) {
     const ctx = this.ctx;
     ctx.save();
     ctx.globalAlpha = 0.5;
@@ -275,6 +304,11 @@ export class Renderer {
     ctx.beginPath();
     ctx.arc(s.x, s.y, range, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    ctx.font = "11px ui-monospace, Menlo, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(label, s.x, s.y - range - 6);
     ctx.restore();
   }
 
@@ -286,14 +320,13 @@ export class Renderer {
     ctx.save();
     ctx.strokeStyle = DIFFICULTY_COLOR[man.difficulty];
     ctx.lineWidth = overlay.aiming ? 3 : 2;
-    ctx.setLineDash([6, 4]);
+    ctx.setLineDash(overlay.aiming ? [] : [6, 4]);
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (const p of pts) ctx.lineTo(p.x, p.y);
     ctx.stroke();
     ctx.restore();
-    if (overlay.showArc) this.drawArc(end, color);
-    // duch lodi
+    this.drawArc(end, color);
     ctx.save();
     ctx.strokeStyle = shade(color, 1.3);
     ctx.lineWidth = 1;
@@ -303,6 +336,36 @@ export class Renderer {
     ctx.stroke();
     ctx.restore();
     drawSprite(ctx, this.sprites.fighter(color), end.x, end.y, end.heading, 0.45);
+    // popisek manévru u konce dráhy
+    ctx.save();
+    ctx.font = "bold 11px ui-monospace, Menlo, monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = DIFFICULTY_COLOR[man.difficulty];
+    const label = man.koiogran ? `otočka ${man.speed}` : `${man.speed} · ${man.angle === 0 ? "rovně" : `${Math.abs(man.angle)}° ${man.angle < 0 ? "L" : "P"}`}`;
+    ctx.fillText(label, end.x, end.y - ship.radius - 10);
+    ctx.restore();
+  }
+
+  private drawIcons(icons: IconSpot[], cam: Camera) {
+    const ctx = this.ctx;
+    const r = ICON_RADIUS / Math.min(1, cam.zoom); // ikony drží čitelnou velikost i při oddálení
+    for (const ic of icons) {
+      ctx.save();
+      ctx.globalAlpha = ic.disabled ? 0.35 : 1;
+      ctx.fillStyle = ic.active ? "#0ea5e9" : "rgba(13,18,34,0.92)";
+      ctx.strokeStyle = ic.active ? "#7dd3fc" : ic.hover ? "#f8fafc" : "rgba(148,163,184,0.7)";
+      ctx.lineWidth = (ic.hover || ic.active ? 2 : 1) / Math.min(1, cam.zoom);
+      ctx.beginPath();
+      ctx.arc(ic.x, ic.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = ic.active ? "#03111c" : "#e2e8f0";
+      ctx.font = `${Math.round(r * 1.1)}px ui-monospace, Menlo, monospace`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(ic.glyph, ic.x, ic.y + 1);
+      ctx.restore();
+    }
   }
 
   private drawEffect(e: ViewModel["effects"][number], view: ViewModel, now: number) {
@@ -315,7 +378,6 @@ export class Renderer {
         ctx.save();
         ctx.globalAlpha = 1 - t;
         ctx.fillStyle = e.color ?? "#fbbf24";
-        // pixelový výbuch: pár čtverců
         const n = 8;
         for (let i = 0; i < n; i++) {
           const a = (i / n) * Math.PI * 2 + e.start;

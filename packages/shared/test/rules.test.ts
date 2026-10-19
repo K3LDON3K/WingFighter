@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyManeuver,
+  carveCrater,
+  circleHitsAsteroid,
   createGame,
   createRng,
+  generateProfile,
   FIGHTER_PROFILE,
   listManeuvers,
   makeManeuver,
@@ -14,10 +17,13 @@ import {
   resolveTurn,
   sanitizeOrders,
   TORPEDO,
+  type Asteroid,
   type GameState,
   type PlayerInfo,
   type ShipOrders,
 } from "../src/index.ts";
+
+const ast = (id: string, x: number, y: number, radius: number): Asteroid => ({ id, x, y, radius, vx: 0, vy: 0, seed: 1, profile: Array(48).fill(radius), version: 0 });
 
 const players: PlayerInfo[] = [
   { id: "p1", name: "Alfa", team: 0, isBot: false },
@@ -112,8 +118,8 @@ describe("vyhodnocení kola", () => {
     const a = r.state.ships[0];
     const b = r.state.ships[1];
     expect(r.events.filter((e) => e.type === "collision")).toHaveLength(2);
-    // každá dostala 1 zranění do štítů (2 → 1 → dobití 2)
-    expect(r.events.filter((e) => e.type === "damage")).toHaveLength(2);
+    // každá dostala 15 zranění do štítů
+    expect(r.events.filter((e) => e.type === "damage" && e.amount === 15)).toHaveLength(2);
     // lodě se od sebe odrazily a pokračovaly – nekončí v bodě srážky
     expect(Math.hypot(a.x - 500, a.y - 500)).toBeGreaterThan(30);
     expect(Math.hypot(b.x - 600, b.y - 500)).toBeGreaterThan(30);
@@ -123,16 +129,16 @@ describe("vyhodnocení kola", () => {
   });
 
   it("náraz do asteroidu loď odmrští, zraní a letí dál", () => {
-    const g = game({ asteroids: [{ id: "a", x: 700, y: 500, radius: 40, vx: 0, vy: 0, seed: 1 }] });
+    const g = game({ asteroids: [ast("a", 700, 500, 40)] });
     place(g, "ship-p1-0", 500, 500, 0);
     place(g, "ship-p2-0", 1500, 900, 0);
     const r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m4a0", fire: false }], createRng(1));
     const s = r.state.ships[0];
     const col = r.events.find((e) => e.type === "collision");
     expect(col && col.type === "collision" && col.with).toBe("asteroid");
-    expect(Math.hypot(s.x - 700, s.y - 500)).toBeGreaterThan(40 + 16);
-    expect(s.hull).toBe(3);
-    expect(r.events.some((e) => e.type === "damage" && e.shipId === "ship-p1-0" && e.amount === 1)).toBe(true);
+    expect(Math.hypot(s.x - 700, s.y - 500)).toBeGreaterThan(40 + 16 - 2);
+    expect(s.hull).toBe(100);
+    expect(r.events.some((e) => e.type === "damage" && e.shipId === "ship-p1-0" && e.amount === 15)).toBe(true);
     // loď po odrazu pokračovala v pohybu novým kurzem
     const move = r.events[0];
     const pts = move.type === "move" ? move.paths.find((p) => p.id === "ship-p1-0")!.points : [];
@@ -165,21 +171,26 @@ describe("vyhodnocení kola", () => {
     expect(lasers[0].type === "laser" && lasers[0].shooterId).toBe("ship-p1-0");
   });
 
-  it("červený manévr dá stres a zablokuje akci; zelený ho odstraní; nebezpečný zraní", () => {
+  it("stresové body: červený −1 (akce zůstává), nebezpečný −2 a 5 % trupu, zelený +1, bez bodů nejde červený", () => {
     const g = game();
     place(g, "ship-p1-0", 500, 500, 0);
     place(g, "ship-p2-0", 1500, 900, 0);
+    expect(g.ships[0].stressPoints).toBe(3);
     let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "k3", fire: false, action: { type: "evade" } }], createRng(1));
-    expect(r.state.ships[0].stress).toBe(1);
-    expect(r.state.ships[0].tokens.evade).toBe(0);
-    const fixed = sanitizeOrders(r.state, "p1", [{ shipId: "ship-p1-0", maneuverId: "m3a-90", fire: true }]);
-    expect(fixed[0].maneuverId).not.toBe("m3a-90");
-    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: false }], createRng(1));
-    expect(r.state.ships[0].stress).toBe(0);
-    // z rychlosti 2 na 4 s ostrým úhlem = nebezpečný: stres + 1 zranění
-    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m4a45", fire: false }], createRng(1));
-    expect(r.state.ships[0].stress).toBe(1);
-    expect(r.events.some((e) => e.type === "damage" && e.shipId === "ship-p1-0")).toBe(true);
+    expect(r.state.ships[0].stressPoints).toBe(2);
+    expect(r.state.ships[0].tokens.evade).toBe(0); // tokeny se čistí na konci kola, ale akce proběhla:
+    expect(r.events.some((e) => e.type === "action" && e.ok)).toBe(true);
+    // z rychlosti 3 na 5 s ostrým úhlem = nebezpečný: −2 body + 5 % trupu
+    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m5a45", fire: false }], createRng(1));
+    expect(r.state.ships[0].stressPoints).toBe(0);
+    expect(r.events.some((e) => e.type === "damage" && e.shipId === "ship-p1-0" && e.amount === 5)).toBe(true);
+    // bez bodů: červený manévr sanitizace nahradí
+    const fixed = sanitizeOrders(r.state, "p1", [{ shipId: "ship-p1-0", maneuverId: "m5a45", fire: true }]);
+    expect(fixed[0].maneuverId).not.toBe("m5a45");
+    // zelený manévr vrátí bod
+    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m4a0", fire: false }], createRng(1)); // bílý
+    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m3a0", fire: false }], createRng(1)); // zelený
+    expect(r.state.ships[0].stressPoints).toBe(1);
   });
 
   it("torpédo se vypustí, letí a zasáhne cíl", () => {
@@ -207,8 +218,59 @@ describe("vyhodnocení kola", () => {
     const hit = r.events.find((e) => e.type === "torpedoHit");
     expect(hit && hit.type === "torpedoHit" && hit.shipId).toBe("ship-p2-0");
     expect(r.state.torpedoes).toHaveLength(0);
-    expect(r.state.ships[1].hull).toBe(2);
-    expect(r.state.ships[1].shields).toBe(1);
+    // 45 zranění: štít 50 → 5, trup 100; dobití → štít 15
+    expect(r.state.ships[1].hull).toBe(100);
+    expect(r.state.ships[1].shields).toBe(15);
+  });
+
+  it("torpédo vystřelené na bod tam vybuchne, zraní lodě v okolí a vykousne kráter do asteroidu", () => {
+    const g = game({ asteroids: [ast("a", 1000, 560, 40)] });
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1040, 440, Math.PI / 2); // bude u bodu výbuchu, mimo dráhu torpéda
+    let r = resolveTurn(
+      g,
+      [
+        { shipId: "ship-p1-0", maneuverId: "m1a0", fire: false, special: { type: "torpedo", point: { x: 1000, y: 500 } } },
+        { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false },
+      ],
+      createRng(1),
+    );
+    expect(r.state.torpedoes).toHaveLength(1);
+    expect(r.state.torpedoes[0].targetPoint).toEqual({ x: 1000, y: 500 });
+    const before = [...g.asteroids[0].profile];
+    let blast;
+    for (let i = 0; i < 4 && !blast; i++) {
+      r = resolveTurn(
+        r.state,
+        [
+          { shipId: "ship-p1-0", maneuverId: "m1a0", fire: false },
+          { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false },
+        ],
+        createRng(1),
+      );
+      blast = r.events.find((e) => e.type === "torpedoHit" && e.blast);
+    }
+    expect(blast).toBeTruthy();
+    expect(blast!.type === "torpedoHit" && Math.hypot(blast!.x - 1000, blast!.y - 500)).toBeLessThan(20);
+    expect(r.state.torpedoes).toHaveLength(0);
+    const hit = r.events.find((e) => e.type === "asteroidHit");
+    expect(hit).toBeTruthy();
+    const after = r.state.asteroids[0].profile;
+    expect(Math.min(...after)).toBeLessThan(Math.min(...before));
+    // loď p2 blízko bodu dostala plošné zranění 30
+    expect(r.events.some((e) => e.type === "damage" && e.shipId === "ship-p2-0" && e.amount === 30)).toBe(true);
+  });
+
+  it("kráter: výbuch vykousne tvar a loď skrz díru proletí; dost výbuchů asteroid zničí", () => {
+    const a = ast("a", 500, 500, 40);
+    a.profile = generateProfile(40, 1);
+    expect(circleHitsAsteroid(a, { x: 540, y: 500 }, 16)).toBe(true);
+    carveCrater(a, { x: 550, y: 500 }, 45);
+    expect(a.version).toBe(1);
+    expect(circleHitsAsteroid(a, { x: 540, y: 500 }, 8)).toBe(false);
+    expect(circleHitsAsteroid(a, { x: 470, y: 500 }, 8)).toBe(true);
+    carveCrater(a, { x: 500, y: 500 }, 45);
+    expect(Math.max(...a.profile)).toBeLessThan(10);
   });
 
   it("torpédo lze sestřelit ručně zaměřeným laserem", () => {

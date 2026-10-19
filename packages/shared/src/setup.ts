@@ -1,10 +1,11 @@
-import { MAP } from "./constants.ts";
+import { generateProfile } from "./asteroids.ts";
+import { MAP, STRESS } from "./constants.ts";
 import type { Pose } from "./geometry.ts";
 import { computeStats, DEFAULT_LOADOUT } from "./ships.ts";
 import type { Asteroid, GameSettings, GameState, PlayerInfo, Ship, ShipLoadout } from "./types.ts";
 
-/** Mapa 1 – statické asteroidy (vx, vy = 0; v budoucnu mohou létat). */
-export const MAP_1_ASTEROIDS: Asteroid[] = [
+/** Mapa 1 – statické asteroidy (vx, vy = 0; v budoucnu mohou létat). Tvar se generuje ze seedu. */
+const MAP_1: Omit<Asteroid, "profile" | "version">[] = [
   { id: "a1", x: 1200, y: 800, radius: 80, vx: 0, vy: 0, seed: 11 },
   { id: "a2", x: 850, y: 450, radius: 48, vx: 0, vy: 0, seed: 23 },
   { id: "a3", x: 1550, y: 1150, radius: 52, vx: 0, vy: 0, seed: 37 },
@@ -22,6 +23,7 @@ export const MAP_1_ASTEROIDS: Asteroid[] = [
   { id: "a15", x: 450, y: 350, radius: 40, vx: 0, vy: 0, seed: 139 },
   { id: "a16", x: 1400, y: 600, radius: 24, vx: 0, vy: 0, seed: 149 },
 ];
+export const MAP_1_ASTEROIDS: Asteroid[] = MAP_1.map((a) => ({ ...a, profile: generateProfile(a.radius, a.seed), version: 0 }));
 
 /** Startovní zóny: střed zóny a kurz směrem do mapy. */
 function spawnZones(teamCount: number, w: number, h: number): Pose[] {
@@ -95,7 +97,7 @@ export function createGame(opts: CreateGameOptions): GameState {
           heading: zone.heading,
           hull: stats.hull,
           shields: stats.shields,
-          stress: 0,
+          stressPoints: STRESS.max,
           speed: 2,
           tokens: { focus: 0, evade: 0 },
           ammo: { torpedoes: stats.torpedoes, mines: stats.mines },
