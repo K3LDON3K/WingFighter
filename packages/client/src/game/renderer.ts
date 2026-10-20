@@ -118,6 +118,7 @@ export class Renderer {
     if (state.storms?.length) drawStorms(ctx, state.storms, now, cam.zoom);
     for (const a of view.asteroids) this.drawAsteroid(a);
     for (const m of view.mines) this.drawMine(m, now);
+    this.marks = [];
     for (const d of view.debris) this.drawDebris(d, overlay, now);
     for (const c of view.comets) this.drawComet(c, overlay, now);
 
@@ -163,7 +164,7 @@ export class Renderer {
       drawSprite(ctx, this.sprites.torpedo(TEAM_COLORS[t.team]), t.x, t.y, t.heading);
       if (t.targetPoint && (t.team === overlay.myTeam || overlay.myTeam === undefined)) this.drawPointMarker(t.targetPoint, TEAM_COLORS[t.team], 0.5);
       const tw = overlay.targetWeapons?.[t.id];
-      if (tw?.length) this.drawTargetMark(t.x, t.y, 8, tw);
+      if (tw?.length) this.marks.push({ x: t.x, y: t.y, r: 8, weapons: tw });
       else if (overlay.targetId === t.id || overlay.hoverId === t.id) {
         ctx.save();
         ctx.strokeStyle = overlay.targetId === t.id ? "#fbbf24" : "rgba(248,250,252,0.5)";
@@ -180,6 +181,8 @@ export class Renderer {
       drawSprite(ctx, this.sprites.fighter(TEAM_COLORS[sel.team]), overlay.actionGhost.x, overlay.actionGhost.y, overlay.actionGhost.heading, 0.3);
     }
     for (const e of view.effects) this.drawEffect(e, view, now);
+    for (const mk of this.marks) this.drawTargetMark(mk.x, mk.y, mk.r, mk.weapons);
+    this.marks = [];
     if (overlay.laserOdds) {
       const lo = overlay.laserOdds;
       ctx.save();
@@ -347,6 +350,9 @@ export class Renderer {
    * Značka cíle (varianta D): čtyři rohové závorky v barvě zbraně (více zbraní = žlutá) a v pravém horním rohu
    * plné čtverečky s ikonkami všech zbraní, které na cíl míří.
    */
+  /** Značky cílů se kreslí až nad vším ostatním (lodě, štíty, efekty), aby ikonky zbraní nic nepřekrývalo. */
+  private marks: { x: number; y: number; r: number; weapons: string[] }[] = [];
+
   private drawTargetMark(x: number, y: number, r: number, weapons: string[]) {
     const ctx = this.ctx;
     const R = r + 6;
@@ -487,7 +493,7 @@ export class Renderer {
     const targeted = overlay.targetId === c.id;
     const hovered = overlay.hoverId === c.id;
     const cw = overlay.targetWeapons?.[c.id];
-    if (cw?.length) this.drawTargetMark(c.x, c.y, c.radius, cw);
+    if (cw?.length) this.marks.push({ x: c.x, y: c.y, r: c.radius, weapons: cw });
     else if (targeted || hovered) {
       ctx.save();
       ctx.strokeStyle = targeted ? "#fbbf24" : "rgba(248,250,252,0.6)";
@@ -522,7 +528,7 @@ export class Renderer {
     ctx.fillRect(-2, -2, 4, 4);
     ctx.restore();
     const dw = overlay.targetWeapons?.[d.id];
-    if (dw?.length) this.drawTargetMark(d.x, d.y, 8, dw);
+    if (dw?.length) this.marks.push({ x: d.x, y: d.y, r: 8, weapons: dw });
     else if (targeted || hovered) {
       ctx.save();
       ctx.strokeStyle = targeted ? "#fbbf24" : "rgba(248,250,252,0.6)";
@@ -619,7 +625,7 @@ export class Renderer {
       ctx.restore();
     }
     const weapons = overlay.targetWeapons?.[s.id];
-    if (weapons?.length) this.drawTargetMark(s.x, s.y, s.radius, weapons);
+    if (weapons?.length) this.marks.push({ x: s.x, y: s.y, r: s.radius, weapons });
     else if (targeted || ((selected || hovered) && overlay.showSelectRing)) {
       // kroužek cíle vždy; kroužek výběru / najetí jen když je zapnutý v ladění → Zobrazení
       ctx.save();

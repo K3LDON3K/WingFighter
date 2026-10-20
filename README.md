@@ -145,6 +145,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.52 – Značky cílů (závorky + ikonky zbraní) se kreslí až nad vším ostatním – nepřekrývá je loď ani štít.
 - v3.51 – **Boti:** ze zničeného bota vypadne vždy právě jeden náhodný funkční modul (u hráčů dál platí šance na každý
   modul). **Fog of war:** cizí loď (i torpédo), která vletí do dohledu během kola, se teď animuje po celé své dráze
   od začátku kola – dřív se objevila až na konci pohybu. **Komety** se objevují 2 kola letu za okrajem mapy a teprve
