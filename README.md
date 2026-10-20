@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.22 – třetí vestavěná skladba **„Wingfighter – bitva II (Rangers)“** (D moll, 138 BPM, 176 dob ≈ 77 s):
+  elektronika ve stylu Space Rangers – pumpující kopák, offbeatová basa, šestnáctinová arpeggia, build-up
+  se zhušťujícím snarem a šumovým nájezdem (nový hlas `riser`), drop se širokým leadem a harmonií, break
+  s pady. U nové instalace je v playlistu bitvy automaticky.
 - v3.21 – nové vestavěné skladby: chiptune sekvencer s pulzními vlnami (12,5 / 25 / 50 %), vibratem,
   tempovou ozvěnou, filtrovanými pady, „žesťovým“ sborem, subbasovým dronem, snare/kopák/hi-hat a limiterem.
   **Menu** (A moll, 88 BPM, 128 dob ≈ 87 s): vesmírná elektronika ve stylu Space Rangers – dron, pady, třpytivé

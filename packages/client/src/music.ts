@@ -24,8 +24,9 @@ const STORE = "tracks";
 
 export const SYNTH_MENU: Track = { id: "synth-menu", name: "Wingfighter – hlavní menu", kind: "synth" };
 export const SYNTH_GAME: Track = { id: "synth-game", name: "Wingfighter – bitva", kind: "synth" };
+export const SYNTH_GAME2: Track = { id: "synth-game2", name: "Wingfighter – bitva II (Rangers)", kind: "synth" };
 
-let settings: MusicSettings = { menuTrackId: SYNTH_MENU.id, gameTrackIds: [SYNTH_GAME.id], volume: 0.5 };
+let settings: MusicSettings = { menuTrackId: SYNTH_MENU.id, gameTrackIds: [SYNTH_GAME.id, SYNTH_GAME2.id], volume: 0.5 };
 try {
   const raw = localStorage.getItem(KEY);
   if (raw) settings = { ...settings, ...(JSON.parse(raw) as Partial<MusicSettings>) };
@@ -130,7 +131,7 @@ export async function removeFile(id: string) {
 }
 
 export function allTracks(): Track[] {
-  return [SYNTH_MENU, SYNTH_GAME, ...files];
+  return [SYNTH_MENU, SYNTH_GAME, SYNTH_GAME2, ...files];
 }
 
 /* ---------- přehrávání ---------- */
@@ -194,7 +195,7 @@ function start(t: Track) {
   const c = audioContext();
   if (!c) return;
   current = t;
-  playing = t.kind === "file" ? startFile(c, t) : t.id === SYNTH_MENU.id ? startSynth(c, MENU_SONG) : startSynth(c, GAME_SONG);
+  playing = t.kind === "file" ? startFile(c, t) : startSynth(c, songOf(t.id));
   applyVolume();
 }
 
@@ -230,7 +231,7 @@ function startFile(c: AudioContext, t: Track): Playing {
 
 /* ---------- syntetizované skladby (chiptune sekvencer) ---------- */
 
-type Voice = "bass" | "sub" | "lead" | "brass" | "harm" | "arp" | "pad";
+type Voice = "bass" | "sub" | "lead" | "brass" | "harm" | "arp" | "pad" | "riser";
 interface Ev {
   v: Voice;
   b: number; // doba
@@ -438,6 +439,96 @@ const GAME_SONG: Song = (() => {
   return { bpm: 140, beats: b, ev, drums: d, bright: true };
 })();
 
+/* ===== Bitva II: D moll, 138 BPM, 176 dob (~77 s) – elektronika ve stylu Space Rangers:
+   offbeatová basa, šestnáctinová arpeggia, pumpující kopák, build-up s nájezdem a drop ===== */
+const GAME2_SONG: Song = (() => {
+  const ev: Ev[] = [];
+  const d: Drums = { kick: [], snare: [], hat: [], ohat: [] };
+  type Bar = [string, keyof typeof CH];
+  const A: Bar[] = [["D2", "m"], ["D2", "m"], ["Bb1", "M"], ["C2", "M"]];
+  const B: Bar[] = [["F2", "M"], ["C2", "M"], ["D2", "m"], ["A1", "M"]];
+  const brk: Bar[] = [["Bb1", "M7"], ["C2", "M"], ["D2", "m7"], ["D2", "m7"]];
+  type Style = "intro" | "groove" | "build" | "drop" | "break" | "drop2";
+  const plan: { bars: Bar[]; style: Style; times: number }[] = [
+    { bars: [["D2", "m"], ["D2", "m"], ["D2", "m"], ["D2", "m"]], style: "intro", times: 1 },
+    { bars: A, style: "groove", times: 2 },
+    { bars: B, style: "build", times: 1 },
+    { bars: A, style: "drop", times: 2 },
+    { bars: brk, style: "break", times: 1 },
+    { bars: B, style: "build", times: 1 },
+    { bars: A, style: "drop2", times: 2 },
+  ];
+  const chordMap: [number, number[]][] = [];
+  const sections: [number, Style][] = [];
+  let b = 0;
+  for (const sec of plan) {
+    sections.push([b, sec.style]);
+    const secStart = b;
+    for (let t = 0; t < sec.times; t++)
+      for (const [root, type] of sec.bars) {
+        const r = midi(root);
+        const ch = chordNotes(root, type).map((n) => n + 24);
+        chordMap.push([b, ch]);
+        const s = sec.style;
+        const rel = b - secStart; // doba v rámci sekce
+        // basa: offbeat osminy (trance), v breaku dlouhý tón
+        if (s === "break") ev.push({ v: "bass", b, l: 3.8, n: r, vel: 0.09 });
+        else if (s === "intro") { if (rel >= 4) for (let i = 0; i < 8; i++) ev.push({ v: "bass", b: b + i * 0.5, l: 0.3, n: r + (i % 4 === 3 ? 12 : 0), vel: 0.08 + rel * 0.004 }); }
+        else for (let i = 0; i < 8; i++) ev.push({ v: "bass", b: b + i * 0.5 + 0.25, l: 0.22, n: r + (s === "drop2" && i % 4 === 3 ? 12 : 0), vel: 0.13 });
+        ev.push({ v: "sub", b, l: 3.9, n: r - 12, vel: s === "break" ? 0.06 : 0.09 });
+        // arpeggia: šestnáctiny, v dropu výš a hlasitěji
+        if (s === "intro") { if (rel >= 8) arp(b, 4, ch, [0, 1, 2, 3], 0.25, 0.03 + (rel - 8) * 0.003, ev); }
+        else if (s === "groove") arp(b, 4, ch, [0, 2, 1, 3, 2, 4, 3, 5], 0.25, 0.045, ev);
+        else if (s === "build") arp(b, 4, ch, [0, 1, 2, 3, 4, 5, 6, 7], 0.25, 0.04 + rel * 0.002, ev);
+        else if (s === "break") (pad(b, 4, ch, 0.05, ev), arp(b, 4, ch, [0, 4, 2, 5], 0.5, 0.035, ev));
+        else (arp(b, 4, ch, [3, 5, 4, 6, 3, 7, 5, 6], 0.25, 0.05, ev), pad(b, 4, ch, 0.03, ev));
+        // bicí: čtyřčtvrťový kopák, offbeat otevřený hi-hat, snare na 2 a 4
+        if (s === "intro") {
+          d.hat.push(...rep([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], 4, 1, b));
+          if (rel >= 8) d.kick.push(b, b + 1, b + 2, b + 3);
+          if (rel >= 12) d.snare.push(b + 1, b + 3);
+        } else if (s === "break") {
+          d.hat.push(...rep([0.5, 1.5, 2.5, 3.5], 4, 1, b));
+          if (rel >= 8) d.kick.push(b, b + 2);
+        } else if (s === "build") {
+          d.kick.push(b, b + 1, b + 2, b + 3);
+          d.hat.push(...rep([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], 4, 1, b));
+          // snare se zhušťuje: 2 a 4 → osminy → šestnáctiny
+          if (rel < 8) d.snare.push(b + 1, b + 3);
+          else if (rel < 12) d.snare.push(...rep([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], 4, 1, b));
+          else d.snare.push(...Array.from({ length: 16 }, (_, i) => b + i * 0.25));
+        } else {
+          d.kick.push(b, b + 1, b + 2, b + 3);
+          d.ohat.push(b + 0.5, b + 1.5, b + 2.5, b + 3.5);
+          d.hat.push(...rep([0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75], 4, 1, b));
+          d.snare.push(b + 1, b + 3);
+          if (s === "drop2" && rel % 16 === 12) d.snare.push(b + 3.5, b + 3.75);
+        }
+        b += 4;
+      }
+    if (sec.style === "build") ev.push({ v: "riser", b: secStart, l: 16, n: 0, vel: 0.12 });
+  }
+  const starts = sections.map(([s]) => s);
+  // melodie: groove – krátké syntetické motivy s pauzami; drop – široký lead (žesťový sbor = supersaw)
+  const melG = "D5:0.5 -:0.5 F5:0.5 -:0.5 A5:1 G5:0.5 F5:0.5  -:1 D5:0.5 F5:0.5 E5:1 -:1  Bb4:0.5 -:0.5 D5:0.5 -:0.5 F5:1 E5:0.5 D5:0.5  C5:1 E5:1 G5:1.5 -:0.5  D5:0.5 -:0.5 F5:0.5 -:0.5 A5:1 C6:0.5 A5:0.5  -:1 G5:0.5 F5:0.5 E5:1 -:1  Bb4:0.5 D5:0.5 F5:0.5 Bb5:0.5 A5:1 F5:1  G5:0.5 E5:0.5 C5:1 E5:1 G5:1";
+  const melD = "A5:1.5 D6:0.5 C6:1 A5:1  F5:1 G5:1 A5:2  Bb5:1.5 D6:0.5 F6:1 D6:1  E6:1 C6:1 G5:2  A5:1.5 D6:0.5 C6:1 A5:1  F5:1 G5:1 A5:1 C6:1  D6:1 F6:1 D6:0.5 C6:0.5 A5:1  G5:1 E6:1 G6:1 E6:1";
+  const melD2 = "A6:0.5 -:0.5 A6:0.5 G6:0.5 F6:1 D6:1  C6:0.5 D6:0.5 F6:1 E6:1 C6:1  D6:0.5 -:0.5 D6:0.5 C6:0.5 Bb5:1 D6:1  F6:1 E6:0.5 C6:0.5 G5:2  A5:0.5 C6:0.5 D6:0.5 F6:0.5 A6:1 G6:1  F6:1 E6:1 D6:2  Bb5:1 D6:1 F6:1 Bb6:1  A6:1 G6:1 E6:1 C6:1";
+  phrase("lead", starts[1], melG, 0.085, ev, 0.7);
+  phrase("brass", starts[3], melD, 0.11, ev, 0.9);
+  phrase("brass", starts[6], melD2, 0.11, ev, 0.9);
+  phrase("lead", starts[6], melD2, 0.04, ev, 0.9);
+  const chordAt = (x: number) => [...chordMap].reverse().find(([s]) => s <= x)?.[1] ?? [];
+  harmonize(ev, starts[3], starts[4], chordAt, 0.05, ev);
+  harmonize(ev, starts[6], b, chordAt, 0.05, ev);
+  // v breaku tichá ozvěna hlavního motivu
+  phrase("lead", starts[4] + 4, "A5:1.5 D6:0.5 C6:1 A5:1 F5:1 G5:1 A5:2", 0.05, ev);
+  return { bpm: 138, beats: b, ev, drums: d, bright: true };
+})();
+
+function songOf(id: string): Song {
+  return id === SYNTH_MENU.id ? MENU_SONG : id === SYNTH_GAME2.id ? GAME2_SONG : GAME_SONG;
+}
+
 /** Pulzní vlna s danou střídou (klasický chiptune zvuk). */
 const pulseCache = new Map<string, PeriodicWave>();
 function pulse(c: BaseAudioContext, duty: number): PeriodicWave {
@@ -499,6 +590,25 @@ function startSynth(c: BaseAudioContext, song: Song, dest: AudioNode = musicBus(
   const harmWave = pulse(c, 0.25);
   const note = (e: Ev, t0: number) => {
     const dur = e.l * spb;
+    if (e.v === "riser") {
+      // šumový nájezd s rostoucím filtrem (build-up před dropem)
+      const s = c.createBufferSource();
+      s.buffer = noiseBuf;
+      s.loop = true;
+      const f = c.createBiquadFilter();
+      f.type = "bandpass";
+      f.Q.value = 1.5;
+      f.frequency.setValueAtTime(200, t0);
+      f.frequency.exponentialRampToValueAtTime(6000, t0 + dur);
+      const en = c.createGain();
+      en.gain.setValueAtTime(0.0001, t0);
+      en.gain.exponentialRampToValueAtTime(e.vel, t0 + dur);
+      en.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.1);
+      s.connect(f).connect(en).connect(mix);
+      s.start(t0);
+      s.stop(t0 + dur + 0.15);
+      return;
+    }
     const o = c.createOscillator();
     const f = N(e.n);
     let dest: AudioNode = mix;
@@ -660,7 +770,7 @@ function startSynth(c: BaseAudioContext, song: Song, dest: AudioNode = musicBus(
 
 /** Ladicí export: vyrenderuje vestavěnou skladbu do WAV (offline), např. pro poslech mimo hru. */
 export async function renderSynth(id: string, seconds: number): Promise<Blob> {
-  const song = id === SYNTH_MENU.id ? MENU_SONG : GAME_SONG;
+  const song = songOf(id);
   const sr = 44100;
   const off = new OfflineAudioContext(2, Math.ceil(sr * seconds), sr);
   startSynth(off, song, off.destination, seconds);
