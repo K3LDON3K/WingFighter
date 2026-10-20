@@ -46,7 +46,8 @@ export type ClientMessage =
   | { type: "createRoom"; name: string }
   | { type: "joinRoom"; code: string }
   | { type: "leaveRoom" }
-  | { type: "setTeam"; team: number }
+  | { type: "setTeam"; team: number; playerId?: string }
+  | { type: "balanceTeams"; shuffle?: boolean }
   /** Startovní bod (null = uvolnit); host může nastavit botovi. */
   | { type: "setStart"; index: number | null; botId?: string }
   /** Vlastní výbava, nebo (host) výbava bota. */

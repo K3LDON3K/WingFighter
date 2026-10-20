@@ -145,6 +145,13 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.45 – **Hráči a týmy jako přehledná tabulka**: jeden panel, pruh týmu (jméno · N hráčů · N lodí · N bodů,
+  PŘEJÍT SEM, + BOT), pod ním řádky hráčů (jméno, HOST / BOT, letka jako čipy s portrétem pilota a ikonkami
+  modulů – najetí ukáže celou výbavu, stav ✓ připraven / ⚠ chyba letky / odpojen, tlačítka ⇄ přesun do dalšího
+  týmu (host kohokoli, hráč sebe), ⚙ ruční výbava bota, ✕ odebrat bota). V hlavičce souhrn, výběr výbavy botů,
+  **+ TÝM / − TÝM (2–4 týmy)**, **VYROVNAT** (rozdělí podle lodních bodů) a **ZAMÍCHAT**. Deathmatch = stejná tabulka
+  bez týmových pruhů. **Portréty pilotů** předělány na 32 × 32 „doomguy“ styl: zblízka, těžké stínování, zamračený
+  výraz, každý pilot má vlastní variantu (vlasy, pleť, doplňky), editovaní piloti dostanou vlastní barvu vlasů.
 - v3.44 – Nastavení hry jako **průvodce po stránkách** (1 Mapa · 2 Bitva · 3 Lodě a piloti · 4 Moduly; kroky
   nahoře, Zpět / Další, souhrn hry v hlavičce). Dostupné moduly jako **hexagony** v barvách obchodu (VE HŘE /
   VYŘAZEN). Dostupné lodě a piloti rozděleny do dvou sekcí; piloti s podobiznami. **Portréty pilotů** nově

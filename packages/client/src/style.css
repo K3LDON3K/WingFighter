@@ -3212,3 +3212,152 @@ button.mod-hex:hover:not(:disabled) {
 .mt-portrait.off svg {
   filter: grayscale(1) brightness(0.6);
 }
+
+/* ---- Hráči a týmy: tabulka ---- */
+.teams-card .tt-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.teams-card .tt-top h3 {
+  margin: 0;
+}
+.teams-card .tt-sel {
+  font-family: var(--txt);
+  height: 26px;
+  font-size: 13px;
+}
+.trow {
+  display: grid;
+  grid-template-columns: 8px minmax(140px, 180px) 1fr minmax(90px, auto) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #1e293b;
+  font-family: var(--ui);
+  font-size: 17px;
+}
+.trow.th {
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #64748b;
+  letter-spacing: 1px;
+  border-bottom: none;
+}
+.trow.me {
+  background: rgba(125, 211, 252, 0.06);
+}
+.trow .t-strip {
+  width: 8px;
+  height: 22px;
+}
+.trow .t-name {
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trow .t-name .dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: var(--green);
+  vertical-align: middle;
+}
+.trow .t-name .dot.off {
+  background: var(--red);
+}
+.trow .host {
+  color: var(--yellow);
+  font-size: 14px;
+}
+.trow .bot-tag {
+  font-size: 11px;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  padding: 0 3px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.trow .t-fleet {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.trow .t-status {
+  font-size: 13px;
+  color: #94a3b8;
+}
+.trow .t-status.ok {
+  color: #86efac;
+}
+.trow .t-status.warn {
+  color: #fbbf24;
+}
+.trow .t-status.off {
+  color: #f87171;
+}
+.trow .t-act {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  min-width: 70px;
+}
+.trow .t-act .px.tiny {
+  padding: 2px 6px;
+  font-size: 14px;
+  min-width: 24px;
+}
+.thead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  margin-top: 6px;
+  background: color-mix(in srgb, var(--team) 14%, transparent);
+  border-left: 4px solid var(--team);
+}
+.thead.mine {
+  box-shadow: inset 0 0 0 1px var(--team);
+}
+.thead .th-name {
+  color: var(--team);
+  font-size: 18px;
+}
+.thead .th-info {
+  font-size: 13px;
+  color: #94a3b8;
+}
+.ship-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px 2px 2px;
+  background: #0b1020;
+  border: 1px solid #334155;
+}
+.ship-chip svg {
+  display: block;
+  image-rendering: pixelated;
+}
+.ship-chip .sc-mods {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.teams-card .bot-editor {
+  margin: 4px 0 8px 18px;
+}
+@media (max-width: 700px) {
+  .trow {
+    grid-template-columns: 6px 1fr auto;
+  }
+  .trow .t-fleet {
+    grid-column: 2 / span 2;
+  }
+  .trow.th {
+    display: none;
+  }
+}

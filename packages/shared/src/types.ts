@@ -331,6 +331,8 @@ export interface GameSettings {
   turnLimit: number;
   /** Lodní body na hráče: součet cen trupů letky musí být přesně tento (stíhač = 1). */
   shipPoints: number;
+  /** Počet týmů v TDM (2–4). */
+  teams?: number;
   /** Max. kusů modulu na hráče (0 = zakázán; chybí = bez limitu). */
   allowedModules: Partial<Record<ModuleType, number>>;
   /** Zakázané trupy (0 = zakázán; chybí = povolen). */

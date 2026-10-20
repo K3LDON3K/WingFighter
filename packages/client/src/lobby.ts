@@ -2,11 +2,11 @@ import {
   RULES,
   HULLS,
   PILOTS,
-  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
+  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
 import { logoCanvas } from "./logo.ts";
 import { openMusicPanel } from "./main.ts";
 import { renderMapPreview } from "./map-preview.ts";
-import { loadoutTag, moduleHexSvg, renderLoadout, svgEl } from "./loadout-ui.ts";
+import { moduleHexSvg, renderLoadout, svgEl } from "./loadout-ui.ts";
 import { pilotPortrait } from "./pilot-ui.ts";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
@@ -152,47 +152,93 @@ function roomView(m: LobbyModel, net: Net) {
   const me = room.players.find((p) => p.id === m.playerId);
   const tdm = room.settings.mode === "tdm";
 
-  const teamBox = (team: number) => {
-    const members = room.players.filter((p) => p.team === team);
+  applyTuning(room.tuning);
+  const budget = room.tuning.startBudget;
+  const settings = room.settings;
+  const set = (patch: Partial<typeof settings>) => net.send({ type: "setSettings", settings: patch });
+  const nTeams = tdm ? Math.max(2, Math.min(MAX_TEAMS_TDM, room.settings.teams ?? 2)) : 1;
+  /** Loď jako čip: portrét pilota + ikonky modulů; najetí ukáže celou výbavu. */
+  const shipChip = (l: ShipLoadout) => {
+    const hull = HULLS[l.hullId]?.name ?? l.hullId;
+    const pilot = PILOTS[l.pilotId]?.name ?? l.pilotId;
+    const mods = l.modules.map((m) => `${MODULES[m.type].name}${m.hp !== undefined && m.hp <= 0 ? " (zničen)" : ""}`).join(", ") || "bez modulů";
+    return h(
+      "span",
+      { class: "ship-chip", title: `${hull} · ${pilot}\n${mods}` },
+      pilotPortrait(l.pilotId, 20),
+      h("span", { class: "sc-mods" }, ...(l.modules.length ? l.modules.map((m) => icon(MODULES[m.type].icon, m.hp !== undefined && m.hp <= 0 ? "#f87171" : "#60a5fa", 10)) : [h("span", { class: "muted", style: "font-size:11px" }, "–")])),
+    );
+  };
+  const fleetOf = (p: RoomPlayer) => (p.loadouts?.length ? p.loadouts : [p.loadout]);
+  const canEditBot = (p: RoomPlayer) => p.isBot && isHost && room.settings.botLoadout === "manual";
+  /** Řádek hráče v tabulce týmů. */
+  const playerRow = (p: RoomPlayer, color: string) => {
+    const fleet = fleetOf(p);
+    const err = validateFleet(fleet, room.settings);
+    const status = !p.connected ? ["off", "odpojen"] : err ? ["warn", `⚠ ${err}`] : ["ok", "✓ připraven"];
+    const canMove = nTeams > 1 && (isHost || p.id === m.playerId);
+    const open = botEdit === p.id;
     return h(
       "div",
-      { class: `team ${me?.team === team ? "mine" : ""}`, style: `--team:${TEAM_COLORS[team]}` },
-      h("h3", {}, label(TEAM_NAMES[team])),
-      ...members.map((p) =>
-        h(
-          "div",
-          { class: "player" },
-          h("span", { class: `dot ${p.connected ? "" : "off"}` }),
-          h("span", {}, p.name),
-          p.id === room.hostId ? h("span", { class: "host" }, "HOST") : null,
-          shieldPick(p),
-          p.isBot && isHost ? h("button", { class: "x", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
-        ),
-      ),
-      ...members.map((p) => botEditor(p)),
+      { class: `trow ${p.id === m.playerId ? "me" : ""}` },
+      h("span", { class: "t-strip", style: `background:${color}` }),
+      h("span", { class: "t-name" }, h("span", { class: `dot ${p.connected ? "" : "off"}` }), " ", p.name, p.id === room.hostId ? h("span", { class: "host" }, " HOST") : null, p.isBot ? h("span", { class: "bot-tag" }, "BOT") : null),
+      h("span", { class: "t-fleet" }, ...fleet.map(shipChip)),
+      h("span", { class: `t-status txt ${status[0]}` }, status[1]),
       h(
-        "div",
-        { class: "row", style: "margin-top:8px" },
-        me?.team !== team ? h("button", { onclick: () => net.send({ type: "setTeam", team }) }, label("Přejít sem")) : null,
-        isHost ? h("button", { onclick: () => net.send({ type: "addBot", team }) }, icon("bot", "currentColor", 12), label("bot")) : null,
+        "span",
+        { class: "t-act" },
+        canMove ? h("button", { class: "px tiny", title: "Přesunout do dalšího týmu", onclick: () => net.send({ type: "setTeam", team: (p.team + 1) % nTeams, playerId: p.id }) }, "⇄") : null,
+        canEditBot(p) ? h("button", { class: `px tiny ${open ? "on" : ""}`, title: "Naklikat výbavu bota", onclick: () => ((botEdit = open ? null : p.id), rerender()) }, "⚙") : null,
+        p.isBot && isHost ? h("button", { class: "px tiny", title: "Odebrat bota", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
       ),
     );
   };
-
-  applyTuning(room.tuning);
-  const budget = room.tuning.startBudget;
-  /** Výbava v řádku hráče: vlastní = editor níže, ostatní = štítek; bot v ručním režimu = host může rozkliknout. */
-  const shieldPick = (p: RoomPlayer) => {
-    const fleet = p.loadouts?.length ? p.loadouts : [p.loadout];
-    const tag = fleet.length > 1 ? h("span", { class: "lo-tagwrap" }, ...fleet.map((l) => loadoutTag(l))) : loadoutTag(fleet[0]);
-    if (p.isBot && isHost && room.settings.botLoadout === "manual") {
-      const open = botEdit === p.id;
-      return h("span", { class: "lo-tagwrap" }, tag, h("button", { class: open ? "on" : "", title: "Naklikat výbavu bota", onclick: () => ((botEdit = open ? null : p.id), rerender()) }, icon("inventory", "currentColor", 10), label(open ? "zavřít" : "výbava")));
-    }
-    return tag;
+  const teamHead = (team: number) => {
+    const members = room.players.filter((p) => p.team === team);
+    const ships = members.reduce((s, p) => s + fleetOf(p).length, 0);
+    const pts = members.reduce((s, p) => s + fleetPoints(fleetOf(p)), 0);
+    const color = TEAM_COLORS[team];
+    const mine = me?.team === team;
+    return h(
+      "div",
+      { class: `thead ${mine ? "mine" : ""}`, style: `--team:${color}` },
+      h("span", { class: "th-name" }, label(TEAM_NAMES[team])),
+      h("span", { class: "th-info txt" }, members.length ? `${members.length} ${members.length === 1 ? "hráč" : members.length < 5 ? "hráči" : "hráčů"} · ${ships} ${ships === 1 ? "loď" : ships < 5 ? "lodě" : "lodí"} · ${pts} ${pts === 1 ? "bod" : pts < 5 ? "body" : "bodů"}` : "prázdný tým ⚠"),
+      h("span", { class: "spacer" }),
+      mine ? h("span", { class: "muted txt", style: "font-size:12px" }, "tvůj tým") : h("button", { class: "px tiny", onclick: () => net.send({ type: "setTeam", team }) }, label("Přejít sem")),
+      isHost ? h("button", { class: "px tiny", title: "Přidat bota do tohoto týmu", onclick: () => net.send({ type: "addBot", team }) }, "+ ", icon("bot", "currentColor", 10), " ", label("bot")) : null,
+    );
   };
+  const humans = room.players.filter((p) => !p.isBot).length;
+  const bots = room.players.length - humans;
+  const shipsAll = room.players.reduce((s, p) => s + fleetOf(p).length, 0);
+  const teamsTable = () => h(
+    "div",
+    { class: "card teams-card" },
+    h(
+      "div",
+      { class: "tt-top" },
+      h("h3", {}, icon("people", "#7dd3fc", 12), " ", label(tdm ? "Hráči a týmy" : "Hráči")),
+      h("span", { class: "muted txt", style: "font-size:12px" }, `${tdm ? "Týmový deathmatch" : "Každý sám za sebe"} · ${humans} ${humans === 1 ? "hráč" : humans < 5 ? "hráči" : "hráčů"} · ${bots} ${bots === 1 ? "bot" : bots < 5 ? "boti" : "botů"} · ${shipsAll} lodí`),
+      h("span", { class: "spacer" }),
+      isHost
+        ? h("select", { class: "tt-sel", title: "Výbava botů", onchange: (e) => set({ botLoadout: (e.target as HTMLSelectElement).value as "default" | "random" | "manual" }) }, ...([["default", "boti: výchozí výbava"], ["random", "boti: náhodná"], ["manual", "boti: ruční (⚙ u bota)"]] as const).map(([v, t]) => h("option", { value: v, selected: room.settings.botLoadout === v }, t)))
+        : null,
+      isHost && tdm ? h("button", { class: "px tiny", disabled: nTeams >= MAX_TEAMS_TDM, title: "Přidat tým", onclick: () => set({ teams: nTeams + 1 }) }, "+ ", label("tým")) : null,
+      isHost && tdm ? h("button", { class: "px tiny", disabled: nTeams <= 2, title: "Odebrat poslední tým (jeho hráči přejdou k modrým)", onclick: () => set({ teams: nTeams - 1 }) }, "− ", label("tým")) : null,
+      isHost && tdm ? h("button", { class: "px tiny", title: "Rozdělit hráče do týmů rovnoměrně podle lodních bodů", onclick: () => net.send({ type: "balanceTeams" }) }, label("vyrovnat")) : null,
+      isHost && tdm ? h("button", { class: "px tiny", title: "Náhodně zamíchat týmy", onclick: () => net.send({ type: "balanceTeams", shuffle: true }) }, label("zamíchat")) : null,
+      isHost && !tdm ? h("button", { class: "px tiny", onclick: () => net.send({ type: "addBot", team: 0 }) }, "+ ", icon("bot", "currentColor", 10), " ", label("bot")) : null,
+    ),
+    h("div", { class: "trow th" }, h("span"), h("span", {}, label("hráč")), h("span", {}, label("letka (loď = pilot + moduly)")), h("span", {}, label("stav")), h("span")),
+    ...(tdm
+      ? Array.from({ length: nTeams }, (_, t) => [teamHead(t), ...room.players.filter((p) => p.team === t).flatMap((p) => [playerRow(p, TEAM_COLORS[t]), botEditor(p)])]).flat()
+      : room.players.flatMap((p, i) => [playerRow(p, TEAM_COLORS[i % TEAM_COLORS.length]), botEditor(p)])),
+    h("div", { class: "muted txt", style: "font-size:12px;margin-top:8px" }, `Najetí na loď ukáže celou výbavu. ⇄ = přesun do dalšího týmu (host kohokoli, ty sebe)${isHost ? ", ⚙ = výbava bota (v režimu „ruční“), ✕ = odebrat bota" : ""}.${tdm ? " Prázdný tým se do bitvy nepočítá." : ""}`),
+  );
   const botEditor = (p: RoomPlayer) =>
-    botEdit === p.id && p.isBot && isHost && room.settings.botLoadout === "manual"
+    botEdit === p.id && canEditBot(p)
       ? (() => {
           const fleet = p.loadouts?.length ? p.loadouts : [p.loadout];
           const t = Math.min(botTab, fleet.length - 1);
@@ -205,8 +251,6 @@ function roomView(m: LobbyModel, net: Net) {
         })()
       : null;
 
-  const settings = room.settings;
-  const set = (patch: Partial<typeof settings>) => net.send({ type: "setSettings", settings: patch });
   const allowedHullIds = () => Object.keys(HULLS).filter((id) => settings.allowedHulls?.[id] !== 0);
   const allowedPilotIds = () => Object.keys(PILOTS).filter((id) => settings.allowedPilots?.[id] !== 0);
   /** Záložky lodí letky: „LOĎ 1 · Stíhač · Kadet“. */
@@ -242,26 +286,7 @@ function roomView(m: LobbyModel, net: Net) {
       ),
       h("div", { class: "muted txt" }, "Řekni kód ostatním, nebo ať místnost najdou v seznamu."),
     ),
-    tdm
-      ? h("div", { class: "teams" }, ...Array.from({ length: MAX_TEAMS_TDM }, (_, i) => teamBox(i)))
-      : h(
-          "div",
-          { class: "card" },
-          h("h3", {}, label("Hráči (každý sám za sebe)")),
-          ...room.players.map((p, i) =>
-            h(
-              "div",
-              { class: "player" },
-              h("span", { class: `dot ${p.connected ? "" : "off"}` }),
-              h("span", { style: `color:${TEAM_COLORS[i % TEAM_COLORS.length]}` }, p.name),
-              p.id === room.hostId ? h("span", { class: "host" }, "HOST") : null,
-              shieldPick(p),
-              p.isBot && isHost ? h("button", { class: "x", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
-            ),
-          ),
-          ...room.players.map((p) => botEditor(p)),
-          isHost ? h("div", { class: "row", style: "margin-top:8px" }, h("button", { onclick: () => net.send({ type: "addBot", team: 0 }) }, icon("bot", "currentColor", 12), label("bot"))) : null,
-        ),
+    teamsTable(),
     me
       ? h(
           "div",

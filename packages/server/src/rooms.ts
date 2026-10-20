@@ -140,7 +140,7 @@ class Room {
   code: string;
   name: string;
   hostId: string;
-  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, allowedHulls: {}, allowedPilots: {}, botLoadout: "default", map: { ...DEFAULT_MAP, seed: Math.floor(Math.random() * 100000) } };
+  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipPoints: 1, teams: 2, allowedModules: {}, allowedHulls: {}, allowedPilots: {}, botLoadout: "default", map: { ...DEFAULT_MAP, seed: Math.floor(Math.random() * 100000) } };
   tuning: Tuning = initialTuning();
   members = new Map<string, RoomMember>();
   game: RunningGame | null = null;
@@ -318,9 +318,30 @@ export class Hub {
         return;
       case "setTeam": {
         if (!room || room.game) return;
-        const m = room.members.get(client.id);
+        // host může přesunout kohokoli (i bota), hráč jen sebe
+        const targetId = msg.playerId && room.hostId === client.id ? msg.playerId : client.id;
+        const m = room.members.get(targetId);
         if (!m) return;
-        m.team = clampInt(msg.team, 0, MAX_TEAMS_TDM - 1);
+        m.team = clampInt(msg.team, 0, (room.settings.teams ?? 2) - 1);
+        this.broadcastRoom(room);
+        return;
+      }
+      case "balanceTeams": {
+        if (!room || room.game || room.hostId !== client.id) return;
+        const n = room.settings.teams ?? 2;
+        const members = [...room.members.values()];
+        if (msg.shuffle) for (let i = members.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [members[i], members[j]] = [members[j], members[i]];
+        } else members.sort((a, b) => fleetPoints(b.loadouts) - fleetPoints(a.loadouts));
+        // greedy: každého dalšího do týmu s nejmenším součtem lodních bodů
+        const sums = Array.from({ length: n }, () => 0);
+        for (const m of members) {
+          let best = 0;
+          for (let t = 1; t < n; t++) if (sums[t] < sums[best]) best = t;
+          m.team = best;
+          sums[best] += fleetPoints(m.loadouts);
+        }
         this.broadcastRoom(room);
         return;
       }
@@ -379,7 +400,7 @@ export class Hub {
         const id = `bot-${randomBytes(3).toString("hex")}`;
         const used = new Set([...room.members.values()].map((m) => m.name));
         const name = BOT_NAMES.find((n) => !used.has(`Bot ${n}`)) ?? randomBytes(2).toString("hex");
-        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, MAX_TEAMS_TDM - 1), isBot: true, ready: true, loadouts: this.botFleet(room), earned: 0, spent: 0 });
+        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, (room.settings.teams ?? 2) - 1), isBot: true, ready: true, loadouts: this.botFleet(room), earned: 0, spent: 0 });
         this.broadcastRoom(room);
         this.broadcastRooms();
         return;
@@ -397,6 +418,10 @@ export class Hub {
         const s = msg.settings;
         if (s.mode === "tdm" || s.mode === "dm") room.settings.mode = s.mode;
         if (typeof s.turnLimit === "number") room.settings.turnLimit = clampInt(s.turnLimit, 0, 99);
+        if (typeof s.teams === "number") {
+          room.settings.teams = clampInt(s.teams, 2, MAX_TEAMS_TDM);
+          for (const m of room.members.values()) if (m.team >= room.settings.teams) m.team = 0;
+        }
         if (typeof s.shipPoints === "number") {
           room.settings.shipPoints = clampInt(s.shipPoints, 1, 3);
           room.resizeFleets();
@@ -725,10 +750,12 @@ export class Hub {
   }
 
   private smallestTeam(room: Room): number {
-    const counts = Array.from({ length: MAX_TEAMS_TDM }, () => 0);
-    for (const m of room.members.values()) counts[m.team]++;
-    // obsazujeme jen první dva týmy automaticky, třetí si hráč vybere sám
-    return counts[0] <= counts[1] ? 0 : 1;
+    const n = room.settings.teams ?? 2;
+    const counts = Array.from({ length: n }, () => 0);
+    for (const m of room.members.values()) if (m.team < n) counts[m.team]++;
+    let best = 0;
+    for (let t = 1; t < n; t++) if (counts[t] < counts[best]) best = t;
+    return best;
   }
 
   private newCode(): string {
