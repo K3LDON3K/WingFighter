@@ -40,6 +40,7 @@ const http = createServer((req, res) => {
     res.end();
     return;
   }
+  if (existsSync(file) && statSync(file).isDirectory() && existsSync(join(file, "index.html"))) file = join(file, "index.html");
   if (!existsSync(file) || statSync(file).isDirectory()) file = join(CLIENT_DIST, "index.html");
   res.writeHead(200, {
     "content-type": MIME[extname(file)] ?? "application/octet-stream",
