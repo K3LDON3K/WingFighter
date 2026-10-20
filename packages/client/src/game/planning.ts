@@ -357,7 +357,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
             onclick: () => (moveDone ? cb.cancelManeuver(ship.id) : isMove ? cb.aim(ship.id) : cb.chooseAction(ship.id, a.id)),
           },
           costPips(a.id === "koiogran" ? 2 : 1, dots > 0 ? "spent" : "red", a.id === "koiogran" ? "stojí 2 akce" : a.id === "move" ? "stojí 1 akci (rovně stejnou rychlostí zdarma)" : "stojí 1 akci"),
-          moveDone ? h("span", { class: "pen-done" }, icon("pen", "currentColor", 22), h("span", { class: "pd-tick" }, icon("tick", "#bbf7d0", 11))) : icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
+          icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
           moveDone ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
           stormOff ? h("span", { class: "sb" }, "⚡") : null,

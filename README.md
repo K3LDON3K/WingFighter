@@ -145,7 +145,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
-- v3.35 – tlačítko MANÉVR po nakreslení dráhy (varianta D2): zezelená, tužka s ✓ a dole proužek „↺ RESET“;
+- v3.35 – tlačítko MANÉVR po nakreslení dráhy (varianta D2): zezelená, tužka, zaškrtnutý čtvereček ceny a dole proužek „↺ RESET“ (v3.35.1 bez druhé fajfky u tužky);
   stisk manévr resetuje (rovně stejnou rychlostí, akce se uvolní). Na dotyku platí dráha hned po zvednutí
   prstu (bez čipů i bez ✕ proužku); myší se potvrzuje klikem jako dřív. ✕ pod MANÉVR odstraněno.
 - v3.34 – bez čipů ✓ / ✕: i na dotyku dráhu potvrdí ťuknutí kamkoliv nebo SPUSTIT KOLO (jako myší). Pod
