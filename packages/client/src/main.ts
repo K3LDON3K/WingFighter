@@ -51,7 +51,8 @@ import {
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
 import { audioReady, isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
-import { loadLibrary, playMode } from "./music.ts";
+import { loadLibrary, playMode, renderSynth } from "./music.ts";
+(window as unknown as { __wfRender: typeof renderSynth }).__wfRender = renderSynth;
 import { renderMusicPanel } from "./music-ui.ts";
 import { logoCanvas, replayLogo } from "./logo.ts";
 

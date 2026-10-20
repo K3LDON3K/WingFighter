@@ -145,6 +145,13 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.21 – nové vestavěné skladby: chiptune sekvencer s pulzními vlnami (12,5 / 25 / 50 %), vibratem,
+  tempovou ozvěnou, filtrovanými pady, „žesťovým“ sborem, subbasovým dronem, snare/kopák/hi-hat a limiterem.
+  **Menu** (A moll, 88 BPM, 128 dob ≈ 87 s): vesmírná elektronika ve stylu Space Rangers – dron, pady, třpytivé
+  arpeggio, intro → téma → druhé téma → téma s druhým hlasem → most. **Bitva** (E moll, 140 BPM, 184 dob
+  ≈ 79 s): hnací basa v osminách, napjatá část, fanfárový refrén s žesti a pochodovým snarem (hrdinský
+  charakter à la filmové vesmírné bitvy), breakdown s vířením, závěrečný refrén. Ladicí `window.__wfRender(id, s)`
+  vyrenderuje skladbu do WAV.
 - v3.20 – úvodní obrazovka: po načtení jen statické logo a tlačítko **SPUSTIT HRU**. Klik povolí zvuk
   v prohlížeči, přepne do hlavního menu, kde proběhne animace loga se zvukem a naváže hudba menu
   (nahrazuje nápovědu „klikni kamkoliv“ z v3.19.2). Při návratu do rozehrané bitvy se úvodní obrazovka

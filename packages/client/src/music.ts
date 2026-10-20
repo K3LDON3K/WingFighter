@@ -228,121 +228,421 @@ function startFile(c: AudioContext, t: Track): Playing {
 
 /* --- syntetizované skladby (sekvencer) --- */
 
+/* ---------- syntetizované skladby (chiptune sekvencer) ---------- */
+
+type Voice = "bass" | "sub" | "lead" | "brass" | "harm" | "arp" | "pad";
+interface Ev {
+  v: Voice;
+  b: number; // doba
+  l: number; // délka v dobách
+  n: number; // MIDI
+  vel: number;
+}
+interface Drums {
+  kick: number[];
+  snare: number[];
+  hat: number[];
+  ohat: number[];
+}
 interface Song {
   bpm: number;
-  /** Délka smyčky v dobách (čtvrťových). */
   beats: number;
-  /** Basa: [doba, délka, frekvence] */
-  bass: [number, number, number][];
-  /** Melodie / arpeggio: [doba, délka, frekvence, hlasitost?] */
-  lead: [number, number, number, number?][];
-  /** Bicí: doby s kopákem / hi-hatem. */
-  kick: number[];
-  hat: number[];
-  leadWave: OscillatorType;
-  bassWave: OscillatorType;
+  ev: Ev[];
+  drums: Drums;
+  /** Charakter: menu = měkčí vlny, bitva = ostré pulzy. */
+  bright: boolean;
 }
 
 const N = (n: number) => 440 * Math.pow(2, (n - 69) / 12); // MIDI → Hz
+const NAMES: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+/** "E5" → MIDI 76 */
+function midi(s: string): number {
+  const m = /^([A-G])([#b]?)(-?\d)$/.exec(s);
+  if (!m) throw new Error(`nota ${s}`);
+  return 12 * (Number(m[3]) + 1) + NAMES[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0);
+}
+/** Melodie zapsaná jako "E5:2 G5:1 -:1" (nota:délka, - = pauza), od doby `at`. */
+function phrase(v: Voice, at: number, txt: string, vel: number, out: Ev[], legato = 0.92) {
+  let b = at;
+  for (const tok of txt.trim().split(/\s+/)) {
+    const [name, len] = tok.split(":");
+    const l = Number(len ?? 1);
+    if (name !== "-") out.push({ v, b, l: l * legato, n: midi(name), vel });
+    b += l;
+  }
+  return b;
+}
+/** Akord: kořen (MIDI) + typ. */
+const CH: Record<string, number[]> = { m: [0, 3, 7], M: [0, 4, 7], m7: [0, 3, 7, 10], M7: [0, 4, 7, 11], sus: [0, 5, 7], dom: [0, 4, 7, 10] };
+function chordNotes(root: string, type: keyof typeof CH) {
+  const r = midi(root);
+  return CH[type].map((i) => r + i);
+}
+/** Arpeggio přes akord: vzor indexů do akordu (+12 = o oktávu výš), krok v dobách. */
+function arp(at: number, len: number, chord: number[], pattern: number[], step: number, vel: number, out: Ev[], v: Voice = "arp") {
+  for (let b = 0, i = 0; b < len - 1e-6; b += step, i++) {
+    const p = pattern[i % pattern.length];
+    out.push({ v, b: at + b, l: step * 0.8, n: chord[p % chord.length] + 12 * Math.floor(p / chord.length), vel });
+  }
+}
+function pad(at: number, len: number, chord: number[], vel: number, out: Ev[]) {
+  for (const n of chord) out.push({ v: "pad", b: at, l: len * 0.98, n, vel });
+}
+/** Harmonie k melodii: nejbližší tón akordu 3–5 půltónů pod melodií. */
+function harmonize(ev: Ev[], from: number, to: number, chordAt: (b: number) => number[], vel: number, out: Ev[]) {
+  for (const e of ev) {
+    if ((e.v !== "lead" && e.v !== "brass") || e.b < from || e.b >= to) continue;
+    const ch = chordAt(e.b);
+    let best = e.n - 4;
+    let bd = 99;
+    for (const c of ch) for (const o of [-24, -12, 0, 12, 24]) {
+      const d = e.n - (c + o);
+      if (d >= 3 && d <= 5 && Math.abs(d - 4) < bd) (bd = Math.abs(d - 4)), (best = c + o);
+    }
+    out.push({ ...e, v: "harm", n: best, vel });
+  }
+}
+const rep = (base: number[], len: number, times: number, off = 0) => Array.from({ length: times }, (_, k) => base.map((b) => off + k * len + b)).flat();
 
-/** Hlavní menu: pomalé, atmosférické (A moll), ~84 BPM, 32 dob. */
+/* ===== Hlavní menu: A moll, 88 BPM, 128 dob (~87 s), klidné ale s tahem ===== */
 const MENU_SONG: Song = (() => {
-  const bass: Song["bass"] = [];
-  const lead: Song["lead"] = [];
-  const roots = [45, 41, 43, 40]; // A2 F2 G2 E2
-  roots.forEach((r, bar) => {
-    bass.push([bar * 8, 7.5, N(r)]);
-    const chord = bar === 0 ? [57, 60, 64, 67] : bar === 1 ? [53, 57, 60, 64] : bar === 2 ? [55, 59, 62, 67] : [52, 56, 59, 64];
-    for (let i = 0; i < 16; i++) lead.push([bar * 8 + i * 0.5, 0.45, N(chord[i % 4] + (i >= 8 ? 12 : 0)), 0.09]);
-  });
-  // horní melodie
-  const mel: [number, number, number][] = [[0, 2, 76], [2, 1, 79], [3, 3, 81], [8, 2, 77], [10, 1, 76], [11, 3, 72], [16, 2, 74], [18, 1, 76], [19, 3, 79], [24, 4, 76], [28, 4, 71]];
-  for (const [b, l, n] of mel) lead.push([b, l * 0.95, N(n), 0.13]);
-  return { bpm: 84, beats: 32, bass, lead, kick: [0, 4, 8, 12, 16, 20, 24, 28], hat: Array.from({ length: 32 }, (_, i) => i + 0.5), leadWave: "triangle", bassWave: "triangle" };
+  const ev: Ev[] = [];
+  const d: Drums = { kick: [], snare: [], hat: [], ohat: [] };
+  type Bar = [string, keyof typeof CH];
+  // části po 8 dobách na akord
+  const intro: Bar[] = [["A2", "m"], ["E2", "m"]];
+  const secA: Bar[] = [["A2", "m"], ["F2", "M"], ["G2", "M"], ["E2", "m"]];
+  const secB: Bar[] = [["F2", "M"], ["G2", "M"], ["C3", "M"], ["E2", "dom"]];
+  const bridge: Bar[] = [["D2", "m"], ["A2", "m"]];
+  const plan: { bars: Bar[]; drums: 0 | 1 | 2; arpPat: number[]; arpStep: number; padVel: number }[] = [
+    { bars: intro, drums: 0, arpPat: [0, 1, 2, 4], arpStep: 1, padVel: 0.05 },
+    { bars: secA, drums: 1, arpPat: [0, 1, 2, 4, 2, 1], arpStep: 0.5, padVel: 0.045 },
+    { bars: secB, drums: 2, arpPat: [0, 2, 4, 5, 4, 2], arpStep: 0.5, padVel: 0.05 },
+    { bars: secA, drums: 2, arpPat: [0, 1, 2, 4, 5, 4, 2, 1], arpStep: 0.5, padVel: 0.045 },
+    { bars: bridge, drums: 0, arpPat: [0, 2, 4, 2], arpStep: 1, padVel: 0.06 },
+  ];
+  const chordMap: [number, number[]][] = [];
+  let b = 0;
+  for (const sec of plan) {
+    for (const [root, type] of sec.bars) {
+      const ch = chordNotes(root, type).map((n) => n + 12); // akord kolem C4
+      chordMap.push([b, ch]);
+      // basa: kořen + oktáva, lehce synkopovaná
+      const r = midi(root);
+      if (sec.drums === 0) ev.push({ v: "bass", b, l: 7.5, n: r, vel: 0.12 });
+      else for (const [bb, l, up] of [[0, 1.5, 0], [1.5, 0.5, 12], [2, 1.5, 0], [3.5, 0.5, 7], [4, 1.5, 0], [5.5, 0.5, 12], [6, 1, 0], [7, 1, 7]] as [number, number, number][]) ev.push({ v: "bass", b: b + bb, l: l * 0.9, n: r + up, vel: 0.12 });
+      pad(b, 8, ch, sec.padVel, ev);
+      ev.push({ v: "sub", b, l: 7.9, n: r - 12, vel: 0.09 }); // hluboký dron pod vším (vesmírná atmosféra)
+      arp(b, 8, ch, sec.arpPat, sec.arpStep, 0.055, ev);
+      if (sec.drums >= 1) {
+        d.kick.push(b, b + 4, b + 5.5);
+        d.snare.push(b + 2, b + 6);
+        d.hat.push(...rep([0.5, 1.5, 2.5, 3.5], 4, 2, b));
+      }
+      if (sec.drums === 2) {
+        d.hat.push(...rep([0, 1, 2, 3], 4, 2, b));
+        d.ohat.push(b + 7.5);
+      }
+      b += 8;
+    }
+  }
+  const melA = "E5:2 G5:1 A5:3 G5:1 E5:1  F5:2 E5:1 C5:3 D5:1 E5:1  D5:2 E5:1 G5:3 A5:1 G5:1  E5:4 B4:2 C5:1 D5:1";
+  const melB = "C5:1.5 D5:0.5 E5:2 G5:2 A5:2  B5:3 A5:1 G5:2 E5:2  A5:2 G5:1 E5:2 D5:1 C5:2  B4:3 G#4:1 B4:2 -:2";
+  const melA2 = "E5:2 G5:1 A5:2 B5:1 C6:2  A5:2 G5:1 E5:2 F5:1 E5:2  D5:2 E5:1 G5:2 A5:1 B5:2  E5:3 B4:1 C5:1 D5:1 E5:2";
+  phrase("lead", 16, melA, 0.1, ev);
+  phrase("lead", 48, melB, 0.1, ev);
+  phrase("lead", 80, melA2, 0.1, ev);
+  const chordAt = (x: number) => [...chordMap].reverse().find(([s]) => s <= x)?.[1] ?? [];
+  harmonize(ev, 80, 112, chordAt, 0.055, ev);
+  return { bpm: 88, beats: b, ev, drums: d, bright: false };
 })();
 
-/** Bitva: rychlé, napínavé (E moll → C), 128 BPM, 32 dob. */
+/* ===== Bitva: E moll, 140 BPM, 184 dob (~79 s), hnací basa, ostré pulzy ===== */
 const GAME_SONG: Song = (() => {
-  const bass: Song["bass"] = [];
-  const lead: Song["lead"] = [];
-  const roots = [40, 40, 36, 38]; // E2 E2 C2 D2
-  roots.forEach((r, bar) => {
-    for (let i = 0; i < 8; i++) bass.push([bar * 8 + i, 0.45, N(i % 2 ? r + 12 : r)]);
-    const chord = bar < 2 ? [64, 67, 71] : bar === 2 ? [60, 64, 67] : [62, 66, 69];
-    for (let i = 0; i < 16; i++) lead.push([bar * 8 + i * 0.5, 0.25, N(chord[i % 3] + 12), 0.07]);
-  });
-  const mel: [number, number, number][] = [[0, 1, 76], [1, 0.5, 79], [1.5, 0.5, 83], [2, 2, 81], [4, 1, 79], [5, 1, 76], [6, 2, 74], [8, 1, 76], [9, 0.5, 79], [9.5, 0.5, 83], [10, 2, 84], [12, 1, 83], [13, 1, 81], [14, 2, 79], [16, 1.5, 72], [17.5, 0.5, 76], [18, 2, 79], [20, 1, 77], [21, 1, 76], [22, 2, 74], [24, 1.5, 74], [25.5, 0.5, 78], [26, 2, 81], [28, 1, 79], [29, 1, 78], [30, 2, 76]];
-  for (const [b, l, n] of mel) lead.push([b, l * 0.9, N(n), 0.12]);
-  return { bpm: 128, beats: 32, bass, lead, kick: Array.from({ length: 16 }, (_, i) => i * 2), hat: Array.from({ length: 64 }, (_, i) => i * 0.5 + 0.25), leadWave: "square", bassWave: "sawtooth" };
+  const ev: Ev[] = [];
+  const d: Drums = { kick: [], snare: [], hat: [], ohat: [] };
+  type Bar = [string, keyof typeof CH];
+  const A: Bar[] = [["E2", "m"], ["E2", "m"], ["C2", "M"], ["D2", "M"]];
+  const B: Bar[] = [["A2", "m"], ["A2", "m"], ["C2", "M"], ["B1", "M"]];
+  const C: Bar[] = [["G2", "M"], ["D2", "M"], ["E2", "m"], ["C2", "M"]];
+  const brk: Bar[] = [["E2", "m"], ["C2", "M"]];
+  type Style = "intro" | "drive" | "tense" | "chorus" | "break";
+  const plan: { bars: Bar[]; style: Style; times: number }[] = [
+    { bars: [["E2", "m"], ["E2", "m"]], style: "intro", times: 1 },
+    { bars: A, style: "drive", times: 2 },
+    { bars: B, style: "tense", times: 2 },
+    { bars: C, style: "chorus", times: 2 },
+    { bars: A, style: "drive", times: 2 },
+    { bars: brk, style: "break", times: 2 },
+    { bars: C, style: "chorus", times: 2 },
+  ];
+  const chordMap: [number, number[]][] = [];
+  let b = 0;
+  const sections: [number, Style][] = [];
+  for (const sec of plan) {
+    sections.push([b, sec.style]);
+    for (let t = 0; t < sec.times; t++)
+      for (const [root, type] of sec.bars) {
+        const r = midi(root);
+        const ch = chordNotes(root, type).map((n) => n + 24);
+        chordMap.push([b, ch]);
+        const s = sec.style;
+        // basa
+        if (s === "break") ev.push({ v: "bass", b, l: 3.8, n: r, vel: 0.1 });
+        else if (s === "intro") for (let i = 0; i < 8; i++) ev.push({ v: "bass", b: b + i * 0.5, l: 0.4, n: r, vel: 0.11 });
+        else {
+          const pat = s === "chorus" ? [0, 12, 0, 7, 0, 12, 7, 12] : [0, 0, 12, 0, 0, 12, 0, 10];
+          for (let i = 0; i < 8; i++) ev.push({ v: "bass", b: b + i * 0.5, l: 0.4, n: r + pat[i], vel: 0.12 });
+        }
+        // arpeggia / pad
+        if (s === "drive") arp(b, 4, ch, [0, 1, 2, 3, 2, 1], 0.25, 0.045, ev);
+        if (s === "tense") arp(b, 4, ch, [0, 2, 1, 3], 0.5, 0.05, ev);
+        if (s === "chorus") (arp(b, 4, ch, [0, 1, 2, 4, 5, 4, 2, 1], 0.25, 0.04, ev), pad(b, 4, ch, 0.035, ev));
+        if (s === "break") (pad(b, 4, ch, 0.05, ev), arp(b, 4, ch, [0, 2, 4, 2], 0.5, 0.04, ev));
+        // bicí
+        if (s === "intro") {
+          d.hat.push(...rep([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], 4, 1, b));
+          d.kick.push(b, b + 2);
+          if (b >= 4) d.snare.push(b + 2, b + 3, b + 3.25, b + 3.5, b + 3.75);
+        } else if (s === "break") {
+          d.hat.push(...rep([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], 4, 1, b));
+          if (b - sections[sections.length - 1][0] >= 4) d.snare.push(...rep([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], 4, 1, b));
+        } else {
+          d.kick.push(b, b + 1.5, b + 2, b + 3.5);
+          d.snare.push(b + 1, b + 3);
+          d.hat.push(...rep([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], 4, 1, b));
+          if (s === "chorus") (d.ohat.push(b + 2.5), d.snare.push(b + 2.5, b + 2.75)); // pochodový „ra-ta“
+          if (s === "tense") d.snare.push(b + 3.75);
+        }
+        b += 4;
+      }
+  }
+  // melodie (po 32 dobách)
+  const melA = "E5:1 G5:0.5 B5:0.5 A5:2  G5:1 E5:1 D5:2  E5:1 G5:0.5 B5:0.5 C6:2  B5:1 A5:1 G5:2  C5:1.5 E5:0.5 G5:2  F#5:1 E5:1 D5:2  D5:1.5 F#5:0.5 A5:2  G5:1 F#5:1 E5:2";
+  const melB = "A5:0.5 -:0.5 A5:0.5 -:0.5 C6:1 B5:1  A5:0.5 G5:0.5 E5:2 -:1  C6:0.5 -:0.5 C6:0.5 -:0.5 D6:1 C6:1  B5:1 D#5:1 F#5:2  A5:0.5 -:0.5 A5:0.5 -:0.5 E6:1 D6:1  C6:1 B5:1 A5:2  G5:1 E5:1 C6:1 B5:1  D#5:1 F#5:1 B5:2";
+  // refrén: fanfára – skoky o kvartu/kvintu, tečkovaný rytmus (pochodový, hrdinský charakter)
+  const melC = "G5:1.5 D6:0.5 G6:2  F#6:0.75 D6:0.25 A5:1 D6:2  E6:0.75 E6:0.25 E6:0.5 B5:1.5 G5:1  C6:0.5 D6:0.5 E6:1 G6:2  G6:1.5 D6:0.5 B5:2  A5:0.75 A5:0.25 D6:1 F#6:2  G6:1 F#6:0.5 E6:0.5 B5:2  C6:1 E6:1 D6:1 B5:1";
+  const melA2 = "E6:0.5 -:0.5 E6:0.5 D6:0.5 B5:2  G5:1 A5:1 B5:2  E6:0.5 -:0.5 E6:0.5 D6:0.5 C6:2  B5:0.5 C6:0.5 B5:0.5 A5:0.5 G5:2  C6:1 E6:1 G6:2  F#6:1 E6:1 D6:2  D6:1 F#6:1 A6:1 F#6:1  G6:0.5 F#6:0.5 E6:0.5 D6:0.5 E6:2";
+  const starts = sections.map(([s]) => s);
+  phrase("lead", starts[1], melA, 0.1, ev, 0.85);
+  phrase("lead", starts[2], melB, 0.1, ev, 0.8);
+  phrase("brass", starts[3], melC, 0.12, ev, 0.9);
+  phrase("lead", starts[4], melA2, 0.1, ev, 0.85);
+  phrase("brass", starts[6], melC, 0.12, ev, 0.9);
+  phrase("lead", starts[6], melC, 0.05, ev, 0.9); // zdvojení ostrým pulzem o stejné výšce = lesk
+  const chordAt = (x: number) => [...chordMap].reverse().find(([s]) => s <= x)?.[1] ?? [];
+  harmonize(ev, starts[3], starts[4], chordAt, 0.06, ev);
+  harmonize(ev, starts[6], b, chordAt, 0.06, ev);
+  // v breaku melodie o oktávu níž, tiše (ozvěna motivu A)
+  phrase("lead", starts[5] + 8, "E5:1 G5:0.5 B5:0.5 A5:2 G5:1 E5:1 D5:2", 0.06, ev);
+  return { bpm: 140, beats: b, ev, drums: d, bright: true };
 })();
 
-function startSynth(c: AudioContext, song: Song): Playing {
+/** Pulzní vlna s danou střídou (klasický chiptune zvuk). */
+const pulseCache = new Map<string, PeriodicWave>();
+function pulse(c: BaseAudioContext, duty: number): PeriodicWave {
+  const key = `${duty}`;
+  let w = pulseCache.get(key);
+  if (!w) {
+    const n = 32;
+    const re = new Float32Array(n);
+    const im = new Float32Array(n);
+    for (let k = 1; k < n; k++) im[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty);
+    w = c.createPeriodicWave(re, im, { disableNormalization: false });
+    pulseCache.set(key, w);
+  }
+  return w;
+}
+
+function startSynth(c: BaseAudioContext, song: Song, dest: AudioNode = musicBus(), offlineSeconds = 0): Playing {
   const g = c.createGain();
   g.gain.setValueAtTime(0.0001, c.currentTime);
-  g.gain.linearRampToValueAtTime(settings.volume, c.currentTime + 1.5);
-  g.connect(musicBus());
+  g.gain.linearRampToValueAtTime(offlineSeconds ? 0.8 : settings.volume, c.currentTime + 1.5);
+  // limiter proti přebuzení v hutných místech (refrén s žesti + bicí)
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = -16;
+  comp.knee.value = 8;
+  comp.ratio.value = 8;
+  comp.attack.value = 0.003;
+  comp.release.value = 0.12;
+  const mix = c.createGain();
+  mix.gain.value = 0.85;
+  mix.connect(comp).connect(g);
+  g.connect(dest);
   const spb = 60 / song.bpm;
-  const loopSec = song.beats * spb;
-  let loopStart = c.currentTime + 0.1;
-  let scheduledUntil = loopStart;
-  let stopped = false;
-  const note = (wave: OscillatorType, f: number, t0: number, dur: number, vol: number) => {
+  // sběrnice: lead/arp přes tempovou ozvěnu (vesmírný prostor), pad přes lowpass
+  const echoIn = c.createGain();
+  const delay = c.createDelay(2);
+  delay.delayTime.value = spb * 0.75;
+  const fb = c.createGain();
+  fb.gain.value = song.bright ? 0.28 : 0.35;
+  const wet = c.createGain();
+  wet.gain.value = 0.35;
+  const dampen = c.createBiquadFilter();
+  dampen.type = "lowpass";
+  dampen.frequency.value = 2400;
+  echoIn.connect(mix);
+  echoIn.connect(delay);
+  delay.connect(dampen).connect(fb).connect(delay);
+  dampen.connect(wet).connect(mix);
+  const brassBus = c.createBiquadFilter();
+  brassBus.type = "lowpass";
+  brassBus.frequency.value = 2200;
+  brassBus.Q.value = 1.2;
+  brassBus.connect(echoIn);
+  const padBus = c.createBiquadFilter();
+  padBus.type = "lowpass";
+  padBus.frequency.value = song.bright ? 1400 : 900;
+  padBus.connect(mix);
+  const leadWave = pulse(c, song.bright ? 0.25 : 0.5);
+  const arpWave = pulse(c, 0.125);
+  const harmWave = pulse(c, 0.25);
+  const note = (e: Ev, t0: number) => {
+    const dur = e.l * spb;
     const o = c.createOscillator();
-    o.type = wave;
+    const f = N(e.n);
+    let dest: AudioNode = mix;
+    let vel = e.vel;
+    if (e.v === "bass") o.type = song.bright ? "sawtooth" : "triangle";
+    else if (e.v === "sub") o.type = "sine";
+    else if (e.v === "brass") (o.type = "sawtooth"), (dest = brassBus);
+    else if (e.v === "lead") (o.setPeriodicWave(leadWave), (dest = echoIn));
+    else if (e.v === "harm") (o.setPeriodicWave(harmWave), (dest = echoIn));
+    else if (e.v === "arp") (o.setPeriodicWave(arpWave), (dest = echoIn));
+    else (o.type = "triangle"), (dest = padBus);
     o.frequency.setValueAtTime(f, t0);
-    const e = c.createGain();
-    e.gain.setValueAtTime(0.0001, t0);
-    e.gain.linearRampToValueAtTime(vol, t0 + 0.01);
-    e.gain.setValueAtTime(vol, t0 + Math.max(0.02, dur * spb - 0.05));
-    e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * spb);
-    o.connect(e).connect(g);
+    if ((e.v === "lead" || e.v === "brass") && dur > 0.35) {
+      // vibrato na delších tónech
+      const lfo = c.createOscillator();
+      lfo.frequency.value = 5.5;
+      const lg = c.createGain();
+      lg.gain.setValueAtTime(0, t0);
+      lg.gain.linearRampToValueAtTime(f * 0.012, t0 + 0.25);
+      lfo.connect(lg).connect(o.frequency);
+      lfo.start(t0);
+      lfo.stop(t0 + dur + 0.05);
+    }
+    if (e.v === "pad" || e.v === "brass") {
+      // lehké rozladění pro šířku (pad) / „žesťový“ sbor (brass)
+      const o2 = c.createOscillator();
+      o2.type = e.v === "pad" ? "triangle" : "sawtooth";
+      o2.frequency.setValueAtTime(f * (e.v === "pad" ? 1.004 : 0.994), t0);
+      const e2 = c.createGain();
+      const a2 = e.v === "pad" ? 0.6 : 0.04;
+      e2.gain.setValueAtTime(0.0001, t0);
+      e2.gain.linearRampToValueAtTime(vel * 0.8, t0 + a2);
+      e2.gain.setValueAtTime(vel * 0.8, t0 + Math.max(a2 + 0.05, dur - (e.v === "pad" ? 0.5 : 0.06)));
+      e2.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+      o2.connect(e2).connect(dest);
+      o2.start(t0);
+      o2.stop(t0 + dur + 0.05);
+    }
+    const env = c.createGain();
+    const atk = e.v === "pad" ? 0.6 : e.v === "sub" ? 0.3 : e.v === "brass" ? 0.04 : 0.008;
+    const rel = e.v === "pad" ? 0.5 : e.v === "sub" ? 0.4 : e.v === "bass" ? 0.03 : 0.06;
+    env.gain.setValueAtTime(0.0001, t0);
+    env.gain.linearRampToValueAtTime(vel, t0 + atk);
+    if (e.v === "arp" || e.v === "bass") env.gain.exponentialRampToValueAtTime(vel * 0.5, t0 + Math.max(atk + 0.01, dur * 0.7)); // perkusivní
+    env.gain.setValueAtTime(e.v === "arp" || e.v === "bass" ? vel * 0.5 : vel, t0 + Math.max(atk + 0.01, dur - rel));
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.01);
+    o.connect(env).connect(dest);
     o.start(t0);
-    o.stop(t0 + dur * spb + 0.02);
+    o.stop(t0 + dur + 0.05);
   };
-  const drum = (t0: number, kick: boolean) => {
-    if (kick) {
+  const noiseBuf = (() => {
+    const len = Math.ceil(c.sampleRate * 0.3);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const dd = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) dd[i] = Math.random() * 2 - 1;
+    return buf;
+  })();
+  const drum = (kind: "kick" | "snare" | "hat" | "ohat", t0: number) => {
+    if (kind === "kick") {
       const o = c.createOscillator();
       o.type = "sine";
-      o.frequency.setValueAtTime(150, t0);
-      o.frequency.exponentialRampToValueAtTime(40, t0 + 0.12);
+      o.frequency.setValueAtTime(160, t0);
+      o.frequency.exponentialRampToValueAtTime(42, t0 + 0.11);
       const e = c.createGain();
-      e.gain.setValueAtTime(0.25, t0);
-      e.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14);
-      o.connect(e).connect(g);
+      e.gain.setValueAtTime(song.bright ? 0.32 : 0.24, t0);
+      e.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+      o.connect(e).connect(mix);
       o.start(t0);
-      o.stop(t0 + 0.16);
-    } else {
-      const len = Math.ceil(c.sampleRate * 0.04);
-      const buf = c.createBuffer(1, len, c.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      o.stop(t0 + 0.18);
+      // klik na začátku
       const s = c.createBufferSource();
-      s.buffer = buf;
-      const f = c.createBiquadFilter();
-      f.type = "highpass";
-      f.frequency.value = 6000;
-      const e = c.createGain();
-      e.gain.value = 0.05;
-      s.connect(f).connect(e).connect(g);
+      s.buffer = noiseBuf;
+      const eg = c.createGain();
+      eg.gain.setValueAtTime(0.08, t0);
+      eg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.02);
+      s.connect(eg).connect(mix);
       s.start(t0);
+      s.stop(t0 + 0.03);
+      return;
     }
+    const s = c.createBufferSource();
+    s.buffer = noiseBuf;
+    const f = c.createBiquadFilter();
+    const e = c.createGain();
+    let len = 0.04;
+    if (kind === "snare") {
+      f.type = "bandpass";
+      f.frequency.value = 1800;
+      f.Q.value = 0.7;
+      len = 0.16;
+      e.gain.setValueAtTime(song.bright ? 0.2 : 0.14, t0);
+      e.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+      const o = c.createOscillator();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(220, t0);
+      o.frequency.exponentialRampToValueAtTime(120, t0 + 0.08);
+      const eo = c.createGain();
+      eo.gain.setValueAtTime(0.15, t0);
+      eo.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+      o.connect(eo).connect(mix);
+      o.start(t0);
+      o.stop(t0 + 0.1);
+    } else {
+      f.type = "highpass";
+      f.frequency.value = 7000;
+      len = kind === "ohat" ? 0.22 : 0.035;
+      e.gain.setValueAtTime(kind === "ohat" ? 0.06 : 0.045, t0);
+      e.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+    }
+    s.connect(f).connect(e).connect(mix);
+    s.start(t0);
+    s.stop(t0 + len + 0.01);
   };
-  const scheduleLoop = (t0: number) => {
-    for (const [b, l, f] of song.bass) note(song.bassWave, f, t0 + b * spb, l, 0.11);
-    for (const [b, l, f, v] of song.lead) note(song.leadWave, f, t0 + b * spb, l, v ?? 0.1);
-    for (const b of song.kick) drum(t0 + b * spb, true);
-    for (const b of song.hat) drum(t0 + b * spb, false);
+  // seřazený seznam událostí jedné smyčky; plánujeme vždy jen ~1,5 s dopředu
+  type Item = { b: number; run: (t: number) => void };
+  const items: Item[] = [];
+  for (const e of song.ev) items.push({ b: e.b, run: (t) => note(e, t) });
+  for (const k of ["kick", "snare", "hat", "ohat"] as const) for (const b of song.drums[k]) items.push({ b, run: (t) => drum(k, t) });
+  items.sort((x, y) => x.b - y.b);
+  const loopSec = song.beats * spb;
+  let loopStart = c.currentTime + 0.1;
+  let pos = 0;
+  let stopped = false;
+  const schedule = (horizon: number) => {
+    for (;;) {
+      if (pos >= items.length) {
+        loopStart += loopSec;
+        pos = 0;
+      }
+      const it = items[pos];
+      const t = loopStart + it.b * spb;
+      if (t > horizon) break;
+      if (t >= c.currentTime) it.run(t);
+      pos++;
+    }
   };
   const tick = () => {
     if (stopped) return;
-    while (scheduledUntil < c.currentTime + 1.5) {
-      scheduleLoop(loopStart);
-      loopStart += loopSec;
-      scheduledUntil = loopStart;
-    }
-    timer = window.setTimeout(tick, 400);
+    schedule(c.currentTime + 1.5);
+    timer = window.setTimeout(tick, 300);
   };
-  let timer = window.setTimeout(tick, 0);
+  let timer = 0;
+  if (offlineSeconds) schedule(offlineSeconds);
+  else timer = window.setTimeout(tick, 0);
   return {
     stop(fade) {
       stopped = true;
@@ -356,4 +656,25 @@ function startSynth(c: AudioContext, song: Song): Playing {
       g.gain.setValueAtTime(v, c.currentTime);
     },
   };
+}
+
+/** Ladicí export: vyrenderuje vestavěnou skladbu do WAV (offline), např. pro poslech mimo hru. */
+export async function renderSynth(id: string, seconds: number): Promise<Blob> {
+  const song = id === SYNTH_MENU.id ? MENU_SONG : GAME_SONG;
+  const sr = 44100;
+  const off = new OfflineAudioContext(2, Math.ceil(sr * seconds), sr);
+  startSynth(off, song, off.destination, seconds);
+  const buf = await off.startRendering();
+  const n = buf.length;
+  const out = new DataView(new ArrayBuffer(44 + n * 4));
+  const str = (o: number, s: string) => [...s].forEach((ch, i) => out.setUint8(o + i, ch.charCodeAt(0)));
+  str(0, "RIFF"); out.setUint32(4, 36 + n * 4, true); str(8, "WAVE"); str(12, "fmt "); out.setUint32(16, 16, true);
+  out.setUint16(20, 1, true); out.setUint16(22, 2, true); out.setUint32(24, sr, true); out.setUint32(28, sr * 4, true);
+  out.setUint16(32, 4, true); out.setUint16(34, 16, true); str(36, "data"); out.setUint32(40, n * 4, true);
+  const L = buf.getChannelData(0), R = buf.getChannelData(1);
+  for (let i = 0; i < n; i++) {
+    out.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i])) * 32767, true);
+    out.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i])) * 32767, true);
+  }
+  return new Blob([out], { type: "audio/wav" });
 }
