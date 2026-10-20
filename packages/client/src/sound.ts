@@ -148,7 +148,7 @@ const SFX: Record<SfxName, (c: AudioContext, b: AudioNode) => void> = {
     tone(c, b, { wave: "sawtooth", f0: 220, f1: 180, dur: 0.12, gain: 0.18 });
     tone(c, b, { wave: "sawtooth", f0: 220, f1: 170, dur: 0.14, gain: 0.18, at: 0.14 });
   },
-  launch: (c, b) => arp(c, b, [440, 554, 659, 880], 0.06, { gain: 0.18, dur: 0.12 }),
+  launch: (c, b) => tone(c, b, { wave: "square", f0: 660, f1: 990, dur: 0.12, gain: 0.16 }),
   turnStart: (c, b) => arp(c, b, [330, 440], 0.08, { wave: "triangle", gain: 0.16, dur: 0.14 }),
   laser: (c, b) => tone(c, b, { wave: "square", f0: 1400, f1: 300, dur: 0.16, gain: 0.22 }),
   laserHit: (c, b) => {
