@@ -173,7 +173,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     const btn = (seg: number, d: 1 | -1) => {
       const v = planned[seg];
       const can = d < 0 ? v > 0 : inHand > 0 && v < RULES.segmentMax;
-      return h("button", { class: "px sbtn", disabled: !can, title: d < 0 ? `${SEGMENT_NAMES[seg]}: odebrat bod` : inHand <= 0 ? "nejdřív bod někde odeber" : `${SEGMENT_NAMES[seg]}: přidat bod (max. ${RULES.segmentMax})`, onclick: () => cb.shieldDelta(ship.id, seg, d) }, d < 0 ? h("i", { class: "minus" }) : "+");
+      return h("button", { class: "px sbtn", disabled: !can, title: d < 0 ? `${SEGMENT_NAMES[seg]}: odebrat bod` : inHand <= 0 ? "nejdřív bod někde odeber" : `${SEGMENT_NAMES[seg]}: přidat bod (max. ${RULES.segmentMax})`, onclick: () => cb.shieldDelta(ship.id, seg, d) }, icon(d < 0 ? "minus" : "plus", "currentColor", 8));
     };
     // příď a záď: − vlevo, + vpravo; boky: + nahoře, − dole
     const total = ship.segments.reduce((a, b) => a + b, 0);
@@ -193,11 +193,13 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     return h("div", { class: "vgauge", title }, bar, h("span", { class: "vname" }, label(name)), h("span", { class: "vnum", style: `color:${color}` }, num));
   };
   const hullBlocks = Math.max(ship.hull > 0 ? 1 : 0, Math.round((10 * ship.hull) / ship.stats.hull));
+  const maxSp = profileOf(ship.loadout).maxSpeed;
   const gauges = h(
     "div",
     { class: "gauges" },
     vgauge(10, hullBlocks, ship.hull <= ship.stats.hull * 0.3 ? "#ef4444" : "#4ade80", "#14341f", "trup", String(ship.hull), `Trup ${ship.hull}/${ship.stats.hull}`),
     vgauge(STRESS.max, ship.stressPoints, "#f472b6", "#3b1a2e", "stres", `${ship.stressPoints}/${STRESS.max}`, "Stresové body: červený manévr −1, nebezpečný −2, zelený +1"),
+    vgauge(5, ship.speed, "#94a3b8", "#1e293b", "rychlost", `${ship.speed}/${maxSp}`, `Aktuální rychlost ${ship.speed}, max. s touto váhou ${maxSp} (váha ${loadoutWeight(ship.loadout)})`),
   );
   const right = h("div", { class: "bb-shipinfo" }, gauges);
   const shieldLine =
@@ -207,24 +209,24 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         ? h("div", { class: "bb-row dim" }, icon("shield", "#64748b"), h("span", { class: "pv" }, label("štít vypnut")))
         : null;
   if (shieldLine) right.append(shieldLine);
-  right.append(h("div", { class: "bb-row" }, h("span", { class: "stat", title: `Aktuální rychlost / max. s touto váhou (${loadoutWeight(ship.loadout)})` }, icon("speed", "#94a3b8"), `${ship.speed}/${profileOf(ship.loadout).maxSpeed}`)));
   if (stormed) right.append(h("div", { class: "storm-warn", title: "Elektromagnetická bouře: štíty a lasery mimo provoz, torpéda neřiditelná, skener nefunguje" }, "⚡ ", label("bouře")));
+  // jméno hráče / lodi je na záložce nad panelem (na horní hraně lišty)
   const status = h(
     "div",
     { class: "pnl bb-ship" },
     h(
       "div",
-      { class: "bb-head" },
-      h("span", { class: "bb-name txt", style: `color:${teamColor}` }, ship.name),
+      { class: "bb-tab", style: `color:${teamColor}` },
+      h("span", { class: "txt" }, ship.name),
       my.length > 1 ? h("div", { class: "ship-tabs" }, ...my.map((s, i) => h("button", { class: `px ${s.id === ship.id ? "on" : ""}`, title: s.name, onclick: () => cb.select(s.id) }, String(i + 1)))) : null,
     ),
     h("div", { class: "bb-shipbody" }, shieldBox, right),
   );
 
   /* ---- 1b. výzbroj: munice každého modulu ---- */
-  const ammoMods = ship.loadout.modules.filter((md) => md.ammo !== undefined);
+  const ammoMods = ship.loadout.modules.filter((md) => md.ammo !== undefined || md.type === "laser");
   const weapons = h("div", { class: "pnl bb-ammo" }, h("div", { class: "ttl" }, label("Výzbroj")));
-  if (ammoMods.length === 0) weapons.append(h("div", { class: "muted txt" }, "bez munice"));
+  if (ammoMods.length === 0) weapons.append(h("div", { class: "muted txt" }, "bez zbraní"));
   const counters: Record<string, number> = {};
   const typeCount: Record<string, number> = {};
   for (const md of ammoMods) typeCount[md.type] = (typeCount[md.type] ?? 0) + 1;
@@ -233,9 +235,15 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     counters[md.type] = (counters[md.type] ?? 0) + 1;
     const max = def.ammo ?? 0;
     const left = md.ammo ?? 0;
-    const base = md.type === "torpedo" ? "TORP" : md.type === "mine" ? "MINY" : md.type === "mg" ? "KULOMET" : def.short;
+    const base = md.type === "torpedo" ? "TORP" : md.type === "mine" ? "MINY" : md.type === "mg" ? "KULOMET" : md.type === "laser" ? "LASER" : def.short;
     const name = `${base}${typeCount[md.type] > 1 ? ` ${counters[md.type]}` : ""}`;
     const icons = h("span", { class: "ammo-icons" });
+    if (md.type === "laser") {
+      // bez munice: nekonečno
+      icons.append(h("span", { class: "inf", title: "Lasery nemají munici – střílí každé kolo" }, "∞"));
+      weapons.append(h("div", { class: "ammo-row", title: `${def.name} – ${FACING_NAMES[md.facing ?? "front"]}: bez munice` }, h("span", { class: "ammo-name" }, label(name), h("span", { class: "muted" }, ` ${FACING_GLYPH[md.facing ?? "front"]}`)), icons));
+      continue;
+    }
     if (md.type === "mg") {
       const n = 10;
       const lit = Math.round((left / Math.max(1, max)) * n);

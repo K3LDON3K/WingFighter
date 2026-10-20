@@ -1021,18 +1021,19 @@ h3,
   flex-direction: column;
 }
 .sbtn {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
   padding: 0;
   font-size: 13px;
-  line-height: 1;
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
-.sbtn .minus {
+.sbtn svg {
   display: block;
-  width: 7px;
-  height: 2px;
-  background: currentColor;
 }
 .hand-slots {
   display: flex;
@@ -1053,9 +1054,11 @@ h3,
 /* svislé ukazatele trupu a stresu */
 .gauges {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-end;
-  height: 96px;
+  justify-content: space-between;
+  height: 100%;
+  flex: 1;
 }
 .vgauge {
   display: flex;
@@ -1067,7 +1070,7 @@ h3,
   display: flex;
   flex-direction: column-reverse;
   gap: 1px;
-  height: 70px;
+  height: 82px;
   justify-content: flex-start;
 }
 .vbar i {
@@ -1079,9 +1082,38 @@ h3,
 .vname {
   font-size: 10px;
   color: var(--text);
+  white-space: nowrap;
 }
 .vnum {
   font-size: 12px;
+}
+.bb-ship {
+  position: relative;
+  overflow: visible !important;
+  justify-content: center;
+}
+.bb-tab {
+  position: absolute;
+  top: -22px;
+  left: 6px;
+  height: 22px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  background: var(--panel-2);
+  border: 3px solid;
+  border-color: var(--bevel-l) var(--bevel-d) transparent var(--bevel-l);
+}
+.bb-shipbody {
+  align-items: center;
+}
+.inf {
+  color: #f87171;
+  font-size: 18px;
+  line-height: 1;
 }
 /* výzbroj */
 .bb-ammo {
