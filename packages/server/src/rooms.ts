@@ -37,6 +37,9 @@ import {
   applyLoadoutTrade,
   moduleCost,
   settleLoadoutAfterBattle,
+  needsBailout,
+  bailoutLoadout,
+  moduleSellPrice,
 } from "@wingfighter/shared";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
@@ -612,6 +615,14 @@ export class Hub {
       const p = g.state.players.find((x) => x.id === m.id);
       if (p && p.credits !== undefined && m.walletAtStart !== undefined) m.earned += p.credits - m.walletAtStart;
       m.walletAtStart = undefined;
+      // krach: bez funkčních modulů a bez kreditů → startovní loď zdarma (zničené zbytky se automaticky prodají)
+      if (needsBailout(m.loadout, room.walletOf(m))) {
+        const scrap = [...m.loadout.modules, ...(m.loadout.cargo ?? [])].reduce((s, mod) => s + moduleSellPrice(mod), 0);
+        m.spent -= scrap;
+        m.loadout = bailoutLoadout(m.loadout);
+        const c = this.clients.get(m.id);
+        if (c) this.send(c, { type: "notice", message: `Přišel jsi o všechno – dostáváš startovní loď zdarma (záchranná výbava nejde prodat). Kredity: ${room.walletOf(m)}.` });
+      }
     }
   }
 

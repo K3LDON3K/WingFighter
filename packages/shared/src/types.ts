@@ -127,6 +127,8 @@ export interface ModuleInstance {
   hp?: number;
   /** Modul už byl v bitvě – prodá se jen za část ceny (nový se vrací za plnou). */
   used?: boolean;
+  /** Záchranná výbava (dar po krachu) – nejde prodat. */
+  gift?: boolean;
   /** Natočení zbraně (lasery: výseč, miny: strana odhozu, torpéda: směr výletu). Štíty směr nemají. */
   facing?: Facing;
   /** Skener: náboje a zbývající kola cooldownu (po něm plné náboje). */

@@ -134,6 +134,7 @@ export function moduleBroken(m: ModuleInstance): boolean {
 export function moduleSellPrice(m: ModuleInstance): number {
   const def = MODULES[m.type];
   if (!def) return 0;
+  if (m.gift) return 0;
   if (moduleBroken(m)) return Math.round((def.price * RULES.brokenSellPct) / 100);
   if (m.used) return Math.round((def.price * RULES.usedSellPct) / 100);
   return def.price;
@@ -163,10 +164,10 @@ export function applyLoadoutTrade(prev: ShipLoadout, next: ShipLoadout): { loado
     if (!old) {
       // nákup: vždy nový, plný, nepoškozený
       cost += def.price;
-      return { ...m, ammo: def.ammo, hp: undefined, used: undefined };
+      return { ...m, ammo: def.ammo, hp: undefined, used: undefined, gift: undefined };
     }
     if (old.type !== m.type) return "modul nelze změnit na jiný typ";
-    const out: ModuleInstance = { ...m, hp: old.hp, used: old.used };
+    const out: ModuleInstance = { ...m, hp: old.hp, used: old.used, gift: old.gift };
     if (def.ammo !== undefined) {
       const was = old.ammo ?? 0;
       const want = Math.max(0, Math.min(def.ammo, Math.round(m.ammo ?? was)));
@@ -310,6 +311,17 @@ export function refillLoadout(loadout: ShipLoadout): ShipLoadout {
       ...(m.type === "scanner" ? { charges: SCANNER.charges, cooldown: 0 } : { charges: undefined, cooldown: undefined }),
     })),
   };
+}
+
+/** Hráč bez funkčních modulů a bez kreditů na nový dostane startovní loď zdarma (moduly nejdou prodat). */
+export function needsBailout(loadout: ShipLoadout, wallet: number): boolean {
+  const working = [...loadout.modules, ...(loadout.cargo ?? [])].some(moduleWorking);
+  const cheapest = Math.min(...Object.values(MODULES).map((d) => d.price));
+  return !working && wallet < cheapest;
+}
+export function bailoutLoadout(from: ShipLoadout): ShipLoadout {
+  const lo = structuredClone(DEFAULT_LOADOUT);
+  return { ...lo, pilotId: from.pilotId, modules: lo.modules.map((m) => ({ ...m, id: `g-${m.id}-${Date.now().toString(36)}`, used: true, gift: true })) };
 }
 
 /** Výbava po bitvě: poškozené moduly se opraví na plné hp (zničené zůstanou), vše je „použité“, munice zůstává. */

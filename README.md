@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.32.1 – záchranná výbava: kdo po bitvě nemá žádný funkční modul ani kredity na nejlevnější, dostane
+  startovní loď zdarma (zbytky se automaticky prodají); záchranné moduly nejdou prodat (0 kreditů), jinak
+  se používají normálně.
 - v3.32 – ekonomika mezi bitvami: každý hráč má v místnosti **kredity** (startovní rozpočet + výdělky z bitev
   − utracené za výbavu; zobrazeno u „Tvoje výbava“). Změna výbavy je obchod: nový modul za plnou cenu (před
   bitvou jde vrátit za plnou), použitý modul (po bitvě) se prodá za 60 %, zničený za 10 % (ladění → Moduly).

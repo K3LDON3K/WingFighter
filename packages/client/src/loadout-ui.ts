@@ -177,7 +177,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         const x = svgEl("g", { class: "lo-remove", transform: `translate(${box.x + box.w - 24}, ${box.y + box.h - 14})` });
         x.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: "#0b1020", stroke: "#f87171", "stroke-width": 1 }));
         x.append(svgEl("path", { d: "M-4,-4 L4,4 M4,-4 L-4,4", stroke: "#f87171", "stroke-width": 2 }));
-        x.append(svgEl("title", {}, shop ? `Prodat ${def.name} za ${moduleSellPrice(m)} kreditů${m.used ? " (použitý)" : moduleBroken(m) ? " (zničený)" : ""}` : `Odebrat ${def.name} (vrátí ${def.price} kreditů)`));
+        x.append(svgEl("title", {}, shop ? m.gift ? `${def.name}: záchranná výbava – nejde prodat (odebrání = zahození)` : `Prodat ${def.name} za ${moduleSellPrice(m)} kreditů${moduleBroken(m) ? " (zničený)" : m.used ? " (použitý)" : ""}` : `Odebrat ${def.name} (vrátí ${def.price} kreditů)`));
         x.addEventListener("click", (ev) => {
           ev.stopPropagation();
           remove(m.id);
