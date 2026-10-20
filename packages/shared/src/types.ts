@@ -106,6 +106,10 @@ export interface ModuleDef {
   /** Munice na modul a váha jednoho kusu. */
   ammo?: number;
   ammoWeight?: number;
+  /** Cena jednoho kusu munice při dokupování (levnější než prodat prázdný a koupit nový). */
+  ammoPrice?: number;
+  /** Životy modulu: zranění trupu ho poškozuje, při 0 přestane fungovat. */
+  hp: number;
   shieldType?: ShieldType;
   shields?: number;
 }
@@ -119,6 +123,8 @@ export interface ModuleInstance {
   type: ModuleType;
   slot: SlotId;
   ammo?: number;
+  /** Zbývající životy modulu (chybí = plné). 0 = zničený: nefunguje, prodá se jen za zlomek ceny. */
+  hp?: number;
   /** Natočení zbraně (lasery: výseč, miny: strana odhozu, torpéda: směr výletu). Štíty směr nemají. */
   facing?: Facing;
   /** Skener: náboje a zbývající kola cooldownu (po něm plné náboje). */
@@ -370,10 +376,11 @@ export type TurnEvent =
   | { type: "torpedoExpire"; torpedoId: string; x: number; y: number }
   | { type: "torpedoShot"; torpedoId: string; shooterId: string; x: number; y: number; attackDice: DieFace[]; defenseDice: DieFace[]; destroyed: boolean }
   | { type: "debrisShot"; debrisId: string; shooterId: string; x: number; y: number; destroyed: boolean; reward: number }
-  | { type: "jettison"; shipId: string; debris: Debris }
+  | { type: "jettison"; shipId: string; debris: Debris ; dropped?: boolean }
   /** Zvednutí nákladu: ok = zvednuto; jinak důvod (lost = předmět uchvátila jiná loď). */
   | { type: "pickup"; shipId: string; debrisId: string; x: number; y: number; ok: boolean; reason?: "lost" | "range" | "speed" | "full" | "gone"; winnerId?: string; module?: ModuleInstance }
   | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" | "comet" | "tail" }
+  | { type: "moduleDamage"; shipId: string; moduleId: string; moduleType: ModuleType; damage: number; hp: number; maxHp: number; broken: boolean }
   /** Skener (vyhodnocuje se hned při plánování, ale zapisuje se do logu kola). */
   | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }
   | { type: "action"; shipId: string; action: ActionOrder; ok: boolean; path?: Pose[] }

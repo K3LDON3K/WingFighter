@@ -4,7 +4,7 @@
  */
 import { CARGO, COMET, CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
-import { HULLS, LASER_DICE, MODULES, WEIGHT } from "./ships.ts";
+import { HULLS, LASER_DICE, MODULE_HP_PCT, MODULES, WEIGHT } from "./ships.ts";
 
 export interface Tuning {
   // zranění
@@ -121,6 +121,11 @@ export interface Tuning {
   creditsPerKill: number;
   creditsPerTurn: number;
   debrisRewardPct: number;
+  // moduly
+  moduleDamagePct: number;
+  moduleDropChance: number;
+  brokenSellPct: number;
+  moduleHpPct: number;
 }
 
 export const DEFAULT_TUNING: Tuning = {
@@ -225,6 +230,10 @@ export const DEFAULT_TUNING: Tuning = {
   creditsPerKill: 200,
   creditsPerTurn: 10,
   debrisRewardPct: 50,
+  moduleDamagePct: 50,
+  moduleDropChance: 45,
+  brokenSellPct: 10,
+  moduleHpPct: 100,
 };
 
 export interface TuningField {
@@ -353,6 +362,11 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "creditsPerKill", label: "Odměna za sestřel", group: "Ekonomika", min: 0, max: 5000, step: 10 },
   { key: "creditsPerTurn", label: "Odměna za přežité kolo", group: "Ekonomika", min: 0, max: 500, step: 5 },
   { key: "debrisRewardPct", label: "Sestřelený vyhozený modul – % ceny", group: "Ekonomika", min: 0, max: 200, step: 10 },
+  // --- moduly ---
+  { key: "moduleHpPct", label: "Životy modulů (% základu)", group: "Moduly", min: 10, max: 500, step: 10, hint: "základ: lasery 30, torpédomet 20, miny 20, kulomet 25, skener 15, štíty 40" },
+  { key: "moduleDamagePct", label: "Podíl zranění trupu do modulu (%)", group: "Moduly", min: 0, max: 200, step: 5, hint: "směrovaný zásah poškodí modul na zasažené straně, výbuch/náraz náhodný modul" },
+  { key: "moduleDropChance", label: "Šance, že modul vypadne ze zničené lodi (%)", group: "Moduly", min: 0, max: 100, step: 5, hint: "každý modul zvlášť: při 45 % vypadne ze 4 modulů aspoň jeden v 91 %, všechny jen ve 4 %" },
+  { key: "brokenSellPct", label: "Prodej zničeného modulu (% ceny)", group: "Moduly", min: 0, max: 100, step: 5 },
 ];
 
 /** Ořeže neznámé/nesmyslné hodnoty podle TUNING_FIELDS. */
@@ -472,4 +486,8 @@ export function applyTuning(t: Tuning): void {
   RULES.creditsPerKill = t.creditsPerKill;
   RULES.creditsPerTurn = t.creditsPerTurn;
   RULES.debrisRewardPct = t.debrisRewardPct;
+  RULES.moduleDamagePct = t.moduleDamagePct;
+  RULES.moduleDropChance = t.moduleDropChance;
+  RULES.brokenSellPct = t.brokenSellPct;
+  MODULE_HP_PCT.value = t.moduleHpPct;
 }

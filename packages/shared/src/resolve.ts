@@ -31,7 +31,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, MODULES, profileOf } from "./ships.ts";
+import { cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, moduleHp, moduleMaxHp, moduleWorking, MODULES, occupiedSlots, profileOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 
 /** Je loď/bod v elektromagnetické bouři? */
@@ -55,6 +55,7 @@ import type {
   Asteroid,
   Comet,
   Debris,
+  SlotId,
   GameResult,
   GameState,
   Maneuver,
@@ -120,7 +121,65 @@ export function statsOf(state: GameState, playerId: string | undefined): PlayerS
 }
 
 /** Kontext pro připisování kreditů během vyhodnocení (nastavuje resolveTurn). */
-let creditCtx: { state: GameState; events: TurnEvent[] } | null = null;
+let creditCtx: { state: GameState; events: TurnEvent[]; rng: Rng; turn: number } | null = null;
+
+/** Po změně modulů srovná štíty s tím, co funkční moduly unesou. */
+function syncShields(ship: Ship): void {
+  refreshShip(ship);
+  if (ship.shieldType !== "none" && ship.stats.segmentModules === 0 && ship.stats.shields === 0) {
+    ship.shieldType = "none";
+    ship.segments = [0, 0, 0, 0];
+    ship.shields = 0;
+  } else if (ship.shieldType === "segment") {
+    const cap = RULES.segmentHp * ship.stats.segmentModules;
+    ship.segments = ship.segments.map((v) => Math.min(v, cap)) as Segments;
+  } else if (ship.shieldType === "whole") ship.shields = Math.min(ship.shields, ship.stats.shields);
+}
+
+/**
+ * Zranění trupu poškodí i modul: směrovaný zásah modul na zasažené straně (slot příď / pravobok / záď / levobok),
+ * nesměrovaný (výbuch, náraz) náhodný funkční modul. Při 0 hp modul přestane fungovat.
+ */
+function damageModule(ship: Ship, hullDamage: number, events: TurnEvent[], from?: Vec): void {
+  if (!creditCtx || hullDamage <= 0 || RULES.moduleDamagePct <= 0) return;
+  const dmg = Math.max(1, Math.round((hullDamage * RULES.moduleDamagePct) / 100));
+  const working = ship.loadout.modules.filter(moduleWorking);
+  if (working.length === 0) return;
+  let target: ModuleInstance | undefined;
+  if (from) {
+    const slot: SlotId = (["front", "right", "back", "left"] as SlotId[])[hitSegment(ship, from)];
+    target = working.find((m) => occupiedSlots(m).includes(slot));
+    if (!target) return; // na zasažené straně nic není
+  } else target = working[Math.floor(creditCtx.rng.next() * working.length)];
+  const hp = Math.max(0, moduleHp(target) - dmg);
+  target.hp = hp;
+  const broken = hp === 0;
+  events.push({ type: "moduleDamage", shipId: ship.id, moduleId: target.id, moduleType: target.type, damage: dmg, hp, maxHp: moduleMaxHp(target.type), broken });
+  if (broken) syncShields(ship);
+}
+
+/** Zničená loď: každý modul (i z nákladu) s danou šancí vypadne jako trosky do náhodného směru. */
+function dropModules(ship: Ship, events: TurnEvent[]): void {
+  if (!creditCtx) return;
+  const { state, rng, turn } = creditCtx;
+  const all = [...ship.loadout.modules, ...(ship.loadout.cargo ?? [])];
+  for (const mod of all) {
+    if (rng.next() * 100 >= RULES.moduleDropChance) continue;
+    const ang = rng.next() * Math.PI * 2;
+    const dist = 40 + rng.next() * 50;
+    const debris: Debris = {
+      id: `debris-${turn}-${ship.id}-${mod.id}`,
+      type: mod.type,
+      x: clamp(ship.x + Math.cos(ang) * dist, 0, state.width),
+      y: clamp(ship.y + Math.sin(ang) * dist, 0, state.height),
+      team: ship.team,
+      value: Math.round((MODULES[mod.type].price * RULES.debrisRewardPct * (moduleWorking(mod) ? 1 : RULES.brokenSellPct / 100)) / 100),
+      module: { ...mod },
+    };
+    state.debris.push(debris);
+    events.push({ type: "jettison", shipId: ship.id, debris, dropped: true });
+  }
+}
 
 /** Připíše hráči kredity a zapíše událost. */
 export function awardCredits(state: GameState, events: TurnEvent[], playerId: string | undefined, delta: number, reason: "kill" | "survive" | "debris" | "comet" | "tail"): void {
@@ -161,6 +220,7 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec
     ship.shieldEff = Math.max(0, ship.shieldEff - RULES.wholeEffDrop);
   }
   ship.hull -= amount - absorbed;
+  damageModule(ship, amount - absorbed, events, from);
   if (creditCtx) {
     const dealer = statsOf(creditCtx.state, by);
     if (dealer && by !== ship.ownerId) dealer.damageDealt += amount;
@@ -182,6 +242,7 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec
     ship.hull = 0;
     ship.alive = false;
     events.push({ type: "destroyed", shipId: ship.id, x: ship.x, y: ship.y });
+    dropModules(ship, events);
     if (creditCtx) {
       const st = statsOf(creditCtx.state, ship.ownerId);
       if (st) st.deaths++;
@@ -279,16 +340,16 @@ export function actionCost(ship: Ship, o: ShipOrders): number {
 /** Je cíl (loď nebo torpédo) nepřátelský a existující? */
 /** Torpédový modul s municí (zadaný, nebo první s municí). */
 export function torpedoModule(ship: Ship, moduleId?: string) {
-  const mods = ship.loadout.modules.filter((m) => m.type === "torpedo" && (m.ammo ?? 0) > 0);
+  const mods = ship.loadout.modules.filter((m) => m.type === "torpedo" && (m.ammo ?? 0) > 0 && moduleWorking(m));
   return mods.find((m) => m.id === moduleId) ?? mods[0];
 }
 /** Minový modul s municí. */
 export function mineModule(ship: Ship) {
-  return ship.loadout.modules.find((m) => m.type === "mine" && (m.ammo ?? 0) > 0);
+  return ship.loadout.modules.find((m) => m.type === "mine" && (m.ammo ?? 0) > 0 && moduleWorking(m));
 }
 /** Kulometný modul s municí (zadaný, nebo první s municí). */
 export function mgModule(ship: Ship, moduleId?: string) {
-  const mods = ship.loadout.modules.filter((m) => m.type === "mg" && (m.ammo ?? 0) > 0);
+  const mods = ship.loadout.modules.filter((m) => m.type === "mg" && (m.ammo ?? 0) > 0 && moduleWorking(m));
   return mods.find((m) => m.id === moduleId) ?? mods[0];
 }
 
@@ -302,7 +363,7 @@ export function mgHitChance(d: number, targetEvading = false): number {
 
 /** Laserový modul (zadaný, nebo první). */
 export function laserModule(ship: Ship, moduleId?: string) {
-  const mods = ship.loadout.modules.filter((m) => m.type === "laser");
+  const mods = ship.loadout.modules.filter((m) => m.type === "laser" && moduleWorking(m));
   return mods.find((m) => m.id === moduleId) ?? mods[0];
 }
 
@@ -446,7 +507,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   if (!state.comets) state.comets = [];
   const events: TurnEvent[] = [];
   const turn = state.turn;
-  creditCtx = { state, events };
+  creditCtx = { state, events, rng, turn: state.turn };
 
   // Nová kometa přilétá na okraj mapy na začátku kola (lze ji hned ostřelovat, pohybuje se s loděmi).
   const cometLevel = state.settings.map?.comets ?? "none";
@@ -509,15 +570,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const cidx = (ship.loadout.cargo ?? []).findIndex((m) => m.id === wanted);
     if (idx < 0 && cidx < 0) continue;
     const [mod] = idx >= 0 ? ship.loadout.modules.splice(idx, 1) : ship.loadout.cargo!.splice(cidx, 1);
-    refreshShip(ship);
-    if (ship.shieldType !== "none" && ship.stats.segmentModules === 0 && ship.stats.shields === 0) {
-      ship.shieldType = "none";
-      ship.segments = [0, 0, 0, 0];
-      ship.shields = 0;
-    } else if (ship.shieldType === "segment") {
-      const cap = RULES.segmentHp * ship.stats.segmentModules;
-      ship.segments = ship.segments.map((v) => Math.min(v, cap)) as Segments;
-    } else if (ship.shieldType === "whole") ship.shields = Math.min(ship.shields, ship.stats.shields);
+    syncShields(ship);
     const f = forward(ship.heading);
     const back = ship.stats.radius + 14;
     const debris: Debris = {
@@ -526,7 +579,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       x: clamp(ship.x - f.x * back, 0, state.width),
       y: clamp(ship.y - f.y * back, 0, state.height),
       team: ship.team,
-      value: Math.round((MODULES[mod.type].price * RULES.debrisRewardPct) / 100),
+      value: Math.round((MODULES[mod.type].price * RULES.debrisRewardPct * (moduleWorking(mod) ? 1 : RULES.brokenSellPct / 100)) / 100),
       module: { ...mod },
     };
     state.debris.push(debris);
@@ -1492,6 +1545,7 @@ export function laserOdds(ship: Ship, target: Ship): { hitChance: number; expect
 export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: "ship" | "deep" | "cooldown", targetId?: string): { error?: string; target?: Ship } {
   const mod = ship.loadout.modules.find((m) => m.id === moduleId && m.type === "scanner");
   if (!mod) return { error: "loď nemá skener" };
+  if (!moduleWorking(mod)) return { error: "skener je zničený" };
   if ((mod.cooldown ?? 0) > 0) return { error: `skener je v cooldownu (${mod.cooldown} kol)` };
   const charges = mod.charges ?? 0;
   if (mode === "ship") {
@@ -1523,7 +1577,7 @@ export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: 
 
 /** Náhled kulometu: cíl (stejná pravidla jako vyhodnocení), šance zásahu projektilu a očekávané zranění. */
 export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: string, mgModuleId?: string): { targetId: string; x: number; y: number; hitChance: number; expectedDamage: number; shots: number } | undefined {
-  const mod = ship.loadout.modules.find((m) => m.type === "mg" && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg");
+  const mod = ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m) && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m));
   if (!mod) return undefined;
   const aim = aimPose(ship, mod);
   const inRange = (p: Vec) => dist(ship, p) <= MG.range && inArc(aim, p, MG.halfArc) && !lineBlocked(state.asteroids, ship, p);
@@ -1548,6 +1602,6 @@ export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: stri
 
 /** Výseč kulometu pro náhled. */
 export function mgArcOf(ship: Ship, mgModuleId?: string): { heading: number; halfArc: number; range: number } {
-  const mod = ship.loadout.modules.find((m) => m.type === "mg" && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg");
+  const mod = ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m) && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m));
   return { heading: ship.heading + facingAngle(mod?.facing), halfArc: MG.halfArc, range: MG.range };
 }

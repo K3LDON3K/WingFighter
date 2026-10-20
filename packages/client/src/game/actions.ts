@@ -1,4 +1,4 @@
-import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
+import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -46,9 +46,9 @@ export const ACTIONS: ActionOption[] = [
     glyph: "⚡",
     label: "Lasery (1 akce)",
     description: "Na začátku kola (před pohybem) vystřelí lasery ze současné pozice na cíl ve výseči ±20° do 300 (preferovaný cíl, jinak nejbližší nepřítel; ne skrz asteroid). Bez této akce loď nestřílí.",
-    disabled: (ship, s, o) => (!ship.loadout.modules.some((m) => m.type === "laser") ? "loď nemá laserový modul" : inStorm(s, ship) ? "v bouři lasery nefungují" : noAp(ship, o, !!o.fire)),
+    disabled: (ship, s, o) => (!ship.loadout.modules.some((m) => m.type === "laser") ? "loď nemá laserový modul" : !ship.loadout.modules.some((m) => m.type === "laser" && moduleWorking(m)) ? "lasery jsou zničené" : inStorm(s, ship) ? "v bouři lasery nefungují" : noAp(ship, o, !!o.fire)),
     active: (o) => !!o.fire,
-    apply: (o, ship) => ({ fire: !o.fire, laserModuleId: o.fire ? undefined : ship.loadout.modules.find((m) => m.type === "laser")?.id }),
+    apply: (o, ship) => ({ fire: !o.fire, laserModuleId: o.fire ? undefined : ship.loadout.modules.find((m) => m.type === "laser" && moduleWorking(m))?.id }),
     requiresModule: "laser",
   },
   {
@@ -56,9 +56,9 @@ export const ACTIONS: ActionOption[] = [
     glyph: "⁘",
     label: "Kulomet (1 akce)",
     description: "Na začátku kola vystřelí dávku projektilů s rozptylem na cíl ve výseči kulometu (krátký dosah, široká výseč). Každý projektil má šanci zasáhnout podle vzdálenosti a dává malé zranění. Míří na preferovaný cíl (loď, torpédo, trosky), jinak na nejbližší nepřátelskou loď. Funguje i v bouři.",
-    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mg") ? "loď nemá kulomet" : !ship.loadout.modules.some((m) => m.type === "mg" && (m.ammo ?? 0) > 0) ? "došly náboje" : noAp(ship, o, !!o.fireMg)),
+    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mg") ? "loď nemá kulomet" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m)) ? "kulomet je zničený" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m) && (m.ammo ?? 0) > 0) ? "došly náboje" : noAp(ship, o, !!o.fireMg)),
     active: (o) => !!o.fireMg,
-    apply: (o, ship) => ({ fireMg: !o.fireMg, mgModuleId: o.fireMg ? undefined : ship.loadout.modules.find((m) => m.type === "mg" && (m.ammo ?? 0) > 0)?.id }),
+    apply: (o, ship) => ({ fireMg: !o.fireMg, mgModuleId: o.fireMg ? undefined : ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m) && (m.ammo ?? 0) > 0)?.id }),
     requiresModule: "mg",
   },
   {
@@ -66,9 +66,9 @@ export const ACTIONS: ActionOption[] = [
     glyph: "➤",
     label: "Torpédo (1 akce)",
     description: `Fázové torpédo: vyletí rovně z lodi (${TORPEDO.launchDist} j. rychlostí ${TORPEDO.launchSpeed}/kolo), pak se otáčí na cíl a po zaměření zrychlí až na ${TORPEDO.speed}/kolo; při plné rychlosti zatáčí jen mírně a cíl mimo výseč před sebou ztratí. Cíl zadáš jen na mapě: klikni na viditelnou nepřátelskou loď či torpédo do ${TORPEDO.lockRange} (sleduje ji celý let), nebo na bod do ${TORPEDO.pointRange} – tam vybuchne (poloměr ${TORPEDO.blastRadius}, zranění ${TORPEDO.blastDamage} všem, kráter do asteroidu). Přímý zásah lodi = ${TORPEDO.damage}.`,
-    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "torpedo") ? "loď nemá torpédomet" : ship.ammo.torpedoes > 0 ? noAp(ship, o, o.special?.type === "torpedo") : "došla torpéda"),
+    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "torpedo") ? "loď nemá torpédomet" : !ship.loadout.modules.some((m) => m.type === "torpedo" && moduleWorking(m)) ? "torpédomet je zničený" : ship.ammo.torpedoes > 0 ? noAp(ship, o, o.special?.type === "torpedo") : "došla torpéda"),
     active: (o) => o.special?.type === "torpedo",
-    apply: (o, ship) => ({ special: o.special?.type === "torpedo" ? undefined : { type: "torpedo", moduleId: ship.loadout.modules.find((m) => m.type === "torpedo" && (m.ammo ?? 0) > 0)?.id } }),
+    apply: (o, ship) => ({ special: o.special?.type === "torpedo" ? undefined : { type: "torpedo", moduleId: ship.loadout.modules.find((m) => m.type === "torpedo" && moduleWorking(m) && (m.ammo ?? 0) > 0)?.id } }),
     pick: "torpedo",
     requiresModule: "torpedo",
   },
@@ -77,7 +77,7 @@ export const ACTIONS: ActionOption[] = [
     glyph: "✹",
     label: "Mina (1 akce)",
     description: "Odhodí minu ze startovní pozice lodi na stranu, kam je minový zásobník natočený (za sebe / do boku); aktivní od příštího kola. Buď reaguje na pole: nepřítel, který v něm na začátku kola stojí, ji odpálí hned, kdokoliv (i ty) při vletu během kola; nebo je časovaná 1–3 kola a vybuchne na začátku kola, kdy odpočet dojde. Zraní všechny v poli a vykousne kráter do asteroidu.",
-    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mine") ? "loď nemá minový zásobník" : ship.ammo.mines > 0 ? noAp(ship, o, o.special?.type === "mine") : "došly miny"),
+    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mine") ? "loď nemá minový zásobník" : !ship.loadout.modules.some((m) => m.type === "mine" && moduleWorking(m)) ? "minový zásobník je zničený" : ship.ammo.mines > 0 ? noAp(ship, o, o.special?.type === "mine") : "došly miny"),
     active: (o) => o.special?.type === "mine",
     apply: (o, ship) => ({ special: o.special?.type === "mine" ? undefined : { type: "mine", side: mineSideOf(mineModule(ship)?.facing) } }),
     requiresModule: "mine",

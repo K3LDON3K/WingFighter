@@ -1,4 +1,8 @@
 import {
+  moduleHp,
+  moduleMaxHp,
+  moduleWorking,
+  type ModuleInstance,
   RULES,
   COMET,
   CARGO,
@@ -246,24 +250,43 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   }
 
   /* ---- 1b. výzbroj: munice každého modulu ---- */
-  const ammoMods = ship.loadout.modules.filter((md) => md.ammo !== undefined || md.type === "laser");
+  // všechny moduly: zbraně s municí, ostatní jen se stavem; každý má ukazatel životů (zničený = červený, nefunguje)
+  const ammoMods = [...ship.loadout.modules].sort((a, b) => Number(b.ammo !== undefined || b.type === "laser") - Number(a.ammo !== undefined || a.type === "laser"));
   const weapons = h("div", { class: "pnl bb-ammo" }, h("div", { class: "ttl" }, label("Výzbroj")));
-  if (ammoMods.length === 0) weapons.append(h("div", { class: "muted txt" }, "bez zbraní"));
+  if (ammoMods.length === 0) weapons.append(h("div", { class: "muted txt" }, "bez modulů"));
   const counters: Record<string, number> = {};
   const typeCount: Record<string, number> = {};
   for (const md of ammoMods) typeCount[md.type] = (typeCount[md.type] ?? 0) + 1;
+  const hpBar = (md: ModuleInstance) => {
+    const hp = moduleHp(md);
+    const max = moduleMaxHp(md.type);
+    const pct = hp / max;
+    const bar = h("span", { class: `mod-hp ${hp === 0 ? "dead" : ""}`, title: hp === 0 ? "Modul je zničený – nefunguje (prodá se jen za zlomek ceny)" : `Životy modulu ${hp}/${max} – zranění trupu modul poškozuje` });
+    bar.append(h("i", { style: `width:${Math.round(pct * 100)}%;background:${pct > 0.6 ? "#4ade80" : pct > 0.3 ? "#fbbf24" : "#f87171"}` }));
+    return bar;
+  };
   for (const md of ammoMods) {
     const def = MODULES[md.type];
     counters[md.type] = (counters[md.type] ?? 0) + 1;
     const max = def.ammo ?? 0;
     const left = md.ammo ?? 0;
-    const base = md.type === "torpedo" ? "TORP" : md.type === "mine" ? "MINY" : md.type === "mg" ? "KULOMET" : md.type === "laser" ? "LASER" : def.short;
+    const broken = !moduleWorking(md);
+    const base = md.type === "torpedo" ? "TORP" : md.type === "mine" ? "MINY" : md.type === "mg" ? "KULOMET" : md.type === "laser" ? "LASER" : md.type === "scanner" ? "SKENER" : md.type === "shield-segment" || md.type === "shield-whole" ? "ŠTÍT" : def.short;
     const name = `${base}${typeCount[md.type] > 1 ? ` ${counters[md.type]}` : ""}`;
     const icons = h("span", { class: "ammo-icons" });
+    const facingTxt = md.facing ? ` ${FACING_GLYPH[md.facing]}` : "";
+    if (broken) {
+      weapons.append(h("div", { class: "ammo-row broken", title: `${def.name}: ZNIČENÝ – nefunguje. Dá se vyhodit nebo po bitvě prodat za ${RULES.brokenSellPct} % ceny.` }, h("span", { class: "ammo-name" }, label(name), h("span", { class: "muted" }, facingTxt)), hpBar(md), h("span", { class: "ammo-num" }, label("zničen"))));
+      continue;
+    }
     if (md.type === "laser") {
       // bez munice: nekonečno
       icons.append(h("span", { class: "inf", title: "Lasery nemají munici – střílí každé kolo" }, "∞"));
-      weapons.append(h("div", { class: "ammo-row", title: `${def.name} – ${FACING_NAMES[md.facing ?? "front"]}: bez munice` }, h("span", { class: "ammo-name" }, label(name), h("span", { class: "muted" }, ` ${FACING_GLYPH[md.facing ?? "front"]}`)), icons));
+      weapons.append(h("div", { class: "ammo-row", title: `${def.name} – ${FACING_NAMES[md.facing ?? "front"]}: bez munice` }, h("span", { class: "ammo-name" }, label(name), h("span", { class: "muted" }, facingTxt)), hpBar(md), icons));
+      continue;
+    }
+    if (md.ammo === undefined) {
+      weapons.append(h("div", { class: "ammo-row", title: `${def.name}: funkční` }, h("span", { class: "ammo-name" }, label(name)), hpBar(md), h("span", { class: "ammo-num muted" }, md.type === "scanner" ? `${md.charges ?? 0}⚡` : "")));
       continue;
     }
     if (md.type === "mg") {
@@ -275,7 +298,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       h(
         "div",
         { class: "ammo-row", title: `${def.name} ${typeCount[md.type] > 1 ? counters[md.type] : ""} – ${FACING_NAMES[md.facing ?? "front"]}: munice ${left}/${max}` },
-        h("span", { class: "ammo-name" }, label(name), h("span", { class: "muted" }, ` ${FACING_GLYPH[md.facing ?? "front"]}`)),
+        h("span", { class: "ammo-name" }, label(name), h("span", { class: "muted" }, facingTxt)),
+        hpBar(md),
         icons,
         h("span", { class: "ammo-num muted" }, md.type === "mg" ? String(left) : `${left}/${max}`),
       ),

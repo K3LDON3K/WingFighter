@@ -145,6 +145,14 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.31 – životy modulů a výpad modulů: každý modul má hp (lasery 30, torpédomet 20, miny 20, kulomet 25,
+  skener 15, štíty 40; ladění → Moduly). Zranění, které projde do trupu, poškodí i modul (50 % zranění):
+  směrovaný zásah modul na zasažené straně (slot podle směru jako u segmentů), výbuch / náraz náhodný modul.
+  Modul s 0 hp je **zničený** – nefunguje (lasery nestřílí, munice nejde použít, štít spadne, skener
+  bez nábojů), váží dál, ve VÝZBROJI, v inventáři a v troskách je červený. Zničená loď: každý modul (i z nákladu)
+  vypadne s šancí 45 % do náhodného směru 40–90 j. jako trosky (zvednutelné, s aktuálním hp a municí).
+  Zničený modul se prodá za 10 % ceny (sestřelení takových trosek dává jen zlomek odměny). Nový zvuk prasknutí
+  modulu, texty v logu, hp ukazatel u každého modulu ve VÝZBROJI.
 - v3.30 – rychlost na dráze (varianta C): naplánovaná dráha je tenká souvislá čára v barvě obtížnosti a na ní
   tolik teček, kolik je rychlost (poslední u ducha lodi); svislé čárky u konce dráhy zmizely, otočka má ↺.
   Okénko potvrzení volných akcí je úzké jako tlačítko SPUSTIT KOLO, bez tlačítka ZPĚT (Esc = zpět).

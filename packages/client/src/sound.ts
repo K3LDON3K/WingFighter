@@ -31,7 +31,8 @@ export type SfxName =
   | "win"
   | "lose"
   | "turnStart"
-  | "logoFly";
+  | "logoFly"
+  | "moduleBreak";
 
 const KEY_VOL = "wingfighter.sfxVolume";
 const KEY_MUTE = "wingfighter.sfxMuted";
@@ -220,6 +221,12 @@ const SFX: Record<SfxName, (c: AudioContext, b: AudioNode) => void> = {
   mine: (c, b) => {
     tone(c, b, { wave: "square", f0: 800, dur: 0.05, gain: 0.12 });
     tone(c, b, { wave: "square", f0: 800, dur: 0.05, gain: 0.12, at: 0.12 });
+  },
+  moduleBreak: (c, b) => {
+    // prasknutí modulu: kovové lupnutí + krátké zajiskření
+    tone(c, b, { wave: "square", f0: 320, f1: 90, dur: 0.14, gain: 0.2 });
+    noise(c, b, { dur: 0.25, gain: 0.14, filter: "highpass", freq: 3000, at: 0.03 });
+    arp(c, b, [1800, 2600, 1400], 0.04, { gain: 0.07, at: 0.08 });
   },
   logoFly: (c, b) => {
     // prolet stíhače: stoupavý šum + tón motoru

@@ -90,7 +90,11 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
         lines.push(e.mode === "ship" ? `${name(e.shipId)} skenoval ${e.targetId ? name(e.targetId) : "loď"}.` : e.mode === "deep" ? `${name(e.shipId)} provedl hluboký sken – mapa odkryta do konce kola.` : `${name(e.shipId)} vynutil cooldown skeneru.`);
         break;
       case "jettison":
-        lines.push(`${name(e.shipId)} vyhodil modul ${MODULES[e.debris.type]?.name ?? e.debris.type} (sestřelení = +${e.debris.value} kreditů).`);
+        if (e.dropped) lines.push(`Z vraku ${name(e.shipId)} vypadl modul ${MODULES[e.debris.type]?.name ?? e.debris.type}${e.debris.module && (e.debris.module.hp ?? 1) <= 0 ? " (zničený)" : ""} – lze zvednout.`);
+        else lines.push(`${name(e.shipId)} vyhodil modul ${MODULES[e.debris.type]?.name ?? e.debris.type} (sestřelení = +${e.debris.value} kreditů).`);
+        break;
+      case "moduleDamage":
+        lines.push(e.broken ? `🔧 ${name(e.shipId)}: modul ${MODULES[e.moduleType]?.name ?? e.moduleType} je zničen – přestal fungovat.` : `${name(e.shipId)}: modul ${MODULES[e.moduleType]?.name ?? e.moduleType} poškozen (−${e.damage}, zbývá ${e.hp}/${e.maxHp}).`);
         break;
       case "pickup":
         lines.push(
@@ -239,7 +243,7 @@ export class TurnAnimation {
           time = moveStart + e.t * MOVE_DURATION;
           break;
         case "jettison":
-          time = 0;
+          time = e.dropped ? lastTime + 120 : 0;
           break;
         case "pickup":
           if (!movePassed) {
@@ -283,6 +287,7 @@ export class TurnAnimation {
           break;
         case "damage":
         case "destroyed":
+        case "moduleDamage":
           time = lastTime + 60;
           break;
         case "spawnTorpedo":
@@ -374,7 +379,16 @@ export class TurnAnimation {
       case "jettison": {
         const sh = v.ships.find((x) => x.id === e.shipId);
         v.debris.push({ ...e.debris });
-        if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: `VYHOZEN ${MODULES[e.debris.type]?.short ?? ""}`, color: "#94a3b8", start: now, duration: 1000 });
+        if (e.dropped) {
+          // modul vylétá z vraku do místa trosek
+          const from = sh ? { x: sh.x, y: sh.y } : { x: e.debris.x, y: e.debris.y };
+          v.effects.push({ kind: "drop", from, to: { x: e.debris.x, y: e.debris.y }, color: "#94a3b8", start: now, duration: 500 });
+        } else if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: `VYHOZEN ${MODULES[e.debris.type]?.short ?? ""}`, color: "#94a3b8", start: now, duration: 1000 });
+        break;
+      }
+      case "moduleDamage": {
+        const sh = v.ships.find((x) => x.id === e.shipId);
+        if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y + 14, text: e.broken ? `${MODULES[e.moduleType]?.short ?? "MODUL"} ZNIČEN` : `${MODULES[e.moduleType]?.short ?? "MODUL"} −${e.damage}`, color: e.broken ? "#f87171" : "#fdba74", start: now + 150, duration: e.broken ? 1400 : 900 });
         break;
       }
       case "pickup": {
@@ -634,6 +648,11 @@ export class TurnAnimation {
       case "destroyed":
         sfxAt("bigExplosion", e.x, e.y);
         break;
+      case "moduleDamage": {
+        const s = at(e.shipId);
+        if (s && e.broken) sfxAt("moduleBreak", s.x, s.y);
+        break;
+      }
       case "damage": {
         const s = at(e.shipId);
         if (!s) break;

@@ -1,4 +1,5 @@
 import {
+  moduleBroken,
   cargoCapacity,
   moduleWeight,
   allowedFacings,
@@ -115,9 +116,11 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     const grp = svgEl("g", { class: `lo-g ${m ? "mod" : "empty"} ${ro && !selectable ? "ro" : ""} ${selected ? "sel" : ""} ${selectable ? "selectable" : ""}` });
     const pts = hexPoints(box);
     if (m && def) {
-      const col = selected ? "#fb923c" : moduleColor(m.type);
-      grp.append(svgEl("polygon", { points: pts, fill: "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
-      grp.append(svgEl("polygon", { points: pts, fill: col, opacity: selected ? 0.3 : 0.18 }));
+      const broken = moduleBroken(m);
+      const col = selected ? "#fb923c" : broken ? "#ef4444" : moduleColor(m.type);
+      grp.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
+      grp.append(svgEl("polygon", { points: pts, fill: col, opacity: selected ? 0.3 : broken ? 0.35 : 0.18 }));
+      if (broken) grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h - 6, "font-family": "Jersey", "font-size": 10, fill: "#fca5a5", "text-anchor": "middle" }, "ZNIČEN"));
       const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
       const words = def.name.toUpperCase().split(" ");
       const long = Math.max(...words.map((w) => w.length)) > 8;
@@ -197,9 +200,11 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       if (m) {
         const def = MODULES[m.type];
         const selected = opts.selectedId === m.id;
-        const col = selected ? "#fb923c" : moduleColor(m.type);
-        csvg.append(svgEl("polygon", { points: pts, fill: "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
-        csvg.append(svgEl("polygon", { points: pts, fill: col, opacity: selected ? 0.3 : 0.18 }));
+        const broken = moduleBroken(m);
+        const col = selected ? "#fb923c" : broken ? "#ef4444" : moduleColor(m.type);
+        csvg.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
+        csvg.append(svgEl("polygon", { points: pts, fill: col, opacity: selected ? 0.3 : broken ? 0.35 : 0.18 }));
+        if (broken) csvg.append(svgEl("text", { x: hexW / 2, y: hexH - 5, "font-family": "Jersey", "font-size": 9, fill: "#fca5a5", "text-anchor": "middle" }, "ZNIČEN"));
         const words = def.name.toUpperCase().split(" ");
         words.forEach((w, k) => csvg.append(svgEl("text", { x: hexW / 2, y: hexH / 2 + 4 - (words.length - 1) * 5 + k * 10, "font-family": "Jersey, ui-monospace, monospace", "font-size": 11, fill: "#f8fafc", "text-anchor": "middle" }, w)));
         if (m.ammo !== undefined) csvg.append(svgEl("text", { x: hexW / 2, y: 12, "font-family": "Jersey", "font-size": 10, fill: "#fbbf24", "text-anchor": "middle" }, String(m.ammo)));

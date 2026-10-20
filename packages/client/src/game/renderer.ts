@@ -453,9 +453,11 @@ export class Renderer {
     ctx.save();
     ctx.translate(d.x, d.y);
     ctx.rotate(now / 2500 + d.x);
-    ctx.fillStyle = "#475569";
+    // zničený modul je načervenalý
+    const broken = !!d.module && (d.module.hp ?? 1) <= 0;
+    ctx.fillStyle = broken ? "#7f1d1d" : "#475569";
     ctx.fillRect(-7, -7, 14, 14);
-    ctx.fillStyle = "#94a3b8";
+    ctx.fillStyle = broken ? "#dc8a8a" : "#94a3b8";
     ctx.fillRect(-5, -5, 10, 10);
     ctx.fillStyle = TEAM_COLORS[d.team];
     ctx.fillRect(-2, -2, 4, 4);

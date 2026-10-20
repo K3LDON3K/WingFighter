@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeStats,
+  moduleWorking,
   DEFAULT_TUNING,
   DEFAULT_LOADOUT,
   loadoutWeight,
@@ -1040,5 +1042,52 @@ describe("náklad", () => {
     expect(r.state.debris.some((d) => d.module?.id === "c0")).toBe(true);
     // sanitizace: zvednutí je 1 akce
     expect(actionCost(g.ships[0], noFire(me.id, "m2a0", { type: "pickup", targetId: "d1" }))).toBe(1);
+  });
+});
+
+describe("životy modulů a výpad modulů", () => {
+  it("zásah laserem zepředu poškodí modul na přídi; při 0 hp přestane fungovat", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 700, 500, Math.PI); // nos proti nosu – p1 střílí do přídě p2
+    const target = g.ships[1];
+    target.shieldType = "none";
+    target.segments = [0, 0, 0, 0];
+    const frontMod = target.loadout.modules.find((m) => m.slot === "front")!;
+    const r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(3));
+    const dmgEvents = r.events.filter((e) => e.type === "moduleDamage");
+    if (r.events.some((e) => e.type === "laser" && e.damage > 0)) {
+      expect(dmgEvents.length).toBeGreaterThan(0);
+      expect(dmgEvents.every((e) => e.type === "moduleDamage" && e.moduleId === frontMod.id)).toBe(true);
+    }
+    // ručně: modul na 0 hp → nefunguje a nepočítá se do statistik
+    const after = r.state.ships[1];
+    const fm = after.loadout.modules.find((m) => m.id === frontMod.id)!;
+    fm.hp = 0;
+    expect(moduleWorking(fm)).toBe(false);
+    expect(computeStats(after.loadout).torpedoes + computeStats(after.loadout).mines).toBeLessThanOrEqual(computeStats(DEFAULT_LOADOUT).torpedoes + computeStats(DEFAULT_LOADOUT).mines);
+  });
+
+  it("ze zničené lodi vypadnou moduly jako trosky (šance na modul)", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 640, 500, Math.PI);
+    const t = g.ships[1];
+    t.hull = 1;
+    t.shieldType = "none";
+    t.segments = [0, 0, 0, 0];
+    let dropped = 0;
+    let runs = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(seed));
+      if (!r.events.some((e) => e.type === "destroyed")) continue;
+      runs++;
+      const drops = r.events.filter((e) => e.type === "jettison" && e.dropped);
+      dropped += drops.length;
+      expect(drops.length).toBeLessThanOrEqual(t.loadout.modules.length);
+      expect(r.state.debris.length).toBe(drops.length);
+    }
+    expect(runs).toBeGreaterThan(0);
+    expect(dropped).toBeGreaterThan(0);
   });
 });

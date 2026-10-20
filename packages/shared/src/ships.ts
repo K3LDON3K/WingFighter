@@ -1,6 +1,6 @@
 import { VISION_REF } from "./fog.ts";
 import { FIGHTER_PROFILE } from "./maneuvers.ts";
-import { CARGO, LASER, SCANNER } from "./constants.ts";
+import { CARGO, LASER, RULES, SCANNER } from "./constants.ts";
 import type { Facing, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
 
 /**
@@ -40,13 +40,13 @@ export const PILOTS: Record<string, PilotDef> = {
 
 /** Lodní systémy (moduly). Ceny a váhy ladí `applyTuning`. */
 export const MODULES: Record<ModuleType, ModuleDef> = {
-  laser: { id: "laser", name: "Lasery", short: "LAS", icon: "laser", size: "small", weight: 2, price: 100, description: "Laserové kanóny: výseč ±20° před přídí, dostřel 300. Více modulů = při střelbě si vybereš, ze kterého střílíš (jeden za akci)." },
-  torpedo: { id: "torpedo", name: "Torpédomet", short: "TORP", icon: "torpedo", size: "small", weight: 1, price: 150, ammo: 3, ammoWeight: 1, description: "Fázové torpédo, 3 kusy na modul. Každé vystřelené torpédo loď odlehčí." },
-  mine: { id: "mine", name: "Miny", short: "MINA", icon: "mine", size: "small", weight: 1, price: 100, ammo: 2, ammoWeight: 0.5, description: "Miny, 2 kusy na modul. Odhazují se za loď nebo do stran." },
-  "shield-segment": { id: "shield-segment", name: "Segmentový štít", short: "SEG", icon: "segments", size: "small", weight: 2, price: 120, shieldType: "segment", description: "Čtyři segmenty po 2 bodech; každý zásah ubere 1 bod a je pohlcen celý. Akce Úprava štítu body přesouvá. Nelze kombinovat s celolodním." },
-  mg: { id: "mg", name: "Kulomet", short: "KUL", icon: "mg", size: "small", weight: 1, price: 120, ammo: 100, ammoWeight: 0.02, description: "Krátký dosah (150), široká výseč ±45°. Dávka 10 projektilů s rozptylem, každý 3 zranění; šance zásahu klesá se vzdáleností. Střílí na začátku kola na cokoliv (loď, torpédo, trosky). Funguje i v bouři. 100 nábojů = 10 dávek." },
-  scanner: { id: "scanner", name: "Skener", short: "SKEN", icon: "scan", size: "small", weight: 1, price: 130, description: "2 náboje (dobíjí zelený manévr). Sken lodi (1 náboj): hned ukáže výbavu, natočení modulů, munici a pilota cizí lodi v dohledu. Hluboký sken (2 náboje): hned odkryje mapu celému týmu do konce kola, pak cooldown 3 kola. Nebere akci." },
-  "shield-whole": { id: "shield-whole", name: "Celolodní štít", short: "CEL", icon: "shield", size: "small", weight: 2, price: 120, shieldType: "whole", shields: 50, description: "Zásoba 50 kolem celé lodi, pohltí účinnost % zranění; účinnost po každém zásahu klesá o 10 %. Nelze kombinovat se segmentovým." },
+  laser: { id: "laser", name: "Lasery", short: "LAS", icon: "laser", size: "small", weight: 2, price: 100, hp: 30, description: "Laserové kanóny: výseč ±20° před přídí, dostřel 300. Více modulů = při střelbě si vybereš, ze kterého střílíš (jeden za akci)." },
+  torpedo: { id: "torpedo", name: "Torpédomet", short: "TORP", icon: "torpedo", size: "small", weight: 1, price: 150, hp: 20, ammo: 3, ammoWeight: 1, ammoPrice: 12, description: "Fázové torpédo, 3 kusy na modul. Každé vystřelené torpédo loď odlehčí." },
+  mine: { id: "mine", name: "Miny", short: "MINA", icon: "mine", size: "small", weight: 1, price: 100, hp: 20, ammo: 2, ammoWeight: 0.5, ammoPrice: 12, description: "Miny, 2 kusy na modul. Odhazují se za loď nebo do stran." },
+  "shield-segment": { id: "shield-segment", name: "Segmentový štít", short: "SEG", icon: "segments", size: "small", weight: 2, price: 120, hp: 40, shieldType: "segment", description: "Čtyři segmenty po 2 bodech; každý zásah ubere 1 bod a je pohlcen celý. Akce Úprava štítu body přesouvá. Nelze kombinovat s celolodním." },
+  mg: { id: "mg", name: "Kulomet", short: "KUL", icon: "mg", size: "small", weight: 1, price: 120, hp: 25, ammo: 100, ammoWeight: 0.02, ammoPrice: 0.3, description: "Krátký dosah (150), široká výseč ±45°. Dávka 10 projektilů s rozptylem, každý 3 zranění; šance zásahu klesá se vzdáleností. Střílí na začátku kola na cokoliv (loď, torpédo, trosky). Funguje i v bouři. 100 nábojů = 10 dávek." },
+  scanner: { id: "scanner", name: "Skener", short: "SKEN", icon: "scan", size: "small", weight: 1, price: 130, hp: 15, description: "2 náboje (dobíjí zelený manévr). Sken lodi (1 náboj): hned ukáže výbavu, natočení modulů, munici a pilota cizí lodi v dohledu. Hluboký sken (2 náboje): hned odkryje mapu celému týmu do konce kola, pak cooldown 3 kola. Nebere akci." },
+  "shield-whole": { id: "shield-whole", name: "Celolodní štít", short: "CEL", icon: "shield", size: "small", weight: 2, price: 120, hp: 40, shieldType: "whole", shields: 50, description: "Zásoba 50 kolem celé lodi, pohltí účinnost % zranění; účinnost po každém zásahu klesá o 10 %. Nelze kombinovat se segmentovým." },
 };
 export const MODULE_TYPES = Object.keys(MODULES) as ModuleType[];
 
@@ -112,7 +112,29 @@ export function newModule(type: ModuleType, slot: SlotId, id?: string): ModuleIn
 
 /** Skenerový modul lodi (první). */
 export function scannerModule(loadout: ShipLoadout): ModuleInstance | undefined {
-  return loadout.modules.find((m) => m.type === "scanner");
+  return loadout.modules.find((m) => m.type === "scanner" && moduleWorking(m));
+}
+
+/** Životy modulů se ladí procentem základu. */
+export const MODULE_HP_PCT = { value: 100 };
+export function moduleMaxHp(type: ModuleType): number {
+  return Math.max(1, Math.round(((MODULES[type]?.hp ?? 20) * MODULE_HP_PCT.value) / 100));
+}
+export function moduleHp(m: ModuleInstance): number {
+  return m.hp === undefined ? moduleMaxHp(m.type) : Math.max(0, Math.min(moduleMaxHp(m.type), m.hp));
+}
+/** Modul funguje, dokud má životy. */
+export function moduleWorking(m: ModuleInstance): boolean {
+  return moduleHp(m) > 0;
+}
+export function moduleBroken(m: ModuleInstance): boolean {
+  return !moduleWorking(m);
+}
+/** Prodejní cena modulu: zničený jen za zlomek. */
+export function moduleSellPrice(m: ModuleInstance): number {
+  const def = MODULES[m.type];
+  if (!def) return 0;
+  return moduleBroken(m) ? Math.round((def.price * RULES.brokenSellPct) / 100) : def.price;
 }
 
 /** Velký modul zabírá příď + záď (zapisuje se do slotu "front"). */
@@ -174,8 +196,8 @@ export function profileOf(loadout: ShipLoadout): ManeuverProfile {
 }
 
 export function shieldTypeOf(loadout: ShipLoadout): ShieldType {
-  if (loadout.modules.some((m) => m.type === "shield-whole")) return "whole";
-  if (loadout.modules.some((m) => m.type === "shield-segment")) return "segment";
+  if (loadout.modules.some((m) => m.type === "shield-whole" && moduleWorking(m))) return "whole";
+  if (loadout.modules.some((m) => m.type === "shield-segment" && moduleWorking(m))) return "segment";
   return "none";
 }
 
@@ -249,6 +271,7 @@ export function computeStats(loadout: ShipLoadout): ShipStats {
   for (const m of loadout.modules) {
     const def = MODULES[m.type];
     if (!def) throw new Error(`Neznámý modul: ${m.type}`);
+    if (!moduleWorking(m)) continue; // zničený modul nefunguje (váží ale dál)
     if (m.type === "laser") stats.attack = LASER_DICE.value;
     if (m.type === "torpedo") stats.torpedoes += m.ammo ?? 0;
     if (m.type === "mine") stats.mines += m.ammo ?? 0;

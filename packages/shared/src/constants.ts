@@ -47,6 +47,10 @@ export const RULES = {
   creditsPerKill: 200,
   creditsPerTurn: 10,
   debrisRewardPct: 50,
+  /** Moduly: % zranění trupu, které dostane i modul; šance (%) že modul vypadne ze zničené lodi; prodejní cena zničeného modulu (% ceny). */
+  moduleDamagePct: 50,
+  moduleDropChance: 45,
+  brokenSellPct: 10,
 };
 
 export const TORPEDO = {

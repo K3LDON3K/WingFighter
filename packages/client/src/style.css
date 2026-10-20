@@ -1434,6 +1434,30 @@ h3,
   gap: 2px;
   align-items: center;
 }
+.mod-hp {
+  width: 18px;
+  height: 5px;
+  flex: none;
+  background: #1e293b;
+  border: 1px solid #334155;
+  display: inline-block;
+  margin-right: 3px;
+}
+.mod-hp i {
+  display: block;
+  height: 100%;
+}
+.mod-hp.dead {
+  border-color: #7f1d1d;
+  background: #450a0a;
+}
+.ammo-row.broken .ammo-name {
+  color: #f87171;
+}
+.ammo-row.broken .ammo-num {
+  color: #f87171;
+  font-size: 11px;
+}
 .ammo-num {
   margin-left: auto;
   font-size: 12px;
