@@ -359,7 +359,7 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       }
     }
 
-    const preferredTargetId = enemyTarget(state, ship, raw.preferredTargetId)?.id ?? state.debris.find((d) => d.id === raw.preferredTargetId)?.id;
+    const preferredTargetId = enemyTarget(state, ship, raw.preferredTargetId)?.id ?? state.debris.find((d) => d.id === raw.preferredTargetId)?.id ?? (state.comets ?? []).find((c) => c.id === raw.preferredTargetId)?.id;
     const laserMod = laserModule(ship, raw.laserModuleId);
     const mgMod = mgModule(ship, raw.mgModuleId);
     const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, fire: !!raw.fire && !!laserMod, laserModuleId: laserMod?.id, fireMg: !!raw.fireMg && !!mgMod, mgModuleId: mgMod?.id, preferredTargetId };
@@ -1370,6 +1370,18 @@ export function laserTarget(state: GameState, ship: Ship, preferredTargetId?: st
 }
 
 /** Výseč laserů pro náhled: natočení a poloviční úhel podle modulu. */
+/** Dosáhne laser na bod (kometa / trosky) z aktuální pozice? Vrací důvod, proč ne. */
+export function laserReach(state: GameState, ship: Ship, p: Vec, laserModuleId?: string): string | null {
+  if (inStorm(state, ship)) return "loď je v bouři";
+  const lmod = laserModule(ship, laserModuleId);
+  const aim = aimPose(ship, lmod);
+  if (dist(ship, p) > LASER.range) return "mimo dostřel";
+  if (!inArc(aim, p, laserHalfArc(lmod?.facing))) return "mimo výseč laseru";
+  if (lineBlocked(state.asteroids, ship, p)) return "v cestě je asteroid";
+  if (laserBlockedByStorm(state, ship, p)) return "cíl je v bouři";
+  return null;
+}
+
 export function laserArcOf(ship: Ship, laserModuleId?: string): { heading: number; halfArc: number } {
   const lmod = laserModule(ship, laserModuleId);
   return { heading: ship.heading + facingAngle(lmod?.facing), halfArc: laserHalfArc(lmod?.facing) };

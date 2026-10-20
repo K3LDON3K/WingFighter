@@ -14,6 +14,7 @@ import {
   MODULES,
   profileOf,
   laserTarget,
+  laserReach,
   parseManeuverId,
   resolveManeuver,
   STRESS,
@@ -400,6 +401,11 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         h("span", { class: "muted" }, label(`· průměr ${Math.round(odds.expectedDamage)} zranění`)),
       );
     } else if (o.preferredTargetId && !debrisTarget && !cometTarget) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
+    const pt = cometTarget ?? debrisTarget;
+    if (pt) {
+      const why = laserReach(m.state, ship, pt, o.laserModuleId);
+      details.append(why ? h("span", { class: "warn" }, label(`${why} – nevystřelí`)) : h("span", { class: "odds", style: "color:#4ade80" }, label("v dosahu")));
+    }
     details.append(h("span", { class: "muted" }, label("· klik na nepřítele = cíl")));
   } else if (stormed) {
     details.append(h("span", { class: "pv" }, label("⚡ v bouři: lasery, štít a skener dočasně mimo provoz · torpéda letí rovně")));

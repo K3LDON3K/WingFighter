@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.7.1 – oprava: server zahazoval kometu jako cíl laserů/kulometu (střelba na kometu neproběhla). V panelu
+  laserů se u komety/trosek zobrazuje „v dosahu“ nebo důvod, proč loď nevystřelí (mimo dostřel, mimo výseč,
+  asteroid v cestě, bouře).
 - v3.7 – **Komety**: nastavení mapy „Komety“ (žádné / málo / středně / hodně – šance za kolo a limit v ladění)
   a „Komety naráží do asteroidů“. Kometa přiletí na začátku kola na okraj mapy a letí přímo na protější
   okraj (rychlost 300/kolo, torpédo 240), pohybuje se s loděmi; při plánování je vidět předpověď dráhy.

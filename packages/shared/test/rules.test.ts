@@ -876,6 +876,7 @@ describe("komety", () => {
     place(g2, "ship-p2-0", 1500, 1200, 0);
     g2.comets = [{ ...cometAt(620, 500, Math.PI / 2), hull: 15, maxHull: 15 }];
     r = resolveTurn(g2, [{ shipId: s2.id, maneuverId: "m1a0", fire: true, preferredTargetId: "c1" }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(2));
+    expect(sanitizeOrders(g2, "p1", [{ shipId: s2.id, maneuverId: "m1a0", fire: true, preferredTargetId: "c1" }])[0].preferredTargetId).toBe("c1");
     const shot = r.events.find((e) => e.type === "cometShot");
     expect(shot && shot.type === "cometShot" && shot.destroyed).toBe(true);
     expect(r.state.comets!.length).toBe(0);
