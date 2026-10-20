@@ -126,7 +126,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
                 ? `☄ Kometa se srazila s torpédem.`
                 : e.reason === "mine"
                   ? `☄ Kometa spustila minu.`
-                  : `☄ Kometa odletěla z mapy.`,
+                  : e.reason === "comet"
+                    ? `☄ Dvě komety se srazily a roztříštily.`
+                    : `☄ Kometa odletěla z mapy.`,
         );
         break;
       case "cometTail":

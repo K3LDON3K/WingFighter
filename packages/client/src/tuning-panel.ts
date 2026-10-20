@@ -77,9 +77,10 @@ export function renderTuningPanel(root: HTMLElement, tuning: Tuning, savedTuning
     const val = tuning[f.key];
     const changed = val !== DEFAULT_TUNING[f.key];
     e.row.style.display = f.group === activeTab ? "" : "none";
-    if (document.activeElement !== e.input) e.input.value = String(val);
+    if (f.bool) e.input.checked = val > 0;
+    else if (document.activeElement !== e.input) e.input.value = String(val);
     e.input.classList.toggle("changed", changed);
-    e.note.textContent = changed ? ` (výchozí ${DEFAULT_TUNING[f.key]})` : "";
+    e.note.textContent = changed ? (f.bool ? ` (výchozí ${DEFAULT_TUNING[f.key] ? "ano" : "ne"})` : ` (výchozí ${DEFAULT_TUNING[f.key]})`) : "";
   }
 }
 
@@ -88,9 +89,11 @@ function build(root: HTMLElement, tuning: Tuning, canEdit: boolean, a: TuningAct
   const body = h("div", { class: "tune-body" });
   const b: Built = { tuning, canEdit, head: h("div", { class: "row tune-head" }), tabs: h("div", { class: "tune-tabs" }), body, inputs };
   for (const f of TUNING_FIELDS) {
-    const input = h("input", { type: "number", value: String(tuning[f.key]), min: String(f.min), max: String(f.max), step: String(f.step), disabled: !canEdit });
+    const input = f.bool
+      ? h("input", { type: "checkbox", checked: tuning[f.key] > 0, disabled: !canEdit })
+      : h("input", { type: "number", value: String(tuning[f.key]), min: String(f.min), max: String(f.max), step: String(f.step), disabled: !canEdit });
     const commit = () => {
-      const v = Number(input.value);
+      const v = f.bool ? (input.checked ? 1 : 0) : Number(input.value);
       if (Number.isFinite(v) && v !== b.tuning[f.key]) a.onChange({ [f.key]: v } as Partial<Tuning>);
     };
     input.onchange = commit;

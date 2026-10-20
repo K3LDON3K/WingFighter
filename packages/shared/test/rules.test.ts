@@ -944,6 +944,31 @@ describe("komety", () => {
   });
 });
 
+describe("komety – ladění srážek", () => {
+  it("se zapnutým cometCollide se dvě komety při srážce zničí a komety naráží do asteroidů i bez volby mapy", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, cometCollide: 1 } });
+    g.asteroids = [];
+    place(g, "ship-p1-0", 300, 1200, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    const mk = (id: string, x: number, heading: number): Comet => ({ id, x, y: 500, heading, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: COMET.radius, tailUsed: [] });
+    g.comets = [mk("c1", 500, 0), mk("c2", 800, Math.PI)];
+    let r = resolveTurn(g, g.ships.map((s) => ({ shipId: s.id, maneuverId: "m1a0", fire: false })), createRng(1));
+    expect(r.events.filter((e) => e.type === "cometGone" && e.reason === "comet").length).toBe(2);
+    expect(r.state.comets!.length).toBe(0);
+    // asteroid v cestě
+    const g2 = structuredClone(g);
+    g2.comets = [mk("c1", 500, 0)];
+    g2.asteroids = [ast("a1", 650, 500, 40)];
+    r = resolveTurn(g2, g2.ships.map((s) => ({ shipId: s.id, maneuverId: "m1a0", fire: false })), createRng(1));
+    expect(r.events.some((e) => e.type === "cometGone" && e.reason === "asteroid")).toBe(true);
+    // bez ladění a bez volby mapy proletí
+    const g3 = structuredClone(g2);
+    g3.tuning = { ...DEFAULT_TUNING, weightPerSpeed: 100 };
+    r = resolveTurn(g3, g3.ships.map((s) => ({ shipId: s.id, maneuverId: "m1a0", fire: false })), createRng(1));
+    expect(r.events.some((e) => e.type === "cometGone")).toBe(false);
+  });
+});
+
 describe("úhyb skrz asteroid a kometu", () => {
   it("úhybný manévr proletí asteroidem i kometou; konec v asteroidu = dvojité zranění", () => {
     const g = game();

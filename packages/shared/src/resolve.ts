@@ -799,8 +799,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     cometMovers.set(c.id, { samples, length: c.speed, frozenAt: null, deflections: 0, collided: false });
   }
   const removedComets = new Set<string>();
-  const cometHitAsteroids = !!state.settings.map?.cometsHitAsteroids;
-  const endComet = (c: Comet, k: number, reason: "ship" | "asteroid" | "torpedo" | "mine" | "edge", shipId?: string, damage?: number) => {
+  const cometHitAsteroids = !!state.settings.map?.cometsHitAsteroids || COMET.collide;
+  const endComet = (c: Comet, k: number, reason: "ship" | "asteroid" | "torpedo" | "mine" | "edge" | "comet", shipId?: string, damage?: number) => {
     removedComets.add(c.id);
     const m = cometMovers.get(c.id)!;
     m.frozenAt = k;
@@ -1098,6 +1098,14 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
         endTorpedo(torp, k, { blast: false });
         endComet(c, k, "torpedo");
         continue;
+      }
+      if (COMET.collide) {
+        const other = state.comets.find((o) => o !== c && !removedComets.has(o.id) && circlesOverlap(cp, c.radius, cometMovers.get(o.id)!.samples[k], o.radius));
+        if (other) {
+          endComet(c, k, "comet");
+          endComet(other, k, "comet");
+          continue;
+        }
       }
       if (cometHitAsteroids) {
         const a = state.asteroids.find((x) => !removedAsteroids.has(x.id) && circleHitsAsteroid(x, cp, c.radius));

@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.9 – ladění „Komety“: zaškrtávátko **Naráží do asteroidů i do sebe** – zapnuto = kometa se roztříští o
+  asteroid (vykousne kráter) a dvě komety se při srážce zničí navzájem (doplňuje volbu v nastavení mapy,
+  která řeší jen asteroidy). Ladicí panel umí zaškrtávací pole.
 - v3.8 – přepínač potvrzení nad tlačítkem SPUSTIT KOLO (stejný styl, napojený shora): zapnuto = celé tlačítko
   tmavě červené se žlutým jezdcem vpravo a hra se před spuštěním ptá na nevyužité akce; vypnuto = běžná
   červená, kolo se spustí rovnou. Přepíná klik nebo klávesa P (animovaný jezdec), popis po najetí myší.

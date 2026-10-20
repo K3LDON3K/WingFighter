@@ -110,6 +110,8 @@ export interface Tuning {
   cometMaxFew: number;
   cometMaxMedium: number;
   cometMaxMany: number;
+  /** 1 = komety naráží do asteroidů (jako nastavení mapy) a také do sebe navzájem. */
+  cometCollide: number;
   // ekonomika
   startBudget: number;
   creditsPerKill: number;
@@ -211,6 +213,7 @@ export const DEFAULT_TUNING: Tuning = {
   cometMaxFew: 2,
   cometMaxMedium: 4,
   cometMaxMany: 6,
+  cometCollide: 0,
   startBudget: 500,
   creditsPerKill: 200,
   creditsPerTurn: 10,
@@ -225,6 +228,8 @@ export interface TuningField {
   max: number;
   step: number;
   hint?: string;
+  /** Zaškrtávátko (0/1) místo čísla. */
+  bool?: boolean;
 }
 
 /** Popis polí pro UI (pořadí = pořadí v menu). */
@@ -325,6 +330,7 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "cometHullPct", label: "Průlet – % trupu (když je štít plný)", group: "Komety", min: 0, max: 100, step: 5 },
   { key: "cometBonusCredits", label: "Průlet – kredity (když není co doplnit)", group: "Komety", min: 0, max: 1000, step: 10 },
   { key: "cometNoShieldCredits", label: "Průlet bez štítového modulu – kredity", group: "Komety", min: 0, max: 1000, step: 10, hint: "loď bez štítu dostane navíc plný stres" },
+  { key: "cometCollide", label: "Naráží do asteroidů i do sebe", group: "Komety", min: 0, max: 1, step: 1, bool: true, hint: "zapnuto: kometa se roztříští o asteroid (vykousne kráter) a dvě komety se při srážce zničí navzájem; doplňuje volbu v nastavení mapy" },
   { key: "cometChanceFew", label: "Málo – šance za kolo %", group: "Komety", min: 0, max: 100, step: 5 },
   { key: "cometMaxFew", label: "Málo – max. na mapě", group: "Komety", min: 1, max: 20, step: 1 },
   { key: "cometChanceMedium", label: "Středně – šance za kolo %", group: "Komety", min: 0, max: 100, step: 5 },
@@ -448,6 +454,7 @@ export function applyTuning(t: Tuning): void {
   COMET.noShieldCredits = t.cometNoShieldCredits;
   COMET.chance = { few: t.cometChanceFew, medium: t.cometChanceMedium, many: t.cometChanceMany };
   COMET.max = { few: t.cometMaxFew, medium: t.cometMaxMedium, many: t.cometMaxMany };
+  COMET.collide = t.cometCollide > 0;
   RULES.creditsPerKill = t.creditsPerKill;
   RULES.creditsPerTurn = t.creditsPerTurn;
   RULES.debrisRewardPct = t.debrisRewardPct;

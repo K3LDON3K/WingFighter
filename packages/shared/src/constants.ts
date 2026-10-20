@@ -103,6 +103,8 @@ export const COMET = {
   /** Šance (%) na novou kometu za kolo a max. počet komet na mapě podle nastavení mapy. */
   chance: { few: 25, medium: 50, many: 100 } as Record<"few" | "medium" | "many", number>,
   max: { few: 2, medium: 4, many: 6 } as Record<"few" | "medium" | "many", number>,
+  /** Ladění: komety naráží do asteroidů i do sebe (navíc k volbě v nastavení mapy). */
+  collide: false,
 };
 
 export const MINE = {

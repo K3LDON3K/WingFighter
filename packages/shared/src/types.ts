@@ -349,7 +349,7 @@ export type TurnEvent =
   /** Kometa: přílet na okraj mapy, zásah zbraní (lasery/kulomet před pohybem), zánik během pohybu (náraz do lodi/asteroidu/torpéda/miny, odlet z mapy). */
   | { type: "spawnComet"; comet: Comet }
   | { type: "cometShot"; cometId: string; shooterId: string; x: number; y: number; damage: number; hullAfter: number; destroyed: boolean; reward: number }
-  | { type: "cometGone"; cometId: string; x: number; y: number; t: number; reason: "ship" | "asteroid" | "torpedo" | "mine" | "edge"; shipId?: string; damage?: number }
+  | { type: "cometGone"; cometId: string; x: number; y: number; t: number; reason: "ship" | "asteroid" | "torpedo" | "mine" | "edge" | "comet"; shipId?: string; damage?: number }
   /** Průlet ocasem komety: co loď dostala. */
   | { type: "cometTail"; cometId: string; shipId: string; t: number; x: number; y: number; effect: "shield" | "segment" | "hull" | "credits" | "stress"; amount: number; segment?: number }
   | { type: "mineBlast"; mineId: string; x: number; y: number; t: number; hits: { shipId: string; damage: number }[] }
