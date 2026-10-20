@@ -2032,6 +2032,9 @@ body.touch .game canvas {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+.noanim {
+  animation: none !important;
+}
 /* MANÉVR nakreslen: zelené tlačítko, tužka s ✓, dole proužek ↺ RESET (stisk = reset) */
 .bb-weapon.done {
   background: #166534;

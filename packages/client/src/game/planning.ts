@@ -139,8 +139,22 @@ function costPips(n: number, color: "red" | "yellow" | "spent", title: string): 
   return el;
 }
 
+/** Okénka otevřená při minulém vykreslení – při překreslení (klik na +/−) se znovu neanimují. */
+let openPops = new Set<string>();
+const popsNow = new Set<string>();
+const popClass = (key: string) => (popsNow.add(key), openPops.has(key) ? "noanim" : "");
+
 export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks) {
   clear(root);
+  popsNow.clear();
+  try {
+    renderBottomBarInner(root, m, cb);
+  } finally {
+    openPops = new Set(popsNow);
+  }
+}
+
+function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks) {
   const my = m.state.ships.filter((s) => s.alive && s.ownerId === m.myId);
   const ship = my.find((s) => s.id === m.selectedShipId) ?? my[0];
 
@@ -173,7 +187,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   /* ---- 1. loď: pixelová bublina štítu + svislé ukazatele ---- */
   const planned = o.action?.type === "shield" ? o.action.segments : undefined;
   const inHand = shieldInHand(ship, o);
-  const editing = !!planned && !locked; // akce ŠTÍT zapnutá → −/+ u segmentů, změny platí hned
+  const editing = !!planned && !locked && !!m.shieldEdit; // okénko −/+ otevřené; klik vedle = potvrdit
   const teamColor = TEAM_COLORS[ship.team];
   const stormed = inStorm(m.state, ship);
   const bubbleSize = 110;
@@ -194,7 +208,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, 84, stormed);
     shieldPop = h(
       "div",
-      { class: "shield-pop" },
+      { class: `shield-pop ${popClass(`shield:${ship.id}`)}` },
       h("div", { class: "spair top" }, btn(0, -1), btn(0, 1)),
       h("div", { class: "smid" }, h("div", { class: "spair left" }, btn(3, 1), btn(3, -1)), popBubble, h("div", { class: "spair right" }, btn(1, 1), btn(1, -1))),
       h("div", { class: "spair bottom" }, btn(2, -1), btn(2, 1)),
@@ -341,8 +355,6 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   for (let i = 0; i < RULES.actionPoints; i++) apips.append(h("i", { class: i < RULES.actionPoints - acts.length ? "on" : "" }));
   /** Kolik akcí tlačítko právě stojí (tečky): otočka 2, manévr 1 (jen když se liší od rovně stejnou rychlostí), ostatní 1. */
   const dotsFor = (id: string) => (id === "koiogran" ? (acts.some((a) => a.id === "koiogran") ? 2 : 0) : id === "move" ? (acts.some((a) => a.id === "move") && !acts.some((a) => a.id === "koiogran") ? 1 : 0) : acts.some((a) => a.id === id) ? 1 : 0);
-  /** Křížek přes celou šířku pod tlačítkem – zruší naplánovanou akci. */
-  const cancelStrip = (what: string) => h("button", { class: "px act-cancel", disabled: locked, title: `Zrušit: ${what}`, onclick: () => cb.cancelAction(ship.id) }, "✕");
   const buttons = h("div", { class: "bb-weapons" });
   for (const grp of ACTION_GROUPS) {
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
@@ -352,8 +364,11 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     for (const a of avail) {
       const isMove = a.id === "move";
       const active = isMove ? aiming : a.active(o);
-      // manévr nakreslen a potvrzen: zelené tlačítko s ✓, stisk = reset na rovně stejnou rychlostí
+      // manévr nakreslen a potvrzen: zelené tlačítko, stisk = reset na rovně stejnou rychlostí
       const moveDone = isMove && !aiming && o.maneuverId !== defaultOrders(ship).maneuverId;
+      // štít: upraveno a okénko zavřené = hotovo (zelené), stisk = reset (zrušit úpravu)
+      const shieldDone = a.id === "shield" && !!planned && !editing;
+      const done = moveDone || shieldDone;
       const stormOff = stormed && (a.id === "laser" || a.id === "shield");
       const why = stormOff ? "systém je v bouři mimo provoz" : a.disabled(ship, m.state, o);
       const dots = dotsFor(a.id); // > 0 = akce je za toto tlačítko utracená
@@ -361,18 +376,24 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         h(
           "button",
           {
-            class: `px bb-weapon ${active && !stormOff ? "on" : ""} ${moveDone ? "done" : ""} ${stormOff ? "stormed" : ""} ${dots > 0 ? "spent" : ""}`,
-            disabled: locked || stormOff || (!!why && !active && !moveDone && dots === 0),
-            title: moveDone ? `Manévr je nakreslený a platí. Stisk = reset: loď poletí rovně stejnou rychlostí (zdarma).\nNovou dráhu nakreslíš tažením z lodi.` : `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`,
-            onclick: () => (moveDone ? cb.cancelManeuver(ship.id) : isMove ? cb.aim(ship.id) : cb.chooseAction(ship.id, a.id)),
+            class: `px bb-weapon ${active && !stormOff && !done ? "on" : ""} ${done ? "done" : ""} ${stormOff ? "stormed" : ""} ${dots > 0 ? "spent" : ""}`,
+            disabled: locked || stormOff || (!!why && !active && !done && dots === 0),
+            title: moveDone
+              ? `Manévr je nakreslený a platí. Stisk = reset: loď poletí rovně stejnou rychlostí (zdarma).\nNovou dráhu nakreslíš tažením z lodi.`
+              : shieldDone
+                ? "Úprava štítu platí. Stisk = reset (štít zůstane, jak je teď)."
+                : a.id === "shield" && editing
+                  ? "Rozmísti body −/+ a klikni kamkoliv vedle (nebo sem) – úprava se potvrdí."
+                  : `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`,
+            onclick: () => (moveDone ? cb.cancelManeuver(ship.id) : shieldDone ? cb.cancelAction(ship.id) : a.id === "shield" && editing ? cb.shieldConfirm(ship.id) : isMove ? cb.aim(ship.id) : cb.chooseAction(ship.id, a.id)),
           },
           costPips(a.id === "koiogran" ? 2 : 1, dots > 0 ? "spent" : "red", a.id === "koiogran" ? "stojí 2 akce" : a.id === "move" ? "stojí 1 akci (rovně stejnou rychlostí zdarma)" : "stojí 1 akci"),
           icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
-          moveDone ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
+          done ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
         );
-      if (a.id === "shield" && planned) row.append(h("div", { class: "scan-holder stack" }, shieldPop, wbtn, cancelStrip("úprava štítu")));
+      if (a.id === "shield" && editing) row.append(h("div", { class: "scan-holder stack" }, shieldPop, wbtn));
       else row.append(wbtn);
     }
     if (grp.label === "Speciální") {
@@ -393,23 +414,25 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
           h("span", { class: "lbl" }, label(lbl)),
         );
-      const holder = h("div", { class: `scan-holder ${cargoActive ? "stack" : ""}` });
+      const cargoDone = cargoActive && !m.cargoOpen; // akce zvolená, okénko zavřené = hotovo, stisk = reset
+      const holder = h("div", { class: `scan-holder ${m.cargoOpen ? "stack" : ""}` });
       holder.append(
         h(
           "button",
           {
-            class: `px bb-weapon ${cargoActive ? "on" : ""} ${cargoSpent > 0 ? "spent" : ""} ${m.cargoOpen ? "open" : ""}`,
+            class: `px bb-weapon ${cargoActive && !cargoDone ? "on" : ""} ${cargoDone ? "done" : ""} ${cargoSpent > 0 ? "spent" : ""} ${m.cargoOpen ? "open" : ""}`,
             disabled: locked,
-            title: "Náklad: vyhodit modul z lodi nebo z nákladu (1 akce) / zvednout trosky do nákladového prostoru (1 akce)",
-            onclick: () => cb.cargoToggle(ship.id),
+            title: cargoDone ? `${jetOn ? "Vyhození modulu" : "Zvednutí nákladu"} platí. Stisk = reset (akce se zruší).` : "Náklad: vyhodit modul z lodi nebo z nákladu (1 akce) / zvednout trosky do nákladového prostoru (1 akce). Klik vedle okénko zavře a volba platí.",
+            onclick: () => (cargoDone ? cb.cancelAction(ship.id) : cb.cargoToggle(ship.id)),
           },
           costPips(1, cargoSpent > 0 ? "spent" : "red", "stojí 1 akci"),
           icon("cargo", "currentColor", 22),
           h("span", { class: "lbl" }, label(jetOn ? "Vyhodit" : pickOn ? "Zvednout" : "Náklad")),
+          cargoDone ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
         ),
       );
       if (m.cargoOpen && !locked) {
-        const pop = h("div", { class: "cargo-pop" }, h("div", { class: "cargo-tabs" }, sub(jet, jetOn, whyJet, "Vyhodit"), sub(pick, pickOn, whyPick, "Zvednout")));
+        const pop = h("div", { class: `cargo-pop ${popClass(`cargo:${ship.id}`)}` }, h("div", { class: "cargo-tabs" }, sub(jet, jetOn, whyJet, "Vyhodit"), sub(pick, pickOn, whyPick, "Zvednout")));
         if (jetOn) {
           const curId = o.action?.type === "jettison" ? o.action.moduleId : undefined;
           const chosen = ship.loadout.modules.find((x) => x.id === curId) ?? (ship.loadout.cargo ?? []).find((x) => x.id === curId);
@@ -433,7 +456,6 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         } else pop.append(h("div", { class: "muted cargo-note" }, label(`náklad ${(ship.loadout.cargo ?? []).length}/${cargoCapacity(ship.loadout)}`)));
         holder.append(pop);
       }
-      if (cargoActive) holder.append(cancelStrip(jetOn ? "vyhození modulu" : "zvednutí nákladu"));
       row.append(holder);
       const sc = scannerModule(ship.loadout);
       if (sc) {
@@ -466,7 +488,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           holder.append(
             h(
               "div",
-              { class: "scan-pop" },
+              { class: `scan-pop ${popClass(`scan:${ship.id}`)}` },
               h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || charges < 1, title: `Sken lodi (1 náboj): klikni na cizí loď v dohledu do ${SCANNER.range}. Proběhne hned, nebere akci.`, onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(1)),
               h("button", { class: "px bb-weapon sm", disabled: locked || charges < 2, title: `Hluboký sken (2 náboje): hned odkryje mapu do ${SCANNER.deepRange} celému týmu do konce kola, pak cooldown ${SCANNER.cooldown} kola.`, onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(2)),
               h("button", { class: "px bb-weapon sm force", disabled: locked || charges >= SCANNER.charges, title: charges >= SCANNER.charges ? "Jde jen bez plné zásoby nábojů" : `Vynutit cooldown: ${SCANNER.cooldown} − ${charges} = ${forceLen} kola, pak plné náboje`, onclick: () => cb.scan(ship.id, "cooldown") }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Cooldown")), h("span", { class: "c" }, `${forceLen}K`)),

@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.38 – tlačítka akcí s okénkem (ŠTÍT, NÁKLAD) se chovají jako MANÉVR: okénko zůstává otevřené a při
+  klikání na −/+ už neprobliká (okénko se znovu neanimuje), klik kamkoliv vedle okénko zavře a volba platí –
+  tlačítko zezelená s proužkem ↺ RESET; další stisk akci zruší. ✕ proužky pod tlačítky odstraněny. Při
+  nepoložených bodech štítu klik vedle jen upozorní.
 - v3.37 – ukazatel RYCHLOST v panelu lodi (varianta C): dílky nad maximem daným váhou jsou tmavě červené
   s rámečkem, maximum v čísle červeně a vedle ikona váhy; tooltip říká, které rychlosti váha blokuje.
 - v3.36 – během bitvy se obrazovka neuspává (Screen Wake Lock API; iPadOS 16.4+, Chrome, Android). Zámek se

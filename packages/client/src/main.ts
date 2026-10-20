@@ -1679,6 +1679,22 @@ function bindInput(c: HTMLCanvasElement) {
   /** Klik / ťuknutí na mapu. */
   function tapAt(w: { x: number; y: number; sx: number; sy: number }, touch: boolean) {
     const g = game!;
+    // klik vedle otevřeného okénka (štít / náklad) = potvrdit a zavřít
+    let closed = false;
+    if (g.cargoOpen) {
+      g.cargoOpen = false;
+      closed = true;
+    }
+    if (g.shieldEdit) {
+      const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
+      const so = sel && g.orders.get(sel.id);
+      if (sel && so && shieldInHand(sel, so) > 0) showNotice("Nejdřív polož všechny body štítu (+).");
+      else {
+        g.shieldEdit = false;
+        closed = true;
+      }
+    }
+    if (closed) renderSide();
     // 1) míření: klik / ťuknutí kamkoliv potvrdí dráhu
     if (g.aimingShipId) {
       confirmManeuver(g.aimingShipId);
