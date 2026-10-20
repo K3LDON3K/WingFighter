@@ -60,6 +60,7 @@ export interface PlanningCallbacks {
   jettisonChosen(shipId: string, moduleId: string): void;
   /** Přepnout potvrzování nevyužitých akcí (přepínač nad SPUSTIT KOLO, klávesa P). */
   toggleConfirm(): void;
+  confirmLaunch(go: boolean): void;
   /** Úprava štítu: změna bodů segmentu o ±1, potvrzení rozložení. */
   shieldDelta(shipId: string, segment: number, delta: number): void;
   shieldConfirm(shipId: string): void;
@@ -88,6 +89,8 @@ export interface PlanningModel {
   inventoryOpen?: boolean;
   /** Ptát se před spuštěním kola s nevyužitými akcemi. */
   askConfirm?: boolean;
+  /** Otevřené potvrzení nevyužitých akcí nad tlačítkem SPUSTIT KOLO (volné / celkem). */
+  confirm?: { unused: number; total: number } | null;
 }
 
 /** Kolik bodů štítu je "v ruce" (odebráno, ale ještě nerozmístěno). */
@@ -560,9 +563,27 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   );
 
   /* ---- 4. spuštění kola (úzký sloupec) ---- */
+  let confirmPop: HTMLElement | null = null;
+  if (m.confirm && !locked) {
+    const { unused, total } = m.confirm;
+    const word = unused === 1 ? "volná akce" : unused < 5 ? "volné akce" : "volných akcí";
+    confirmPop = h(
+      "div",
+      { class: "confirm-pop" },
+      h("div", { class: "cp-title" }, icon("target", "#fbbf24", 12), label("Nevyužité akce")),
+      h("div", { class: "cp-text txt" }, h("b", {}, String(unused)), ` ${word} z ${total}`),
+      h(
+        "div",
+        { class: "cp-btns" },
+        h("button", { class: "px cp-go", onclick: () => cb.confirmLaunch(true) }, icon("play", "#fff", 10), label("spustit"), h("span", { class: "k" }, "ENTER")),
+        h("button", { class: "px cp-back", onclick: () => cb.confirmLaunch(false) }, label("zpět"), h("span", { class: "k" }, "ESC")),
+      ),
+    );
+  }
   const go = h(
     "div",
-    { class: "pnl bb-go" },
+    { class: `pnl bb-go ${confirmPop ? "confirming" : ""}` },
+    confirmPop,
     h(
       "div",
       { class: `launch-stack ${m.askConfirm ? "ask" : ""} ${locked ? "locked" : ""}` },

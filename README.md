@@ -145,6 +145,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.26 – potvrzení nevyužitých akcí už není překryvný dialog: vysune se okénko přímo nad tlačítko SPUSTIT
+  KOLO (styl jako skener) s počtem volných akcí a tlačítky SPUSTIT / ZPĚT; potvrdit jde myší, dalším
+  Enterem nebo dalším stiskem SPUSTIT KOLO, Esc = zpět. Tlačítko CENTROVAT přejmenováno na **POHLED**
+  (C; stavy loď / dohled / mapa) a vedle něj nové tlačítko s okem (**F**): vycentruje na vybranou loď
+  při zachování aktuálního zoomu.
 - v3.25 – tlačítko CENTROVAT (C) má tři režimy a cyklicky je střídá: **loď** (2× blíž než dřív – polovina
   dohledu; zároveň výchozí pohled na začátku bitvy) → **dohled** (celý kruh dohledu, dřívější stav) →
   **mapa** (celá mapa). Na tlačítku jsou tři políčka s podsvíceným aktivním režimem a jeho název; po

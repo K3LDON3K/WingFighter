@@ -374,10 +374,19 @@ function updateCenterBtn() {
   centerBtnMode = m;
   const next = m === null ? 0 : (m + 1) % CENTER_MODES.length;
   clear(centerBtn);
-  centerBtn.title = `Centrovat (C): ${CENTER_MODES.map((x, i) => (i === m ? `[${x.name}]` : x.name)).join(" → ")}. Další stisk: ${CENTER_MODES[next].title.toLowerCase()}.`;
+  centerBtn.title = `Pohled (C): ${CENTER_MODES.map((x, i) => (i === m ? `[${x.name}]` : x.name)).join(" → ")}. Další stisk: ${CENTER_MODES[next].title.toLowerCase()}.`;
   const pips = h("span", { class: "cpips" });
   CENTER_MODES.forEach((_, i) => pips.append(h("i", { class: i === m ? "on" : "" })));
-  centerBtn.append(icon("center", "currentColor", 12), label("centrovat"), pips, h("span", { class: "cmode" }, label(m === null ? "–" : CENTER_MODES[m].name)));
+  centerBtn.append(icon("center", "currentColor", 12), label("pohled"), pips, h("span", { class: "cmode" }, label(m === null ? "–" : CENTER_MODES[m].name)));
+}
+
+/** Vycentrovat na loď při zachování aktuálního zoomu (tlačítko s okem, klávesa F). */
+function lookAtShip(shipId: string | undefined) {
+  if (!game || !cam || !shipId) return;
+  const s = game.state.ships.find((x) => x.id === shipId);
+  if (!s) return;
+  cam.centerOn(s.x, s.y);
+  cam.clampTo(game.state.width, game.state.height);
 }
 
 /** Když je loď mimo záběr, vycentruje na ni kameru. */
@@ -469,7 +478,7 @@ function setAskConfirm(ask: boolean) {
 
 function submitOrders(force = false) {
   if (!game || game.submitted) return;
-  if (game.confirmOpen && !force) return;
+  if (game.confirmOpen) force = true; // otevřené potvrzení: další SPUSTIT / Enter = potvrdit
   for (const [id, o] of game.orders) {
     const ship = game.state.ships.find((x) => x.id === id);
     if (ship && o.action?.type === "jettison" && !ship.loadout.modules.some((m) => m.id === (o.action as { moduleId: string }).moduleId)) {
@@ -486,17 +495,11 @@ function submitOrders(force = false) {
       return;
     }
   }
-  if (!force && !game.skipConfirm) {
-    let unused = 0;
-    for (const [id, o] of game.orders) {
-      const ship = game.state.ships.find((x) => x.id === id && x.alive);
-      if (ship) unused += Math.max(0, RULES.actionPoints - actionCost(ship, o));
-    }
-    if (unused > 0) {
-      game.confirmOpen = true;
-      renderSide();
-      return;
-    }
+  if (!force && !game.skipConfirm && unusedActions().unused > 0) {
+    // potvrzení se vysune nad tlačítko SPUSTIT KOLO (Enter = spustit, Esc = zpět)
+    game.confirmOpen = true;
+    renderSide();
+    return;
   }
   game.confirmOpen = false;
   game.aimingShipId = null;
@@ -547,7 +550,7 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = CENTROVAT"),
+    h("div", { class: "hint" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ"),
     sideEl,
     h(
       "div",
@@ -555,6 +558,7 @@ function mountGame() {
       h("button", { class: "gear", title: "Přiblížit (+)", onclick: () => zoomBy(ZOOM_STEP) }, "+"),
       h("button", { class: "gear", title: "Oddálit (−)", onclick: () => zoomBy(1 / ZOOM_STEP) }, "−"),
       (centerBtn = h("button", { class: "gear center-btn", onclick: () => centerOnShip(game?.selectedShipId) })),
+      h("button", { class: "gear", title: "Najít vybranou loď: vycentrovat na ni, zoom zůstane (F)", onclick: () => lookAtShip(game?.selectedShipId) }, icon("eye", "currentColor", 12)),
     ),
     h(
       "div",
@@ -1006,45 +1010,31 @@ function renderPlayersStatus() {
 }
 
 /** Dialog: spustit kolo i s nevyužitými akcemi? */
-function renderConfirm() {
-  if (!confirmEl || !game) return;
-  const leaving = (confirmEl as HTMLElement & { _close?: () => void })._close;
-  if (leaving && !game.confirmOpen) return;
-  (confirmEl as HTMLElement & { _close?: () => void })._close = undefined;
-  confirmEl.style.display = game.confirmOpen ? "grid" : "none";
-  clear(confirmEl);
-  if (!game.confirmOpen) return;
+/** Volné akční body mých živých lodí (pro potvrzení před spuštěním kola). */
+function unusedActions(): { unused: number; total: number } {
   let unused = 0;
+  let total = 0;
+  if (!game) return { unused, total };
   for (const [id, o] of game.orders) {
     const ship = game.state.ships.find((x) => x.id === id && x.alive);
-    if (ship) unused += Math.max(0, RULES.actionPoints - actionCost(ship, o));
+    if (!ship) continue;
+    unused += Math.max(0, RULES.actionPoints - actionCost(ship, o));
+    total += RULES.actionPoints;
   }
-  const total = RULES.actionPoints * [...game.orders.keys()].filter((id) => game!.state.ships.some((x) => x.id === id && x.alive)).length;
-  const word = unused === 1 ? "volnou akci" : unused < 5 ? "volné akce" : "volných akcí";
-  const chk = h("input", { type: "checkbox", id: "skip-confirm" }) as HTMLInputElement;
-  confirmEl.append(
-    h(
-      "div",
-      { class: "pnl confirm" },
-      h("div", { class: "ctl" }, label("Nevyužité akce")),
-      h("div", { class: "ctx txt" }, "Máš ještě ", h("b", {}, String(unused)), ` ${word} z ${total}.`, h("br"), "Opravdu spustit kolo?"),
-      h(
-        "div",
-        { class: "cbtns" },
-        h("button", { class: "px cb primary", onclick: () => confirmLaunch(true) }, icon("play", "#fff", 10), label("spustit"), h("span", { class: "k" }, "ENTER")),
-        h("button", { class: "px cb", onclick: () => confirmLaunch(false) }, label("zpět"), h("span", { class: "k" }, "ESC")),
-      ),
-      h("label", { class: "cchk", htmlFor: "skip-confirm" }, chk, "vypnout potvrzování (přepínač nad tlačítkem, klávesa P)"),
-    ),
-  );
-  (confirmEl as HTMLElement & { _chk?: HTMLInputElement })._chk = chk;
+  return { unused, total };
+}
+
+/** Překryvný dialog slouží už jen pro potvrzení odchodu (askLeave); potvrzení kola je v liště. */
+function renderConfirm() {
+  if (!confirmEl || !game) return;
+  if ((confirmEl as HTMLElement & { _close?: () => void })._close) return;
+  confirmEl.style.display = "none";
+  clear(confirmEl);
 }
 
 function confirmLaunch(go: boolean) {
   if (!game) return;
-  const chk = (confirmEl as (HTMLElement & { _chk?: HTMLInputElement }) | null)?._chk;
   game.confirmOpen = false;
-  if (chk?.checked) setAskConfirm(false);
   if (go) submitOrders(true);
   else renderSide();
 }
@@ -1091,6 +1081,7 @@ function renderSide() {
       scanPick: game.scanPick,
       cargoOpen: game.cargoOpen,
       askConfirm: !game.skipConfirm,
+      confirm: game.confirmOpen ? unusedActions() : null,
     },
     {
       select: (id) => {
@@ -1119,6 +1110,7 @@ function renderSide() {
       },
       ready: () => submitOrders(),
       toggleConfirm: () => setAskConfirm(game!.skipConfirm),
+      confirmLaunch: (go) => confirmLaunch(go),
       showScore: () => toggleStats(true),
       jettisonChosen: (id, moduleId) => {
         const g = game!;
@@ -1632,6 +1624,10 @@ function bindInput(c: HTMLCanvasElement) {
     }
     if (e.key === "c" || e.key === "C") {
       centerOnShip(game.selectedShipId);
+      return;
+    }
+    if (e.key === "f" || e.key === "F") {
+      lookAtShip(game.selectedShipId);
       return;
     }
     if (e.key === "p" || e.key === "P") {
