@@ -716,6 +716,18 @@ h3,
   justify-content: center;
   transition: background 0.3s;
 }
+.bb-toggle {
+  position: relative;
+}
+.bb-toggle .q {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  font-size: 8px;
+  color: #fecaca;
+  text-shadow: 1px 1px #450a0a;
+  line-height: 1;
+}
 .bb-toggle .sw {
   display: block;
   width: 34px;
@@ -768,6 +780,10 @@ h3,
 .launch-stack.locked .bb-toggle .sw i {
   background: #94a3b8;
   box-shadow: none;
+}
+.launch-stack.locked .bb-toggle .q {
+  color: #94a3b8;
+  text-shadow: none;
 }
 .bb-launch:hover:not(:disabled) {
   background: #ef4444;

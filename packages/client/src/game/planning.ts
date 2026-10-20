@@ -439,6 +439,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           onclick: () => cb.toggleConfirm(),
         },
         h("span", { class: "sw" }, h("i")),
+        h("span", { class: "q" }, "?"),
       ),
       locked
         ? h("button", { class: "px bb-launch waiting", title: "Klik = vrátit se k úpravám", onclick: () => cb.unready() }, icon("wait", "#e2e8f0", 18), h("span", { class: "l1" }, label("Čekám")), h("span", { class: "sub" }, label("klik = upravit")))
