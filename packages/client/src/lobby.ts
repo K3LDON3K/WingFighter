@@ -238,121 +238,103 @@ function roomView(m: LobbyModel, net: Net) {
     (() => {
       const map = settings.map ?? DEFAULT_MAP;
       const setMap = (patch: Partial<MapSettings>) => set({ map: { ...map, ...patch } });
-      const sel = (lbl: string, value: string, opts: [string, string][], onChange: (v: string) => void) =>
-        h("label", {}, h("span", {}, lbl), h("select", { disabled: !isHost, onchange: (e) => onChange((e.target as HTMLSelectElement).value) }, ...opts.map(([v, t]) => h("option", { value: v, selected: value === v }, t))));
+      /** Řádek formuláře: popisek | prvek | „?“ s vysvětlivkou. */
+      const frow = (lbl: string, ctl: Node, hint?: string) => h("div", { class: "frow" }, h("span", { class: "txt flbl" }, lbl), h("div", { class: "fctl" }, ctl), hint ? h("span", { class: "fhint", title: hint }, "?") : h("span"));
+      const sel = (value: string, opts: [string, string][], onChange: (v: string) => void, width?: string) =>
+        h("select", { class: "fsel", disabled: !isHost, style: width ? `width:${width}` : "", onchange: (e) => onChange((e.target as HTMLSelectElement).value) }, ...opts.map(([v, t]) => h("option", { value: v, selected: value === v }, t)));
+      /** Pixelový přepínač ano / ne. */
+      const toggle = (on: boolean, onChange: (v: boolean) => void, title?: string) =>
+        h("button", { class: `ptoggle ${on ? "on" : ""}`, disabled: !isHost, title, onclick: () => onChange(!on) }, h("span", { class: "pt-sw" }, h("i")), h("span", { class: "txt pt-lbl" }, on ? "ano" : "ne"));
+      const section = (title: string, ...rows: Node[]) => h("div", { class: "fsec" }, h("div", { class: "fsec-h" }, label(title)), ...rows);
       const bots = room.players.filter((p) => p.isBot);
-      const targetSel = isHost && bots.length ? h("select", { onchange: (e) => (startFor = (e.target as HTMLSelectElement).value || null) }, h("option", { value: "", selected: !startFor }, "já"), ...bots.map((b) => h("option", { value: b.id, selected: startFor === b.id }, b.name))) : null;
+      const targetSel = isHost && bots.length ? h("select", { class: "fsel", style: "width:150px", onchange: (e) => (startFor = (e.target as HTMLSelectElement).value || null) }, h("option", { value: "", selected: !startFor }, "já"), ...bots.map((b) => h("option", { value: b.id, selected: startFor === b.id }, b.name))) : null;
+      const TILE_COLOR: Record<ModuleType, string> = { laser: "#f87171", torpedo: "#fb923c", mine: "#fbbf24", "shield-segment": "#7dd3fc", mg: "#fde047", scanner: "#a78bfa", "shield-whole": "#38bdf8" };
+      const allowedOn = (t: ModuleType) => settings.allowedModules[t] !== 0;
+      const setAllowed = (t: ModuleType, on: boolean) => {
+        const next: Partial<Record<ModuleType, number>> = { ...settings.allowedModules };
+        if (on) delete next[t];
+        else next[t] = 0;
+        set({ allowedModules: next });
+      };
+      const setAll = (on: boolean) => {
+        const next: Partial<Record<ModuleType, number>> = {};
+        if (!on) for (const t of MODULE_TYPES) next[t] = 0;
+        set({ allowedModules: next });
+      };
+      const onCount = MODULE_TYPES.filter(allowedOn).length;
+      const tiles = h(
+        "div",
+        { class: "mod-tiles" },
+        ...MODULE_TYPES.map((t) => {
+          const on = allowedOn(t);
+          const col = TILE_COLOR[t];
+          return h(
+            "button",
+            { class: `mod-tile ${on ? "on" : ""}`, disabled: !isHost, style: on ? `border-color:${col} #0b1020 #0b1020 ${col}` : "", title: `${MODULES[t].name}\n${MODULES[t].description}\n${on ? "Klik = vyřadit z této hry" : "Klik = povolit v této hře"}`, onclick: () => setAllowed(t, !on) },
+            icon(MODULES[t].icon, on ? col : "#475569", 26),
+            h("span", { class: "mt-name" }, label(MODULES[t].name)),
+            h("span", { class: "mt-chk" }, on ? "✓" : ""),
+          );
+        }),
+      );
+      const summary = `${MAP_SIZES[map.size]?.label ?? map.size} · asteroidy ${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids} · ${map.storms === 0 ? "bez bouří" : `${map.storms} bouře`} · komety ${{ none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"]} · seed ${map.seed} · ${settings.mode === "tdm" ? "týmový deathmatch" : "deathmatch"}${settings.turnLimit ? ` · ${settings.turnLimit} kol` : ""} · startovní kredity ${budget}`;
       return h(
         "div",
-        { class: "card mapcard" },
-        h("h3", {}, label("Mapa"), isHost ? "" : label(" (mění host)")),
+        { class: "card gamecard" },
+        h("h3", {}, icon("target", "#7dd3fc", 12), " ", label("Nastavení hry"), isHost ? "" : h("span", { class: "muted" }, label(" (mění host)"))),
         h(
           "div",
-          { class: "map-grid" },
+          { class: "game-grid" },
           h(
             "div",
-            { class: "settings map-settings" },
-            sel("Velikost", map.size, Object.entries(MAP_SIZES).map(([k, v]) => [k, v.label]), (v) => setMap({ size: v as MapSettings["size"] })),
-            sel("Asteroidy", map.asteroids, [["none", "žádné"], ["few", "málo"], ["medium", "střední"], ["many", "hodně"]], (v) => setMap({ asteroids: v as MapSettings["asteroids"] })),
-            h("label", {}, h("span", {}, "Shluky asteroidů"), h("input", { type: "checkbox", checked: map.clusters, disabled: !isHost, onchange: (e) => setMap({ clusters: (e.target as HTMLInputElement).checked }) })),
-            sel("Bouře", String(map.storms), [["0", "žádná"], ["1", "1"], ["2", "2"], ["3", "3"], ["5", "mnoho (5)"]], (v) => setMap({ storms: Number(v) })),
-            sel("Velikost bouří", map.stormSize, [["small", "malé"], ["medium", "střední"], ["large", "velké"]], (v) => setMap({ stormSize: v as MapSettings["stormSize"] })),
-            h("label", {}, h("span", {}, "Symetrická"), h("input", { type: "checkbox", checked: map.symmetric, disabled: !isHost, title: "Zrcadlená mapa – obě strany stejné podmínky", onchange: (e) => setMap({ symmetric: (e.target as HTMLInputElement).checked }) })),
-            sel("Komety", map.comets ?? "none", [["none", "žádné"], ["few", "málo"], ["medium", "středně"], ["many", "hodně"]], (v) => setMap({ comets: v as MapSettings["comets"] })),
-            h("label", {}, h("span", {}, "Komety naráží do asteroidů"), h("input", { type: "checkbox", checked: !!map.cometsHitAsteroids, disabled: !isHost, title: "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím.", onchange: (e) => setMap({ cometsHitAsteroids: (e.target as HTMLInputElement).checked }) })),
-            h(
-              "label",
-              {},
-              h("span", {}, "Seed"),
-              h("span", { class: "row", style: "gap:4px" }, h("input", { type: "number", value: String(map.seed), min: "0", max: "999999", disabled: !isHost, style: "width:90px", onchange: (e) => setMap({ seed: Number((e.target as HTMLInputElement).value) || 0 }) }), isHost ? h("button", { title: "Nová náhodná mapa", onclick: () => setMap({ seed: Math.floor(Math.random() * 100000) }) }, "🎲") : null),
+            { class: "game-form" },
+            section(
+              "Mapa",
+              frow("Velikost", sel(map.size, Object.entries(MAP_SIZES).map(([k, v]) => [k, v.label]), (v) => setMap({ size: v as MapSettings["size"] }))),
+              frow("Asteroidy", sel(map.asteroids, [["none", "žádné"], ["few", "málo"], ["medium", "střední"], ["many", "hodně"]], (v) => setMap({ asteroids: v as MapSettings["asteroids"] })), "Hustota asteroidů na mapě."),
+              frow("Shluky asteroidů", toggle(map.clusters, (v) => setMap({ clusters: v })), "Asteroidy v hustších shlucích místo rovnoměrného rozptylu."),
+              frow(
+                "Bouře",
+                h("div", { class: "fpair" }, sel(String(map.storms), [["0", "žádná"], ["1", "1"], ["2", "2"], ["3", "3"], ["5", "mnoho (5)"]], (v) => setMap({ storms: Number(v) }), "96px"), sel(map.stormSize, [["small", "malé"], ["medium", "střední"], ["large", "velké"]], (v) => setMap({ stormSize: v as MapSettings["stormSize"] }), "118px")),
+                "Počet a velikost elektromagnetických bouří (fialové): uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener jí nepronikne, loď v bouři není vidět.",
+              ),
+              frow("Symetrická", toggle(map.symmetric, (v) => setMap({ symmetric: v })), "Zrcadlená mapa – obě strany mají stejné podmínky."),
+              frow(
+                "Komety",
+                h("div", { class: "fpair" }, sel(map.comets ?? "none", [["none", "žádné"], ["few", "málo"], ["medium", "středně"], ["many", "hodně"]], (v) => setMap({ comets: v as MapSettings["comets"] }), "118px"), h("span", { class: "txt muted fsub" }, "naráží do asteroidů"), toggle(!!map.cometsHitAsteroids, (v) => setMap({ cometsHitAsteroids: v }), "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím.")),
+                "Komety přilétají na okraj mapy a letí přes ni rychleji než torpéda: náraz zraní loď, sestřel dává kredity, průlet ocasem doplní štít.",
+              ),
+              frow(
+                "Seed",
+                h("div", { class: "fpair" }, h("input", { class: "fsel", type: "number", value: String(map.seed), min: "0", max: "999999", disabled: !isHost, style: "width:118px", onchange: (e) => setMap({ seed: Number((e.target as HTMLInputElement).value) || 0 }) }), isHost ? h("button", { class: "fdice", title: "Nová náhodná mapa", onclick: () => setMap({ seed: Math.floor(Math.random() * 100000) }) }, "🎲") : null),
+                "Stejný seed = stejná mapa.",
+              ),
             ),
-            h("div", { class: "muted txt", style: "margin-top:6px" }, "Stejný seed = stejná mapa. Elektromagnetická bouře (fialová): uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener jí nepronikne. Komety přilétají na okraj mapy a letí přes ni rychleji než torpéda: náraz zraní loď, sestřel dává kredity, průlet ocasem doplní štít."),
+            section(
+              "Bitva",
+              frow("Herní mód", sel(settings.mode, [["tdm", "Týmový deathmatch"], ["dm", "Deathmatch (všichni proti všem)"]], (v) => set({ mode: v as "tdm" | "dm" }))),
+              frow("Limit kol", sel(String(settings.turnLimit), [0, 10, 15, 20, 30, 40].map((n) => [String(n), n === 0 ? "bez limitu" : `${n} kol`]), (v) => set({ turnLimit: Number(v) })), "Při limitu kol vyhrává tým s největším součtem zbývajícího trupu a štítů."),
+              frow("Lodí na hráče", sel(String(settings.shipsPerPlayer), [1, 2, 3, 4].map((n) => [String(n), String(n)]), (v) => set({ shipsPerPlayer: Number(v) }))),
+              frow("Výbava botů", sel(settings.botLoadout, [["default", "výchozí sestava"], ["random", "náhodná"], ["manual", "ruční (naklikám u bota)"]], (v) => set({ botLoadout: v as "default" | "random" | "manual" }))),
+            ),
+            section(
+              "Dostupné moduly",
+              tiles,
+              h("div", { class: "txt muted mt-foot" }, `${onCount} ze ${MODULE_TYPES.length} modulů ve hře`, isHost ? h("span", {}, " · ", h("a", { href: "#", onclick: (e: Event) => (e.preventDefault(), setAll(true)) }, "všechny"), " · ", h("a", { href: "#", onclick: (e: Event) => (e.preventDefault(), setAll(false)) }, "žádný")) : null, " · vyřazený modul nejde koupit; kdo ho má v sestavě, musí ho před bitvou prodat."),
+            ),
           ),
           h(
             "div",
-            { class: "map-side" },
-            h("div", { class: "muted txt" }, "Klikni na startovní bod na okraji mapy. Barva = tým, ostatní vidí, kde kdo startuje. Bez volby dostaneš volný bod při startu.", targetSel ? h("span", {}, " Nastavuji start pro: ", targetSel) : null),
+            { class: "game-side" },
+            h("div", { class: "fsec-h" }, label("Náhled mapy · startovní bod")),
             renderMapPreview(map, room.players, startFor ?? m.playerId, (index) => net.send({ type: "setStart", index, ...(startFor ? { botId: startFor } : {}) })),
+            h("div", { class: "muted txt" }, "Klikni na kroužek na okraji = tvůj start (barva = tým, ostatní vidí, kde kdo startuje). Bez volby dostaneš volný bod."),
+            targetSel ? h("div", { class: "frow" }, h("span", { class: "txt flbl" }, "Start pro"), h("div", { class: "fctl" }, targetSel), h("span")) : null,
+            h("div", { class: "txt muted game-summary" }, summary),
           ),
         ),
       );
     })(),
-    h(
-      "div",
-      { class: "card settings" },
-      h("h3", {}, label("Nastavení bitvy"), isHost ? "" : label(" (mění host)")),
-      h(
-        "label",
-        {},
-        h("span", {}, "Herní mód"),
-        h(
-          "select",
-          { disabled: !isHost, onchange: (e) => set({ mode: (e.target as HTMLSelectElement).value as "tdm" | "dm" }) },
-          h("option", { value: "tdm", selected: settings.mode === "tdm" }, "Týmový deathmatch"),
-          h("option", { value: "dm", selected: settings.mode === "dm" }, "Deathmatch (všichni proti všem)"),
-        ),
-      ),
-      h(
-        "label",
-        {},
-        h("span", {}, "Limit kol"),
-        h(
-          "select",
-          { disabled: !isHost, onchange: (e) => set({ turnLimit: Number((e.target as HTMLSelectElement).value) }) },
-          ...[0, 10, 15, 20, 30, 40].map((n) => h("option", { value: String(n), selected: settings.turnLimit === n }, n === 0 ? "bez limitu" : `${n} kol`)),
-        ),
-      ),
-      h(
-        "label",
-        {},
-        h("span", {}, "Lodí na hráče"),
-        h(
-          "select",
-          { disabled: !isHost, onchange: (e) => set({ shipsPerPlayer: Number((e.target as HTMLSelectElement).value) }) },
-          ...[1, 2, 3, 4].map((n) => h("option", { value: String(n), selected: settings.shipsPerPlayer === n }, String(n))),
-        ),
-      ),
-      h(
-        "label",
-        {},
-        h("span", {}, "Výbava botů"),
-        h(
-          "select",
-          { disabled: !isHost, onchange: (e) => set({ botLoadout: (e.target as HTMLSelectElement).value as "default" | "random" | "manual" }) },
-          h("option", { value: "default", selected: settings.botLoadout === "default" }, "výchozí sestava"),
-          h("option", { value: "random", selected: settings.botLoadout === "random" }, "náhodná"),
-          h("option", { value: "manual", selected: settings.botLoadout === "manual" }, "ruční (naklikám u bota)"),
-        ),
-      ),
-      h("div", { class: "muted txt", style: "margin-top:6px" }, `Startovní kredity každého hráče: ${budget} (mění se v ladění → Ekonomika; výdělky z bitev se přičítají). Povolené moduly na hráče:`),
-      h(
-        "div",
-        { class: "allowed" },
-        ...MODULE_TYPES.map((t) =>
-          h(
-            "label",
-            { title: MODULES[t].description },
-            h("span", { class: "txt" }, icon(MODULES[t].icon, "currentColor", 10), " ", MODULES[t].name),
-            h(
-              "select",
-              {
-                disabled: !isHost,
-                onchange: (e) => {
-                  const v = (e.target as HTMLSelectElement).value;
-                  const next: Partial<Record<ModuleType, number>> = { ...settings.allowedModules };
-                  if (v === "") delete next[t];
-                  else next[t] = Number(v);
-                  set({ allowedModules: next });
-                },
-              },
-              h("option", { value: "", selected: settings.allowedModules[t] === undefined }, "bez limitu"),
-              ...[0, 1, 2, 3, 4].map((n) => h("option", { value: String(n), selected: settings.allowedModules[t] === n }, n === 0 ? "zakázán" : `max ${n}`)),
-            ),
-          ),
-        ),
-      ),
-      h("div", { class: "muted txt", style: "margin-top:6px" }, "Při limitu kol vyhrává tým s největším součtem zbývajícího trupu a štítů."),
-    ),
     (() => {
       const wrap = h("div");
       const toggle = h("button", { onclick: () => ((tuningOpen = !tuningOpen), rerender()) }, icon("target", "currentColor", 12), label(tuningOpen ? "Skrýt ladění" : "Ladění parametrů"));

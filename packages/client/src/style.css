@@ -2661,3 +2661,205 @@ body.touch .lo-refill {
   padding: 1px 3px;
   margin-left: 6px;
 }
+
+/* ---------- místnost: sjednocený panel Nastavení hry ---------- */
+.game-grid {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+  align-items: start;
+}
+.game-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fsec-h {
+  color: #7dd3fc;
+  font-size: 13px;
+  letter-spacing: 1px;
+  border-bottom: 1px solid #1e293b;
+  padding-bottom: 3px;
+  margin-bottom: 4px;
+}
+.frow {
+  display: grid;
+  grid-template-columns: 150px 1fr 18px;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+.flbl {
+  font-size: 15px;
+}
+.fctl {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.fctl > .fsel {
+  width: 100%;
+}
+.fsel {
+  height: 32px;
+  font-size: 15px;
+  padding: 2px 8px;
+}
+.fpair {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}
+.fsub {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.fdice {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 16px;
+}
+.fhint {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #475569;
+  color: #94a3b8;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+}
+/* pixelový přepínač ano / ne */
+.ptoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  color: var(--muted);
+}
+.ptoggle:disabled {
+  cursor: default;
+  opacity: 0.8;
+}
+.ptoggle .pt-sw {
+  width: 38px;
+  height: 18px;
+  border: 2px solid #64748b;
+  background: #1e293b;
+  position: relative;
+  display: inline-block;
+}
+.ptoggle .pt-sw i {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  background: #94a3b8;
+}
+button.ptoggle,
+button.ptoggle.on,
+button.ptoggle:hover,
+button.ptoggle.on:hover:not(:disabled),
+button.ptoggle:focus {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--muted);
+}
+.ptoggle.on .pt-sw {
+  border-color: #86efac;
+  background: #166534;
+}
+.ptoggle.on .pt-sw i {
+  left: auto;
+  right: 1px;
+  background: #bbf7d0;
+}
+.ptoggle .pt-lbl {
+  font-size: 14px;
+}
+/* dlaždice dostupných modulů */
+.mod-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mod-tile {
+  width: 92px;
+  height: 84px;
+  border: 3px solid;
+  border-color: #1e293b #0a0e1c #0a0e1c #1e293b;
+  background: #0a0e1c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  padding: 0 4px;
+  opacity: 0.55;
+  color: #64748b;
+}
+.mod-tile.on {
+  background: #0f172a;
+  opacity: 1;
+  color: #f8fafc;
+}
+.mod-tile:disabled {
+  cursor: default;
+}
+.mod-tile .mt-name {
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.1;
+}
+.mod-tile .mt-chk {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #475569;
+  background: #0a0e1c;
+  color: #bbf7d0;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mod-tile.on .mt-chk {
+  border-color: #86efac;
+  background: #166534;
+}
+.mt-foot {
+  font-size: 13px;
+  margin-top: 6px;
+}
+.mt-foot a {
+  color: #7dd3fc;
+}
+.game-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.game-side .muted.txt {
+  font-size: 14px;
+}
+.game-summary {
+  font-size: 13px;
+  color: #64748b;
+  border-top: 1px solid #1e293b;
+  padding-top: 6px;
+}
+@media (max-width: 1000px) {
+  .game-grid {
+    grid-template-columns: 1fr;
+  }
+}

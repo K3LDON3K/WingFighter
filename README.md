@@ -145,6 +145,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.39 – místnost: jedna karta **Nastavení hry** místo dvou (Mapa + Nastavení bitvy). Jednotná mřížka řádků
+  (popisek | prvek | „?“ s vysvětlivkou), stejně široké selecty, pixelové přepínače ano/ne, související volby na
+  jednom řádku (bouře = počet + velikost, komety + naráží do asteroidů, seed + kostka), sekce Mapa / Bitva /
+  Dostupné moduly, vpravo náhled mapy se startovními body a jednořádkový souhrn hry. Limity „max N na hráče“
+  nahrazeny **dlaždicemi dostupných modulů** (klik = povolit / vyřadit, odkazy všechny / žádný); vyřazený modul
+  nejde koupit a hráč ho musí před bitvou prodat.
 - v3.38 – tlačítka akcí s okénkem (ŠTÍT, NÁKLAD) se chovají jako MANÉVR: okénko zůstává otevřené a při
   klikání na −/+ už neprobliká (okénko se znovu neanimuje), klik kamkoliv vedle okénko zavře a volba platí –
   tlačítko zezelená s proužkem ↺ RESET; další stisk akci zruší. ✕ proužky pod tlačítky odstraněny. Při
