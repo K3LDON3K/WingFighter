@@ -225,6 +225,13 @@ h3,
   text-align: center;
   padding: 16px 0 0;
 }
+.title .logo {
+  display: block;
+  margin: 0 auto;
+  image-rendering: pixelated;
+  max-width: 100%;
+  height: auto;
+}
 .title .sub {
   color: var(--muted);
   font-size: 9px;

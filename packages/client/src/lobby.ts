@@ -1,4 +1,5 @@
 import { applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@spacegame/shared";
+import { logoCanvas } from "./logo.ts";
 import { renderMapPreview } from "./map-preview.ts";
 import { loadoutTag, renderLoadout } from "./loadout-ui.ts";
 import { clear, h } from "./dom.ts";
@@ -33,7 +34,7 @@ export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName:
     h("div", { class: `status ${m.connected ? "ok" : "bad"}` }, m.connected ? "ONLINE" : "OFFLINE..."),
     screen,
   );
-  screen.append(h("div", { class: "center" }, h("div", { class: "title" }, h("h1", {}, "SPACEGAME"), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)));
+  screen.append(h("div", { class: "center" }, h("div", { class: "title" }, logoCanvas(5), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)));
   screen.scrollTop = scrollTop;
   // obnova fokusu nesmí stránku odrolovat
   if (activeId) {

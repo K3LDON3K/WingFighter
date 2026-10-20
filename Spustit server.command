@@ -1,5 +1,5 @@
 #!/bin/bash
-# Poklepáním spustí herní server SpaceGame. Poprvé nainstaluje závislosti a sestaví klienta.
+# Poklepáním spustí herní server Wingfighter. Poprvé nainstaluje závislosti a sestaví klienta.
 cd "$(dirname "$0")"
 
 if ! command -v node >/dev/null 2>&1; then

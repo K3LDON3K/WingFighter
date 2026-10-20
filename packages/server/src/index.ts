@@ -82,7 +82,7 @@ wss.on("connection", (ws) => {
 
 http.listen(PORT, HOST, () => {
   console.log("");
-  console.log("  SpaceGame server běží.");
+  console.log("  Wingfighter server běží.");
   console.log(`  Lokálně:   http://localhost:${PORT}`);
   for (const ip of lanAddresses()) console.log(`  V síti:    http://${ip}:${PORT}`);
   console.log("");

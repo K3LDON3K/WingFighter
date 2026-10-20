@@ -1,4 +1,6 @@
-# SpaceGame – tahová vesmírná střílečka (prototyp v1)
+# Wingfighter – tahová vesmírná střílečka
+
+(Dříve SpaceGame; složka a balíčky `@spacegame/*` zůstávají kvůli kompatibilitě.)
 
 2D tahová multiplayerová hra v prohlížeči. Inspirace: desková hra X-Wing (ciferník manévrů,
 skryté simultánní plánování, kostky) a Space Rangers (vzhled, později inventář lodí).
@@ -143,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.6 – hra se jmenuje **Wingfighter**. Nové pixel art logo na hlavní obrazovce (dvoubarevný nápis s 3D
+  stínem, lasery a stíhač); při načtení stránky stíhač přiletí zleva, nápis se za ním odkrývá a lasery
+  vystřelí, pak je logo statické (`packages/client/src/logo.ts`). Přejmenován titulek stránky, výpis
+  serveru a startovací skript.
 - v3.5.1 – pozorovatel: po zničení všech svých lodí hráč vidí celou mapu (bez mlhy) a sleduje zbytek bitvy;
   v liště má panel POZOROVATEL s tlačítky Tabulka skóre a Opustit hru. Opuštění hry (i z menu) se potvrzuje
   dialogem (upozorní, že opouštíš i navazující bitvy v místnosti). Tabulka skóre kdykoliv přes Tab,
