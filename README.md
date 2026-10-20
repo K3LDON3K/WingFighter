@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.18 – zvuky ve hře: události kola (lasery, kulomet, torpéda, miny, výbuchy, nárazy, štít/trup, úhyb,
+  komety, náklad, zničení lodi) hrají prostorově – čím dál od vlastních lodí, tím tišeji; UI (klik, zapnutí
+  / zrušení akce, chyba, spuštění kola, nové kolo, sken, bouře), lobby (připojení hráče), konec bitvy
+  (výhra / prohra). Hlasitost a ztlumení v Esc menu, klávesa **M** = ztlumit; pamatuje se v prohlížeči.
 - v3.17 – zvukový modul (`packages/client/src/sound.ts`): 27 syntetizovaných 8-bit efektů přes Web Audio
   (bez souborů), hlasitost a ztlumení v prohlížeči. Zatím jen ukázková stránka **/zvuky/** (server umí
   servírovat podsložky s index.html); napojení do hry přijde po odsouhlasení zvuků.

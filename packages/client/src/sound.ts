@@ -224,3 +224,16 @@ export function sfx(name: SfxName, distance = 0) {
     /* ignore */
   }
 }
+
+/** Posluchač pro prostorové ztišení: pozice vlastních lodí a dohled. */
+let listener: (() => { points: { x: number; y: number }[]; radius: number }) | null = null;
+export function setSfxListener(fn: typeof listener) {
+  listener = fn;
+}
+/** Efekt na místě mapy: čím dál od vlastních lodí, tím tišší (za dvojnásobkem dohledu skoro ticho). */
+export function sfxAt(name: SfxName, x: number, y: number) {
+  const l = listener?.();
+  if (!l || l.points.length === 0) return sfx(name);
+  const d = Math.min(...l.points.map((p) => Math.hypot(p.x - x, p.y - y)));
+  sfx(name, Math.max(0, Math.min(1, (d - l.radius * 0.5) / (l.radius * 1.5))));
+}

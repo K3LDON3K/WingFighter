@@ -1819,6 +1819,16 @@ button.px.tiny {
   border-color: #93c5fd #1e3a8a #1e3a8a #93c5fd;
   color: #fff;
 }
+.menu-sound {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  padding: 4px 0;
+}
+.menu-sound input[type="range"] {
+  flex: 1;
+}
 .menu-btn.danger {
   border-color: #fca5a5 #7f1d1d #7f1d1d #fca5a5;
   color: #fca5a5;

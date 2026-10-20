@@ -1,5 +1,6 @@
 import { CARGO, COMET, MODULES, MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
 import { cometToView, mineToView, shipToView, torpedoToView, viewFromState, type ViewModel } from "./view.ts";
+import { sfxAt } from "../sound.ts";
 
 const MOVE_DURATION = 2200;
 const ACTION_DURATION = 450;
@@ -363,6 +364,7 @@ export class TurnAnimation {
 
   private fire(e: TurnEvent, now: number) {
     const v = this.view;
+    this.sound(e);
     switch (e.type) {
       case "collision": {
         const s = v.ships.find((x) => x.id === e.shipId);
@@ -582,6 +584,76 @@ export class TurnAnimation {
         this.pendingMines.push({ at: now + dur, mine: e.mine });
         break;
       }
+    }
+  }
+
+  /** Zvuk k události (prostorově ztišený podle vzdálenosti od vlastních lodí). */
+  private sound(e: TurnEvent) {
+    const v = this.view;
+    const at = (id: string) => v.ships.find((x) => x.id === id);
+    switch (e.type) {
+      case "collision": {
+        const s = at(e.shipId);
+        if (s) sfxAt("collision", s.x, s.y);
+        break;
+      }
+      case "laser":
+        sfxAt("laser", e.from.x, e.from.y);
+        setTimeout(() => sfxAt(e.damage > 0 ? "laserHit" : "laserMiss", e.to.x, e.to.y), 120);
+        break;
+      case "mg":
+        sfxAt("mg", e.from.x, e.from.y);
+        break;
+      case "torpedoShot":
+      case "debrisShot":
+      case "cometShot": {
+        const sh = at(e.shooterId);
+        if (sh) sfxAt("laser", sh.x, sh.y);
+        if (e.destroyed) setTimeout(() => sfxAt("explosion", e.x, e.y), 150);
+        break;
+      }
+      case "spawnTorpedo":
+        sfxAt("torpedoLaunch", e.torpedo.x, e.torpedo.y);
+        break;
+      case "spawnMine":
+        sfxAt("mine", e.mine.x, e.mine.y);
+        break;
+      case "torpedoHit":
+      case "mineBlast":
+        sfxAt("explosion", e.x, e.y);
+        break;
+      case "cometGone":
+        if (e.reason !== "edge") sfxAt("explosion", e.x, e.y);
+        break;
+      case "spawnComet":
+        sfxAt("comet", e.comet.x, e.comet.y);
+        break;
+      case "cometTail":
+        sfxAt("cometTail", e.x, e.y);
+        break;
+      case "destroyed":
+        sfxAt("bigExplosion", e.x, e.y);
+        break;
+      case "damage": {
+        const s = at(e.shipId);
+        if (!s) break;
+        const absorbed = e.absorbed ?? 0;
+        sfxAt(absorbed >= e.amount ? "shieldHit" : "hullHit", s.x, s.y);
+        break;
+      }
+      case "evadePass":
+      case "evadeThrough":
+        sfxAt("evade", e.x, e.y);
+        break;
+      case "pickup":
+        if (e.ok) sfxAt("pickup", e.x, e.y);
+        break;
+      case "action":
+        if (e.ok && e.action.type === "evade") {
+          const s = at(e.shipId);
+          if (s) sfxAt("evade", s.x, s.y);
+        }
+        break;
     }
   }
 

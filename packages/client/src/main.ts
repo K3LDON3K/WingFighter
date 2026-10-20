@@ -24,6 +24,7 @@ import {
   TORPEDO,
   COMET,
   CARGO,
+  inStorm,
   MINE,
   applyTuning,
   computeStats,
@@ -49,6 +50,7 @@ import {
   type TurnResult,
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
+import { getVolume, isMuted, setMuted, setSfxListener, setVolume, sfx, unlockAudio } from "./sound.ts";
 import { icon, label } from "./icons.ts";
 import { renderLoadout } from "./loadout-ui.ts";
 import { actionById } from "./game/actions.ts";
@@ -162,6 +164,7 @@ let noticeTimer: number | undefined;
 
 function showError(msg: string) {
   error = msg;
+  sfx("error");
   render();
   clearTimeout(errorTimer);
   errorTimer = window.setTimeout(() => {
@@ -180,6 +183,7 @@ net.on((msg) => {
       rooms = msg.rooms;
       break;
     case "room":
+      if (room && msg.room && msg.room.code === room.code && msg.room.players.length > room.players.length) sfx("join");
       room = msg.room;
       if (!room || !room.inGame) {
         if (game) leaveGame();
@@ -213,6 +217,7 @@ net.on((msg) => {
       }
       break;
     case "scanResult":
+      sfx("scan");
       if (game) showScanResult(msg.ship);
       break;
     case "turnResult":
@@ -377,6 +382,10 @@ function pumpQueue() {
     game.anim = null;
     game.ready = [];
     resetOrders();
+    if (game.state.status !== "finished") {
+      sfx("turnStart");
+      if (game.state.ships.some((s) => s.alive && s.ownerId === playerId && inStorm(game!.state, s))) setTimeout(() => sfx("storm"), 300);
+    }
     renderSide();
     pumpQueue();
   };
@@ -440,6 +449,7 @@ function submitOrders(force = false) {
   game.confirmOpen = false;
   game.aimingShipId = null;
   game.shieldEdit = false;
+  sfx("launch");
   net.send({ type: "submitOrders", orders: [...game.orders.values()] });
   game.submitted = true;
   game.picking = null;
@@ -846,6 +856,13 @@ function renderMenu() {
         label("Opustit hru – hlavní menu"),
       ),
       h("button", { class: "px menu-btn", onclick: () => showStats() }, icon("log", "currentColor", 12), " ", label("Tabulka skóre"), h("span", { class: "sub" }, "TAB")),
+      h(
+        "div",
+        { class: "menu-sound" },
+        h("span", {}, label("Zvuk")),
+        h("input", { type: "range", min: "0", max: "100", value: String(Math.round(getVolume() * 100)), oninput: (e) => setVolume(Number((e.target as HTMLInputElement).value) / 100), onchange: () => sfx("laser") }),
+        h("label", { class: "txt" }, h("input", { type: "checkbox", checked: isMuted(), onchange: (e) => setMuted((e.target as HTMLInputElement).checked) }), " ztlumit (M)"),
+      ),
       h("div", { class: "muted txt menu-note" }, "Esc během plánování nejdřív ruší rozdělanou akci (kreslení dráhy, výběr cíle), prázdný Esc otevře menu."),
     ),
   );
@@ -880,6 +897,8 @@ function renderHud() {
         color = TEAM_COLORS[r.winnerTeam];
       }
       const isHost = room?.hostId === playerId;
+      const myTeam2 = s.players.find((p) => p.id === playerId)?.team;
+      sfx(r.winnerTeam !== null && r.winnerTeam === myTeam2 ? "win" : "lose");
       overlayEl.append(
         h(
           "div",
@@ -1066,6 +1085,7 @@ function renderSide() {
         const mod = ship?.loadout.modules.find((x) => x.id === moduleId) ?? ship?.loadout.cargo?.find((x) => x.id === moduleId);
         g.orders.set(id, { ...o, action: { type: "jettison", moduleId } });
         g.cargoOpen = false; // potvrzení = okénko se zavře
+        sfx("toggle");
         if (mod) showNotice(`Vyhodí se: ${MODULES[mod.type].name} (na začátku kola)`);
         renderSide();
       },
@@ -1077,6 +1097,7 @@ function renderSide() {
         g.cargoOpen = false;
         g.shieldEdit = false;
         g.jettisonPick = false;
+        sfx("cancel");
         renderSide();
       },
       cargoToggle: (id) => {
@@ -1101,6 +1122,7 @@ function renderSide() {
         if (d > 0 && shieldInHand(ship, o) <= 0) return;
         segs[seg] = next;
         // návrat na původní rozložení = akce se sama vypne (tlačítka zmizí)
+        sfx("click");
         const same = segs.every((v, i) => v === ship.segments[i]);
         g.orders.set(id, same ? { ...o, action: undefined } : { ...o, action: { type: "shield", segments: segs } });
         if (same) g.shieldEdit = false;
@@ -1132,6 +1154,7 @@ function renderSide() {
         const mod = sh && scannerModule(sh.loadout);
         if (!mod) return;
         net.send({ type: "scan", shipId: id, moduleId: mod.id, mode });
+        sfx(mode === "deep" ? "deepScan" : "click");
         game!.scanPick = false;
         renderSide();
       },
@@ -1342,6 +1365,7 @@ function chooseIcon(shipId: string, id: string) {
     return;
   }
   const next = { ...o, ...a.apply(o, ship, g.state) };
+  sfx(a.active(next) ? "toggle" : "cancel");
   g.orders.set(shipId, next);
   g.picking = a.pick && a.active(next) ? a.pick : null;
   g.shieldEdit = a.id === "shield" && next.action?.type === "shield";
@@ -1564,6 +1588,11 @@ function bindInput(c: HTMLCanvasElement) {
       setAskConfirm(game.skipConfirm);
       return;
     }
+    if (e.key === "m" || e.key === "M") {
+      setMuted(!isMuted());
+      showNotice(isMuted() ? "Zvuk ztlumen (M)" : "Zvuk zapnut (M)");
+      return;
+    }
     const id = game.selectedShipId;
     const o = id && game.orders.get(id);
     const cur = o ? parseManeuverId(o.maneuverId) : null;
@@ -1626,6 +1655,21 @@ function render() {
 
 render();
 net.connect();
+// zvuk: odemknout prvním vstupem; obyčejná tlačítka mimo lištu akcí cvaknou
+window.addEventListener("pointerdown", () => unlockAudio(), { once: true });
+window.addEventListener("keydown", () => unlockAudio(), { once: true });
+document.addEventListener("click", (e) => {
+  const b = (e.target as HTMLElement | null)?.closest?.("button");
+  if (!b || b.disabled) return;
+  if (b.closest(".bottombar, .scan-pop, .cargo-pop, .shield-pop, .confirm")) return;
+  sfx("click");
+});
+setSfxListener(() => {
+  if (!game) return { points: [], radius: 960 };
+  const view = game.anim ? game.anim.view : game.view;
+  const mine = game.state.ships.filter((s) => s.alive && s.ownerId === playerId);
+  return { points: mine.map((s) => view.ships.find((v) => v.id === s.id) ?? s).map((s) => ({ x: s.x, y: s.y })), radius: mine[0]?.stats.vision ?? 960 };
+});
 try {
   document.fonts?.load("15px Jersey");
   document.fonts?.load("8px PS2P");
