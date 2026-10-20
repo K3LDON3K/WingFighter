@@ -52,7 +52,7 @@ try {
 function ensure(): AudioContext | null {
   if (typeof window === "undefined" || !("AudioContext" in window)) return null;
   if (!ctx) {
-    ctx = new AudioContext();
+    ctx = new AudioContext({ latencyHint: "interactive" });
     master = ctx.createGain();
     master.gain.value = muted ? 0 : volume;
     master.connect(ctx.destination);
@@ -67,6 +67,13 @@ function ensure(): AudioContext | null {
 /** Zavolej při prvním vstupu uživatele (klik / klávesa), aby prohlížeč zvuk povolil. */
 export function unlockAudio() {
   ensure();
+}
+
+/** Počká, až je audio skutečně rozběhnuté (resume je asynchronní) – nejvýš ~400 ms. */
+export function audioReady(): Promise<void> {
+  const c = ensure();
+  if (!c || c.state === "running") return Promise.resolve();
+  return Promise.race([c.resume().catch(() => undefined), new Promise<void>((r) => setTimeout(r, 400))]);
 }
 
 export function getVolume() {

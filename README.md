@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.19.1 – odezva zvuku: cvaknutí tlačítek hraje už při stisku (ne až po puštění myši), animace loga
+  se zvukem startuje až po rozběhnutí audia (resume je asynchronní – zvuk dřív zaostával za obrazem),
+  audio kontext s nízkou latencí.
 - v3.19 – hudba: dvě vestavěné syntetizované skladby (hlavní menu 84 BPM, bitva 128 BPM) a možnost nahrát
   vlastní mp3 / ogg / wav (ukládají se jen v prohlížeči, IndexedDB). Panel **HUDBA** vlevo nahoře v lobby
   a „Hudba a zvuk“ v Esc menu: přepínač, která skladba hraje v menu, zaškrtávátka pro playlist v bitvě

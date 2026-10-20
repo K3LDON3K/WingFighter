@@ -50,7 +50,7 @@ import {
   type TurnResult,
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
-import { isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
+import { audioReady, isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
 import { loadLibrary, playMode } from "./music.ts";
 import { renderMusicPanel } from "./music-ui.ts";
 import { replayLogo } from "./logo.ts";
@@ -1693,8 +1693,11 @@ const firstGesture = () => {
     playMode("game");
     return;
   }
-  const dur = replayLogo(true);
-  setTimeout(() => playMode(screen === "game" ? "game" : "menu"), dur);
+  // animaci spustit až s rozběhnutým audiem, jinak by zvuk zaostal za obrazem
+  void audioReady().then(() => {
+    const dur = replayLogo(true);
+    setTimeout(() => playMode(screen === "game" ? "game" : "menu"), dur);
+  });
 };
 window.addEventListener("pointerdown", firstGesture, { once: true });
 window.addEventListener("keydown", firstGesture, { once: true });
@@ -1703,12 +1706,15 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && musicOverlay) closeMusicPanel();
   else if ((e.key === "m" || e.key === "M") && !(e.target instanceof HTMLInputElement)) setMuted(!isMuted());
 });
-document.addEventListener("click", (e) => {
+// cvaknutí tlačítka hned při stisku (click přichází až po puštění myši a působí opožděně); klávesnice přes click
+const uiClick = (e: Event) => {
   const b = (e.target as HTMLElement | null)?.closest?.("button");
   if (!b || b.disabled) return;
   if (b.closest(".bottombar, .scan-pop, .cargo-pop, .shield-pop, .confirm")) return;
   sfx("click");
-});
+};
+document.addEventListener("pointerdown", (e) => e.button === 0 && uiClick(e));
+document.addEventListener("click", (e) => e.detail === 0 && uiClick(e));
 setSfxListener(() => {
   if (!game) return { points: [], radius: 960 };
   const view = game.anim ? game.anim.view : game.view;
