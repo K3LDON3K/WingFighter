@@ -441,6 +441,8 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
     man = makeManeuver(profile, speed, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, false, ship.speed);
   }
   if (!man) return false;
+  // bez volných stresových bodů se manévr vůbec nenabízí (dřív šel vybrat a jen se neprovedl)
+  if (stressCost(man.difficulty) > ship.stressPoints) return false;
   if (actionCost(ship, { ...o, maneuverId: man.id }) > RULES.actionPoints) return false;
   if (man.id !== o.maneuverId) {
     game.orders.set(shipId, { ...o, maneuverId: man.id });

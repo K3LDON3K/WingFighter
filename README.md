@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.48 – **Životy modulů v hexagonech** (varianta A): barevná výplň hexu ubývá odshora dolů podle zbývajících
+  životů (plné = jako dřív, nad hladinou tmavý podklad a tenká linka), ve vysvětlivce modulu je „životy X/Y“.
+  Platí v inventáři v bitvě, ve skenu i v obchodě. **Oprava:** manévr, na který nemáš stresové body (otočka, ostré
+  zatáčky), už nejde vůbec vybrat – tlačítko Otočka je zašedlé s důvodem a při kreslení dráhy se neuloží.
 - v3.47 – V otevřené místnosti je **náhled mapy přes celou šířku** panelu (značky a jména se škálují). Startovní bod:
   každý hráč volí jen sobě; host navíc botům – místo seznamu jsou **čipy** (já + boti s ikonkou): klik na bota, klik na
   kroužek v mapě, bot dostane **✓**. Po výběru se volba vrátí na „já“.

@@ -1,5 +1,6 @@
 import {
   moduleBroken,
+  moduleHp,
   type PilotDef,
   type PilotMods,
   moduleSellPrice,
@@ -76,6 +77,36 @@ function hexPoints(b: { x: number; y: number; w: number; h: number }): string {
   const cy = b.y + b.h / 2;
   return [0, 60, 120, 180, 240, 300].map((a) => `${(cx + HEX_R * Math.cos((a * Math.PI) / 180)).toFixed(1)},${(cy + HEX_R * Math.sin((a * Math.PI) / 180)).toFixed(1)}`).join(" ");
 }
+let hpClipSeq = 0;
+/**
+ * Výplň hexu podle životů modulu (varianta A): barva ubývá odshora dolů, nad hladinou zůstává tmavý podklad
+ * a tenká linka hladiny. Plné životy = beze změny.
+ */
+function hpFill(pts: string, box: { y: number; h: number }, col: string, opacity: number, frac: number): SVGElement[] {
+  const poly = svgEl("polygon", { points: pts, fill: col, opacity });
+  if (frac >= 1) return [poly];
+  const id = `hpc${hpClipSeq++}`;
+  const top = box.y + box.h * (1 - frac);
+  const defs = svgEl("defs", {});
+  const clip = svgEl("clipPath", { id });
+  clip.append(svgEl("polygon", { points: pts }));
+  defs.append(clip);
+  poly.setAttribute("clip-path", `url(#${id})`);
+  // oříznutí hladiny: polygon zobrazíme jen pod linkou
+  const band = svgEl("clipPath", { id: `${id}b` });
+  band.append(svgEl("rect", { x: -9999, y: top, width: 99999, height: 99999 }));
+  defs.append(band);
+  const g = svgEl("g", { "clip-path": `url(#${id}b)` });
+  g.append(poly);
+  const line = svgEl("line", { x1: -9999, y1: top, x2: 99999, y2: top, stroke: col, "stroke-width": 1, opacity: 0.7, "clip-path": `url(#${id})` });
+  return [defs, g, line];
+}
+/** Podíl zbývajících životů modulu 0–1. */
+function hpFrac(m: ModuleInstance): number {
+  const max = MODULES[m.type].hp;
+  return max > 0 ? Math.max(0, Math.min(1, moduleHp(m) / max)) : 1;
+}
+
 /** Barva kategorie: zbraně červeně, speciální moduly modře. */
 export function moduleColor(type: ModuleType): string {
   return type === "laser" || type === "torpedo" || type === "mine" || type === "mg" ? "#ef4444" : "#3b82f6";
@@ -138,7 +169,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const broken = moduleBroken(m);
       const col = selected ? "#fb923c" : broken ? "#ef4444" : moduleColor(m.type);
       grp.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
-      grp.append(svgEl("polygon", { points: pts, fill: col, opacity: selected ? 0.3 : broken ? 0.35 : 0.18 }));
+      grp.append(...hpFill(pts, box, col, selected ? 0.3 : broken ? 0.35 : 0.18, broken ? 1 : hpFrac(m)));
       if (broken) grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h - 6, "font-family": "Jersey", "font-size": 10, fill: "#fca5a5", "text-anchor": "middle" }, "ZNIČEN"));
       const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
       const words = def.name.toUpperCase().split(" ");
@@ -192,7 +223,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         });
         grp.append(x);
       }
-      grp.append(svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${selectable ? "\nKlik = vybrat k vyhození" : ""}`));
+      grp.append(svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · životy ${moduleHp(m)}/${def.hp} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${selectable ? "\nKlik = vybrat k vyhození" : ""}`));
       if (selectable) grp.addEventListener("click", () => opts.onSelect!(m.id));
     } else {
       const name = hull.slots.find((x) => x.id === slot)?.name ?? slot;
@@ -236,7 +267,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         const broken = moduleBroken(m);
         const col = selected ? "#fb923c" : broken ? "#ef4444" : moduleColor(m.type);
         csvg.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
-        csvg.append(svgEl("polygon", { points: pts, fill: col, opacity: selected ? 0.3 : broken ? 0.35 : 0.18 }));
+        csvg.append(...hpFill(pts, { y: 2, h: hexH - 4 }, col, selected ? 0.3 : broken ? 0.35 : 0.18, broken ? 1 : hpFrac(m)));
         if (broken) csvg.append(svgEl("text", { x: hexW / 2, y: hexH - 5, "font-family": "Jersey", "font-size": 9, fill: "#fca5a5", "text-anchor": "middle" }, "ZNIČEN"));
         const words = def.name.toUpperCase().split(" ");
         words.forEach((w, k) => csvg.append(svgEl("text", { x: hexW / 2, y: hexH / 2 + 4 - (words.length - 1) * 5 + k * 10, "font-family": "Jersey, ui-monospace, monospace", "font-size": 11, fill: "#f8fafc", "text-anchor": "middle" }, w)));
