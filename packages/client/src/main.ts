@@ -482,7 +482,7 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint" }, "KLIK NA LOD = KRESLIT DRAHU · KLIK = POTVRDIT · KLIK NA NEPRITELE = CIL · TAZENI = POSUN · KOLECKO / +- = ZOOM · C = CENTROVAT"),
+    h("div", { class: "hint" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +− = ZOOM · C = CENTROVAT"),
     sideEl,
     h(
       "div",
@@ -854,7 +854,7 @@ function renderHud() {
     .map((t) => {
       const alive = s.ships.filter((x) => x.team === t && x.alive).length;
       const label = s.settings.mode === "dm" ? (s.players.find((p) => p.team === t)?.name ?? TEAM_NAMES[t]) : TEAM_NAMES[t];
-      return `<span style="color:${TEAM_COLORS[t]}">${label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()}: ${t === myTeam ? alive : `${alive} V DOHLEDU`}</span>`;
+      return `<span style="color:${TEAM_COLORS[t]}">${label.toUpperCase()}: ${t === myTeam ? alive : `${alive} V DOHLEDU`}</span>`;
     })
     .join(" · ");
   const credits = s.players.find((p) => p.id === playerId)?.credits;
@@ -880,7 +880,7 @@ function renderHud() {
           h(
             "div",
             { class: "card" },
-            h("h2", { style: `color:${color}` }, title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()),
+            h("h2", { style: `color:${color}` }, title.toUpperCase()),
             h("div", { class: "muted txt" }, r.reason === "turnLimit" ? "Dosažen limit kol." : "Soupeři zničeni."),
             renderLeaderboard(s),
             h("div", { style: "margin-top:16px" }, isHost ? h("button", { class: "primary", onclick: () => net.send({ type: "backToLobby" }) }, "Zpět do místnosti") : h("span", { class: "muted" }, "Host může vrátit všechny do místnosti.")),
@@ -1585,8 +1585,8 @@ function render() {
 render();
 net.connect();
 try {
-  document.fonts?.load("9px PS2P");
-  document.fonts?.load("15px Pix");
+  document.fonts?.load("15px Jersey");
+  document.fonts?.load("8px PS2P");
 } catch {
   /* ignore */
 }

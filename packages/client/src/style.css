@@ -5,6 +5,15 @@
   font-display: swap;
 }
 @font-face {
+  font-family: "Jersey";
+  src: url("/fonts/jersey-15-latin-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Jersey";
+  src: url("/fonts/jersey-15-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
   font-family: "Pix";
   src: url("/fonts/pixelify-sans-latin-ext-400-normal.woff2") format("woff2");
   unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
@@ -41,10 +50,10 @@
   --red: #f87171;
   --yellow: #fbbf24;
   --pink: #f472b6;
-  --ui: "PS2P", ui-monospace, Menlo, monospace;
-  --txt: "Pix", ui-monospace, Menlo, monospace;
+  --ui: "Jersey", ui-monospace, Menlo, monospace;
+  --txt: "Jersey", ui-monospace, Menlo, monospace;
   font-family: var(--ui);
-  font-size: 9px;
+  font-size: 18px;
   color: var(--text);
   image-rendering: pixelated;
 }
@@ -68,7 +77,7 @@ select,
 .sub-txt,
 p {
   font-family: var(--txt);
-  font-size: 15px;
+  font-size: 18px;
 }
 .muted {
   color: var(--muted);
@@ -117,7 +126,7 @@ p {
 button,
 .px {
   font-family: var(--ui);
-  font-size: 9px;
+  font-size: 18px;
   color: var(--text);
   background: var(--panel-3);
   border: 3px solid;
@@ -181,13 +190,13 @@ h1 {
   text-shadow: 3px 3px #075985;
 }
 h2 {
-  font-size: 12px;
+  font-size: 14px;
   font-family: var(--txt);
   font-size: 20px;
 }
 h3,
 .ttl {
-  font-size: 9px;
+  font-size: 18px;
   color: #7dd3fc;
   letter-spacing: 1px;
 }
@@ -234,14 +243,14 @@ h3,
 }
 .title .sub {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 18px;
   margin-top: 8px;
 }
 .status {
   position: fixed;
   top: 8px;
   right: 12px;
-  font-size: 9px;
+  font-size: 18px;
   color: var(--muted);
 }
 .status.ok::before {
@@ -293,7 +302,7 @@ h3,
   gap: 6px;
   padding: 4px 0;
   font-family: var(--txt);
-  font-size: 15px;
+  font-size: 18px;
 }
 .player .dot {
   width: 8px;
@@ -306,12 +315,12 @@ h3,
 .player .host {
   color: var(--yellow);
   font-family: var(--ui);
-  font-size: 8px;
+  font-size: 17px;
 }
 .player .x {
   margin-left: auto;
   padding: 2px 6px;
-  font-size: 9px;
+  font-size: 18px;
 }
 .settings label {
   display: flex;
@@ -363,11 +372,11 @@ h3,
   border: 3px solid;
   border-color: var(--bevel-l) var(--bevel-d) var(--bevel-d) var(--bevel-l);
   padding: 8px 12px;
-  font-size: 9px;
+  font-size: 18px;
   line-height: 2;
 }
 .hud .big {
-  font-size: 12px;
+  font-size: 14px;
   color: #fff;
 }
 .hint {
@@ -375,7 +384,7 @@ h3,
   bottom: 8px;
   left: 10px;
   color: var(--muted);
-  font-size: 8px;
+  font-size: 17px;
   background: rgba(5, 7, 15, 0.75);
   padding: 4px 8px;
 }
@@ -405,14 +414,14 @@ h3,
   max-height: 260px;
   overflow: auto;
   padding: 4px 10px 8px;
-  font-size: 14px;
+  font-size: 17px;
   color: var(--muted);
   line-height: 1.25;
 }
 .maplog .log .turn {
   color: var(--text);
   font-family: var(--ui);
-  font-size: 9px;
+  font-size: 18px;
   margin: 8px 0 4px;
 }
 .tooltip {
@@ -423,7 +432,7 @@ h3,
   border: 3px solid;
   border-color: var(--bevel-l) var(--bevel-d) var(--bevel-d) var(--bevel-l);
   padding: 8px 10px;
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1.25;
   z-index: 5;
 }
@@ -432,7 +441,7 @@ h3,
   margin-bottom: 4px;
   color: var(--accent);
   font-family: var(--ui);
-  font-size: 9px;
+  font-size: 18px;
   font-weight: 400;
 }
 .tooltip .warn {
@@ -451,7 +460,7 @@ h3,
 }
 .overlay h2 {
   font-family: var(--ui);
-  font-size: 16px;
+  font-size: 19px;
   text-shadow: 3px 3px #000;
 }
 .ship-tabs {
@@ -479,7 +488,7 @@ h3,
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 8px;
+  font-size: 17px;
   margin-top: 6px;
 }
 
@@ -507,7 +516,7 @@ h3,
   justify-content: center;
 }
 .bb-big {
-  font-size: 12px;
+  font-size: 14px;
   color: #fff;
   display: flex;
   align-items: center;
@@ -520,7 +529,7 @@ h3,
   height: 20px;
 }
 .bb-name {
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -552,7 +561,7 @@ h3,
   gap: 4px !important;
 }
 .bb-maneuver .ttl {
-  font-size: 8px;
+  font-size: 17px;
 }
 .man-readout {
   display: flex;
@@ -576,10 +585,10 @@ h3,
 }
 .man-angle {
   color: var(--muted);
-  font-size: 8px;
+  font-size: 17px;
 }
 .man-diff {
-  font-size: 7px;
+  font-size: 14px;
   height: 10px;
 }
 .spacer {
@@ -587,7 +596,7 @@ h3,
 }
 .bb-maneuver button {
   padding: 5px 0;
-  font-size: 5px;
+  font-size: 8px;
   width: 100%;
   display: inline-flex;
   align-items: center;
@@ -596,7 +605,7 @@ h3,
   white-space: nowrap;
 }
 .keycap {
-  font-size: 5px;
+  font-size: 8px;
   color: var(--muted);
   border: 1px solid #475569;
   background: #0b1020;
@@ -639,10 +648,10 @@ h3,
   display: block;
 }
 .man-hint {
-  font-size: 6px;
+  font-size: 10px;
 }
 .bb-acts {
-  font-size: 8px;
+  font-size: 17px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -663,7 +672,7 @@ h3,
   border-right: 0;
 }
 .act-cap {
-  font-size: 6px;
+  font-size: 10px;
   color: var(--muted);
   letter-spacing: 1px;
 }
@@ -679,7 +688,7 @@ h3,
   padding: 4px 0 2px;
 }
 .bb-weapon .lbl {
-  font-size: 7px;
+  font-size: 14px;
 }
 .bb-details {
   display: flex;
@@ -747,7 +756,7 @@ h3,
   position: absolute;
   right: 4px;
   top: 4px;
-  font-size: 8px;
+  font-size: 17px;
   color: #fecaca;
   text-shadow: 1px 1px #450a0a;
   line-height: 1;
@@ -813,14 +822,15 @@ h3,
   background: #ef4444;
 }
 .bb-launch .l1 {
-  font-size: 8px;
+  font-size: 16px;
   margin-top: 4px;
 }
 .bb-launch .l2 {
-  font-size: 11px;
+  font-size: 24px;
+  line-height: 1;
 }
 .bb-launch .sub {
-  font-size: 6px;
+  font-size: 10px;
   opacity: 0.9;
   margin-top: 4px;
 }
@@ -863,7 +873,7 @@ h3,
 .map-zoom button:first-child,
 .map-zoom button:nth-child(2) {
   width: 32px;
-  font-size: 12px;
+  font-size: 14px;
   padding: 4px 0;
 }
 .gear {
@@ -908,7 +918,7 @@ h3,
   border-bottom: 3px solid var(--bevel-d);
 }
 .tune-tabs .tab {
-  font-size: 7px;
+  font-size: 14px;
   padding: 6px 8px;
   border-bottom: 0;
   opacity: 0.7;
@@ -933,7 +943,7 @@ h3,
 }
 .tune-label {
   flex: 1;
-  font-size: 14px;
+  font-size: 17px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -943,7 +953,7 @@ h3,
   text-align: right;
   padding: 5px 6px;
   font-family: var(--ui);
-  font-size: 10px;
+  font-size: 17px;
 }
 .tune-row input.changed {
   border-color: var(--yellow);
@@ -961,7 +971,7 @@ h3,
   border: 3px solid;
   border-color: var(--bevel-l) var(--bevel-d) var(--bevel-d) var(--bevel-l);
   font-family: var(--txt);
-  font-size: 15px;
+  font-size: 18px;
 }
 .toast.ok {
   color: var(--green);
@@ -996,7 +1006,7 @@ h3,
   position: absolute;
   right: 2px;
   bottom: 2px;
-  font-size: 7px;
+  font-size: 14px;
   color: #fb923c;
   background: rgba(0, 0, 0, 0.6);
   padding: 2px 3px;
@@ -1017,7 +1027,7 @@ h3,
 }
 .seg-edit .seg-name {
   width: 58px;
-  font-size: 7px;
+  font-size: 14px;
   color: #94a3b8;
 }
 .seg-edit .num {
@@ -1026,11 +1036,11 @@ h3,
 }
 button.px.tiny {
   padding: 2px 6px;
-  font-size: 9px;
+  font-size: 18px;
   line-height: 1;
 }
 .hand {
-  font-size: 8px;
+  font-size: 17px;
   padding: 3px 6px;
   border: 2px solid #334155;
   color: #94a3b8;
@@ -1060,7 +1070,7 @@ button.px.tiny {
   height: 34px;
   border: 2px dashed #334155;
   color: #475569;
-  font-size: 6px;
+  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1072,7 +1082,7 @@ button.px.tiny {
 }
 .shield-pick button {
   padding: 3px 6px;
-  font-size: 7px;
+  font-size: 14px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -1088,7 +1098,7 @@ button.px.tiny {
   align-items: center;
   gap: 3px;
   margin-left: 6px;
-  font-size: 7px;
+  font-size: 14px;
   color: #60a5fa;
 }
 .bb-launch:disabled {
@@ -1099,7 +1109,7 @@ button.px.tiny {
   white-space: nowrap;
 }
 .odds {
-  font-size: 9px;
+  font-size: 18px;
   padding: 2px 5px;
   border: 2px solid currentColor;
 }
@@ -1124,7 +1134,7 @@ button.px.tiny {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 8px;
+  font-size: 17px;
 }
 .lo-diagram {
   grid-row: 2 / 4;
@@ -1152,7 +1162,7 @@ button.px.tiny {
   gap: 2px;
 }
 .lo-slotname {
-  font-size: 6px;
+  font-size: 10px;
   color: var(--muted);
 }
 .lo-cells {
@@ -1167,7 +1177,7 @@ button.px.tiny {
   align-items: center;
   justify-content: center;
   gap: 1px;
-  font-size: 6px;
+  font-size: 10px;
   border: 2px dashed #334155;
   color: #475569;
   background: transparent;
@@ -1192,13 +1202,13 @@ button.px.tiny {
   position: absolute;
   right: 2px;
   top: 1px;
-  font-size: 6px;
+  font-size: 10px;
   color: #fbbf24;
 }
 .lo-summary {
   display: flex;
   gap: 14px;
-  font-size: 8px;
+  font-size: 17px;
   align-items: center;
 }
 .lo-shop {
@@ -1222,11 +1232,11 @@ button.px.tiny {
   width: 108px;
   min-height: 62px;
   padding: 6px 2px;
-  font-size: 6px;
+  font-size: 10px;
   border-color: var(--mc) var(--bevel-d) var(--bevel-d) var(--mc);
 }
 .lo-buy .lo-buyname {
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.1;
   max-width: 100px;
   text-align: center;
@@ -1245,7 +1255,7 @@ button.px.tiny {
   align-items: center;
   gap: 3px;
   margin-left: 6px;
-  font-size: 7px;
+  font-size: 14px;
   color: #cbd5e1;
 }
 .lo-tagwrap {
@@ -1255,7 +1265,7 @@ button.px.tiny {
 }
 .lo-tagwrap button {
   padding: 3px 6px;
-  font-size: 7px;
+  font-size: 14px;
 }
 .bot-editor {
   margin: 4px 0 8px;
@@ -1273,12 +1283,12 @@ button.px.tiny {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  font-size: 7px;
+  font-size: 14px;
 }
 .hud-cr {
   margin-left: 12px;
   color: #fbbf24;
-  font-size: 10px;
+  font-size: 17px;
 }
 .inventory {
   width: 340px;
@@ -1320,10 +1330,10 @@ button.px.tiny {
   gap: 2px;
 }
 .pilot-cap {
-  font-size: 6px;
+  font-size: 10px;
 }
 .pilot-name {
-  font-size: 8px;
+  font-size: 17px;
   color: #fff;
 }
 .pbubble {
@@ -1336,12 +1346,12 @@ button.px.tiny {
   border-color: #5b6f9c #0a0e1c #0a0e1c #5b6f9c;
   box-shadow: 4px 4px 0 #000;
   color: var(--text);
-  font-size: 8px;
+  font-size: 17px;
   pointer-events: none;
 }
 .pbubble .pb-name {
   color: #fff;
-  font-size: 9px;
+  font-size: 18px;
   margin-bottom: 4px;
 }
 .pbubble .pb-desc {
@@ -1350,7 +1360,7 @@ button.px.tiny {
 }
 .pbubble .pb-cap {
   color: var(--accent);
-  font-size: 7px;
+  font-size: 14px;
   margin-bottom: 3px;
 }
 .pbubble .pb-list {
@@ -1404,7 +1414,7 @@ button.px.tiny {
   align-items: center;
 }
 .pilot-badge.vertical .pilot-name {
-  font-size: 7px;
+  font-size: 14px;
   max-width: 70px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1444,7 +1454,7 @@ button.px.tiny {
   background: rgba(18, 26, 48, 0.98);
 }
 .menu-title {
-  font-size: 14px;
+  font-size: 17px;
   color: #fff;
   text-align: center;
   text-shadow: 3px 3px #000;
@@ -1452,7 +1462,7 @@ button.px.tiny {
 .menu-btn {
   width: 100%;
   padding: 12px 10px;
-  font-size: 9px;
+  font-size: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1460,7 +1470,7 @@ button.px.tiny {
 }
 .menu-btn .sub {
   margin-left: auto;
-  font-size: 7px;
+  font-size: 14px;
   opacity: 0.7;
 }
 .menu-btn.primary {
@@ -1473,7 +1483,7 @@ button.px.tiny {
   color: #fca5a5;
 }
 .menu-note {
-  font-size: 12px;
+  font-size: 14px;
   text-align: center;
 }
 .lo-remove {
@@ -1589,7 +1599,7 @@ button.px.tiny {
   position: absolute;
   top: 3px;
   right: 4px;
-  font-size: 7px;
+  font-size: 14px;
   color: #fbbf24;
 }
 .bb-weapon.on .c {
@@ -1599,7 +1609,7 @@ button.px.tiny {
   color: #94a3b8;
 }
 .scan-slide .sm {
-  font-size: 6px;
+  font-size: 10px;
   height: 16px;
   width: 150px;
   display: inline-flex;
@@ -1654,7 +1664,7 @@ button.px.tiny {
 }
 .lb {
   border-collapse: collapse;
-  font-size: 7px;
+  font-size: 14px;
   width: 100%;
 }
 .lb th {
@@ -1675,7 +1685,7 @@ button.px.tiny {
   font-family: var(--ui);
 }
 .lb td.txt {
-  font-size: 13px;
+  font-size: 16px;
 }
 .lb tr.me td {
   background: rgba(56, 189, 248, 0.08);
@@ -1717,14 +1727,14 @@ button.px.tiny {
 }
 .storm-warn {
   color: #e879f9;
-  font-size: 7px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 .map-settings label > span:first-child {
   font-family: var(--txt);
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .lo-hexbuy {
@@ -1764,7 +1774,7 @@ button.px.tiny {
   position: absolute;
   right: 3px;
   top: 2px;
-  font-size: 9px;
+  font-size: 18px;
   color: #fde047;
   text-shadow: 1px 1px #000;
 }
@@ -1820,7 +1830,7 @@ button.px.tiny {
   z-index: 3;
 }
 .pstat .pcap {
-  font-size: 7px;
+  font-size: 14px;
   color: var(--accent);
   margin-bottom: 4px;
 }
@@ -1828,7 +1838,7 @@ button.px.tiny {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 7px;
+  font-size: 14px;
   height: 15px;
   white-space: nowrap;
   overflow: hidden;
@@ -1845,7 +1855,7 @@ button.px.tiny {
   border-top: 2px solid var(--bevel-d);
   padding-top: 4px;
   font-family: var(--txt);
-  font-size: 10px;
+  font-size: 17px;
   color: var(--muted);
   line-height: 1.3;
 }
@@ -1874,10 +1884,10 @@ button.px.tiny {
 }
 .confirm .ctl {
   color: var(--yellow);
-  font-size: 9px;
+  font-size: 18px;
 }
 .confirm .ctx {
-  font-size: 13px;
+  font-size: 16px;
 }
 .confirm .ctx b {
   color: var(--yellow);
@@ -1899,13 +1909,13 @@ button.px.tiny {
   color: #fff;
 }
 .confirm .k {
-  font-size: 5px;
+  font-size: 8px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   padding: 1px 3px;
 }
 .confirm .cchk {
   font-family: var(--txt);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
   display: flex;
   gap: 6px;
@@ -1923,7 +1933,7 @@ button.px.tiny {
   margin-top: 6px;
 }
 .bb-spectator .k {
-  font-size: 5px;
+  font-size: 8px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   padding: 1px 3px;
   margin-left: 6px;

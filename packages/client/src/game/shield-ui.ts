@@ -44,12 +44,12 @@ function rect(x: number, y: number, w: number, h: number, fill: string, stroke?:
   return r;
 }
 
-function text(x: number, y: number, str: string, color: string, size = 8) {
+function text(x: number, y: number, str: string, color: string, size = 13) {
   const t = document.createElementNS(NS, "text");
   t.setAttribute("x", x.toFixed(1));
   t.setAttribute("y", y.toFixed(1));
   t.setAttribute("text-anchor", "middle");
-  t.setAttribute("font-family", "PS2P, monospace");
+  t.setAttribute("font-family", "Jersey, monospace");
   t.setAttribute("font-size", String(size));
   t.setAttribute("fill", color);
   t.setAttribute("stroke", "#05070f");
@@ -132,7 +132,7 @@ export function shieldBubble(ship: BubbleShip, teamColor: string, planned?: Segm
       r.classList.add("sd", `sd${i % 5}`);
     });
     svg.append(rect(12, 50, 94, 18, "rgba(5,7,15,0.85)", "#a855f7"));
-    svg.append(text(cx, 62, "ŠTÍT VYPNUT ⚡", "#e879f9", 6));
+    svg.append(text(cx, 62, "ŠTÍT VYPNUT ⚡", "#e879f9", 10));
   }
   return svg;
 }

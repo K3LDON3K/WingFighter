@@ -106,7 +106,7 @@ export function drawStormSparks(ctx: CanvasRenderingContext2D, x: number, y: num
   }
   ctx.globalAlpha = 0.8 + 0.2 * Math.sin(now / 120);
   ctx.fillStyle = "#fde047";
-  ctx.font = "10px PS2P, ui-monospace, Menlo, monospace";
+  ctx.font = "17px Jersey, ui-monospace, Menlo, monospace";
   ctx.textAlign = "center";
   ctx.fillText("⚡", x + radius + 12, y - radius - 2);
   ctx.restore();

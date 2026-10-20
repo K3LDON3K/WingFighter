@@ -64,7 +64,7 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
         ctx.stroke();
       }
       ctx.fillStyle = "#e2e8f0";
-      ctx.font = "9px Pix, ui-monospace, monospace";
+      ctx.font = "9px Jersey, ui-monospace, monospace";
       ctx.textAlign = x > width / 2 ? "right" : "left";
       ctx.fillText(p.name, x + (x > width / 2 ? -10 : 10), y + 3);
     } else {

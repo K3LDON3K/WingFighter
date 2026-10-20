@@ -117,11 +117,11 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
       const words = def.name.toUpperCase().split(" ");
       const long = Math.max(...words.map((w) => w.length)) > 8;
-      const fs = long ? 9.5 : 12;
+      const fs = long ? 13 : 16;
       const base = box.y + box.h / 2 + 4 - (words.length - 1) * 6;
-      words.forEach((w, i) => grp.append(svgEl("text", { x: box.x + box.w / 2, y: base + i * 12, "font-family": "Pix, ui-monospace, monospace", "font-size": fs, fill: "#f8fafc", "text-anchor": "middle" }, w)));
-      if (ammo !== undefined) grp.append(svgEl("text", { x: box.x + box.w / 2 + 20, y: box.y + 14, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "middle" }, String(ammo)));
-      if (m.type === "scanner") grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + 14, "font-family": "PS2P", "font-size": 6, fill: (m.cooldown ?? 0) > 0 ? "#f87171" : "#fbbf24", "text-anchor": "middle" }, (m.cooldown ?? 0) > 0 ? `CD ${m.cooldown}` : `${m.charges ?? 0}×`));
+      words.forEach((w, i) => grp.append(svgEl("text", { x: box.x + box.w / 2, y: base + i * 12, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: "#f8fafc", "text-anchor": "middle" }, w)));
+      if (ammo !== undefined) grp.append(svgEl("text", { x: box.x + box.w / 2 + 20, y: box.y + 14, "font-family": "Jersey", "font-size": 12, fill: "#fbbf24", "text-anchor": "middle" }, String(ammo)));
+      if (m.type === "scanner") grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + 14, "font-family": "Jersey", "font-size": 10, fill: (m.cooldown ?? 0) > 0 ? "#f87171" : "#fbbf24", "text-anchor": "middle" }, (m.cooldown ?? 0) > 0 ? `CD ${m.cooldown}` : `${m.charges ?? 0}×`));
       if (hasFacing(m.type)) {
         // šipky natočení: všechny povolené směry (šedé = možnosti, žlutá = zvolený); boční v cípech, ↑↓ uprostřed hran
         for (const f of allowedFacings(m.type, m.slot)) {
@@ -157,7 +157,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     } else {
       const name = hull.slots.find((x) => x.id === slot)?.name ?? slot;
       grp.append(svgEl("polygon", { points: pts, fill: "rgba(5,7,15,0.55)", stroke: "#7dd3fc", "stroke-width": 3, "stroke-dasharray": "6 4" }));
-      grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "Pix, ui-monospace, monospace", "font-size": 11, fill: "#7dd3fc", "text-anchor": "middle" }, name.toUpperCase()));
+      grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "Jersey, ui-monospace, monospace", "font-size": 15, fill: "#7dd3fc", "text-anchor": "middle" }, name.toUpperCase()));
       grp.append(svgEl("title", {}, `${name}: volný malý slot`));
     }
     svg.append(grp);
@@ -166,7 +166,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     const f = SLOT_BOX.front;
     const b = SLOT_BOX.back;
     svg.append(svgEl("rect", { x: f.x - 8, y: f.y - 8, width: f.w + 16, height: b.y + b.h - f.y + 16, fill: "none", stroke: "#fbbf24", "stroke-width": 2, "stroke-dasharray": "3 5" }));
-    svg.append(svgEl("text", { x: f.x + f.w / 2, y: f.y - 14, "font-family": "PS2P", "font-size": 7, fill: "#fbbf24", "text-anchor": "middle" }, "1 VELKY"));
+    svg.append(svgEl("text", { x: f.x + f.w / 2, y: f.y - 14, "font-family": "Jersey", "font-size": 12, fill: "#fbbf24", "text-anchor": "middle" }, "1 VELKY"));
   }
   for (const m of loadout.modules) {
     const occ = occupiedSlots(m);
@@ -235,9 +235,9 @@ function hexBuyButton(t: ModuleType, have: number, why: string | null, onClick: 
   ic.setAttribute("y", "14");
   svg.append(ic);
   const words = def.name.toUpperCase().split(" ");
-  const fs = Math.max(...words.map((w) => w.length)) > 8 ? 9 : 11;
-  words.forEach((w, i) => svg.append(svgEl("text", { x: cx, y: 46 + i * 11, "font-family": "Pix, ui-monospace, monospace", "font-size": fs, fill: why ? "#64748b" : "#f8fafc", "text-anchor": "middle" }, w)));
-  svg.append(svgEl("text", { x: cx, y: 46 + words.length * 11 + 4, "font-family": "PS2P", "font-size": 7, fill: why ? "#64748b" : "#fbbf24", "text-anchor": "middle" }, `${def.price}${have ? ` ×${have}` : ""}`));
+  const fs = Math.max(...words.map((w) => w.length)) > 8 ? 13 : 15;
+  words.forEach((w, i) => svg.append(svgEl("text", { x: cx, y: 46 + i * 11, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: why ? "#64748b" : "#f8fafc", "text-anchor": "middle" }, w)));
+  svg.append(svgEl("text", { x: cx, y: 46 + words.length * 11 + 4, "font-family": "Jersey", "font-size": 12, fill: why ? "#64748b" : "#fbbf24", "text-anchor": "middle" }, `${def.price}${have ? ` ×${have}` : ""}`));
   const btn = h("button", { class: `lo-hexbuy ${why ? "dis" : ""}`, disabled: !!why, title: `${def.name}\n${def.description}\nCena ${def.price} · váha ${def.weight}${def.ammo ? ` + ${def.ammoWeight} × ${def.ammo} munice` : ""}${why ? `\nNelze: ${why}` : ""}`, onclick: onClick }, svg);
   return btn;
 }

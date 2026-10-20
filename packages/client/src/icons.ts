@@ -58,11 +58,9 @@ export function icon(name: string, color = "currentColor", size = 16): SVGSVGEle
 }
 
 /** Popisky v Press Start 2P: font nemá češtinu, odstraníme diakritiku a dáme velká písmena. */
+/** Popisky UI: velká písmena (písmo Jersey má plnou češtinu, háčky zůstávají). */
 export function label(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase();
+  return text.toUpperCase();
 }
 
 /** Segmentový pruh (dílky). */

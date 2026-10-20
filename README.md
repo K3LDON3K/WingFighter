@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.12 – nové písmo **Jersey 15** (pixel art s plnou českou diakritikou, OFL) všude v UI i na mapě; Press
+  Start 2P zůstává jen v logu. Popisky už neodstraňují háčky a čárky.
 - v3.11 – akce: v hlavičce svítí červeně **volné** akce (utracené se odbarví, „1/2 volné“); na tlačítku se
   cenové čtverečky po aktivaci odbarví a objeví se v nich pixel art fajfka; červené pilulky vlevo dole zrušeny.
 - v3.10.3 – cena akce na tlačítkách jako čtverečky: červené = akce (otočka 2), žluté = náboje skeneru.
