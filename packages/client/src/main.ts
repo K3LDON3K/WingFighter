@@ -87,6 +87,7 @@ import { renderLobby } from "./lobby.ts";
 import { renderTuningPanel, showHitboxes, showSelectRing } from "./tuning-panel.ts";
 import { applyTouchClass, isTouchMode } from "./touch.ts";
 import { keepAwake } from "./wakelock.ts";
+import { initTooltips } from "./tooltip.ts";
 
 /** Manévr před začátkem kreslení (dotyk: ✕ ho vrátí). */
 const aimBackup = new Map<string, string>();
@@ -1954,6 +1955,7 @@ function render() {
 }
 
 applyTouchClass();
+initTooltips();
 render();
 net.connect();
 void loadLibrary();

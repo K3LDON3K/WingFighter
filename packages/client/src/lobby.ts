@@ -327,7 +327,22 @@ function roomView(m: LobbyModel, net: Net) {
             { class: "game-form" },
             section(
               "Mapa",
-              frow("Velikost", sel(map.size, Object.entries(MAP_SIZES).map(([k, v]) => [k, v.label]), (v) => setMap({ size: v as MapSettings["size"] }))),
+              frow(
+                "Velikost",
+                h(
+                  "div",
+                  { class: "pips-row" },
+                  ...(Object.keys(MAP_SIZES) as MapSettings["size"][]).map((k, i) => {
+                    const on = map.size === k;
+                    const sz = [10, 14, 18, 22][i] ?? 22;
+                    const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+                    s.append(svgEl("rect", { x: String(13 - sz / 2), y: String(13 - (sz * 2) / 3 / 2), width: String(sz), height: String((sz * 2) / 3), fill: on ? "#1e3a5f" : "none", stroke: on ? "#7dd3fc" : "#334155", "stroke-width": "2" }));
+                    return h("button", { class: `pip size ${on ? "on" : ""}`, disabled: !isHost, title: `${MAP_SIZES[k].label} · ${MAP_SIZES[k].starts} startovních bodů`, onclick: () => setMap({ size: k }) }, s);
+                  }),
+                  h("span", { class: "txt muted pips-txt" }, MAP_SIZES[map.size]?.label ?? map.size),
+                ),
+                "Velikost mapy v herních jednotkách; větší mapa = víc startovních bodů a delší přelety.",
+              ),
               frow(
                 "Asteroidy",
                 pips(3, Math.max(0, AST_LEVELS.indexOf(map.asteroids)), "rock", (k) => rockSvg(true, ROCK_LEVEL[k - 1]), (k) => rockSvg(false, ROCK_LEVEL[k - 1]), (k) => ["málo", "střední", "hodně"][k - 1], (v) => setMap({ asteroids: AST_LEVELS[v] }), ["žádné", "málo", "střední", "hodně"][Math.max(0, AST_LEVELS.indexOf(map.asteroids))]),
@@ -347,7 +362,23 @@ function roomView(m: LobbyModel, net: Net) {
                 "Velikost bouří",
                 h("div", { class: "pips-row" }, ...STORM_SIZES.map((sz, i) => h("button", { class: `pip storm ${map.stormSize === sz ? "on" : ""}`, disabled: !isHost, title: ["malé", "střední", "velké"][i] + " bouře", onclick: () => setMap({ stormSize: sz }) }, stormSvg([4, 7, 10][i])))),
               ),
-              frow("Symetrická", toggle(map.symmetric, (v) => setMap({ symmetric: v })), "Zrcadlená mapa – obě strany mají stejné podmínky."),
+              frow(
+                "Symetrie",
+                h(
+                  "div",
+                  { class: "pips-row" },
+                  ...[false, true].map((sym) => {
+                    const on = map.symmetric === sym;
+                    const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+                    const pts: [number, number, number][] = sym ? [[6, 8, 3], [20, 8, 3], [9, 18, 2.5], [17, 18, 2.5]] : [[6, 7, 3], [18, 10, 2], [10, 19, 2.5], [21, 19, 3.5]];
+                    if (sym) s.append(svgEl("line", { x1: "13", y1: "3", x2: "13", y2: "23", stroke: on ? "#7dd3fc" : "#334155", "stroke-width": "1", "stroke-dasharray": "2 2" }));
+                    for (const [x, y, r] of pts) s.append(svgEl("circle", { cx: String(x), cy: String(y), r: String(r), fill: on ? "#b9ad8a" : "none", stroke: on ? "#7a6f52" : "#334155", "stroke-width": on ? "1" : "2" }));
+                    return h("button", { class: `pip size ${on ? "on" : ""}`, disabled: !isHost, title: sym ? "Zrcadlená mapa – obě strany mají stejné podmínky" : "Náhodná mapa bez zrcadlení", onclick: () => setMap({ symmetric: sym }) }, s);
+                  }),
+                  h("span", { class: "txt muted pips-txt" }, map.symmetric ? "zrcadlená" : "náhodná"),
+                ),
+                "Zrcadlená mapa dá oběma stranám stejné podmínky.",
+              ),
               frow(
                 "Komety",
                 pips(3, Math.max(0, COMET_LEVELS.indexOf(map.comets ?? "none")), "comet", () => cometSvg(true), () => cometSvg(false), (k) => ["málo", "středně", "hodně"][k - 1], (v) => setMap({ comets: COMET_LEVELS[v] }), ["žádné", "málo", "středně", "hodně"][Math.max(0, COMET_LEVELS.indexOf(map.comets ?? "none"))]),

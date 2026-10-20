@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.41 – vysvětlivky v pixel-art stylu: všechny nativní bubliny (atribut title i <title> v SVG) nahrazuje
+  vlastní okénko s bevel rámečkem a písmem hry (první řádek žlutě jako nadpis, „Nelze: …“ červeně); myš =
+  najetí, dotyk = podržení ~0,45 s. Nastavení mapy: i Velikost (čtyři políčka s rostoucím obdélníkem) a
+  Symetrie (náhodná / zrcadlená) jako políčka.
 - v3.40 – nastavení mapy: bouře jako pět políček (kolik svítí, tolik bouří, 0–5; klik na poslední = o jednu
   míň), velikost bouří jako tři políčka jen s velikostí kolečka, komety jako tři políčka s kometou
   (málo / středně / hodně); přepínač „komety naráží do asteroidů“ na vlastním řádku. Asteroidy stejně: tři
