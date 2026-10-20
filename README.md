@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.36 – během bitvy se obrazovka neuspává (Screen Wake Lock API; iPadOS 16.4+, Chrome, Android). Zámek se
+  obnoví po návratu z pozadí a uvolní při odchodu z bitvy. Vyžaduje HTTPS nebo localhost – na vlastní síti
+  přes http:// ho Safari nepovolí (viz poznámka níže).
 - v3.35 – tlačítko MANÉVR po nakreslení dráhy (varianta D2): zezelená, tužka, zaškrtnutý čtvereček ceny a dole proužek „↺ RESET“ (v3.35.1 bez druhé fajfky u tužky);
   stisk manévr resetuje (rovně stejnou rychlostí, akce se uvolní). Na dotyku platí dráha hned po zvednutí
   prstu (bez čipů i bez ✕ proužku); myší se potvrzuje klikem jako dřív. ✕ pod MANÉVR odstraněno.
