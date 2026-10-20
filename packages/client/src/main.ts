@@ -96,6 +96,8 @@ interface GameSession {
   /** Skener: vysunutá tlačítka / výběr cíle skenu lodi. */
   scanOpen: boolean;
   scanPick: boolean;
+  /** Vysunutá nabídka nákladu (vyhodit / zvednout). */
+  cargoOpen: boolean;
   hoverId?: string;
   hoverIcon?: string;
   mouse: { x: number; y: number; sx: number; sy: number } | null;
@@ -263,6 +265,7 @@ function startGame(state: GameState) {
     skipConfirm: !loadAskConfirm(),
     scanOpen: false,
     scanPick: false,
+    cargoOpen: false,
     mouse: null,
     icons: [],
   };
@@ -284,6 +287,7 @@ function resetOrders() {
   game.speedLock.clear();
   game.picking = null;
   game.minePick = null;
+  game.cargoOpen = false;
   const my = game.state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const s of my) game.orders.set(s.id, defaultOrders(s));
   if (!game.selectedShipId || !my.some((s) => s.id === game!.selectedShipId)) game.selectedShipId = my[0]?.id;
@@ -1023,6 +1027,7 @@ function renderSide() {
       inventoryOpen: game.inventoryOpen,
       scanOpen: game.scanOpen,
       scanPick: game.scanPick,
+      cargoOpen: game.cargoOpen,
       askConfirm: !game.skipConfirm,
     },
     {
@@ -1053,6 +1058,11 @@ function renderSide() {
       ready: () => submitOrders(),
       toggleConfirm: () => setAskConfirm(game!.skipConfirm),
       showScore: () => toggleStats(true),
+      cargoToggle: (id) => {
+        game!.selectedShipId = id;
+        game!.cargoOpen = !game!.cargoOpen;
+        renderSide();
+      },
       leave: () => askLeave(),
       unready: () => {
         net.send({ type: "unready" });
@@ -1315,6 +1325,7 @@ function chooseIcon(shipId: string, id: string) {
   g.picking = a.pick && a.active(next) ? a.pick : null;
   g.shieldEdit = a.id === "shield" && next.action?.type === "shield";
   if (a.id === "jettison") g.jettisonPick = false; // výběr modulu probíhá v okénku nad tlačítkem
+  if (a.id === "jettison" || a.id === "pickup") g.cargoOpen = true;
   g.minePick = a.id === "mine" && next.special?.type === "mine" ? "timer" : null;
   renderSide();
 }
@@ -1535,7 +1546,7 @@ function bindInput(c: HTMLCanvasElement) {
     const id = game.selectedShipId;
     const o = id && game.orders.get(id);
     const cur = o ? parseManeuverId(o.maneuverId) : null;
-    if (e.key === "Escape" && (game.submitted || !id || !cur || (!game.shieldEdit && !game.minePick && !game.picking && !game.aimingShipId && !game.jettisonPick && !game.inventoryOpen && !tuningOpen && !game.scanPick))) {
+    if (e.key === "Escape" && (game.submitted || !id || !cur || (!game.shieldEdit && !game.minePick && !game.picking && !game.aimingShipId && !game.jettisonPick && !game.inventoryOpen && !tuningOpen && !game.scanPick && !game.cargoOpen))) {
       toggleMenu(true);
       e.preventDefault();
       return;
@@ -1544,6 +1555,7 @@ function bindInput(c: HTMLCanvasElement) {
     if (!id || !cur) return;
     if (e.key === "Escape") {
       if (game.scanPick) game.scanPick = false;
+      else if (game.cargoOpen) game.cargoOpen = false;
       else if (tuningOpen) tuningOpen = false;
       else if (game.jettisonPick || game.inventoryOpen) {
         game.jettisonPick = false;
