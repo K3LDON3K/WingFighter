@@ -272,6 +272,16 @@ function roomView(m: LobbyModel, net: Net) {
         return s;
       };
       const COMET_LEVELS: MapSettings["comets"][] = ["none", "few", "medium", "many"];
+      const AST_LEVELS: MapSettings["asteroids"][] = ["none", "few", "medium", "many"];
+      /** Kameny: rozptýlené nebo ve shluku (pro políčka asteroidů a shluků). */
+      const rockSvg = (lit: boolean, pts: [number, number, number][]) => {
+        const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+        for (const [x, y, r] of pts) s.append(svgEl("circle", { cx: String(x), cy: String(y), r: String(r), fill: lit ? "#b9ad8a" : "none", stroke: lit ? "#7a6f52" : "#334155", "stroke-width": lit ? "1" : "2", ...(lit ? {} : { "stroke-dasharray": "2 2" }) }));
+        return s;
+      };
+      const ROCKS_SPREAD: [number, number, number][] = [[6, 7, 3], [19, 6, 2.5], [8, 19, 2.5], [20, 18, 3.5], [14, 12, 2]];
+      const ROCKS_CLUSTER: [number, number, number][] = [[11, 12, 3.5], [17, 10, 2.5], [15, 17, 3], [9, 18, 2], [19, 16, 2]];
+      const ROCK_LEVEL: [number, number, number][][] = [[[13, 13, 4]], [[8, 9, 3.5], [18, 17, 4]], [[7, 7, 3], [19, 8, 3.5], [9, 19, 3.5], [19, 19, 2.5], [14, 13, 2]]];
       const STORM_SIZES: MapSettings["stormSize"][] = ["small", "medium", "large"];
       const bots = room.players.filter((p) => p.isBot);
       const targetSel = isHost && bots.length ? h("select", { class: "fsel", style: "width:150px", onchange: (e) => (startFor = (e.target as HTMLSelectElement).value || null) }, h("option", { value: "", selected: !startFor }, "já"), ...bots.map((b) => h("option", { value: b.id, selected: startFor === b.id }, b.name))) : null;
@@ -318,8 +328,16 @@ function roomView(m: LobbyModel, net: Net) {
             section(
               "Mapa",
               frow("Velikost", sel(map.size, Object.entries(MAP_SIZES).map(([k, v]) => [k, v.label]), (v) => setMap({ size: v as MapSettings["size"] }))),
-              frow("Asteroidy", sel(map.asteroids, [["none", "žádné"], ["few", "málo"], ["medium", "střední"], ["many", "hodně"]], (v) => setMap({ asteroids: v as MapSettings["asteroids"] })), "Hustota asteroidů na mapě."),
-              frow("Shluky asteroidů", toggle(map.clusters, (v) => setMap({ clusters: v })), "Asteroidy v hustších shlucích místo rovnoměrného rozptylu."),
+              frow(
+                "Asteroidy",
+                pips(3, Math.max(0, AST_LEVELS.indexOf(map.asteroids)), "rock", (k) => rockSvg(true, ROCK_LEVEL[k - 1]), (k) => rockSvg(false, ROCK_LEVEL[k - 1]), (k) => ["málo", "střední", "hodně"][k - 1], (v) => setMap({ asteroids: AST_LEVELS[v] }), ["žádné", "málo", "střední", "hodně"][Math.max(0, AST_LEVELS.indexOf(map.asteroids))]),
+                "Hustota asteroidů na mapě.",
+              ),
+              frow(
+                "Rozložení",
+                h("div", { class: "pips-row" }, h("button", { class: `pip rock ${!map.clusters ? "on" : ""}`, disabled: !isHost, title: "Rovnoměrně rozptýlené", onclick: () => setMap({ clusters: false }) }, rockSvg(true, ROCKS_SPREAD)), h("button", { class: `pip rock ${map.clusters ? "on" : ""}`, disabled: !isHost, title: "Ve shlucích", onclick: () => setMap({ clusters: true }) }, rockSvg(true, ROCKS_CLUSTER)), h("span", { class: "txt muted pips-txt" }, map.clusters ? "ve shlucích" : "rozptýlené")),
+                "Asteroidy rovnoměrně rozptýlené, nebo v hustších shlucích s volnými koridory.",
+              ),
               frow(
                 "Bouře",
                 pips(5, map.storms, "storm", () => stormSvg(9), () => emptySvg(), (k) => `${k} bouří`, (v) => setMap({ storms: v }), map.storms === 0 ? "žádná" : map.storms === 1 ? "1 bouře" : map.storms < 5 ? `${map.storms} bouře` : "5 bouří"),

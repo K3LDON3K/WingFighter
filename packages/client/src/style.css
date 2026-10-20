@@ -2875,6 +2875,11 @@ button.ptoggle:focus {
   border-color: #67e8f9;
   background: #082f3a;
 }
+.pip.rock.on,
+.pip.rock.on:hover:not(:disabled) {
+  border-color: #d6c89a;
+  background: #2a2412;
+}
 .pip:hover:not(:disabled) {
   background: #111a33;
 }
