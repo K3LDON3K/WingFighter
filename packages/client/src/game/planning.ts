@@ -376,13 +376,22 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           const curId = o.action?.type === "jettison" ? o.action.moduleId : undefined;
           const chosen = ship.loadout.modules.find((x) => x.id === curId) ?? (ship.loadout.cargo ?? []).find((x) => x.id === curId);
           pop.append(
-            h("div", { class: "jp-head" }, icon("debris", "#7dd3fc", 12), label(chosen ? `vyhodit: ${MODULES[chosen.type].name}` : "klikni na modul, který vyhodíš")),
+            chosen
+              ? h("div", { class: "jp-head ok" }, icon("check", "#4ade80", 12), label(`vyhodí se: ${MODULES[chosen.type].name}`), h("span", { class: "muted" }, label("· na začátku kola · jiný modul = klik")))
+              : h("div", { class: "jp-head warn" }, icon("debris", "#fbbf24", 12), label("klikni na modul, který vyhodíš")),
             renderLoadout({ loadout: ship.loadout, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.setOrders(ship.id, { action: { type: "jettison", moduleId: id } }) }),
           );
         } else if (pickOn) {
           const wantId = o.action?.type === "pickup" ? o.action.targetId : undefined;
           const tgt = wantId ? (m.state.debris ?? []).find((d) => d.id === wantId) : undefined;
-          pop.append(h("div", { class: "jp-head" }, icon("cargo", "#a7f3d0", 12), label(tgt ? `zvednout: ${MODULES[tgt.type].name}` : "klikni na trosky v dosahu")), h("div", { class: "muted cargo-note" }, label(`dosah ${CARGO.range} · rychlost ≤ ${CARGO.maxSpeed} · po střelbě, před pohybem`)));
+          const sp = cur.speed;
+          const near = (m.state.debris ?? []).some((d) => dist(ship, d) <= CARGO.range);
+          pop.append(
+            tgt
+              ? h("div", { class: "jp-head ok" }, icon("check", "#4ade80", 12), label(`zvedne se: ${MODULES[tgt.type].name}`), h("span", { class: "muted" }, label(`· ${Math.round(dist(ship, tgt))} / ${CARGO.range}`)))
+              : h("div", { class: "jp-head warn" }, icon("cargo", "#fbbf24", 12), label(near ? "klikni na trosky v dosahu" : "v dosahu nejsou žádné trosky – akce se nevykoná")),
+            h("div", { class: `cargo-note ${sp > CARGO.maxSpeed ? "warn" : "muted"}` }, label(sp > CARGO.maxSpeed ? `rychlost ${sp} > ${CARGO.maxSpeed} – zpomal, jinak se nezvedne` : `dosah ${CARGO.range} · rychlost ${sp} ok · po střelbě, před pohybem`)),
+          );
         } else pop.append(h("div", { class: "muted cargo-note" }, label(`náklad ${(ship.loadout.cargo ?? []).length}/${cargoCapacity(ship.loadout)}`)));
         holder.append(pop);
       }
@@ -501,8 +510,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     details.append(icon("debris", "#94a3b8"));
     if (chosen) {
       const after = { ...ship.loadout, modules: ship.loadout.modules.filter((x) => x.id !== cur), cargo: (ship.loadout.cargo ?? []).filter((x) => x.id !== cur) };
-      details.append(h("span", { class: "txt" }, `vyhodit: ${MODULES[chosen.type].name}`), h("span", { class: "muted" }, label(`· váha ${loadoutWeight(ship.loadout)} → ${loadoutWeight(after)} · max. rychlost ${profileOf(ship.loadout).maxSpeed} → ${profileOf(after).maxSpeed}`)));
-    } else details.append(h("span", { class: "warn" }, label("↑ vyber modul v okénku nad tlačítkem")));
+      details.append(h("span", { class: "odds", style: "color:#4ade80" }, label(`✔ vyhodí se: ${MODULES[chosen.type].name}`)), h("span", { class: "muted" }, label(`· váha ${loadoutWeight(ship.loadout)} → ${loadoutWeight(after)} · max. rychlost ${profileOf(ship.loadout).maxSpeed} → ${profileOf(after).maxSpeed}`)));
+    } else details.append(h("span", { class: "warn" }, label("↑ vyber modul v okénku nad tlačítkem – jinak se nic nevyhodí")));
   } else if (o.action?.type === "pickup") {
     const wantId = o.action.targetId;
     const tgt = wantId ? (m.state.debris ?? []).find((d) => d.id === wantId) : undefined;

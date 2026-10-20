@@ -144,9 +144,7 @@ ACTIONS.push({
     const cap = cargoCapacity(ship.loadout);
     if (cap <= 0) return "loď nemá nákladový prostor";
     if ((ship.loadout.cargo ?? []).length >= cap) return "nákladový prostor je plný";
-    if (!(s.debris ?? []).some((d) => dist(ship, d) <= CARGO.range)) return `v dosahu ${CARGO.range} nejsou žádné trosky`;
-    const sp = parseManeuverId(o.maneuverId)?.speed ?? ship.speed;
-    if (sp > CARGO.maxSpeed && o.action?.type !== "pickup") return `zpomal na rychlost ${CARGO.maxSpeed}`;
+    // dosah a rychlost nejsou blokující – akci jde zapnout (ukáže dosah), jen se nevykoná
     return noAp(ship, o, o.action?.type === "pickup");
   },
   active: (o) => o.action?.type === "pickup",

@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.15.2 – náklad: po výběru modulu zelené potvrzení „✔ vyhodí se: …“ (v okénku i pod akcemi), vybraný hex
+  pulzuje; ZVEDNOUT jde zapnout vždy (ukáže dosah) – když nic není v dosahu nebo je rychlost > 2, zobrazí se
+  žluté varování, že se akce nevykoná.
 - v3.15.1 – spojené tlačítko **NÁKLAD** (Speciální): vysune volby VYHODIT / ZVEDNOUT; vyhození ukáže hexový
   inventář, zvednutí cíl a podmínky. Popisek tlačítka se mění podle zvolené akce.
 - v3.15 – **Nákladový prostor**: stíhač uveze 1 malý modul (ladění, skupina „Náklad“: dosah 120, max. rychlost 2,
