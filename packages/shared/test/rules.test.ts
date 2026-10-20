@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   applyLoadoutTrade,
+  laserTarget,
+  laserOdds,
   ammoRefillCost,
   moduleSellPrice,
   settleLoadoutAfterBattle,
@@ -806,7 +808,7 @@ describe("generovaná mapa a bouře", () => {
 
 describe("kulomet", () => {
   it("dávka 10 projektilů před pohybem, zranění podle zásahů, funguje z bouře i do bouře; segmentový štít pohltí dávku za 1 bod", () => {
-    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, mgHitNear: 100, mgHitFar: 100 } });
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, mgHitNear: 100, mgHitFar: 100, mgRange: 200 } });
     g.asteroids = [];
     const me = g.ships[0];
     me.loadout.modules = [newModule("mg", "front", "mg1")];
@@ -1126,5 +1128,35 @@ describe("obchod s výbavou mezi bitvami", () => {
     const cheat = applyLoadoutTrade(after, { ...after, modules: after.modules.map((m) => ({ ...m, hp: undefined, used: undefined })) });
     expect(cheat.loadout.modules.find((m) => m.id === laser.id)!.hp).toBe(0);
     expect(cheat.cost).toBe(0);
+  });
+});
+
+describe("cíl částečně ve výseči", () => {
+  it("loď s okrajem v dostřelu jde zaměřit, šance se násobí podílem v dosahu; loď celá mimo ne", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g.asteroids = [];
+    const me = g.ships[0];
+    place(g, "ship-p1-0", 500, 500, 0);
+    // střed 10 za hranicí dostřelu (300), ale kolizní kruhy do výseče zasahují
+    place(g, "ship-p2-0", 810, 500, Math.PI);
+    const full = laserOdds({ ...me, x: 500, y: 500 } as typeof me, { ...g.ships[1], x: 700 } as typeof me);
+    const part = laserOdds(me, g.ships[1]);
+    expect(part.coverage).toBeGreaterThan(0);
+    expect(part.coverage).toBeLessThan(1);
+    expect(part.hitChance).toBeLessThan(full.hitChance);
+    expect(laserTarget(g, me)?.id).toBe("ship-p2-0");
+    let fired = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(seed));
+      const ev = r.events.find((e) => e.type === "laser");
+      if (ev && ev.type === "laser") {
+        fired++;
+        expect(ev.coverage).toBeCloseTo(part.coverage, 5);
+      }
+    }
+    expect(fired).toBe(20);
+    // celá mimo → žádný cíl
+    place(g, "ship-p2-0", 900, 500, Math.PI);
+    expect(laserTarget(g, me)).toBeUndefined();
   });
 });

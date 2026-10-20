@@ -39,6 +39,7 @@ import {
   scannerModule,
   SCANNER,
   type Ship,
+  LASER,
   laserArcOf,
   laserOdds,
   mgArcOf,
@@ -732,16 +733,26 @@ function buildOverlay(view: ViewModel): Overlay {
           if (pv) {
             const pct = Math.round(pv.hitChance * 100);
             overlay.targetId = pv.targetId;
-            overlay.laserOdds = { x: pv.x, y: pv.y, text: `${pct} % ×${pv.shots}`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171" };
+            const cov = Math.round(pv.coverage * 100);
+            overlay.laserOdds = { x: pv.x, y: pv.y, text: `${pct} % ×${pv.shots}`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171", sub: pv.coverage < 1 ? `${cov} % v dosahu` : undefined };
+            if (pv.coverage < 1) {
+              const arc = mgArcOf(ship, o.mgModuleId);
+              overlay.partialTarget = { id: pv.targetId, x: ship.x, y: ship.y, heading: arc.heading, range: arc.range, halfArc: arc.halfArc };
+            }
           }
         }
         if (o.fire) {
           const tgt = laserTarget(g.state, ship, o.preferredTargetId, o.laserModuleId);
           if (tgt) {
-            const odds = laserOdds(ship, tgt);
+            const odds = laserOdds(ship, tgt, o.laserModuleId);
             const pct = Math.round(odds.hitChance * 100);
             overlay.targetId = tgt.id;
-            overlay.laserOdds = { x: tgt.x, y: tgt.y, text: `${pct} %`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171" };
+            const cov = Math.round(odds.coverage * 100);
+            overlay.laserOdds = { x: tgt.x, y: tgt.y, text: `${pct} %`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171", sub: odds.coverage < 1 ? `${cov} % v dosahu` : undefined };
+            if (odds.coverage < 1) {
+              const arc = laserArcOf(ship, o.laserModuleId);
+              overlay.partialTarget = { id: tgt.id, x: ship.x, y: ship.y, heading: arc.heading, range: LASER.range, halfArc: arc.halfArc };
+            }
           }
         }
       }

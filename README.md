@@ -145,6 +145,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.49 – **Střelba na cíl částečně ve výseči.** Místo středu lodi se počítá podíl jejích kolizních kruhů uvnitř výseče
+  a dostřelu (0–100 %). Jakmile je uvnitř aspoň kousek, cíl jde zaměřit a střelba proběhne; **šance na zásah se
+  násobí podílem v dosahu** (lasery: každý zásah na kostkách projde jen s touto pravděpodobností; kulomet: šance
+  projektilu × podíl). Úhyb obránce se nemění. U cíle se zobrazí výsledná šance a pod ní „N % v dosahu“, v panelu
+  Lasery totéž; část lodi mimo výseč se v mapě ztlumí. Cíl úplně mimo zaměřit nejde.
 - v3.48 – **Životy modulů v hexagonech** (varianta A): barevná výplň hexu ubývá odshora dolů podle zbývajících
   životů (plné = jako dřív, nad hladinou tmavý podklad a tenká linka), ve vysvětlivce modulu je „životy X/Y“.
   Platí v inventáři v bitvě, ve skenu i v obchodě. **Oprava:** manévr, na který nemáš stresové body (otočka, ostré

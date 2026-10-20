@@ -67,7 +67,9 @@ export interface Overlay {
   targetId?: string;
   targetPoint?: { x: number; y: number };
   /** Šance laserů na zásah u cíle. */
-  laserOdds?: { x: number; y: number; text: string; color: string };
+  laserOdds?: { x: number; y: number; text: string; color: string; sub?: string };
+  /** Cíl jen částečně ve výseči: část lodi mimo výseč se ztlumí. */
+  partialTarget?: { id: string; x: number; y: number; heading: number; range: number; halfArc: number };
   /** Právě se vybírá cíl kliknutím. */
   picking?: "torpedo" | "lock";
   myTeam?: number;
@@ -182,6 +184,14 @@ export class Renderer {
       ctx.strokeRect(lo.x - w / 2, lo.y + 22, w, 14);
       ctx.fillStyle = lo.color;
       ctx.fillText(lo.text, lo.x, lo.y + 32);
+      if (lo.sub) {
+        ctx.font = "11px Jersey, ui-monospace, Menlo, monospace";
+        const w2 = ctx.measureText(lo.sub).width + 8;
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(lo.x - w2 / 2, lo.y + 37, w2, 12);
+        ctx.fillStyle = "#cbd5e1";
+        ctx.fillText(lo.sub, lo.x, lo.y + 46);
+      }
       ctx.restore();
     }
     if (overlay.vision) this.drawFog(overlay.vision, cam);
@@ -612,6 +622,21 @@ export class Renderer {
       }
       ctx.restore();
     } else drawSprite(ctx, this.sprites.fighter(color), s.x, s.y, s.heading);
+    const pt = overlay.partialTarget;
+    if (pt && pt.id === s.id) {
+      // část cíle mimo výseč laseru/kulometu ztlumíme (evenodd: čtverec kolem lodi minus výseč)
+      const R = s.radius + 10;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(s.x - R, s.y - R, 2 * R, 2 * R);
+      ctx.moveTo(pt.x, pt.y);
+      ctx.arc(pt.x, pt.y, pt.range, pt.heading - pt.halfArc, pt.heading + pt.halfArc);
+      ctx.closePath();
+      ctx.clip("evenodd");
+      ctx.fillStyle = "rgba(5,7,15,0.65)";
+      ctx.fillRect(s.x - R, s.y - R, 2 * R, 2 * R);
+      ctx.restore();
+    }
     // vybraná vlastní loď: pulzující bílý překryv siluety (varianta A)
     if (selected && s.alive) drawSprite(ctx, this.sprites.fighterSilhouette(), s.x, s.y, s.heading, 0.3 + 0.2 * Math.sin(now / 260));
     if (this.stormsRef && pointInStorm(this.stormsRef, s)) drawStormSparks(ctx, s.x, s.y, s.radius, now);

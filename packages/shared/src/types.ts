@@ -435,6 +435,8 @@ export type TurnEvent =
       evades: number;
       damage: number;
       rangeBand: number;
+      /** Podíl cíle ve výseči (0–1), 1 = celý. */
+      coverage?: number;
     }
   /** Dávka kulometu: počet projektilů, zásahy, celkové zranění; úhly rozptylu pro animaci (rad, relativně ke směru na cíl). */
   | { type: "mg"; shooterId: string; targetId: string; from: Pose; to: Pose; shots: number; hits: number; damage: number; spread: number[]; destroyed?: boolean }

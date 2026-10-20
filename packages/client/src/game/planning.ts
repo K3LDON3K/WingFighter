@@ -595,14 +595,16 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     const target = debrisTarget || cometTarget ? undefined : laserTarget(m.state, ship, o.preferredTargetId, o.laserModuleId);
     details.append(icon("target", target ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, tname ?? (target ? `nejbližší: ${target.name}` : "nikdo ve výseči")));
     if (target) {
-      const odds = laserOdds(ship, target);
+      const odds = laserOdds(ship, target, o.laserModuleId);
       const pct = Math.round(odds.hitChance * 100);
+      const cov = Math.round(odds.coverage * 100);
       details.append(
         h(
           "span",
-          { class: "odds", style: `color:${pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171"}`, title: `Šance aspoň na jeden čistý zásah (zásahy − úhyby) ze současných pozic, pásmo ${odds.rangeBand}${odds.rangeBand === 1 ? " (+1 kostka útoku)" : odds.rangeBand === 3 ? " (+1 kostka obrany)" : ""}. Očekávané zranění ≈ ${Math.round(odds.expectedDamage)}.` },
+          { class: "odds", style: `color:${pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171"}`, title: `Šance aspoň na jeden čistý zásah (zásahy − úhyby) ze současných pozic, pásmo ${odds.rangeBand}${odds.rangeBand === 1 ? " (+1 kostka útoku)" : odds.rangeBand === 3 ? " (+1 kostka obrany)" : ""}.${odds.coverage < 1 ? ` Cíl je ve výseči jen z ${cov} % – šance je tím vynásobená.` : ""} Očekávané zranění ≈ ${Math.round(odds.expectedDamage)}.` },
           label(`zásah ${pct} %`),
         ),
+        ...(odds.coverage < 1 ? [h("span", { class: "muted" }, label(`· ${cov} % v dosahu`))] : []),
         h("span", { class: "muted" }, label(`· průměr ${Math.round(odds.expectedDamage)} zranění`)),
       );
     } else if (o.preferredTargetId && !debrisTarget && !cometTarget) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
