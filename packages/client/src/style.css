@@ -495,7 +495,7 @@ h3,
 /* ---- spodní lišta (pevné rozměry) ---- */
 .bottombar {
   display: grid;
-  grid-template-columns: 290px 1fr 84px 84px 96px;
+  grid-template-columns: 250px 170px 1fr 84px 84px 96px;
   gap: 6px;
   height: 172px;
   padding: 6px;
@@ -989,14 +989,133 @@ h3,
 }
 .bubble-box {
   position: relative;
+  flex: none;
+}
+.shield-box {
+  position: relative;
   width: 118px;
   height: 118px;
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.shield-box.editing {
+  width: 132px;
+  height: auto;
+  flex-direction: column;
+  gap: 1px;
   margin-top: -6px;
 }
-.bubble-box.editing {
-  outline: 2px dashed #fb923c;
-  outline-offset: -2px;
+.shield-box .spair {
+  display: flex;
+  gap: 2px;
+}
+.shield-box .smid {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.shield-box .spair.left,
+.shield-box .spair.right {
+  flex-direction: column;
+}
+.sbtn {
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  justify-content: center;
+}
+.sbtn .minus {
+  display: block;
+  width: 7px;
+  height: 2px;
+  background: currentColor;
+}
+.hand-slots {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+}
+.hand-slots i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid #1e3a5f;
+  background: #0b1020;
+  display: block;
+}
+.hand-slots i.on {
+  background: #3b82f6;
+  border-color: #60a5fa;
+}
+/* svislé ukazatele trupu a stresu */
+.gauges {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  height: 96px;
+}
+.vgauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.vbar {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1px;
+  height: 70px;
+  justify-content: flex-start;
+}
+.vbar i {
+  width: 12px;
+  flex: 1;
+  border: 1px solid #0a0e1c;
+  display: block;
+}
+.vname {
+  font-size: 10px;
+  color: var(--text);
+}
+.vnum {
+  font-size: 12px;
+}
+/* výzbroj */
+.bb-ammo {
+  gap: 4px !important;
+}
+.ammo-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  white-space: nowrap;
+}
+.ammo-name {
+  width: 56px;
+  font-size: 12px;
+  flex: none;
+}
+.ammo-icons {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+.ammo-num {
+  margin-left: auto;
+  font-size: 12px;
+}
+.mgpip {
+  width: 4px;
+  height: 9px;
+  background: #334155;
+  display: block;
+}
+.mgpip.on {
+  background: #f87171;
 }
 .bubble {
   display: block;

@@ -482,7 +482,7 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +− = ZOOM · C = CENTROVAT"),
+    h("div", { class: "hint" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = CENTROVAT"),
     sideEl,
     h(
       "div",
@@ -1066,7 +1066,10 @@ function renderSide() {
         if (next < 0 || next > RULES.segmentMax) return;
         if (d > 0 && shieldInHand(ship, o) <= 0) return;
         segs[seg] = next;
-        g.orders.set(id, { ...o, action: { type: "shield", segments: segs } });
+        // návrat na původní rozložení = akce se sama vypne (tlačítka zmizí)
+        const same = segs.every((v, i) => v === ship.segments[i]);
+        g.orders.set(id, same ? { ...o, action: undefined } : { ...o, action: { type: "shield", segments: segs } });
+        if (same) g.shieldEdit = false;
         renderSide();
       },
       shieldConfirm: (id) => {

@@ -145,6 +145,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.13 – nový panel lodi: bublina štítu + svislé ukazatele trupu a stresu; „1/1“ se při jedné lodi nezobrazuje.
+  **Úprava štítu**: po zapnutí akce ŠTÍT se u segmentů objeví −/+ (příď a záď: − vlevo / + vpravo; boky: + nahoře
+  / − dole), každá změna platí hned (bez potvrzení), odebrané body svítí v 8 modrých slotech pod bublinou;
+  návrat na původní rozložení akci sám vypne. Nový panel **VÝZBROJ**: řádek za každý modul s municí
+  (TORP 1 ↑, TORP 2 ←, MINY ↓, KULOMET →), ikonky munice – vystřelené šedé, kulomet po 10 nábojích.
 - v3.12 – nové písmo **Jersey 15** (pixel art s plnou českou diakritikou, OFL) všude v UI i na mapě; Press
   Start 2P zůstává jen v logu. Popisky už neodstraňují háčky a čárky.
 - v3.11 – akce: v hlavičce svítí červeně **volné** akce (utracené se odbarví, „1/2 volné“); na tlačítku se
