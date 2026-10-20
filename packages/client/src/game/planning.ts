@@ -111,6 +111,13 @@ function angleGlyph(angle: number, koiogran: boolean): string {
 }
 
 /** Spodní lišta: stav lodi, manévr, zbraně, spuštění kola. Pevné rozměry – text nemění velikost UI. */
+/** Cena akce vpravo nahoře na tlačítku: červené čtverečky = akce, žluté = náboje skeneru. */
+function costPips(n: number, color: "red" | "yellow", title: string): HTMLElement {
+  const el = h("span", { class: `cost-pips ${color}`, title });
+  for (let i = 0; i < n; i++) el.append(h("i"));
+  return el;
+}
+
 export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks) {
   clear(root);
   const my = m.state.ships.filter((s) => s.alive && s.ownerId === m.myId);
@@ -269,7 +276,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
             title: `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`,
             onclick: () => (isMove ? cb.aim(ship.id) : cb.chooseAction(ship.id, a.id)),
           },
-          h("span", { class: "c", title: a.id === "koiogran" ? "stojí 2 akce" : a.id === "move" ? "stojí 1 akci (rovně stejnou rychlostí zdarma)" : "stojí 1 akci" }, a.id === "koiogran" ? "2" : "1"),
+          costPips(a.id === "koiogran" ? 2 : 1, "red", a.id === "koiogran" ? "stojí 2 akce" : a.id === "move" ? "stojí 1 akci (rovně stejnou rychlostí zdarma)" : "stojí 1 akci"),
           icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit"))),
           dotEl,
@@ -305,14 +312,14 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         if (m.scanOpen && cd === 0 && !stormed) {
           // tři tlačítka vyjedou nad tlačítko skeneru (přes okraj lišty), stejně velká jako ono
           const forceLen = Math.max(1, SCANNER.cooldown - charges);
-          const cost = (t: string) => h("span", { class: "c" }, t);
+          const cost = (n: number) => costPips(n, "yellow", `${n} ${n === 1 ? "náboj" : "náboje"} skeneru (nebere akci)`);
           holder.append(
             h(
               "div",
               { class: "scan-pop" },
-              h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || charges < 1, title: `Sken lodi (1 náboj): klikni na cizí loď v dohledu do ${SCANNER.range}. Proběhne hned, nebere akci.`, onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost("1")),
-              h("button", { class: "px bb-weapon sm", disabled: locked || charges < 2, title: `Hluboký sken (2 náboje): hned odkryje mapu do ${SCANNER.deepRange} celému týmu do konce kola, pak cooldown ${SCANNER.cooldown} kola.`, onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost("2")),
-              h("button", { class: "px bb-weapon sm force", disabled: locked || charges >= SCANNER.charges, title: charges >= SCANNER.charges ? "Jde jen bez plné zásoby nábojů" : `Vynutit cooldown: ${SCANNER.cooldown} − ${charges} = ${forceLen} kola, pak plné náboje`, onclick: () => cb.scan(ship.id, "cooldown") }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Cooldown")), cost(`${forceLen}K`)),
+              h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || charges < 1, title: `Sken lodi (1 náboj): klikni na cizí loď v dohledu do ${SCANNER.range}. Proběhne hned, nebere akci.`, onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(1)),
+              h("button", { class: "px bb-weapon sm", disabled: locked || charges < 2, title: `Hluboký sken (2 náboje): hned odkryje mapu do ${SCANNER.deepRange} celému týmu do konce kola, pak cooldown ${SCANNER.cooldown} kola.`, onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(2)),
+              h("button", { class: "px bb-weapon sm force", disabled: locked || charges >= SCANNER.charges, title: charges >= SCANNER.charges ? "Jde jen bez plné zásoby nábojů" : `Vynutit cooldown: ${SCANNER.cooldown} − ${charges} = ${forceLen} kola, pak plné náboje`, onclick: () => cb.scan(ship.id, "cooldown") }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Cooldown")), h("span", { class: "c" }, `${forceLen}K`)),
             ),
           );
         }

@@ -145,6 +145,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.10.3 – cena akce na tlačítkách jako čtverečky: červené = akce (otočka 2), žluté = náboje skeneru.
 - v3.10.1 – každé tlačítko akce má vpravo nahoře žlutou cenu v akcích (1, otočka 2); tlačítko skeneru ukazuje
   jen náboje (2 políčka), při cooldownu 3 políčka s odpočtem.
 - v3.10 – akce: nové tlačítko **MANÉVR** (první v Pohybu) nahrazuje NAKRESLIT – klik začne kreslit dráhu,

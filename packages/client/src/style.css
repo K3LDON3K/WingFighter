@@ -1553,6 +1553,30 @@ button.px.tiny {
 .scan-pop .bb-weapon.on {
   background: var(--accent);
 }
+.cost-pips {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: inline-flex;
+  gap: 2px;
+}
+.cost-pips i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid #0a0e1c;
+  display: block;
+}
+.cost-pips.red i {
+  background: #ef4444;
+  border-color: #7f1d1d;
+}
+.cost-pips.yellow i {
+  background: #fbbf24;
+  border-color: #92400e;
+}
+.bb-weapon:disabled .cost-pips i {
+  filter: grayscale(0.6);
+}
 .bb-weapon .c {
   position: absolute;
   top: 3px;
