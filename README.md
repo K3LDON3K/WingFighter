@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.7.2 – úhybný manévr proletí i asteroidem a kometou bez srážky (vlnka + řádek v logu); loď ale nesmí
+  v tělese skončit – konec dráhy v asteroidu nebo v kometě = normální srážka s dvojitým zraněním.
 - v3.7.1 – oprava: server zahazoval kometu jako cíl laserů/kulometu (střelba na kometu neproběhla). V panelu
   laserů se u komety/trosek zobrazuje „v dosahu“ nebo důvod, proč loď nevystřelí (mimo dostřel, mimo výseč,
   asteroid v cestě, bouře).

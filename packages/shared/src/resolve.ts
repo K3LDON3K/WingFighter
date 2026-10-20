@@ -986,6 +986,15 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
           for (const a of state.asteroids) {
             if (removedAsteroids.has(a.id)) continue;
             const ov = circleHitsAsteroid(a, p, r);
+            // úhybný manévr: asteroidem proletí (kromě posledního vzorku – nesmí v něm skončit, jinak dvojité zranění)
+            if (ov && k < MOVE_STEPS && evading.has(ship.id)) {
+              const key = `${ship.id}:${a.id}`;
+              if (!passedThrough.has(key)) {
+                passedThrough.add(key);
+                events.push({ type: "evadeThrough", shipId: ship.id, with: "asteroid", otherId: a.id, t, x: p.x, y: p.y });
+              }
+              continue;
+            }
             if (ov && !stillTouching(ship.id, a.id, true)) {
               hit = { with: "asteroid", otherId: a.id, heading: normalizeAngle(Math.atan2(p.y - a.y, p.x - a.x) + scatter()) };
               break;
@@ -1042,7 +1051,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               : hit.with === "asteroid"
                 ? state.asteroids.find((a) => a.id === hit!.otherId)!
                 : { x: p.x < r ? p.x - 10 : p.x > state.width - r ? p.x + 10 : p.x, y: p.y < r ? p.y - 10 : p.y > state.height - r ? p.y + 10 : p.y };
-          applyDamage(ship, hit.with === "ship" ? RULES.collisionShip : hit.with === "asteroid" ? RULES.collisionAsteroid : RULES.collisionEdge, events, src);
+          const dbl = hit.with === "asteroid" && evading.has(ship.id) ? 2 : 1; // úhyb skončil v asteroidu
+          applyDamage(ship, hit.with === "ship" ? RULES.collisionShip : hit.with === "asteroid" ? RULES.collisionAsteroid * dbl : RULES.collisionEdge, events, src);
           if (!ship.alive) m.frozenAt = k - 1;
           changed = true;
         }
@@ -1061,13 +1071,21 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
         const sm = shipMovers.get(s.id)!;
         const sp = posAt(sm, k);
         if (!circlesOverlap(cp, c.radius, sp, s.stats.radius)) continue;
+        if (k < MOVE_STEPS && evading.has(s.id)) {
+          const key = `${s.id}:${c.id}`;
+          if (!passedThrough.has(key)) {
+            passedThrough.add(key);
+            events.push({ type: "evadeThrough", shipId: s.id, with: "comet", otherId: c.id, t: k / MOVE_STEPS, x: sp.x, y: sp.y });
+          }
+          continue;
+        }
         const away = Math.atan2(sp.y - cp.y, sp.x - cp.x);
         if (sm.frozenAt === null) {
           const h = normalizeAngle(away + scatter());
           deflect(sm, k, h);
           events.push({ type: "collision", shipId: s.id, with: "comet", otherId: c.id, t: k / MOVE_STEPS, newHeading: h });
         }
-        const dmg = scaleEvade(s, COMET.damage);
+        const dmg = evading.has(s.id) ? COMET.damage * 2 : COMET.damage; // úhyb skončil v kometě = dvojité zranění
         endComet(c, k, "ship", s.id, dmg);
         applyDamage(s, dmg, events, cp);
         if (!s.alive) sm.frozenAt = k - 1;

@@ -943,3 +943,36 @@ describe("komety", () => {
     expect(r.state.ships[0].stressPoints).toBe(3);
   });
 });
+
+describe("úhyb skrz asteroid a kometu", () => {
+  it("úhybný manévr proletí asteroidem i kometou; konec v asteroidu = dvojité zranění", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    // asteroid uprostřed dráhy (rychlost 3 rovně = 3 × MOVE_UNIT), loď skončí za ním
+    g.asteroids = [ast("a1", 500 + MOVE_UNIT * 1.5, 500, 30)];
+    const orders = (): ShipOrders[] => [{ shipId: me.id, maneuverId: "m3a0", fire: false, action: { type: "evade" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }];
+    let r = resolveTurn(g, orders(), createRng(1));
+    expect(r.events.some((e) => e.type === "evadeThrough" && e.with === "asteroid")).toBe(true);
+    expect(r.events.some((e) => e.type === "collision" && e.shipId === me.id)).toBe(false);
+    expect(r.state.ships[0].x).toBeGreaterThan(500 + MOVE_UNIT * 2.5);
+    // bez úhybu by narazila
+    r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m3a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.events.some((e) => e.type === "collision" && e.with === "asteroid")).toBe(true);
+    // konec dráhy v asteroidu → srážka s dvojitým zraněním
+    const g2 = game();
+    const me2 = place(g2, "ship-p1-0", 500, 500, 0);
+    place(g2, "ship-p2-0", 1500, 1200, 0);
+    g2.asteroids = [ast("a1", 500 + MOVE_UNIT * 3, 500, 40)];
+    r = resolveTurn(g2, [{ shipId: me2.id, maneuverId: "m3a0", fire: false, action: { type: "evade" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.events.some((e) => e.type === "damage" && e.shipId === me2.id && e.amount === DEFAULT_TUNING.collisionAsteroid * 2)).toBe(true);
+    // kometa: úhyb proletí (kometa letí proti lodi)
+    const g3 = game();
+    const me3 = place(g3, "ship-p1-0", 500, 500, 0);
+    place(g3, "ship-p2-0", 1500, 1200, 0);
+    g3.comets = [{ id: "c1", x: 640, y: 500, heading: Math.PI, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: COMET.radius, tailUsed: [] }];
+    r = resolveTurn(g3, [{ shipId: me3.id, maneuverId: "m3a0", fire: false, action: { type: "evade" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.events.some((e) => e.type === "evadeThrough" && e.with === "comet")).toBe(true);
+    expect(r.events.some((e) => e.type === "cometGone" && e.reason === "ship")).toBe(false);
+  });
+});

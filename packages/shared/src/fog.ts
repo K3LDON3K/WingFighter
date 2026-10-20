@@ -157,6 +157,9 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
       case "evadePass":
         if (visibleShip.has(e.shipId) || visibleShip.has(e.victimId)) events.push(e);
         break;
+      case "evadeThrough":
+        if (visibleShip.has(e.shipId)) events.push(e);
+        break;
       case "jettison":
         if (visibleShip.has(e.shipId)) events.push(e);
         break;

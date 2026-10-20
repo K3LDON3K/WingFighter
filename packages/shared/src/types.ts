@@ -395,7 +395,9 @@ export type TurnEvent =
   | { type: "destroyed"; shipId: string; x: number; y: number }
   | { type: "stress"; shipId: string; stressPoints: number; delta: number }
   /** Úhybný manévr: loď proletěla skrz nepřátelskou loď (t = podíl dráhy, x/y = místo průletu). */
-  | { type: "evadePass"; shipId: string; victimId: string; t: number; x: number; y: number };
+  | { type: "evadePass"; shipId: string; victimId: string; t: number; x: number; y: number }
+  /** Úhybný manévr: průlet skrz asteroid / kometu (bez srážky). */
+  | { type: "evadeThrough"; shipId: string; with: "asteroid" | "comet"; otherId: string; t: number; x: number; y: number };
 
 export interface MovePath {
   id: string;

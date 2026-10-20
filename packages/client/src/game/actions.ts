@@ -73,7 +73,7 @@ export const ACTIONS: ActionOption[] = [
     id: "evade",
     glyph: "⤭",
     label: "Úhybný manévr (1 akce)",
-    description: `Během pohybu proletíš skrz nepřátelské lodě bez srážky (každá z nich ztratí ${RULES.evadePassStress} stresový bod); nesmíš ale skončit v dotyku s nepřítelem – jinak normální srážka. Zranění minou i torpédem je v tomto kole nižší o ${RULES.evadeDamageReduction} %. Stojí ${RULES.evadeStressCost} stresový bod.`,
+    description: `Během pohybu proletíš skrz nepřátelské lodě (každá z nich ztratí ${RULES.evadePassStress} stresový bod), asteroidy i komety bez srážky; nesmíš ale v nich skončit – v nepříteli = normální srážka, v asteroidu nebo kometě = dvojité zranění. Zranění minou i torpédem je v tomto kole nižší o ${RULES.evadeDamageReduction} %. Stojí ${RULES.evadeStressCost} stresový bod.`,
     disabled: (ship, _s, o) => (ship.stressPoints < RULES.evadeStressCost ? "chybí stresový bod" : noAp(ship, o, o.action?.type === "evade")),
     active: (o) => o.action?.type === "evade",
     apply: (o) => ({ action: o.action?.type === "evade" ? undefined : { type: "evade" } }),

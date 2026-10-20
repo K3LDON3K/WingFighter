@@ -79,6 +79,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "evadePass":
         lines.push(`  ${name(e.shipId)} proletěl skrz ${name(e.victimId)}.`);
         break;
+      case "evadeThrough":
+        lines.push(`  ${name(e.shipId)} úhybem proletěl skrz ${e.with === "asteroid" ? "asteroid" : "kometu"}.`);
+        break;
       case "mg":
         lines.push(`${name(e.shooterId)} kulomet → ${name(e.targetId)}: ${e.hits}/${e.shots} zásahů${e.damage ? `, −${e.damage}` : ""}${e.destroyed ? " – zničeno" : ""}.`);
         break;
@@ -214,6 +217,7 @@ export class TurnAnimation {
           time = moveStart + MOVE_DURATION;
           break;
         case "evadePass":
+        case "evadeThrough":
           time = moveStart + e.t * MOVE_DURATION;
           break;
         case "jettison":
@@ -372,6 +376,9 @@ export class TurnAnimation {
         if (victim) v.effects.push({ kind: "text", x: victim.x, y: victim.y, text: "PRŮLET −1 STRES", color: "#f472b6", start: now + 100, duration: 1000 });
         break;
       }
+      case "evadeThrough":
+        v.effects.push({ kind: "ripple", x: e.x, y: e.y, color: e.with === "comet" ? "#67e8f9" : "#d6d3d1", start: now, duration: 700 });
+        break;
       case "mineBlast":
         v.mines = v.mines.filter((m) => m.id !== e.mineId);
         v.effects.push({ kind: "explosion", x: e.x, y: e.y, size: 70, start: now, duration: 700, color: "#f97316" });
