@@ -879,6 +879,32 @@ h3,
 .gear {
   padding: 6px 8px;
 }
+.center-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.center-btn .cpips {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 2px;
+}
+.center-btn .cpips i {
+  width: 6px;
+  height: 6px;
+  background: #334155;
+  border: 1px solid #64748b;
+}
+.center-btn .cpips i.on {
+  background: #7dd3fc;
+  border-color: #e0f2fe;
+}
+.center-btn .cmode {
+  min-width: 46px;
+  text-align: left;
+  color: #7dd3fc;
+  font-size: 12px;
+}
 .tune-wrap {
   position: absolute;
   inset: 40px 10px 10px 10px;

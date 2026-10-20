@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.25 – tlačítko CENTROVAT (C) má tři režimy a cyklicky je střídá: **loď** (2× blíž než dřív – polovina
+  dohledu; zároveň výchozí pohled na začátku bitvy) → **dohled** (celý kruh dohledu, dřívější stav) →
+  **mapa** (celá mapa). Na tlačítku jsou tři políčka s podsvíceným aktivním režimem a jeho název; po
+  ručním posunu či zoomu kamery se indikátor zhasne a další stisk začne od režimu loď.
 - v3.24 – UI: po spuštění kola i během vyhodnocování zůstává spodní lišta vidět, jen jsou všechna tlačítka
   vypnutá (tlačítko SPUSTIT ukazuje „kolo probíhá…“). Výchozí stav přepínače „potvrzení nevyužitých akcí“
   je nově **vypnuto**. Esc menu přehlednější: jednotná tlačítka (ikona · název · klávesa), skupiny Přehled

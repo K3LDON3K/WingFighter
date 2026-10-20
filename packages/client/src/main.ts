@@ -336,25 +336,49 @@ function zoomBy(factor: number) {
   cam.clampTo(game.state.width, game.state.height);
 }
 
-/** Vycentrovat na loď se zoomem, při kterém je v okně celý její kruh dohledu; opakovaný stisk přepíná na celou mapu a zpět. */
+/** Režimy centrování (C): blízko na loď → celý dohled lodi → celá mapa → znovu blízko. */
+const CENTER_MODES = [
+  { name: "loď", title: "Blízko na vybranou loď (polovina dohledu)" },
+  { name: "dohled", title: "Celý kruh dohledu vybrané lodi" },
+  { name: "mapa", title: "Celá mapa" },
+] as const;
+let lastCenter: { x: number; y: number; zoom: number; mode: number } | null = null;
+let centerBtn: HTMLButtonElement | null = null;
+/** Je kamera stále tam, kam ji dalo poslední centrování? Pak vrací jeho režim. */
+function activeCenterMode(): number | null {
+  if (!cam || !lastCenter) return null;
+  const same = Math.abs(cam.zoom - lastCenter.zoom) < 1e-6 && Math.abs(cam.x - lastCenter.x) < 0.5 && Math.abs(cam.y - lastCenter.y) < 0.5;
+  return same ? lastCenter.mode : null;
+}
 function centerOnShip(shipId: string | undefined, force = false) {
   if (!game || !cam || !shipId) return;
   const s = game.state.ships.find((x) => x.id === shipId);
   if (!s) return;
-  const r = s.stats.vision ?? 960;
-  const z = cam.zoomForRadius(r + 20);
-  // kamera se od posledního centrování nepohnula → druhý stisk = celá mapa
-  const unchanged = lastCenter && Math.abs(cam.zoom - lastCenter.zoom) < 1e-6 && Math.abs(cam.x - lastCenter.x) < 0.5 && Math.abs(cam.y - lastCenter.y) < 0.5;
-  if (unchanged && !force) {
-    cam.fit(game.state.width, game.state.height);
-    lastCenter = null;
-    return;
+  const cur = activeCenterMode();
+  const mode = force || cur === null ? 0 : (cur + 1) % CENTER_MODES.length;
+  const r = (s.stats.vision ?? 960) + 20;
+  if (mode === 2) cam.fit(game.state.width, game.state.height);
+  else {
+    cam.centerOn(s.x, s.y, cam.zoomForRadius(mode === 0 ? r / 2 : r));
+    cam.clampTo(game.state.width, game.state.height);
   }
-  cam.centerOn(s.x, s.y, z);
-  cam.clampTo(game.state.width, game.state.height);
-  lastCenter = { x: cam.x, y: cam.y, zoom: cam.zoom };
+  lastCenter = { x: cam.x, y: cam.y, zoom: cam.zoom, mode };
+  updateCenterBtn();
 }
-let lastCenter: { x: number; y: number; zoom: number } | null = null;
+let centerBtnMode: number | null | undefined;
+/** Tlačítko CENTROVAT ukazuje aktivní režim (tři políčka) a název; po ručním posunu kamery nic. */
+function updateCenterBtn() {
+  if (!centerBtn) return;
+  const m = activeCenterMode();
+  if (m === centerBtnMode && centerBtn.childElementCount) return;
+  centerBtnMode = m;
+  const next = m === null ? 0 : (m + 1) % CENTER_MODES.length;
+  clear(centerBtn);
+  centerBtn.title = `Centrovat (C): ${CENTER_MODES.map((x, i) => (i === m ? `[${x.name}]` : x.name)).join(" → ")}. Další stisk: ${CENTER_MODES[next].title.toLowerCase()}.`;
+  const pips = h("span", { class: "cpips" });
+  CENTER_MODES.forEach((_, i) => pips.append(h("i", { class: i === m ? "on" : "" })));
+  centerBtn.append(icon("center", "currentColor", 12), label("centrovat"), pips, h("span", { class: "cmode" }, label(m === null ? "–" : CENTER_MODES[m].name)));
+}
 
 /** Když je loď mimo záběr, vycentruje na ni kameru. */
 function ensureVisible(shipId: string | undefined) {
@@ -530,7 +554,7 @@ function mountGame() {
       { class: "map-zoom" },
       h("button", { class: "gear", title: "Přiblížit (+)", onclick: () => zoomBy(ZOOM_STEP) }, "+"),
       h("button", { class: "gear", title: "Oddálit (−)", onclick: () => zoomBy(1 / ZOOM_STEP) }, "−"),
-      h("button", { class: "gear", title: "Vycentrovat na loď se zoomem na její dohled (C); znovu = celá mapa", onclick: () => centerOnShip(game?.selectedShipId) }, icon("center", "currentColor", 12), label("centrovat")),
+      (centerBtn = h("button", { class: "gear center-btn", onclick: () => centerOnShip(game?.selectedShipId) })),
     ),
     h(
       "div",
@@ -596,6 +620,7 @@ function frame(now: number) {
     }
   }
   const view = game.anim ? game.anim.view : game.view;
+  updateCenterBtn();
   const overlay = buildOverlay(view);
   if (game.hoverIcon && !game.icons.some((i) => `${i.shipId}:${i.id}` === game!.hoverIcon)) game.hoverIcon = undefined;
   renderer.draw(game.state, view, cam, overlay, now, window.devicePixelRatio || 1);
