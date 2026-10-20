@@ -48,6 +48,8 @@ export interface PlanningCallbacks {
   /** Zrušit naplánovanou akci (křížek pod tlačítkem s podnabídkou). */
   cancelAction(shipId: string): void;
   aim(shipId: string): void;
+  /** ✕ pod MANÉVR: při kreslení vrátí původní dráhu, jinak nastaví rovně stejnou rychlostí (zdarma). */
+  cancelManeuver(shipId: string): void;
   ready(): void;
   unready(): void;
   /** Otevře inventář s výběrem modulu k vyhození. */
@@ -358,6 +360,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
         );
       if (a.id === "shield" && planned) row.append(h("div", { class: "scan-holder stack" }, shieldPop, wbtn, cancelStrip("úprava štítu")));
+      else if (isMove && (aiming || o.maneuverId !== defaultOrders(ship).maneuverId))
+        row.append(h("div", { class: "scan-holder stack" }, wbtn, h("button", { class: "px act-cancel", disabled: locked, title: aiming ? "Zrušit kreslení – vrátit původní dráhu" : "Zrušit manévr – loď poletí rovně stejnou rychlostí (zdarma)", onclick: () => cb.cancelManeuver(ship.id) }, "✕")));
       else row.append(wbtn);
     }
     if (grp.label === "Speciální") {

@@ -540,7 +540,6 @@ let hudEl: HTMLElement | null = null;
 let overlayEl: HTMLElement | null = null;
 let menuEl: HTMLElement | null = null;
 let tooltipEl: HTMLElement | null = null;
-let chipsEl: HTMLElement | null = null;
 let tuneEl: HTMLElement | null = null;
 let toastEl: HTMLElement | null = null;
 let pstatEl: HTMLElement | null = null;
@@ -560,12 +559,6 @@ function mountGame() {
   toastEl = h("div", { class: "toast", style: "display:none" });
   pstatEl = h("div", { class: "pstat" });
   confirmEl = h("div", { class: "confirm-wrap", style: "display:none" });
-  chipsEl = h(
-    "div",
-    { class: "aim-chips", style: "display:none" },
-    h("button", { class: "px chip ok", title: "Potvrdit dráhu", onclick: () => game?.aimingShipId && confirmManeuver(game.aimingShipId) }, icon("tick", "#fff", 22)),
-    h("button", { class: "px chip no", title: "Zrušit – vrátit původní dráhu", onclick: () => game?.aimingShipId && cancelAiming(game.aimingShipId) }, "✕"),
-  );
   barEl = h("div", { class: "bottombar" });
   sideEl = h("div", { class: "maplog" });
   mapEl = h(
@@ -596,7 +589,6 @@ function mountGame() {
     ),
     pstatEl,
     tooltipEl,
-    chipsEl,
     overlayEl,
     confirmEl,
     menuEl,
@@ -637,7 +629,7 @@ function mountGame() {
 function unmountGame() {
   cancelAnimationFrame(raf);
   resizeObs?.disconnect();
-  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = chipsEl = null;
+  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = null;
   render();
 }
 
@@ -652,7 +644,6 @@ function frame(now: number) {
   }
   const view = game.anim ? game.anim.view : game.view;
   updateCenterBtn();
-  renderAimChips();
   const overlay = buildOverlay(view);
   if (game.hoverIcon && !game.icons.some((i) => `${i.shipId}:${i.id}` === game!.hoverIcon)) game.hoverIcon = undefined;
   renderer.draw(game.state, view, cam, overlay, now, window.devicePixelRatio || 1);
@@ -996,29 +987,6 @@ function renderHud() {
   }
 }
 
-/** Dotyk: čipy ✓ / ✕ nad duchem lodi, dokud se čekající dráha nepotvrdí. */
-function renderAimChips() {
-  if (!chipsEl || !game || !cam || !mapEl) return;
-  const id = game.aimingShipId;
-  const ship = id ? game.state.ships.find((s) => s.id === id) : undefined;
-  const o = id ? game.orders.get(id) : undefined;
-  if (!isTouchMode() || !ship || !o || game.submitted || game.anim || game.mouse) {
-    chipsEl.style.display = "none";
-    return;
-  }
-  const man = resolveManeuver(profileOf(ship.loadout), o.maneuverId, ship.speed);
-  if (!man) {
-    chipsEl.style.display = "none";
-    return;
-  }
-  const end = maneuverPath(ship, man)(1);
-  const sp = cam.toScreen(end.x, end.y);
-  chipsEl.style.display = "flex";
-  const w = chipsEl.offsetWidth || 124;
-  chipsEl.style.left = `${Math.max(8, Math.min(mapEl.clientWidth - w - 8, sp.x - w / 2))}px`;
-  chipsEl.style.top = `${Math.max(8, Math.min(mapEl.clientHeight - 70, sp.y - 100))}px`;
-}
-
 function renderTooltip() {
   if (!tooltipEl || !game || !mapEl) return;
   const [hShip, hAct] = (game.hoverIcon ?? "").split(":");
@@ -1150,12 +1118,29 @@ function renderSide() {
         renderSide();
       },
       chooseAction: (id, actionId) => chooseIcon(id, actionId),
+      cancelManeuver: (id) => {
+        const g = game!;
+        if (g.aimingShipId === id && aimBackup.has(id)) {
+          cancelAiming(id);
+          return;
+        }
+        // rozkreslený / naplánovaný manévr zpět na „rovně stejnou rychlostí“ (zdarma)
+        const ship = g.state.ships.find((x) => x.id === id);
+        const o = g.orders.get(id);
+        if (!ship || !o) return;
+        g.orders.set(id, { ...o, maneuverId: defaultOrders(ship).maneuverId });
+        g.aimingShipId = null;
+        g.speedLock.delete(id);
+        sfx("cancel");
+        renderSide();
+      },
       aim: (id) => {
         if (game!.aimingShipId === id) {
           confirmManeuver(id);
           return;
         }
         game!.aimingShipId = id;
+        aimBackup.set(id, game!.orders.get(id)?.maneuverId ?? "");
         game!.picking = null;
         game!.selectedShipId = id;
         ensureVisible(id);
@@ -1622,7 +1607,7 @@ function bindInput(c: HTMLCanvasElement) {
       const id = aimDrag;
       aimDrag = null;
       if (moved) {
-        // dráha zůstává čekající – potvrdí se čipem ✓ nebo tlačítkem POTVRDIT
+        // dráha zůstává nakreslená; ťuknutí kamkoliv / SPUSTIT KOLO ji potvrdí, ✕ pod MANÉVR ji vrátí
         g.mouse = null;
         renderSide();
         return;
@@ -1687,11 +1672,11 @@ function bindInput(c: HTMLCanvasElement) {
     tapAt(worldPos(e), false);
   });
 
-  /** Klik / ťuknutí na mapu. Na dotyku se čekající dráha nepotvrzuje klikem kamkoliv (čipy ✓ / ✕). */
+  /** Klik / ťuknutí na mapu. */
   function tapAt(w: { x: number; y: number; sx: number; sy: number }, touch: boolean) {
     const g = game!;
-    // 1) míření: klik kamkoliv potvrdí dráhu (jen myš)
-    if (g.aimingShipId && !touch) {
+    // 1) míření: klik / ťuknutí kamkoliv potvrdí dráhu
+    if (g.aimingShipId) {
       confirmManeuver(g.aimingShipId);
       return;
     }

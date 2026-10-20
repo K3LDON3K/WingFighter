@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.34 – bez čipů ✓ / ✕: i na dotyku dráhu potvrdí ťuknutí kamkoliv nebo SPUSTIT KOLO (jako myší). Pod
+  tlačítkem MANÉVR je ✕: při kreslení vrátí původní dráhu, u naplánovaného manévru ho zruší (loď poletí rovně
+  stejnou rychlostí, akce se uvolní).
 - v3.33.1 – čipy potvrzení dráhy na dotyku jsou čtvercové (56 px) jen s ✓ / ✕.
 - v3.33 – dotykové ovládání (tablety): vstup mapy přes Pointer Events; v dotykovém režimu (automaticky podle
   zařízení, přepínač v ladění → Zobrazení) jeden prst = posun, dva prsty = pinch zoom kolem středu prstů,

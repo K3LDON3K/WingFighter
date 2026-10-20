@@ -2025,33 +2025,6 @@ body.touch .game canvas {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
-.aim-chips {
-  position: absolute;
-  z-index: 7;
-  display: flex;
-  gap: 12px;
-}
-.aim-chips .chip {
-  width: 56px;
-  height: 56px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 30px;
-  line-height: 1;
-  box-shadow: 0 0 0 2px #05070f;
-}
-.aim-chips .chip.ok {
-  background: #166534;
-  border-color: #86efac #14532d #14532d #86efac;
-  color: #fff;
-}
-.aim-chips .chip.no {
-  background: #7f1d1d;
-  border-color: #fca5a5 #450a0a #450a0a #fca5a5;
-  color: #fff;
-}
 /* větší drobné prvky pro prsty */
 body.touch .sbtn {
   width: 28px;
