@@ -2837,6 +2837,45 @@ button.ptoggle:focus {
   border-color: #86efac;
   background: #166534;
 }
+.mod-tile .mt-pts {
+  position: absolute;
+  bottom: 3px;
+  right: 4px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+.mt-gap {
+  width: 14px;
+}
+.fleet-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0;
+}
+.fleet-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #0a0e1c;
+  border: 2px solid;
+  border-color: #1e293b #0a0e1c #0a0e1c #1e293b;
+  color: #94a3b8;
+  min-height: 40px;
+}
+button.fleet-tab.on,
+button.fleet-tab.on:hover:not(:disabled) {
+  background: #0f2a4a;
+  border-color: #7dd3fc #0c4a6e #0c4a6e #7dd3fc;
+  color: #f8fafc;
+}
+.fleet-tab .ft-n {
+  font-size: 14px;
+}
+.fleet-tab .ft-sub {
+  font-size: 12px;
+  color: #94a3b8;
+}
 .mt-foot {
   font-size: 13px;
   margin-top: 6px;
@@ -2941,4 +2980,38 @@ button.ptoggle:focus {
 .ptip .ptip-warn {
   color: #f87171;
   margin-top: 3px;
+}
+
+/* editor pilotů (ladění → Piloti) */
+.pilot-editor .pe-head,
+.pilot-editor .pe-row {
+  display: grid;
+  grid-template-columns: 120px 1fr repeat(5, 64px) 48px 60px;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 0;
+}
+.pilot-editor .pe-head {
+  font-size: 10px;
+  color: var(--muted);
+  border-bottom: 1px solid #1e293b;
+}
+.pilot-editor .pe-head .pe-num {
+  text-align: center;
+  white-space: normal;
+  line-height: 1.1;
+}
+.pilot-editor .pe-row input {
+  height: 28px;
+  font-size: 14px;
+  min-width: 0;
+}
+.pilot-editor .pe-row input.pe-num {
+  text-align: center;
+  padding: 0 2px;
+}
+.pilot-editor .pe-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  justify-self: center;
 }

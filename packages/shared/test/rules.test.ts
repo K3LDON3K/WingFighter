@@ -56,7 +56,7 @@ const players: PlayerInfo[] = [
 
 /** Testy pravidel běží s vypnutým vlivem váhy (max. rychlost 5), váha má vlastní test. */
 function game(overrides?: Partial<GameState>): GameState {
-  const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+  const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
   g.asteroids = [];
   return { ...g, ...overrides };
 }
@@ -470,7 +470,7 @@ describe("vyhodnocení kola", () => {
   });
 
   it("mina se položí na startovní pozici, aktivuje se další kolo a spustí ji i torpédo", () => {
-    const g = createGame({ players: [...players, { id: "p3", name: "Gama", team: 0, isBot: false }], settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
+    const g = createGame({ players: [...players, { id: "p3", name: "Gama", team: 0, isBot: false }], settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" } });
     g.asteroids = [];
     place(g, "ship-p1-0", 500, 500, -Math.PI / 2);
     place(g, "ship-p2-0", 900, 500, Math.PI);
@@ -578,7 +578,7 @@ describe("vyhodnocení kola", () => {
       { id: "b2", name: "Bot 2", team: 1, isBot: true },
       { id: "b3", name: "Bot 3", team: 2, isBot: true },
     ];
-    let g = createGame({ players: bots, settings: { mode: "tdm", turnLimit: 40, shipsPerPlayer: 2, allowedModules: {}, botLoadout: "default" } });
+    let g = createGame({ players: bots, settings: { mode: "tdm", turnLimit: 40, shipPoints: 2, allowedModules: {}, botLoadout: "default" } });
     const rng = createRng(42);
     let turns = 0;
     while (g.status !== "finished" && turns < 100) {
@@ -592,7 +592,7 @@ describe("vyhodnocení kola", () => {
   });
 
   it("deathmatch přiřadí každému hráči vlastní tým a vrací vítěze", () => {
-    const g = createGame({ players: [...players, { id: "p3", name: "Gama", team: 0, isBot: false }], settings: { mode: "dm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
+    const g = createGame({ players: [...players, { id: "p3", name: "Gama", team: 0, isBot: false }], settings: { mode: "dm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" } });
     expect(new Set(g.ships.map((s) => s.team)).size).toBe(3);
     for (const s of g.ships) if (s.ownerId !== "p3") s.alive = false;
     const r = resolveTurn(g, [], createRng(1));
@@ -603,7 +603,7 @@ describe("vyhodnocení kola", () => {
 
 describe("inventář a ekonomika", () => {
   it("váha modulů snižuje max. rychlost; vystřelené torpédo loď odlehčí", () => {
-    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" } });
     g.asteroids = [];
     const ship = g.ships[0];
     expect(loadoutWeight(ship.loadout)).toBe(10); // lasery 2 + torpédomet 1+3 + miny 1+1 + štít 2
@@ -630,7 +630,7 @@ describe("inventář a ekonomika", () => {
   });
 
   it("vyhození modulu: loď odlehčí, trosky lze sestřelit za kredity; sestřel lodi a přežití dávají kredity", () => {
-    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" } });
     g.asteroids = [];
     place(g, "ship-p1-0", 500, 500, 0);
     place(g, "ship-p2-0", 700, 500, Math.PI);
@@ -664,7 +664,7 @@ describe("inventář a ekonomika", () => {
 
 describe("ochranná lhůta torpéda", () => {
   it("vlastní torpédo nemůže 2 kola zranit vlastníka, i když ho loď dožene", () => {
-    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" } });
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" } });
     g.asteroids = [];
     place(g, "ship-p1-0", 300, 500, 0);
     place(g, "ship-p2-0", 1500, 1200, Math.PI);
@@ -680,7 +680,7 @@ describe("ochranná lhůta torpéda", () => {
 
 describe("natočení modulů", () => {
   it("lasery střílí jen ve výseči podle natočení; miny jen na svou stranu; torpédo vylétá směrem modulu", () => {
-    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
     g.asteroids = [];
     const me = g.ships[0];
     const laser = me.loadout.modules.find((m) => m.type === "laser")!;
@@ -711,7 +711,7 @@ describe("natočení modulů", () => {
 
 describe("skener", () => {
   it("sken lodi bere náboj, hluboký sken odkryje mapu do konce kola a spustí cooldown, po cooldownu plné náboje; vynucený cooldown je kratší o náboje", () => {
-    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
     g.asteroids = [];
     const me = g.ships[0];
     me.loadout.modules = [newModule("scanner", "left", "sc")];
@@ -745,7 +745,7 @@ describe("skener", () => {
     expect(stateForTeam(r.state, 0, new Map()).ships.some((s) => s.id === "ship-p2-0")).toBe(false);
     expect(r.state.ships[0].loadout.modules[0].cooldown).toBe(2);
     // zelený manévr mimo cooldown dobije +1
-    const g3 = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    const g3 = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
     g3.asteroids = [];
     g3.ships[0].loadout.modules = [{ ...newModule("scanner", "left", "sc"), charges: 0 }];
     const r3 = resolveTurn(g3, [{ shipId: g3.ships[0].id, maneuverId: "m2a0", fire: false }], createRng(1)); // rovně 2 = zelený
@@ -771,7 +771,7 @@ describe("generovaná mapa a bouře", () => {
     for (const x of left) expect(a.asteroids.some((y) => Math.abs(y.x - (a.width - x.x)) < 1 && y.y === x.y)).toBe(true);
   });
   it("hra na generované mapě: startovní body hráčů, v bouři nefungují štíty ani lasery, torpédo ohluchne, loď v bouři není vidět", () => {
-    const g = createGame({ players: [{ ...players[0], startIndex: 0 }, { ...players[1], startIndex: 5 }], settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default", map }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    const g = createGame({ players: [{ ...players[0], startIndex: 0 }, { ...players[1], startIndex: 5 }], settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default", map }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
     const gen = generateMap(map);
     expect(g.ships[0].x).toBe(gen.starts[0].x);
     expect(g.ships[1].x).toBe(gen.starts[5].x);
@@ -806,7 +806,7 @@ describe("generovaná mapa a bouře", () => {
 
 describe("kulomet", () => {
   it("dávka 10 projektilů před pohybem, zranění podle zásahů, funguje z bouře i do bouře; segmentový štít pohltí dávku za 1 bod", () => {
-    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, mgHitNear: 100, mgHitFar: 100 } });
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, mgHitNear: 100, mgHitFar: 100 } });
     g.asteroids = [];
     const me = g.ships[0];
     me.loadout.modules = [newModule("mg", "front", "mg1")];
@@ -837,7 +837,7 @@ describe("kulomet", () => {
 });
 
 describe("komety", () => {
-  const settingsWith = (comets: "none" | "few" | "medium" | "many", cometsHitAsteroids = false) => ({ mode: "tdm" as const, turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" as const, map: { size: "medium" as const, asteroids: "none" as const, clusters: false, storms: 0, stormSize: "medium" as const, seed: 3, symmetric: false, comets, cometsHitAsteroids } });
+  const settingsWith = (comets: "none" | "few" | "medium" | "many", cometsHitAsteroids = false) => ({ mode: "tdm" as const, turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" as const, map: { size: "medium" as const, asteroids: "none" as const, clusters: false, storms: 0, stormSize: "medium" as const, seed: 3, symmetric: false, comets, cometsHitAsteroids } });
   const noOrders = (g: GameState): ShipOrders[] => g.ships.map((s) => ({ shipId: s.id, maneuverId: "m1a0", fire: false }));
   const cometAt = (x: number, y: number, heading: number, id = "c1"): Comet => ({ id, x, y, heading, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: COMET.radius, tailUsed: [] });
 
@@ -954,7 +954,7 @@ describe("komety", () => {
 
 describe("komety – ladění srážek", () => {
   it("se zapnutým cometCollide se dvě komety při srážce zničí a komety naráží do asteroidů i bez volby mapy", () => {
-    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, cometCollide: 1 } });
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, cometCollide: 1 } });
     g.asteroids = [];
     place(g, "ship-p1-0", 300, 1200, 0);
     place(g, "ship-p2-0", 1500, 1200, 0);

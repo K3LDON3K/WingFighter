@@ -47,6 +47,11 @@ export interface LoadoutEditorOptions {
   showCargo?: boolean;
   /** Obchod v místnosti: kredity hráče; nákup za cenu, prodej za prodejní cenu, dokoupení munice po kusech. */
   wallet?: number;
+  /** Výběr trupu a pilota (místnost): povolené id; chybí = výběr zamčený. */
+  hullChoices?: string[];
+  pilotChoices?: string[];
+  /** Piloti už použití v jiných lodích letky (unikátní nejdou vybrat podruhé). */
+  pilotsTaken?: string[];
 }
 
 const NS = "http://www.w3.org/2000/svg";
@@ -273,8 +278,33 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   const head = h(
     "div",
     { class: "lo-head" },
-    h("label", {}, h("span", {}, label("Loď")), h("select", { disabled: true }, ...Object.values(HULLS).map((x) => h("option", { value: x.id, selected: x.id === loadout.hullId }, x.name)))),
-    h("label", {}, h("span", {}, label("Pilot")), h("select", { disabled: true, title: PILOTS[loadout.pilotId]?.description ?? "" }, ...Object.values(PILOTS).map((x) => h("option", { value: x.id, selected: x.id === loadout.pilotId }, x.name)))),
+    h(
+      "label",
+      {},
+      h("span", {}, label("Loď")),
+      h(
+        "select",
+        { disabled: !opts.hullChoices || ro, title: `${HULLS[loadout.hullId]?.description ?? ""}\nLodní body: ${HULLS[loadout.hullId]?.points ?? 1}`, onchange: (e) => change({ ...loadout, hullId: (e.target as HTMLSelectElement).value }) },
+        ...Object.values(HULLS)
+          .filter((x) => x.id === loadout.hullId || !opts.hullChoices || opts.hullChoices.includes(x.id))
+          .map((x) => h("option", { value: x.id, selected: x.id === loadout.hullId }, `${x.name} · ${x.points} b.`)),
+      ),
+    ),
+    h(
+      "label",
+      {},
+      h("span", {}, label("Pilot")),
+      h(
+        "select",
+        { disabled: !opts.pilotChoices || ro, title: `${PILOTS[loadout.pilotId]?.description ?? ""}${PILOTS[loadout.pilotId]?.abilities.length ? `\n${PILOTS[loadout.pilotId].abilities.join(", ")}` : ""}`, onchange: (e) => change({ ...loadout, pilotId: (e.target as HTMLSelectElement).value }) },
+        ...Object.values(PILOTS)
+          .filter((x) => x.id === loadout.pilotId || !opts.pilotChoices || opts.pilotChoices.includes(x.id))
+          .map((x) => {
+            const taken = x.unique && x.id !== loadout.pilotId && (opts.pilotsTaken ?? []).includes(x.id);
+            return h("option", { value: x.id, selected: x.id === loadout.pilotId, disabled: taken }, `${x.name}${x.abilities.length ? ` (${x.abilities.join(", ")})` : ""}${taken ? " – už v letce" : ""}`);
+          }),
+      ),
+    ),
   );
 
   const summary = h(

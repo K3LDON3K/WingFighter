@@ -1,4 +1,6 @@
 import {
+  HULLS,
+  PILOTS,
   moduleHp,
   moduleMaxHp,
   moduleWorking,
@@ -257,7 +259,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       "div",
       { class: "bb-tab", style: `color:${teamColor}` },
       h("span", { class: "txt" }, ship.name),
-      my.length > 1 ? h("div", { class: "ship-tabs" }, ...my.map((s, i) => h("button", { class: `px ${s.id === ship.id ? "on" : ""}`, title: s.name, onclick: () => cb.select(s.id) }, String(i + 1)))) : null,
+      my.length > 1 ? h("div", { class: "ship-tabs" }, ...my.map((s, i) => h("button", { class: `px ${s.id === ship.id ? "on" : ""}`, title: `${s.name} · ${HULLS[s.loadout.hullId]?.name ?? ""} · trup ${s.hull}/${s.stats.hull}`, onclick: () => cb.select(s.id) }, `${i + 1} ${PILOTS[s.loadout.pilotId]?.name ?? ""}`))) : null,
     ),
     h("div", { class: "bb-shipbody" }, shieldBox, right),
   );

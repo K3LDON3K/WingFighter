@@ -185,6 +185,23 @@ export class SpriteCache {
     if (!s) this.fighters.set(color, (s = fighterSprite(color)));
     return s;
   }
+  /** Bílá silueta stíhače (bez plamenů) – překryv vybrané lodi. */
+  private silhouetteSprite: Sprite | null = null;
+  fighterSilhouette(): Sprite {
+    if (!this.silhouetteSprite) {
+      const base = fighterSprite("#ffffff");
+      const c = document.createElement("canvas");
+      c.width = base.canvas.width;
+      c.height = base.canvas.height;
+      const x = c.getContext("2d")!;
+      for (let yy = 0; yy < FIGHTER_TEMPLATE.length; yy++) for (let xx = 0; xx < FIGHTER_TEMPLATE[0].length; xx++) if (FIGHTER_TEMPLATE[yy][xx] !== "." && FIGHTER_TEMPLATE[yy][xx] !== "E") x.fillRect(xx, yy, 1, 1);
+      x.fillStyle = "#ffffff";
+      x.globalCompositeOperation = "source-in";
+      x.fillRect(0, 0, c.width, c.height);
+      this.silhouetteSprite = { canvas: c, scale: base.scale, cx: base.cx, cy: base.cy };
+    }
+    return this.silhouetteSprite;
+  }
   torpedo(color: string): Sprite {
     let s = this.torpedoes.get(color);
     if (!s) this.torpedoes.set(color, (s = torpedoSprite(color)));

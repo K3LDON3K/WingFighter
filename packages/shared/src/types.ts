@@ -74,6 +74,8 @@ export interface HullDef {
   description: string;
   /** Poloměr pro vykreslení, výběr a hrubé testy (opsaná kružnice modelu se nepoužívá pro kolize). */
   radius: number;
+  /** Cena trupu v lodních bodech (zakladatel dává hráči lodní rozpočet). */
+  points: number;
   /** Kolizní kruhy v souřadnicích lodi (+x příď, +y pravobok); bez nich se použije jeden kruh `radius`. */
   colliders?: { x: number; y: number; r: number }[];
   hull: number;
@@ -87,11 +89,31 @@ export interface HullDef {
   profile: ManeuverProfile;
 }
 
+/** Modifikátory pilota (přičítají se ke statistikám lodi). */
+export interface PilotMods {
+  /** Kostky útoku laserů. */
+  attack: number;
+  /** Kostky obrany. */
+  agility: number;
+  /** Maximum stresových bodů. */
+  stressMax: number;
+  /** Maximální rychlost. */
+  maxSpeed: number;
+  /** Trup v % (např. +10). */
+  hullPct: number;
+}
+
 export interface PilotDef {
   id: string;
   name: string;
   description: string;
+  /** Slovní popis schopností (pro panel pilota); u editovaných pilotů se generuje z modifikátorů. */
   abilities: string[];
+  mods: PilotMods;
+  /** Unikátní na hráče (jen jeden v letce); Kadet se může opakovat. */
+  unique: boolean;
+  /** Vestavěný pilot (nejde smazat, jde upravit). */
+  builtin?: boolean;
 }
 
 export interface ModuleDef {
@@ -157,6 +179,8 @@ export interface ShipStats {
   colliders: { x: number; y: number; r: number }[];
   /** Dohled (fog of war). */
   vision: number;
+  /** Maximum stresových bodů (ladění + pilot). */
+  stressMax: number;
   /** Počet segmentových štítových modulů (životy segmentu = počet × segmentHp). */
   segmentModules: number;
 }
@@ -256,6 +280,8 @@ export interface PlayerInfo {
   team: number;
   isBot: boolean;
   loadout?: ShipLoadout;
+  /** Letka: jedna výbava na loď (chybí = jedna loď podle `loadout`). */
+  loadouts?: ShipLoadout[];
   /** Kredity: zbytek rozpočtu + odměny za sestřely a přežití. */
   credits?: number;
   /** Zvolený startovní bod (index v generované mapě). */
@@ -303,9 +329,14 @@ export interface GameSettings {
   mode: GameMode;
   /** 0 = bez limitu. */
   turnLimit: number;
-  shipsPerPlayer: number;
+  /** Lodní body na hráče: součet cen trupů letky musí být přesně tento (stíhač = 1). */
+  shipPoints: number;
   /** Max. kusů modulu na hráče (0 = zakázán; chybí = bez limitu). */
   allowedModules: Partial<Record<ModuleType, number>>;
+  /** Zakázané trupy (0 = zakázán; chybí = povolen). */
+  allowedHulls?: Partial<Record<string, number>>;
+  /** Zakázaní piloti (0 = zakázán; chybí = povolen). */
+  allowedPilots?: Partial<Record<string, number>>;
   /** Výbava botů: výchozí sestava, náhodná, nebo ruční (host ji nakliká). */
   botLoadout: "default" | "random" | "manual";
   /** Generovaná mapa (chybí = klasická pevná mapa 1). */
@@ -342,6 +373,8 @@ export interface PlayerStats {
 export interface GameState {
   turn: number;
   settings: GameSettings;
+  /** Piloti platní v této bitvě (editovatelní na serveru). */
+  pilots?: PilotDef[];
   /** Ladicí parametry platné pro tuto bitvu. */
   tuning: Tuning;
   width: number;

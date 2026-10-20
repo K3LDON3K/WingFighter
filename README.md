@@ -145,6 +145,15 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.42 – letka a piloti. **Lodní body na hráče** (1–3) místo „lodí na hráče“: každý trup stojí body (stíhač 1),
+  hráč je musí využít přesně; všechny lodě hráče mají jednu peněženku. „Tvoje výbava“ má záložky LOĎ 1/2/3
+  (trup, pilot, moduly, náklad zvlášť); výběr trupu a pilota je odemčený. Zakladatel volí **dostupné lodě
+  a piloty** dlaždicemi (Kadet vždy). Noví piloti **Eso** (+1 obrana / −1 max. stres), **Střelec** (+1 útok /
+  −1 max. rychlost), **Kapitán** (+1 max. stres / −1 útok); piloti se schopnostmi jsou v letce unikátní, Kadet
+  se opakuje; pilot zničené lodi zahyne a příští bitvu nastoupí Kadet. **Editor pilotů** v Ladění → Piloti
+  (jméno, popis, modifikátory útok / obrana / stres / rychlost / trup %, unikátnost; uloženo v `pilots.json`,
+  platí pro všechny místnosti). Lodě se jmenují `ZKR·Pilot N` (MIR·Kadet 1, MIR·Eso). Ve hře: záložky lodí
+  v liště s jménem pilota (klik vycentruje) a vybraná loď má na mapě pulzující bílý překryv siluety.
 - v3.41 – vysvětlivky v pixel-art stylu: všechny nativní bubliny (atribut title i <title> v SVG) nahrazuje
   vlastní okénko s bevel rámečkem a písmem hry (první řádek žlutě jako nadpis, „Nelze: …“ červeně); myš =
   najetí, dotyk = podržení ~0,45 s. Nastavení mapy: i Velikost (čtyři políčka s rostoucím obdélníkem) a

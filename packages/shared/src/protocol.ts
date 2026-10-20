@@ -1,5 +1,5 @@
 import type { Tuning } from "./tuning.ts";
-import type { GameSettings, GameState, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
+import type { GameSettings, GameState, PilotDef, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
 
 /** Stav místnosti v lobby. */
 export interface RoomPlayer {
@@ -9,7 +9,9 @@ export interface RoomPlayer {
   isBot: boolean;
   ready: boolean;
   connected: boolean;
+  /** První loď letky (kompatibilita); celá letka je v `loadouts`. */
   loadout: ShipLoadout;
+  loadouts: ShipLoadout[];
   startIndex?: number;
   /** Kredity hráče v místnosti (rozpočet + výdělky z bitev − výbava). Boti nemají. */
   credits?: number;
@@ -25,6 +27,8 @@ export interface RoomState {
   savedTuning: Tuning | null;
   players: RoomPlayer[];
   inGame: boolean;
+  /** Piloti platní na serveru (editovatelní v ladění). */
+  pilots: PilotDef[];
 }
 
 export interface RoomSummary {
@@ -46,7 +50,8 @@ export type ClientMessage =
   /** Startovní bod (null = uvolnit); host může nastavit botovi. */
   | { type: "setStart"; index: number | null; botId?: string }
   /** Vlastní výbava, nebo (host) výbava bota. */
-  | { type: "setLoadout"; loadout: ShipLoadout; botId?: string }
+  | { type: "setLoadout"; loadout: ShipLoadout; botId?: string; index?: number }
+  | { type: "setPilots"; pilots: PilotDef[] }
   | { type: "addBot"; team: number }
   | { type: "removeBot"; botId: string }
   | { type: "setSettings"; settings: Partial<GameSettings> }

@@ -1,4 +1,4 @@
-import { DEFAULT_TUNING, TUNING_FIELDS, type Tuning } from "@wingfighter/shared";
+import { BUILTIN_PILOTS, DEFAULT_TUNING, pilotAbilities, pilotList, TUNING_FIELDS, type PilotDef, type PilotMods, type Tuning } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 import { setTouchSetting, touchSetting, deviceIsTouch, type TouchSetting } from "./touch.ts";
@@ -14,6 +14,8 @@ export interface TuningActions {
   onSave: () => void;
   onLoad: () => void;
   onClose: () => void;
+  /** Uložit editované piloty na server (jen host; chybí = editor jen pro čtení). */
+  onSavePilots?: (pilots: PilotDef[]) => void;
 }
 
 interface Built {
@@ -23,6 +25,7 @@ interface Built {
   tabs: HTMLElement;
   body: HTMLElement;
   localRows: HTMLElement[];
+  pilotRows: HTMLElement[];
   inputs: Map<keyof Tuning, { input: HTMLInputElement; row: HTMLElement; note: HTMLElement }>;
 }
 
@@ -48,7 +51,8 @@ export const showHitboxes = () => localFlag(KEY_HITBOXES);
 /** Bílý kroužek kolem vybrané lodi (a slabý při najetí myší) – výchozí vypnuto. */
 export const showSelectRing = () => localFlag(KEY_SELRING);
 
-const GROUPS = [...new Set(TUNING_FIELDS.map((f) => f.group)), LOCAL_GROUP];
+const PILOT_GROUP = "Piloti";
+const GROUPS = [...new Set(TUNING_FIELDS.map((f) => f.group)), PILOT_GROUP, LOCAL_GROUP];
 let activeTab = GROUPS[0];
 const built = new WeakMap<HTMLElement, Built>();
 
@@ -107,12 +111,80 @@ export function renderTuningPanel(root: HTMLElement, tuning: Tuning, savedTuning
     e.note.textContent = changed ? (f.bool ? ` (výchozí ${DEFAULT_TUNING[f.key] ? "ano" : "ne"})` : ` (výchozí ${DEFAULT_TUNING[f.key]})`) : "";
   }
   for (const r of b.localRows) r.style.display = activeTab === LOCAL_GROUP ? "" : "none";
+  for (const r of b.pilotRows) r.style.display = activeTab === PILOT_GROUP ? "" : "none";
+}
+
+/* ---------- editor pilotů ---------- */
+const MOD_FIELDS: { key: keyof PilotMods; label: string; min: number; max: number }[] = [
+  { key: "attack", label: "útok (kostky)", min: -2, max: 2 },
+  { key: "agility", label: "obrana (kostky)", min: -2, max: 2 },
+  { key: "stressMax", label: "max. stres", min: -2, max: 2 },
+  { key: "maxSpeed", label: "max. rychlost", min: -2, max: 2 },
+  { key: "hullPct", label: "trup %", min: -50, max: 50 },
+];
+let draft: PilotDef[] | null = null;
+
+function buildPilotEditor(root: HTMLElement, canEdit: boolean, a: TuningActions) {
+  const redraw = () => {
+    clear(root);
+    if (!draft) draft = structuredClone(pilotList());
+    const list = draft;
+    const parts: (HTMLElement | null)[] = [
+      h("div", { class: "muted txt", style: "padding:4px 0 8px" }, canEdit ? "Piloti platí pro všechny místnosti na serveru (pilots.json). Kadet nemá modifikátory a může se v letce opakovat; ostatní jsou unikátní. Změny platí po Uložit." : "Piloty upravuje jen host."),
+      h(
+        "div",
+        { class: "pe-head" },
+        h("span", {}, label("Pilot")),
+        h("span", {}, label("Popis")),
+        ...MOD_FIELDS.map((f) => h("span", { class: "pe-num", title: f.label }, label(f.label))),
+        h("span", { class: "pe-num" }, label("unikát")),
+        h("span", {}),
+      ),
+      ...list.map((p, i) =>
+        h(
+          "div",
+          { class: "pe-row" },
+          h("input", { value: p.name, maxLength: 20, disabled: !canEdit, oninput: (e) => (p.name = (e.target as HTMLInputElement).value) }),
+          h("input", { value: p.description, maxLength: 300, disabled: !canEdit, oninput: (e) => (p.description = (e.target as HTMLInputElement).value) }),
+          ...MOD_FIELDS.map((f) =>
+            h("input", {
+              type: "number",
+              class: "pe-num",
+              value: String(p.mods[f.key]),
+              min: String(f.min),
+              max: String(f.max),
+              step: f.key === "hullPct" ? "5" : "1",
+              disabled: !canEdit || p.id === "kadet",
+              onchange: (e) => {
+                p.mods[f.key] = Math.max(f.min, Math.min(f.max, Math.round(Number((e.target as HTMLInputElement).value) || 0)));
+                p.abilities = pilotAbilities(p.mods);
+              },
+            }),
+          ),
+          h("input", { type: "checkbox", class: "pe-num", checked: p.unique, disabled: !canEdit || p.id === "kadet", onchange: (e) => (p.unique = (e.target as HTMLInputElement).checked) }),
+          canEdit && !p.builtin ? h("button", { class: "px tiny", title: "Smazat pilota", onclick: () => (list.splice(i, 1), redraw()) }, "✕") : h("span", { class: "muted", style: "font-size:10px" }, label(p.id === "kadet" ? "základ" : p.builtin ? "vestavěný" : "")),
+        ),
+      ),
+      canEdit
+        ? h(
+            "div",
+            { class: "row", style: "gap:8px;margin-top:8px;flex-wrap:wrap" },
+            h("button", { onclick: () => (list.push({ id: `p${Date.now().toString(36)}`, name: "Nový pilot", description: "", abilities: [], mods: { attack: 0, agility: 0, stressMax: 0, maxSpeed: 0, hullPct: 0 }, unique: true }), redraw()) }, icon("plus", "currentColor", 10), " ", label("nový pilot")),
+            h("button", { class: "on", title: "Uloží piloty na server a rozešle všem místnostem", onclick: () => a.onSavePilots?.(list) }, label("Uložit piloty")),
+            h("button", { title: "Zahodí neuložené změny", onclick: () => ((draft = null), redraw()) }, label("Načíst aktuální")),
+            h("button", { title: "Vrátí vestavěné čtyři piloty", onclick: () => ((draft = structuredClone(BUILTIN_PILOTS)), redraw()) }, label("Výchozí")),
+          )
+        : null,
+    ];
+    root.append(...parts.filter((x): x is HTMLElement => !!x));
+  };
+  redraw();
 }
 
 function build(root: HTMLElement, tuning: Tuning, canEdit: boolean, a: TuningActions): Built {
   const inputs: Built["inputs"] = new Map();
   const body = h("div", { class: "tune-body" });
-  const b: Built = { tuning, canEdit, head: h("div", { class: "row tune-head" }), tabs: h("div", { class: "tune-tabs" }), body, inputs, localRows: [] };
+  const b: Built = { tuning, canEdit, head: h("div", { class: "row tune-head" }), tabs: h("div", { class: "tune-tabs" }), body, inputs, localRows: [], pilotRows: [] };
   for (const f of TUNING_FIELDS) {
     const input = f.bool
       ? h("input", { type: "checkbox", checked: tuning[f.key] > 0, disabled: !canEdit })
@@ -143,6 +215,11 @@ function build(root: HTMLElement, tuning: Tuning, canEdit: boolean, a: TuningAct
   const noteRow = h("div", { class: "muted txt", style: "padding:6px 0" }, "Volby v této záložce se neposílají na server – mění jen zobrazení v tomto prohlížeči.");
   b.localRows.push(tRow, srRow, hbRow, noteRow);
   body.append(tRow, srRow, hbRow, noteRow);
+  // editor pilotů
+  const pilotBox = h("div", { class: "pilot-editor" });
+  buildPilotEditor(pilotBox, canEdit, a);
+  b.pilotRows.push(pilotBox);
+  body.append(pilotBox);
   root.append(h("div", { class: "pnl tune-card" }, b.head, b.tabs, body));
   return b;
 }

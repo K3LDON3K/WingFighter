@@ -7,8 +7,10 @@ import { WebSocketServer } from "ws";
 import type { ClientMessage } from "@wingfighter/shared";
 import { Hub } from "./rooms.ts";
 import { loadSavedTuning, TUNING_FILE } from "./tuning-store.ts";
+import { loadPilots } from "./pilot-store.ts";
 
 if (loadSavedTuning()) console.log(`  Načteny uložené parametry: ${TUNING_FILE}`);
+loadPilots();
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? "0.0.0.0";

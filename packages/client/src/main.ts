@@ -1,4 +1,5 @@
 import {
+  setPilots,
   RULES,
   actionCost,
   ANGLE_STEP,
@@ -167,6 +168,7 @@ let tuningOpen = false;
 
 /** Promítne parametry bitvy do pravidel a přepočítá maxima lodí (klientská kopie). */
 function adoptTuning(state: GameState) {
+  if (state.pilots?.length) setPilots(state.pilots);
   if (!state.tuning) return;
   applyTuning(state.tuning);
   for (const sh of state.ships) {
@@ -226,6 +228,7 @@ net.on((msg) => {
     case "room":
       if (room && msg.room && msg.room.code === room.code && msg.room.players.length > room.players.length) sfx("join");
       room = msg.room;
+      if (room?.pilots?.length) setPilots(room.pilots);
       if (!room || !room.inGame) {
         if (game) leaveGame();
       }
@@ -1080,6 +1083,7 @@ function renderSide() {
         onReset: () => net.send({ type: "resetTuning" }),
         onSave: () => net.send({ type: "saveTuning" }),
         onLoad: () => net.send({ type: "loadTuning" }),
+        onSavePilots: (pilots) => net.send({ type: "setPilots", pilots }),
         onClose: () => ((tuningOpen = false), renderSide()),
       });
     } else clear(tuneEl);
@@ -1112,6 +1116,7 @@ function renderSide() {
       select: (id) => {
         game!.selectedShipId = id;
         game!.picking = null;
+        ensureVisible(id);
         renderSide();
       },
       setOrders: (id, patch) => {

@@ -612,6 +612,8 @@ export class Renderer {
       }
       ctx.restore();
     } else drawSprite(ctx, this.sprites.fighter(color), s.x, s.y, s.heading);
+    // vybraná vlastní loď: pulzující bílý překryv siluety (varianta A)
+    if (selected && s.alive) drawSprite(ctx, this.sprites.fighterSilhouette(), s.x, s.y, s.heading, 0.3 + 0.2 * Math.sin(now / 260));
     if (this.stormsRef && pointInStorm(this.stormsRef, s)) drawStormSparks(ctx, s.x, s.y, s.radius, now);
 
     ctx.save();

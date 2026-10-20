@@ -1,7 +1,7 @@
 import { VISION_REF } from "./fog.ts";
 import { FIGHTER_PROFILE } from "./maneuvers.ts";
 import { CARGO, LASER, RULES, SCANNER } from "./constants.ts";
-import type { Facing, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
+import type { Facing, GameSettings, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, PilotMods, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
 
 /**
  * Lodě = trup + pilot + moduly ve slotech.
@@ -15,6 +15,7 @@ export const HULLS: Record<string, HullDef> = {
     name: "Stíhač",
     description: "Malá rychlá loď. Čtyři malé sloty: příď, záď, levobok, pravobok. Příď + záď jde spojit v jeden velký slot.",
     radius: 16,
+    points: 1,
     // kolizní model z pixelového spritu: tělo, příď, levé a pravé křídlo (plameny motorů se nepočítají)
     colliders: [
       { x: -4, y: -1.5, r: 13 },
@@ -34,9 +35,53 @@ export const HULLS: Record<string, HullDef> = {
   },
 };
 
-export const PILOTS: Record<string, PilotDef> = {
-  kadet: { id: "kadet", name: "Kadet", description: "Čerstvý absolvent akademie. Bez zvláštních schopností.", abilities: [] },
-};
+const NO_MODS: PilotMods = { attack: 0, agility: 0, stressMax: 0, maxSpeed: 0, hullPct: 0 };
+/** Slovní popis modifikátorů pilota. */
+export function pilotAbilities(m: PilotMods): string[] {
+  const out: string[] = [];
+  const f = (v: number, what: string) => v && out.push(`${v > 0 ? "+" : ""}${v} ${what}`);
+  f(m.attack, "kostka útoku laserů");
+  f(m.agility, "kostka obrany");
+  f(m.stressMax, "max. stresový bod");
+  f(m.maxSpeed, "max. rychlost");
+  f(m.hullPct, "% trupu");
+  return out;
+}
+export const BUILTIN_PILOTS: PilotDef[] = [
+  { id: "kadet", name: "Kadet", description: "Čerstvý absolvent akademie. Bez výhod i nevýhod – těch může být v letce víc.", abilities: [], mods: { ...NO_MODS }, unique: false, builtin: true },
+  { id: "eso", name: "Eso", description: "Pilot s instinktem pro úhyb: +1 kostka obrany, ale snese méně stresu (−1 max. stresový bod).", abilities: [], mods: { ...NO_MODS, agility: 1, stressMax: -1 }, unique: true, builtin: true },
+  { id: "strelec", name: "Střelec", description: "Mistr zaměřování: +1 kostka útoku laserů, zato letí opatrněji (−1 max. rychlost).", abilities: [], mods: { ...NO_MODS, attack: 1, maxSpeed: -1 }, unique: true, builtin: true },
+  { id: "kapitan", name: "Kapitán", description: "Zkušený velitel s chladnou hlavou: +1 max. stresový bod, ale střílí hůř (−1 kostka útoku).", abilities: [], mods: { ...NO_MODS, stressMax: 1, attack: -1 }, unique: true, builtin: true },
+];
+for (const p of BUILTIN_PILOTS) p.abilities = pilotAbilities(p.mods);
+/** Registr pilotů – server ho může přepsat editovanými (setPilots). */
+export const PILOTS: Record<string, PilotDef> = Object.fromEntries(BUILTIN_PILOTS.map((p) => [p.id, p]));
+export function setPilots(list: PilotDef[]) {
+  for (const k of Object.keys(PILOTS)) delete PILOTS[k];
+  for (const p of list) PILOTS[p.id] = { ...p, abilities: pilotAbilities(p.mods) };
+  if (!PILOTS.kadet) PILOTS.kadet = BUILTIN_PILOTS[0];
+}
+export function pilotList(): PilotDef[] {
+  return Object.values(PILOTS);
+}
+/** Ověří tvar seznamu pilotů od klienta. */
+export function sanitizePilots(raw: unknown): PilotDef[] | null {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 24) return null;
+  const out: PilotDef[] = [];
+  const ids = new Set<string>();
+  const num = (v: unknown, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(Number(v) || 0)));
+  for (const r of raw as Record<string, unknown>[]) {
+    if (!r || typeof r !== "object" || typeof r.id !== "string" || typeof r.name !== "string") return null;
+    const id = r.id.replace(/[^a-z0-9-]/gi, "").slice(0, 24).toLowerCase();
+    if (!id || ids.has(id)) return null;
+    ids.add(id);
+    const m = (r.mods ?? {}) as Record<string, unknown>;
+    const mods: PilotMods = { attack: num(m.attack, -2, 2), agility: num(m.agility, -2, 2), stressMax: num(m.stressMax, -2, 2), maxSpeed: num(m.maxSpeed, -2, 2), hullPct: num(m.hullPct, -50, 50) };
+    out.push({ id, name: r.name.slice(0, 20), description: String(r.description ?? "").slice(0, 300), abilities: pilotAbilities(mods), mods, unique: id === "kadet" ? false : r.unique !== false, builtin: BUILTIN_PILOTS.some((b) => b.id === id) });
+  }
+  if (!ids.has("kadet")) out.unshift(BUILTIN_PILOTS[0]);
+  return out;
+}
 
 /** Lodní systémy (moduly). Ceny a váhy ladí `applyTuning`. */
 export const MODULES: Record<ModuleType, ModuleDef> = {
@@ -244,8 +289,58 @@ export function moduleCost(loadout: ShipLoadout): number {
 
 /** Maximální rychlost po započtení váhy (nejméně 1). */
 export function maxSpeedFor(loadout: ShipLoadout): number {
-  const base = hullOf(loadout).profile.maxSpeed;
+  const base = hullOf(loadout).profile.maxSpeed + (PILOTS[loadout.pilotId]?.mods.maxSpeed ?? 0);
   return Math.max(1, base - Math.floor(loadoutWeight(loadout) / Math.max(0.1, WEIGHT.perSpeed)));
+}
+
+/** Prázdná loď (bez modulů) daného trupu s Kadetem – pro další sloty letky. */
+export function emptyLoadout(hullId = "fighter"): ShipLoadout {
+  return { hullId, pilotId: "kadet", modules: [] };
+}
+export function hullPoints(loadout: ShipLoadout): number {
+  return HULLS[loadout.hullId]?.points ?? 1;
+}
+export function fleetPoints(loadouts: ShipLoadout[]): number {
+  return loadouts.reduce((s, l) => s + hullPoints(l), 0);
+}
+/** Jméno lodi: zkratka hráče · pilot · číslo (když se pilot v letce opakuje). */
+export function shipNames(playerName: string, loadouts: ShipLoadout[]): string[] {
+  const abbr = playerName.replace(/[^\p{L}\p{N}]/gu, "").slice(0, 3).toUpperCase() || "PIL";
+  const counts: Record<string, number> = {};
+  for (const l of loadouts) counts[l.pilotId] = (counts[l.pilotId] ?? 0) + 1;
+  const seen: Record<string, number> = {};
+  return loadouts.map((l) => {
+    const pn = PILOTS[l.pilotId]?.name ?? l.pilotId;
+    seen[l.pilotId] = (seen[l.pilotId] ?? 0) + 1;
+    return counts[l.pilotId] > 1 ? `${abbr}·${pn} ${seen[l.pilotId]}` : `${abbr}·${pn}`;
+  });
+}
+/**
+ * Letka hráče: lodní body musí sedět přesně, trupy a piloti povolení, piloti se schopnostmi unikátní,
+ * id modulů unikátní napříč loděmi; každá loď platná sama o sobě.
+ */
+export function validateFleet(loadouts: ShipLoadout[], settings: Pick<GameSettings, "shipPoints" | "allowedModules" | "allowedHulls" | "allowedPilots">, perShipBudget?: number): string | null {
+  if (loadouts.length === 0) return "letka je prázdná";
+  const pts = fleetPoints(loadouts);
+  if (pts !== settings.shipPoints) return pts < settings.shipPoints ? `využij všechny lodní body (${pts}/${settings.shipPoints})` : `příliš mnoho lodních bodů (${pts}/${settings.shipPoints})`;
+  const ids = new Set<string>();
+  const pilotsUsed = new Set<string>();
+  for (const l of loadouts) {
+    if (settings.allowedHulls?.[l.hullId] === 0) return `${HULLS[l.hullId]?.name ?? l.hullId}: v této hře zakázán`;
+    if (settings.allowedPilots?.[l.pilotId] === 0) return `${PILOTS[l.pilotId]?.name ?? l.pilotId}: v této hře zakázán`;
+    const p = PILOTS[l.pilotId];
+    if (p?.unique) {
+      if (pilotsUsed.has(l.pilotId)) return `${p.name}: v letce může být jen jednou`;
+      pilotsUsed.add(l.pilotId);
+    }
+    for (const m of [...l.modules, ...(l.cargo ?? [])]) {
+      if (ids.has(m.id)) return "duplicitní modul v letce";
+      ids.add(m.id);
+    }
+    const err = validateLoadout(l, { allowed: settings.allowedModules, budget: perShipBudget });
+    if (err) return err;
+  }
+  return null;
 }
 
 /** Pohybový profil lodi s ohledem na váhu. */
@@ -343,6 +438,7 @@ export function computeStats(loadout: ShipLoadout): ShipStats {
     radius: hull.radius,
     colliders: hull.colliders ?? [{ x: 0, y: 0, r: hull.radius }],
     vision: VISION_REF.value,
+    stressMax: STRESS_MAX_REF.value,
     segmentModules: 0,
   };
   for (const m of loadout.modules) {
@@ -355,11 +451,21 @@ export function computeStats(loadout: ShipLoadout): ShipStats {
     if (m.type === "shield-whole") stats.shields += def.shields ?? 0;
     if (m.type === "shield-segment") stats.segmentModules++;
   }
+  // pilot
+  const pm = PILOTS[loadout.pilotId]?.mods;
+  if (pm) {
+    if (stats.attack > 0) stats.attack = Math.max(1, stats.attack + pm.attack);
+    stats.agility = Math.max(0, stats.agility + pm.agility);
+    stats.hull = Math.max(10, Math.round((stats.hull * (100 + pm.hullPct)) / 100));
+    stats.stressMax = Math.max(1, stats.stressMax + pm.stressMax);
+  }
   return stats;
 }
 
 /** Kostky útoku laserů (ladí se). */
 export const LASER_DICE = { value: 2 };
+/** Max. stresových bodů (ladí se; pilot upravuje). */
+export const STRESS_MAX_REF = { value: 3 };
 
 export function hullOf(loadout: ShipLoadout): HullDef {
   return HULLS[loadout.hullId];

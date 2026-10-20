@@ -1,5 +1,8 @@
 import {
-  RULES, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
+  RULES,
+  HULLS,
+  PILOTS,
+  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
 import { logoCanvas } from "./logo.ts";
 import { openMusicPanel } from "./main.ts";
 import { renderMapPreview } from "./map-preview.ts";
@@ -134,6 +137,9 @@ let rerender: () => void = () => {};
 const lobbyTunePanel = h("div", { style: "margin-top:10px" });
 /** Bot, kterému host právě kliká výbavu. */
 let botEdit: string | null = null;
+/** Vybraná loď (záložka) v „Tvoje výbava“ a v editoru bota. */
+let fleetTab = 0;
+let botTab = 0;
 /** Komu host vybírá startovní bod (null = sobě). */
 let startFor: string | null = null;
 
@@ -174,7 +180,8 @@ function roomView(m: LobbyModel, net: Net) {
   const budget = room.tuning.startBudget;
   /** Výbava v řádku hráče: vlastní = editor níže, ostatní = štítek; bot v ručním režimu = host může rozkliknout. */
   const shieldPick = (p: RoomPlayer) => {
-    const tag = loadoutTag(p.loadout);
+    const fleet = p.loadouts?.length ? p.loadouts : [p.loadout];
+    const tag = fleet.length > 1 ? h("span", { class: "lo-tagwrap" }, ...fleet.map((l) => loadoutTag(l))) : loadoutTag(fleet[0]);
     if (p.isBot && isHost && room.settings.botLoadout === "manual") {
       const open = botEdit === p.id;
       return h("span", { class: "lo-tagwrap" }, tag, h("button", { class: open ? "on" : "", title: "Naklikat výbavu bota", onclick: () => ((botEdit = open ? null : p.id), rerender()) }, icon("inventory", "currentColor", 10), label(open ? "zavřít" : "výbava")));
@@ -183,11 +190,37 @@ function roomView(m: LobbyModel, net: Net) {
   };
   const botEditor = (p: RoomPlayer) =>
     botEdit === p.id && p.isBot && isHost && room.settings.botLoadout === "manual"
-      ? h("div", { class: "bot-editor" }, renderLoadout({ loadout: p.loadout, budget, allowed: room.settings.allowedModules, compact: true, onChange: (lo) => net.send({ type: "setLoadout", loadout: lo, botId: p.id }) }))
+      ? (() => {
+          const fleet = p.loadouts?.length ? p.loadouts : [p.loadout];
+          const t = Math.min(botTab, fleet.length - 1);
+          return h(
+            "div",
+            { class: "bot-editor" },
+            fleet.length > 1 ? fleetTabs(fleet, t, (i) => ((botTab = i), rerender())) : null,
+            renderLoadout({ loadout: fleet[t], budget, allowed: room.settings.allowedModules, compact: true, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (lo) => net.send({ type: "setLoadout", loadout: lo, botId: p.id, index: t }) }),
+          );
+        })()
       : null;
 
   const settings = room.settings;
   const set = (patch: Partial<typeof settings>) => net.send({ type: "setSettings", settings: patch });
+  const allowedHullIds = () => Object.keys(HULLS).filter((id) => settings.allowedHulls?.[id] !== 0);
+  const allowedPilotIds = () => Object.keys(PILOTS).filter((id) => settings.allowedPilots?.[id] !== 0);
+  /** Záložky lodí letky: „LOĎ 1 · Stíhač · Kadet“. */
+  const fleetTabs = (fleet: ShipLoadout[], active: number, onPick: (i: number) => void) =>
+    h(
+      "div",
+      { class: "fleet-tabs" },
+      ...fleet.map((l, i) =>
+        h(
+          "button",
+          { class: `fleet-tab ${i === active ? "on" : ""}`, title: `${HULLS[l.hullId]?.name ?? l.hullId} · ${PILOTS[l.pilotId]?.name ?? l.pilotId} · ${l.modules.length} modulů`, onclick: () => onPick(i) },
+          icon("ship", i === active ? "#7dd3fc" : "#64748b", 12),
+          h("span", { class: "ft-n" }, label(`Loď ${i + 1}`)),
+          h("span", { class: "ft-sub txt" }, `${HULLS[l.hullId]?.name ?? l.hullId} · ${PILOTS[l.pilotId]?.name ?? l.pilotId}`),
+        ),
+      ),
+    );
 
   return h(
     "div",
@@ -232,7 +265,18 @@ function roomView(m: LobbyModel, net: Net) {
           { class: "card" },
           h("h3", {}, icon("inventory", "#7dd3fc", 12), " ", label("Tvoje výbava"), h("span", { class: "spacer" }), h("span", { class: "lo-wallet", title: "Kredity: rozpočet místnosti + výdělky z bitev − utracené za výbavu. Výbava, munice i zničené moduly ti mezi bitvami zůstávají." }, icon("credits", "#fbbf24", 12), ` ${me.credits ?? budget}`)),
           h("div", { class: "muted txt" }, `Nové moduly kupuješ za plnou cenu (nový jde před bitvou vrátit za plnou cenu, použitý se prodá za ${RULES.usedSellPct} %, zničený za ${RULES.brokenSellPct} %). Munice se mezi bitvami nedoplňuje sama – dokoupíš ji tlačítkem +cena u modulu (levnější než nový modul). Co neutratíš, máš ve hře jako kredity; další získáš za sestřely a přežitá kola. Váha modulů snižuje max. rychlost lodi.`),
-          renderLoadout({ loadout: me.loadout, budget, wallet: me.credits ?? budget, showCargo: !!me.loadout.cargo?.length, allowed: room.settings.allowedModules, onChange: (lo) => net.send({ type: "setLoadout", loadout: lo }) }),
+          (() => {
+            const fleet = me.loadouts?.length ? me.loadouts : [me.loadout];
+            const t = Math.min(fleetTab, fleet.length - 1);
+            const lo = fleet[t];
+            const pts = fleet.reduce((s, l) => s + (HULLS[l.hullId]?.points ?? 1), 0);
+            return h(
+              "div",
+              {},
+              fleet.length > 1 || settings.shipPoints > 1 ? h("div", { class: "row", style: "align-items:center;gap:10px" }, fleetTabs(fleet, t, (i) => ((fleetTab = i), rerender())), h("span", { class: "txt muted", style: "font-size:13px" }, `lodní body ${pts}/${settings.shipPoints} · jedna peněženka pro celou letku`)) : null,
+              renderLoadout({ loadout: lo, budget, wallet: me.credits ?? budget, showCargo: !!lo.cargo?.length, allowed: room.settings.allowedModules, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (nl) => net.send({ type: "setLoadout", loadout: nl, index: t }) }),
+            );
+          })(),
         )
       : null,
     (() => {
@@ -395,8 +439,43 @@ function roomView(m: LobbyModel, net: Net) {
               "Bitva",
               frow("Herní mód", sel(settings.mode, [["tdm", "Týmový deathmatch"], ["dm", "Deathmatch (všichni proti všem)"]], (v) => set({ mode: v as "tdm" | "dm" }))),
               frow("Limit kol", sel(String(settings.turnLimit), [0, 10, 15, 20, 30, 40].map((n) => [String(n), n === 0 ? "bez limitu" : `${n} kol`]), (v) => set({ turnLimit: Number(v) })), "Při limitu kol vyhrává tým s největším součtem zbývajícího trupu a štítů."),
-              frow("Lodí na hráče", sel(String(settings.shipsPerPlayer), [1, 2, 3, 4].map((n) => [String(n), String(n)]), (v) => set({ shipsPerPlayer: Number(v) }))),
+              frow(
+                "Lodní body na hráče",
+                pips(3, settings.shipPoints, "size", () => icon("ship", "#7dd3fc", 18), () => icon("ship", "#334155", 18), (k) => `${k} lodní body`, (v) => set({ shipPoints: Math.max(1, v) }), `${settings.shipPoints} ${settings.shipPoints === 1 ? "bod" : "body"} · stíhač = 1`),
+                "Každý hráč musí body využít přesně: stíhač stojí 1 bod (větší lodě víc). Všechny lodě hráče mají jednu peněženku.",
+              ),
               frow("Výbava botů", sel(settings.botLoadout, [["default", "výchozí sestava"], ["random", "náhodná"], ["manual", "ruční (naklikám u bota)"]], (v) => set({ botLoadout: v as "default" | "random" | "manual" }))),
+            ),
+            section(
+              "Dostupné lodě a piloti",
+              h(
+                "div",
+                { class: "mod-tiles" },
+                ...Object.values(HULLS).map((hd) => {
+                  const on = settings.allowedHulls?.[hd.id] !== 0;
+                  return h(
+                    "button",
+                    { class: `mod-tile ${on ? "on" : ""}`, disabled: !isHost, style: on ? "border-color:#7dd3fc #0b1020 #0b1020 #7dd3fc" : "", title: `${hd.name}\n${hd.description}\nLodní body: ${hd.points}\n${on ? "Klik = vyřadit z této hry" : "Klik = povolit"}`, onclick: () => set({ allowedHulls: { ...settings.allowedHulls, [hd.id]: on ? 0 : undefined } as Partial<Record<string, number>> }) },
+                    icon("ship", on ? "#7dd3fc" : "#475569", 26),
+                    h("span", { class: "mt-name" }, label(hd.name)),
+                    h("span", { class: "mt-pts" }, `${hd.points} b.`),
+                    h("span", { class: "mt-chk" }, on ? "✓" : ""),
+                  );
+                }),
+                h("span", { class: "mt-gap" }),
+                ...Object.values(PILOTS).map((pd) => {
+                  const on = settings.allowedPilots?.[pd.id] !== 0;
+                  const locked = pd.id === "kadet";
+                  return h(
+                    "button",
+                    { class: `mod-tile pilot ${on ? "on" : ""}`, disabled: !isHost || locked, style: on ? "border-color:#fbbf24 #0b1020 #0b1020 #fbbf24" : "", title: `${pd.name}\n${pd.description}${pd.abilities.length ? `\n${pd.abilities.join(", ")}` : ""}\n${pd.unique ? "Unikátní: v letce jen jednou." : "Může se v letce opakovat."}${locked ? "\nKadet je vždy k dispozici." : on ? "\nKlik = vyřadit z této hry" : "\nKlik = povolit"}`, onclick: () => set({ allowedPilots: { ...settings.allowedPilots, [pd.id]: on ? 0 : undefined } as Partial<Record<string, number>> }) },
+                    icon("people", on ? "#fbbf24" : "#475569", 26),
+                    h("span", { class: "mt-name" }, label(pd.name)),
+                    h("span", { class: "mt-chk" }, on ? "✓" : ""),
+                  );
+                }),
+              ),
+              h("div", { class: "txt muted mt-foot" }, "Piloti se schopnostmi jsou v letce unikátní, Kadet se může opakovat. Pilot zničené lodi zahyne – příští bitvu nastoupí Kadet. Piloty lze upravit v Ladění → Piloti."),
             ),
             section(
               "Dostupné moduly",
@@ -427,6 +506,7 @@ function roomView(m: LobbyModel, net: Net) {
           onReset: () => net.send({ type: "resetTuning" }),
           onSave: () => net.send({ type: "saveTuning" }),
           onLoad: () => net.send({ type: "loadTuning" }),
+          onSavePilots: (pilots) => net.send({ type: "setPilots", pilots }),
           onClose: () => ((tuningOpen = false), rerender()),
         });
         wrap.append(panel);

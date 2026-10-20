@@ -40,7 +40,15 @@ import {
   needsBailout,
   bailoutLoadout,
   moduleSellPrice,
+  emptyLoadout,
+  fleetPoints,
+  validateFleet,
+  HULLS,
+  PILOTS,
+  pilotList,
+  sanitizePilots,
 } from "@wingfighter/shared";
+import { savePilots } from "./pilot-store.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
 import { getSavedTuning, initialTuning, saveTuning } from "./tuning-store.ts";
@@ -59,7 +67,8 @@ interface RoomMember {
   team: number;
   isBot: boolean;
   ready: boolean;
-  loadout: ShipLoadout;
+  /** Letka: jedna výbava na loď (součet lodních bodů = settings.shipPoints). */
+  loadouts: ShipLoadout[];
   /** Bot: výbavu nastavil host ručně (přepíše výchozí/náhodnou při startu). */
   manualLoadout?: boolean;
   /** Zvolený startovní bod. */
@@ -131,7 +140,7 @@ class Room {
   code: string;
   name: string;
   hostId: string;
-  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default", map: { ...DEFAULT_MAP, seed: Math.floor(Math.random() * 100000) } };
+  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, allowedHulls: {}, allowedPilots: {}, botLoadout: "default", map: { ...DEFAULT_MAP, seed: Math.floor(Math.random() * 100000) } };
   tuning: Tuning = initialTuning();
   members = new Map<string, RoomMember>();
   game: RunningGame | null = null;
@@ -155,18 +164,39 @@ class Room {
       tuning: this.tuning,
       savedTuning: getSavedTuning(),
       inGame: !!this.game,
+      pilots: pilotList(),
       players: [...this.members.values()].map((m) => ({
         id: m.id,
         name: m.name,
         team: m.team,
         isBot: m.isBot,
         ready: m.ready,
-        loadout: m.loadout,
+        loadout: m.loadouts[0],
+        loadouts: m.loadouts,
         startIndex: m.startIndex,
         credits: m.isBot ? undefined : this.walletOf(m),
         connected: m.isBot ? true : !!clients.get(m.id)?.ws,
       })),
     };
+  }
+
+  /** Nová letka hráče: první loď výchozí sestava, další prázdné stíhače (podle lodních bodů). */
+  newFleet(): ShipLoadout[] {
+    const out: ShipLoadout[] = [structuredClone(DEFAULT_LOADOUT)];
+    while (fleetPoints(out) < this.settings.shipPoints) out.push(emptyLoadout());
+    return out;
+  }
+
+  /** Po změně lodních bodů: letky členů doplnit prázdnými loděmi, nebo oříznout (moduly se prodají). */
+  resizeFleets(): void {
+    for (const m of this.members.values()) {
+      if (m.isBot) continue;
+      while (fleetPoints(m.loadouts) < this.settings.shipPoints) m.loadouts.push(emptyLoadout());
+      while (fleetPoints(m.loadouts) > this.settings.shipPoints && m.loadouts.length > 1) {
+        const gone = m.loadouts.pop()!;
+        m.spent -= [...gone.modules, ...(gone.cargo ?? [])].reduce((s, mod) => s + moduleSellPrice(mod), 0);
+      }
+    }
   }
 
   /** Kredity člena: rozpočet místnosti + vyděláno v bitvách − utraceno za výbavu. */
@@ -264,7 +294,7 @@ export class Hub {
         const code = this.newCode();
         const r = new Room(code, cleanName(msg.name) || `Místnost ${client.name}`, client.id);
         this.rooms.set(code, r);
-        r.members.set(client.id, { id: client.id, name: client.name, team: 0, isBot: false, ready: false, loadout: structuredClone(DEFAULT_LOADOUT), earned: 0, spent: moduleCost(DEFAULT_LOADOUT) });
+        r.members.set(client.id, { id: client.id, name: client.name, team: 0, isBot: false, ready: false, loadouts: r.newFleet(), earned: 0, spent: moduleCost(DEFAULT_LOADOUT) });
         client.roomCode = code;
         this.broadcastRoom(r);
         this.broadcastRooms();
@@ -276,7 +306,7 @@ export class Hub {
         if (r.game) return this.error(client, "V této místnosti už probíhá hra.");
         if (room && room !== r) this.leaveRoom(client);
         const team = r.settings.mode === "tdm" ? this.smallestTeam(r) : 0;
-        r.members.set(client.id, { id: client.id, name: client.name, team, isBot: false, ready: false, loadout: structuredClone(DEFAULT_LOADOUT), earned: 0, spent: moduleCost(DEFAULT_LOADOUT) });
+        r.members.set(client.id, { id: client.id, name: client.name, team, isBot: false, ready: false, loadouts: r.newFleet(), earned: 0, spent: moduleCost(DEFAULT_LOADOUT) });
         client.roomCode = r.code;
         this.broadcastRoom(r);
         this.broadcastRooms();
@@ -319,21 +349,26 @@ export class Hub {
         if (msg.botId && (room.hostId !== client.id || !m.isBot)) return;
         const lo = cleanLoadout(msg.loadout);
         if (!lo) return this.error(client, "Neplatná výbava.");
+        const idx = clampInt(msg.index ?? 0, 0, m.loadouts.length - 1);
         if (m.isBot) {
           // bot: výbava zdarma (jen platnost a rozpočet)
           const err = validateLoadout(lo, { allowed: room.settings.allowedModules, budget: room.tuning.startBudget });
           if (err) return this.error(client, `Výbava: ${err}.`);
-          m.loadout = lo;
+          m.loadouts[idx] = lo;
           m.manualLoadout = true;
         } else {
-          // hráč: změna je obchod – nákup, prodej, dokoupení munice z kreditů
-          const trade = applyLoadoutTrade(m.loadout, lo);
+          // hráč: změna je obchod – nákup, prodej, dokoupení munice z kreditů (jedna peněženka pro celou letku)
+          const trade = applyLoadoutTrade(m.loadouts[idx], lo);
           if (trade.error) return this.error(client, `Výbava: ${trade.error}.`);
           const err = validateLoadout(trade.loadout, { allowed: room.settings.allowedModules });
           if (err) return this.error(client, `Výbava: ${err}.`);
+          if (room.settings.allowedHulls?.[trade.loadout.hullId] === 0) return this.error(client, `${HULLS[trade.loadout.hullId]?.name ?? trade.loadout.hullId}: v této hře zakázán.`);
+          if (room.settings.allowedPilots?.[trade.loadout.pilotId] === 0) return this.error(client, `${PILOTS[trade.loadout.pilotId]?.name ?? trade.loadout.pilotId}: v této hře zakázán.`);
+          const pilot = PILOTS[trade.loadout.pilotId];
+          if (pilot?.unique && m.loadouts.some((l, i) => i !== idx && l.pilotId === pilot.id)) return this.error(client, `${pilot.name} může být v letce jen jednou.`);
           if (trade.cost > room.walletOf(m)) return this.error(client, `Nedostatek kreditů (potřeba ${trade.cost}, máš ${room.walletOf(m)}).`);
           m.spent += trade.cost;
-          m.loadout = trade.loadout;
+          m.loadouts[idx] = trade.loadout;
         }
         this.broadcastRoom(room);
         return;
@@ -344,7 +379,7 @@ export class Hub {
         const id = `bot-${randomBytes(3).toString("hex")}`;
         const used = new Set([...room.members.values()].map((m) => m.name));
         const name = BOT_NAMES.find((n) => !used.has(`Bot ${n}`)) ?? randomBytes(2).toString("hex");
-        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, MAX_TEAMS_TDM - 1), isBot: true, ready: true, loadout: this.botLoadout(room), earned: 0, spent: 0 });
+        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, MAX_TEAMS_TDM - 1), isBot: true, ready: true, loadouts: this.botFleet(room), earned: 0, spent: 0 });
         this.broadcastRoom(room);
         this.broadcastRooms();
         return;
@@ -362,10 +397,25 @@ export class Hub {
         const s = msg.settings;
         if (s.mode === "tdm" || s.mode === "dm") room.settings.mode = s.mode;
         if (typeof s.turnLimit === "number") room.settings.turnLimit = clampInt(s.turnLimit, 0, 99);
-        if (typeof s.shipsPerPlayer === "number") room.settings.shipsPerPlayer = clampInt(s.shipsPerPlayer, 1, 6);
+        if (typeof s.shipPoints === "number") {
+          room.settings.shipPoints = clampInt(s.shipPoints, 1, 3);
+          room.resizeFleets();
+          for (const m of room.members.values()) if (m.isBot && !m.manualLoadout) m.loadouts = this.botFleet(room);
+        }
         if (s.botLoadout === "default" || s.botLoadout === "random" || s.botLoadout === "manual") {
           room.settings.botLoadout = s.botLoadout;
-          for (const m of room.members.values()) if (m.isBot && !m.manualLoadout) m.loadout = this.botLoadout(room);
+          for (const m of room.members.values()) if (m.isBot && !m.manualLoadout) m.loadouts = this.botFleet(room);
+        }
+        if (s.allowedHulls && typeof s.allowedHulls === "object") {
+          const out: Partial<Record<string, number>> = {};
+          for (const id of Object.keys(HULLS)) if ((s.allowedHulls as Record<string, unknown>)[id] === 0) out[id] = 0;
+          if (Object.keys(HULLS).every((id) => out[id] === 0)) delete out[Object.keys(HULLS)[0]]; // aspoň jeden trup musí zůstat
+          room.settings.allowedHulls = out;
+        }
+        if (s.allowedPilots && typeof s.allowedPilots === "object") {
+          const out: Partial<Record<string, number>> = {};
+          for (const id of Object.keys(PILOTS)) if ((s.allowedPilots as Record<string, unknown>)[id] === 0 && id !== "kadet") out[id] = 0; // Kadet vždy
+          room.settings.allowedPilots = out;
         }
         if (s.map && typeof s.map === "object") {
           room.settings.map = sanitizeMapSettings(s.map, room.settings.map ?? DEFAULT_MAP);
@@ -382,6 +432,18 @@ export class Hub {
           room.settings.allowedModules = out;
         }
         this.broadcastRoom(room);
+        return;
+      }
+      case "setPilots": {
+        if (!room || room.hostId !== client.id) return;
+        const list = sanitizePilots(msg.pilots);
+        if (!list) return this.error(client, "Neplatný seznam pilotů.");
+        savePilots(list);
+        // piloti, kteří zmizeli, se v letkách nahradí Kadetem
+        for (const r of this.rooms.values()) {
+          for (const m of r.members.values()) for (const l of m.loadouts) if (!PILOTS[l.pilotId]) l.pilotId = "kadet";
+          this.broadcastRoom(r);
+        }
         return;
       }
       case "setTuning":
@@ -484,12 +546,12 @@ export class Hub {
       return this.error(host, "V týmovém módu musí být obsazené alespoň dva týmy.");
     }
     for (const m of members) {
-      if (m.isBot && !m.manualLoadout) m.loadout = this.botLoadout(room);
-      const err = validateLoadout(m.loadout, { allowed: room.settings.allowedModules, budget: m.isBot ? room.tuning.startBudget : undefined });
-      if (err) return this.error(host, `${m.name} – výbava: ${err}.`);
+      if (m.isBot && !m.manualLoadout) m.loadouts = this.botFleet(room);
+      const err = validateFleet(m.loadouts, room.settings, m.isBot ? room.tuning.startBudget : undefined);
+      if (err) return this.error(host, `${m.name} – letka: ${err}.`);
       if (!m.isBot) m.walletAtStart = room.walletOf(m);
     }
-    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadout), credits: m.isBot ? undefined : room.walletOf(m), startIndex: m.startIndex }));
+    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadouts[0]), loadouts: m.loadouts.map(refillLoadout), credits: m.isBot ? undefined : room.walletOf(m), startIndex: m.startIndex }));
     const state = createGame({ players, settings: room.settings, tuning: room.tuning });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     room.game = { state, orders: new Map(), rng, memory: new Map(), pendingEvents: [] };
@@ -507,6 +569,19 @@ export class Hub {
   }
 
   /** Výbava bota podle nastavení místnosti. */
+  /** Letka bota: tolik lodí, kolik je lodních bodů (každá podle nastavení výbavy botů). */
+  private botFleet(room: Room): ShipLoadout[] {
+    const out: ShipLoadout[] = [];
+    while (fleetPoints(out) < room.settings.shipPoints) {
+      const k = out.length;
+      const lo = this.botLoadout(room);
+      // id modulů musí být v letce unikátní
+      lo.modules = lo.modules.map((m) => ({ ...m, id: `s${k}-${m.id}` }));
+      out.push(lo);
+    }
+    return out;
+  }
+
   private botLoadout(room: Room): ShipLoadout {
     applyTuning(room.tuning);
     const allowed = room.settings.allowedModules;
@@ -528,7 +603,7 @@ export class Hub {
       s.stats = stats;
       s.hull = Math.min(s.hull, stats.hull);
       s.shields = Math.min(s.shields, stats.shields);
-      s.stressPoints = Math.min(s.stressPoints, g.state.tuning.stressMax);
+      s.stressPoints = Math.min(s.stressPoints, stats.stressMax);
     }
     this.broadcast(room, { type: "tuning", tuning: g.state.tuning });
   }
@@ -603,23 +678,27 @@ export class Hub {
     g.settled = true;
     for (const m of room.members.values()) {
       if (m.isBot) continue;
-      const ship = g.state.ships.find((s) => s.ownerId === m.id);
-      if (ship) {
-        const lo = structuredClone(ship.loadout);
-        if (!ship.alive) {
-          // vrak: co nevypadlo, je zničené
-          for (const mod of [...lo.modules, ...(lo.cargo ?? [])]) mod.hp = 0;
-        }
-        m.loadout = settleLoadoutAfterBattle(lo);
+      const mine = g.state.ships.filter((s) => s.ownerId === m.id);
+      if (mine.length) {
+        m.loadouts = mine.map((ship) => {
+          const lo = structuredClone(ship.loadout);
+          if (!ship.alive) {
+            // vrak: co nevypadlo, je zničené; pilot zahynul → příště Kadet
+            for (const mod of [...lo.modules, ...(lo.cargo ?? [])]) mod.hp = 0;
+            lo.pilotId = "kadet";
+          }
+          return settleLoadoutAfterBattle(lo);
+        });
       }
       const p = g.state.players.find((x) => x.id === m.id);
       if (p && p.credits !== undefined && m.walletAtStart !== undefined) m.earned += p.credits - m.walletAtStart;
       m.walletAtStart = undefined;
       // krach: bez funkčních modulů a bez kreditů → startovní loď zdarma (zničené zbytky se automaticky prodají)
-      if (needsBailout(m.loadout, room.walletOf(m))) {
-        const scrap = [...m.loadout.modules, ...(m.loadout.cargo ?? [])].reduce((s, mod) => s + moduleSellPrice(mod), 0);
+      const allMods = m.loadouts.flatMap((l) => [...l.modules, ...(l.cargo ?? [])]);
+      if (needsBailout({ ...m.loadouts[0], modules: allMods, cargo: undefined }, room.walletOf(m))) {
+        const scrap = allMods.reduce((s, mod) => s + moduleSellPrice(mod), 0);
         m.spent -= scrap;
-        m.loadout = bailoutLoadout(m.loadout);
+        m.loadouts = m.loadouts.map((l, i) => (i === 0 ? bailoutLoadout(l) : { ...emptyLoadout(l.hullId), pilotId: l.pilotId }));
         const c = this.clients.get(m.id);
         if (c) this.send(c, { type: "notice", message: `Přišel jsi o všechno – dostáváš startovní loď zdarma (záchranná výbava nejde prodat). Kredity: ${room.walletOf(m)}.` });
       }

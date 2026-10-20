@@ -1,7 +1,7 @@
 import { generateProfile } from "./asteroids.ts";
 import { MAP, RULES } from "./constants.ts";
 import type { Pose } from "./geometry.ts";
-import { computeStats, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf } from "./ships.ts";
+import { computeStats, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf, shipNames, pilotList } from "./ships.ts";
 import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
 import type { Asteroid, GameSettings, GameState, PlayerInfo, Ship, ShipLoadout, Storm } from "./types.ts";
 import { generateMap, START_MARGIN } from "./mapgen.ts";
@@ -70,8 +70,9 @@ export function createGame(opts: CreateGameOptions): GameState {
   const tuning = sanitizeTuning(opts.tuning ?? DEFAULT_TUNING);
   applyTuning(tuning);
   let players = opts.players.map((p) => {
-    const loadout = refillLoadout(p.loadout ?? opts.loadout ?? DEFAULT_LOADOUT);
-    return { ...p, loadout, credits: p.credits ?? Math.max(0, tuning.startBudget - moduleCost(loadout)) };
+    const loadouts = (p.loadouts?.length ? p.loadouts : [p.loadout ?? opts.loadout ?? DEFAULT_LOADOUT]).map(refillLoadout);
+    const loadout = loadouts[0];
+    return { ...p, loadout, loadouts, credits: p.credits ?? Math.max(0, tuning.startBudget - loadouts.reduce((s, l) => s + moduleCost(l), 0)) };
   });
   if (settings.mode === "dm") players = players.map((p, i) => ({ ...p, team: i }));
 
@@ -130,7 +131,7 @@ export function createGame(opts: CreateGameOptions): GameState {
   teams.forEach((team, zi) => {
     const zoneT = zones[zi];
     const members = players.filter((p) => p.team === team);
-    const total = members.length * Math.max(1, settings.shipsPerPlayer);
+    const total = members.reduce((s, p) => s + (p.loadouts?.length ?? 1), 0);
     const spacing = 60;
     let idx = 0;
     for (const p of members) {
@@ -138,16 +139,18 @@ export function createGame(opts: CreateGameOptions): GameState {
       // kolmice ke kurzu zóny
       const px = -Math.sin(zone.heading);
       const py = Math.cos(zone.heading);
-      const perPlayer = Math.max(1, settings.shipsPerPlayer);
+      const fleet = p.loadouts!;
+      const perPlayer = fleet.length;
+      const names = shipNames(p.name, fleet);
       for (let k = 0; k < perPlayer; k++) {
         const offset = startAt ? (k - (perPlayer - 1) / 2) * spacing : (idx - (total - 1) / 2) * spacing;
-        const loadout = structuredClone(p.loadout!);
+        const loadout = structuredClone(fleet[k]);
         const stats = computeStats(loadout);
         ships.push({
           id: `ship-${p.id}-${k}`,
           ownerId: p.id,
           team,
-          name: settings.shipsPerPlayer > 1 ? `${p.name} ${k + 1}` : p.name,
+          name: perPlayer > 1 ? names[k] : p.name,
           loadout,
           stats,
           x: zone.x + px * offset,
@@ -158,7 +161,7 @@ export function createGame(opts: CreateGameOptions): GameState {
           shieldType: shieldTypeOf(loadout),
           shieldEff: 100,
           segments: [RULES.segmentHp * stats.segmentModules, RULES.segmentHp * stats.segmentModules, RULES.segmentHp * stats.segmentModules, RULES.segmentHp * stats.segmentModules],
-          stressPoints: tuning.stressMax,
+          stressPoints: stats.stressMax,
           speed: 2,
           tokens: { focus: 0, evade: 0 },
           ammo: { torpedoes: stats.torpedoes, mines: stats.mines },
@@ -172,6 +175,7 @@ export function createGame(opts: CreateGameOptions): GameState {
   return {
     turn: 1,
     settings,
+    pilots: pilotList(),
     tuning,
     width,
     height,

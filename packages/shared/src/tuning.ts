@@ -4,7 +4,7 @@
  */
 import { CARGO, COMET, CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
-import { HULLS, LASER_DICE, MODULE_HP_PCT, MODULES, WEIGHT } from "./ships.ts";
+import { HULLS, LASER_DICE, MODULE_HP_PCT, MODULES, STRESS_MAX_REF, WEIGHT } from "./ships.ts";
 
 export interface Tuning {
   // zranění
@@ -414,6 +414,7 @@ export function applyTuning(t: Tuning): void {
   RULES.collisionEdge = t.collisionEdge;
   STRESS.dangerHullPercent = t.dangerHullPercent;
   STRESS.max = t.stressMax;
+  STRESS_MAX_REF.value = t.stressMax;
   STRESS.costRed = t.stressCostRed;
   STRESS.costDanger = t.stressCostDanger;
   STRESS.regenGreen = t.stressRegenGreen;

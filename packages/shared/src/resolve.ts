@@ -950,7 +950,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       } else hullHeal();
     } else {
       const before = ship.stressPoints;
-      ship.stressPoints = STRESS.max;
+      ship.stressPoints = ship.stats.stressMax;
       if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
       awardCredits(state, events, ship.ownerId, COMET.noShieldCredits, "tail");
       push("stress", COMET.noShieldCredits);
@@ -1353,7 +1353,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       if (man.koiogran) stM.maneuvers.koiogran++;
     }
     const before = ship.stressPoints;
-    ship.stressPoints = clamp(ship.stressPoints - cost, 0, STRESS.max);
+    ship.stressPoints = clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
     if (man.difficulty === "danger") applyDamage(ship, Math.max(1, Math.round((ship.stats.hull * STRESS.dangerHullPercent) / 100)), events);
     // skener: cooldown odpočítává; po jeho konci plné náboje; jinak zelený manévr dobije +1
