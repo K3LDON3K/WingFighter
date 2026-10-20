@@ -238,7 +238,6 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     h("div", { class: "man-angle" }, cur.koiogran ? "180°" : `${Math.abs(cur.angle)}°`),
     h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (stressCost(man.difficulty) > ship.stressPoints ? "chybí stres" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
     h("div", { class: "spacer" }),
-    h("div", { class: "muted man-hint" }, label(aiming ? "kreslíš dráhu" : "akce manévr")),
     h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
   );
 
