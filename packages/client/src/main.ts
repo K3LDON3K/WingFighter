@@ -1069,6 +1069,16 @@ function renderSide() {
         if (mod) showNotice(`Vyhodí se: ${MODULES[mod.type].name} (na začátku kola)`);
         renderSide();
       },
+      cancelAction: (id) => {
+        const g = game!;
+        const o = g.orders.get(id);
+        if (!o) return;
+        g.orders.set(id, { ...o, action: undefined });
+        g.cargoOpen = false;
+        g.shieldEdit = false;
+        g.jettisonPick = false;
+        renderSide();
+      },
       cargoToggle: (id) => {
         game!.selectedShipId = id;
         game!.cargoOpen = !game!.cargoOpen;

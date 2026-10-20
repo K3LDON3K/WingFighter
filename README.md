@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.16 – zrušení naplánované akce: pod tlačítkem NÁKLAD (vyhodit / zvednout) a ŠTÍT se při aktivní akci
+  zobrazí červený proužek ✕ přes celou šířku; klik akci zruší.
 - v3.15.3 – výběr modulu k vyhození rovnou zavře okénko nákladu a ukáže oznámení; tlačítko zůstává označené
   (VYHODIT ✔) a řádek pod akcemi říká, co se vyhodí.
 - v3.15.2 – náklad: po výběru modulu zelené potvrzení „✔ vyhodí se: …“ (v okénku i pod akcemi), vybraný hex

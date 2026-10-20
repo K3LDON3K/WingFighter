@@ -40,6 +40,8 @@ export interface PlanningCallbacks {
   select(shipId: string): void;
   setOrders(shipId: string, patch: Partial<ShipOrders>): void;
   chooseAction(shipId: string, actionId: string): void;
+  /** Zrušit naplánovanou akci (křížek pod tlačítkem s podnabídkou). */
+  cancelAction(shipId: string): void;
   aim(shipId: string): void;
   ready(): void;
   unready(): void;
@@ -310,6 +312,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   for (let i = 0; i < RULES.actionPoints; i++) apips.append(h("i", { class: i < RULES.actionPoints - acts.length ? "on" : "" }));
   /** Kolik akcí tlačítko právě stojí (tečky): otočka 2, manévr 1 (jen když se liší od rovně stejnou rychlostí), ostatní 1. */
   const dotsFor = (id: string) => (id === "koiogran" ? (acts.some((a) => a.id === "koiogran") ? 2 : 0) : id === "move" ? (acts.some((a) => a.id === "move") && !acts.some((a) => a.id === "koiogran") ? 1 : 0) : acts.some((a) => a.id === id) ? 1 : 0);
+  /** Křížek přes celou šířku pod tlačítkem – zruší naplánovanou akci. */
+  const cancelStrip = (what: string) => h("button", { class: "px act-cancel", disabled: locked, title: `Zrušit: ${what}`, onclick: () => cb.cancelAction(ship.id) }, "✕");
   const buttons = h("div", { class: "bb-weapons" });
   for (const grp of ACTION_GROUPS) {
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
@@ -336,7 +340,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
         );
-      if (a.id === "shield" && shieldPop) row.append(h("div", { class: "scan-holder" }, wbtn, shieldPop));
+      if (a.id === "shield" && planned) row.append(h("div", { class: "scan-holder stack" }, shieldPop, wbtn, cancelStrip("úprava štítu")));
       else row.append(wbtn);
     }
     if (grp.label === "Speciální") {
@@ -357,7 +361,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
           h("span", { class: "lbl" }, label(lbl)),
         );
-      const holder = h("div", { class: "scan-holder" });
+      const holder = h("div", { class: `scan-holder ${cargoActive ? "stack" : ""}` });
       holder.append(
         h(
           "button",
@@ -397,6 +401,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         } else pop.append(h("div", { class: "muted cargo-note" }, label(`náklad ${(ship.loadout.cargo ?? []).length}/${cargoCapacity(ship.loadout)}`)));
         holder.append(pop);
       }
+      if (cargoActive) holder.append(cancelStrip(jetOn ? "vyhození modulu" : "zvednutí nákladu"));
       row.append(holder);
       const sc = scannerModule(ship.loadout);
       if (sc) {
