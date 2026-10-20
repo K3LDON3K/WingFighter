@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.23 – čtvrtá vestavěná skladba **„Wingfighter – hlubina (Space)“** (G dórská, 100 BPM, 160 dob ≈ 96 s):
+  ambientní let vesmírem ve stylu „Space“ skladeb ze Space Rangers – pady s dronem, sekvencovaná basa,
+  melancholický lead s ozvěnou, třpytivé arpeggio, měkké bicí; hodí se do menu i do playlistu bitvy.
 - v3.22 – třetí vestavěná skladba **„Wingfighter – bitva II (Rangers)“** (D moll, 138 BPM, 176 dob ≈ 77 s):
   elektronika ve stylu Space Rangers – pumpující kopák, offbeatová basa, šestnáctinová arpeggia, build-up
   se zhušťujícím snarem a šumovým nájezdem (nový hlas `riser`), drop se širokým leadem a harmonií, break

@@ -25,6 +25,7 @@ const STORE = "tracks";
 export const SYNTH_MENU: Track = { id: "synth-menu", name: "Wingfighter – hlavní menu", kind: "synth" };
 export const SYNTH_GAME: Track = { id: "synth-game", name: "Wingfighter – bitva", kind: "synth" };
 export const SYNTH_GAME2: Track = { id: "synth-game2", name: "Wingfighter – bitva II (Rangers)", kind: "synth" };
+export const SYNTH_SPACE: Track = { id: "synth-space", name: "Wingfighter – hlubina (Space)", kind: "synth" };
 
 let settings: MusicSettings = { menuTrackId: SYNTH_MENU.id, gameTrackIds: [SYNTH_GAME.id, SYNTH_GAME2.id], volume: 0.5 };
 try {
@@ -131,7 +132,7 @@ export async function removeFile(id: string) {
 }
 
 export function allTracks(): Track[] {
-  return [SYNTH_MENU, SYNTH_GAME, SYNTH_GAME2, ...files];
+  return [SYNTH_MENU, SYNTH_GAME, SYNTH_GAME2, SYNTH_SPACE, ...files];
 }
 
 /* ---------- přehrávání ---------- */
@@ -525,8 +526,75 @@ const GAME2_SONG: Song = (() => {
   return { bpm: 138, beats: b, ev, drums: d, bright: true };
 })();
 
+/* ===== Hlubina: G dórská, 100 BPM, 160 dob (~96 s) – ambientní let vesmírem ve stylu Space Rangers
+   („Space“ skladby): pomalé pady, sekvencovaná basa, melancholický lead s ozvěnou, lehké elektronické bicí ===== */
+const SPACE_SONG: Song = (() => {
+  const ev: Ev[] = [];
+  const d: Drums = { kick: [], snare: [], hat: [], ohat: [] };
+  type Bar = [string, keyof typeof CH];
+  const A: Bar[] = [["G2", "m7"], ["Bb2", "M7"], ["F2", "M"], ["C3", "M"]];
+  const B: Bar[] = [["Eb2", "M7"], ["F2", "M"], ["G2", "m7"], ["D2", "m7"]];
+  const C: Bar[] = [["G2", "m7"], ["C3", "M7"]];
+  type Style = "intro" | "flow" | "lift" | "deep" | "outro";
+  const plan: { bars: Bar[]; style: Style; times: number }[] = [
+    { bars: [["G2", "m7"], ["Eb2", "M7"]], style: "intro", times: 1 },
+    { bars: A, style: "flow", times: 1 },
+    { bars: B, style: "lift", times: 1 },
+    { bars: A, style: "flow", times: 1 },
+    { bars: C, style: "deep", times: 2 },
+    { bars: [["G2", "m7"], ["Eb2", "M7"]], style: "outro", times: 1 },
+  ];
+  const chordMap: [number, number[]][] = [];
+  const sections: [number, Style][] = [];
+  let b = 0;
+  for (const sec of plan) {
+    sections.push([b, sec.style]);
+    const secStart = b;
+    for (let t = 0; t < sec.times; t++)
+      for (const [root, type] of sec.bars) {
+        const r = midi(root);
+        const ch = chordNotes(root, type).map((n) => n + 12);
+        chordMap.push([b, ch]);
+        const s = sec.style;
+        const rel = b - secStart;
+        pad(b, 8, ch, s === "deep" ? 0.06 : 0.045, ev);
+        ev.push({ v: "sub", b, l: 7.9, n: r - 12, vel: 0.1 });
+        // sekvencovaná basa: osminy s oktávou na každé 4., v intru/outru jen dlouhý tón
+        if (s === "intro" || s === "outro") ev.push({ v: "bass", b, l: 7.5, n: r, vel: 0.07 });
+        else if (s === "deep") for (let i = 0; i < 8; i++) ev.push({ v: "bass", b: b + i, l: 0.6, n: r + (i % 4 === 2 ? 7 : 0), vel: 0.08 });
+        else for (let i = 0; i < 16; i++) ev.push({ v: "bass", b: b + i * 0.5, l: 0.35, n: r + (i % 4 === 3 ? 12 : i % 8 === 6 ? 7 : 0), vel: 0.1 });
+        // třpytivé arpeggio – v dórské tónině zní otevřeně
+        if (s === "intro") { if (rel >= 8) arp(b, 8, ch, [0, 2, 4, 6], 1, 0.035, ev); }
+        else if (s === "outro") arp(b, 8, ch, [4, 2, 0, 2], 1, 0.03, ev);
+        else if (s === "deep") arp(b, 8, ch, [0, 1, 2, 3, 4, 3, 2, 1], 0.5, 0.03, ev);
+        else arp(b, 8, ch, [0, 2, 1, 3, 4, 2, 5, 3], 0.5, 0.04, ev);
+        // bicí: měkké, elektronické; v hlubině jen hi-hat
+        if (s === "flow" || s === "lift") {
+          d.kick.push(b, b + 2.5, b + 4, b + 6.5);
+          d.snare.push(b + 2, b + 6);
+          d.hat.push(...rep([0.5, 1, 1.5, 2.5, 3, 3.5], 4, 2, b));
+          if (s === "lift") d.ohat.push(b + 3.5, b + 7.5);
+        } else if (s === "deep") d.hat.push(...rep([1, 3], 4, 2, b));
+        b += 8;
+      }
+  }
+  const starts = sections.map(([s]) => s);
+  // melancholická melodie – dlouhé tóny s vibratem, pauzy nechávají dýchat ozvěnu
+  const melA = "D5:3 F5:1 G5:3 -:1  A5:2 G5:1 F5:3 D5:2  C5:3 D5:1 F5:2 E5:2  G5:4 -:4";
+  const melB = "Bb5:3 A5:1 G5:2 F5:2  A5:3 G5:1 F5:2 D5:2  G5:2 A5:1 Bb5:3 A5:2  F5:3 E5:1 D5:4";
+  const melA2 = "D5:1.5 F5:0.5 G5:2 A5:2 C6:2  Bb5:2 A5:1 G5:3 F5:2  G5:1.5 F5:0.5 D5:2 C5:2 D5:2  G5:3 F5:1 D5:4";
+  const melC = "D4:3 F4:1 G4:4  A4:2 G4:2 F4:4  C4:3 D4:1 F4:2 G4:2  D4:8";
+  phrase("lead", starts[1], melA, 0.085, ev, 0.95);
+  phrase("lead", starts[2], melB, 0.09, ev, 0.95);
+  phrase("lead", starts[3], melA2, 0.09, ev, 0.95);
+  phrase("brass", starts[4] + 8, melC, 0.06, ev, 0.97); // hluboký „sbor“ v hlubině
+  const chordAt = (x: number) => [...chordMap].reverse().find(([s]) => s <= x)?.[1] ?? [];
+  harmonize(ev, starts[3], starts[4], chordAt, 0.045, ev);
+  return { bpm: 100, beats: b, ev, drums: d, bright: false };
+})();
+
 function songOf(id: string): Song {
-  return id === SYNTH_MENU.id ? MENU_SONG : id === SYNTH_GAME2.id ? GAME2_SONG : GAME_SONG;
+  return id === SYNTH_MENU.id ? MENU_SONG : id === SYNTH_GAME2.id ? GAME2_SONG : id === SYNTH_SPACE.id ? SPACE_SONG : GAME_SONG;
 }
 
 /** Pulzní vlna s danou střídou (klasický chiptune zvuk). */
