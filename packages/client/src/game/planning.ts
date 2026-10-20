@@ -270,6 +270,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
             title: `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`,
             onclick: () => (isMove ? cb.aim(ship.id) : cb.chooseAction(ship.id, a.id)),
           },
+          h("span", { class: "c", title: a.id === "koiogran" ? "stojí 2 akce" : a.id === "move" ? "stojí 1 akci (rovně stejnou rychlostí zdarma)" : "stojí 1 akci" }, a.id === "koiogran" ? "2" : "1"),
           icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit"))),
           dotEl,
@@ -283,7 +284,8 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         const charges = sc.charges ?? 0;
         const cd = sc.cooldown ?? 0;
         const pips = h("span", { class: "scan-pips" });
-        const slots = Math.max(SCANNER.charges, SCANNER.cooldown);
+        // bez cooldownu: políčka = náboje; při cooldownu: políčka = délka cooldownu (červeně zbývající kola)
+        const slots = cd > 0 ? SCANNER.cooldown : SCANNER.charges;
         for (let i = 0; i < slots; i++) pips.append(h("i", { class: cd > 0 ? (i < cd ? "red" : "") : i < charges ? "on" : "" }));
         const holder = h("div", { class: "scan-holder" });
         holder.append(

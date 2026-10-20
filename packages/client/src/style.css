@@ -1553,15 +1553,18 @@ button.px.tiny {
 .scan-pop .bb-weapon.on {
   background: var(--accent);
 }
-.scan-pop .bb-weapon .c {
+.bb-weapon .c {
   position: absolute;
   top: 3px;
   right: 4px;
   font-size: 7px;
   color: #fbbf24;
 }
-.scan-pop .bb-weapon.on .c {
+.bb-weapon.on .c {
   color: #7f1d1d;
+}
+.bb-weapon:disabled .c {
+  color: #94a3b8;
 }
 .scan-slide .sm {
   font-size: 6px;

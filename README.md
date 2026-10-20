@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.10.1 – každé tlačítko akce má vpravo nahoře žlutou cenu v akcích (1, otočka 2); tlačítko skeneru ukazuje
+  jen náboje (2 políčka), při cooldownu 3 políčka s odpočtem.
 - v3.10 – akce: nové tlačítko **MANÉVR** (první v Pohybu) nahrazuje NAKRESLIT – klik začne kreslit dráhu,
   znovu = potvrdit (mezerník a klik na loď fungují dál); panel MANÉVR vpravo je jen informativní. Za co
   byly akce vyčerpány ukazují červené pilulky: v hlavičce AKCE (použité červeně + „2/2 použito“) a vlevo
