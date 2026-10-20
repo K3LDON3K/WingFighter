@@ -426,9 +426,9 @@ function confirmKey() {
 }
 function loadAskConfirm(): boolean {
   try {
-    return localStorage.getItem(confirmKey()) !== "off";
+    return localStorage.getItem(confirmKey()) === "on";
   } catch {
-    return true;
+    return false;
   }
 }
 function setAskConfirm(ask: boolean) {
@@ -854,6 +854,16 @@ function toggleMenu(open?: boolean) {
 }
 
 /** Herní menu (Esc): pokračovat, ukončit bitvu (host – vrátí všechny do místnosti), opustit hru. */
+function mbtn(ic: Parameters<typeof icon>[0], text: string, key: string, onclick: () => void, cls = "", hint = "", disabled = false) {
+  return h(
+    "button",
+    { class: `px menu-btn ${cls}`, disabled, title: hint, onclick },
+    h("span", { class: "mi" }, icon(ic, "currentColor", 12)),
+    h("span", { class: "ml" }, label(text), hint ? h("span", { class: "mh" }, hint) : null),
+    key ? h("span", { class: "sub" }, key) : null,
+  );
+}
+
 function renderMenu() {
   if (!menuEl || !game) return;
   clear(menuEl);
@@ -864,28 +874,14 @@ function renderMenu() {
     h(
       "div",
       { class: "pnl menu-card" },
-      h("div", { class: "menu-title" }, label("Menu")),
-      h("div", { class: "muted txt" }, `Kolo ${game.state.turn} · ${room?.name ?? ""}`),
-      h("button", { class: "px menu-btn primary", onclick: () => toggleMenu(false) }, icon("play", "currentColor", 12), " ", label("Pokračovat"), h("span", { class: "sub" }, "ESC")),
-      isHost
-        ? h(
-            "button",
-            { class: "px menu-btn", title: "Ukončí bitvu pro všechny a vrátí hráče do místnosti (výbava a nastavení zůstanou)", onclick: () => net.send({ type: "backToLobby" }) },
-            icon("people", "currentColor", 12),
-            " ",
-            label("Ukončit bitvu – do místnosti"),
-          )
-        : h("div", { class: "muted txt menu-note" }, "Bitvu může pro všechny ukončit jen host."),
-      h(
-        "button",
-        { class: "px menu-btn danger", title: "Opustí místnost; bitva ostatních pokračuje bez tebe", onclick: () => askLeave() },
-        icon("wait", "currentColor", 12),
-        " ",
-        label("Opustit hru – hlavní menu"),
-      ),
-      h("button", { class: "px menu-btn", onclick: () => showStats() }, icon("log", "currentColor", 12), " ", label("Tabulka skóre"), h("span", { class: "sub" }, "TAB")),
-      h("button", { class: "px menu-btn", onclick: () => openMusicPanel() }, icon("log", "currentColor", 12), " ", label("Hudba a zvuk"), h("span", { class: "sub" }, "M = ztlumit")),
-      h("div", { class: "muted txt menu-note" }, "Esc během plánování nejdřív ruší rozdělanou akci (kreslení dráhy, výběr cíle), prázdný Esc otevře menu."),
+      h("div", { class: "menu-head" }, h("div", { class: "menu-title" }, label("Menu")), h("div", { class: "muted txt" }, `Kolo ${game.state.turn} · ${room?.name ?? ""}`)),
+      mbtn("play", "Pokračovat", "ESC", () => toggleMenu(false), "primary"),
+      h("div", { class: "menu-sep" }, label("Přehled")),
+      mbtn("log", "Tabulka skóre", "TAB", () => showStats()),
+      mbtn("wait", "Hudba a zvuk", "M", () => openMusicPanel(), "", "M = ztlumit vše"),
+      h("div", { class: "menu-sep" }, label("Odchod")),
+      mbtn("people", "Ukončit bitvu pro všechny", isHost ? "" : "jen host", () => net.send({ type: "backToLobby" }), "", "Vrátí všechny hráče do místnosti; výbava a nastavení zůstanou.", !isHost),
+      mbtn("wait", "Opustit hru", "", () => askLeave(), "danger", "Odejdeš do hlavního menu; bitva ostatních pokračuje bez tebe."),
     ),
   );
 }

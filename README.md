@@ -145,6 +145,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.24 – UI: po spuštění kola i během vyhodnocování zůstává spodní lišta vidět, jen jsou všechna tlačítka
+  vypnutá (tlačítko SPUSTIT ukazuje „kolo probíhá…“). Výchozí stav přepínače „potvrzení nevyužitých akcí“
+  je nově **vypnuto**. Esc menu přehlednější: jednotná tlačítka (ikona · název · klávesa), skupiny Přehled
+  (tabulka skóre, hudba a zvuk) a Odchod (ukončit bitvu pro všechny – jen host, opustit hru), popisky přímo
+  v tlačítkách.
 - v3.23 – čtvrtá vestavěná skladba **„Wingfighter – hlubina (Space)“** (G dórská, 100 BPM, 160 dob ≈ 96 s):
   ambientní let vesmírem ve stylu „Space“ skladeb ze Space Rangers – pady s dronem, sekvencovaná basa,
   melancholický lead s ozvěnou, třpytivé arpeggio, měkké bicí; hodí se do menu i do playlistu bitvy.

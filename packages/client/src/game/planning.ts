@@ -28,6 +28,7 @@ import {
   type MineSide,
   type Segments,
   type ShipOrders,
+  defaultOrders,
 } from "@wingfighter/shared";
 import { clear, h } from "../dom.ts";
 import { icon, label, segBar } from "../icons.ts";
@@ -152,20 +153,9 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     );
     return;
   }
-  if (m.animating) {
-    root.append(
-      h(
-        "div",
-        { class: "pnl bb-status" },
-        h("div", { class: "bb-big" }, icon("play", "#7dd3fc", 18), label("Vyhodnocení kola")),
-        h("div", { class: "txt muted" }, "Sleduj mapu…"),
-      ),
-    );
-    return;
-  }
-
-  const o = m.orders.get(ship.id)!;
-  const locked = m.submitted;
+  const o = m.orders.get(ship.id) ?? defaultOrders(ship);
+  // po odeslání i během vyhodnocování kola zůstává lišta vidět, jen jsou všechna tlačítka vypnutá
+  const locked = m.submitted || m.animating;
   const man = resolveManeuver(profileOf(ship.loadout), o.maneuverId, ship.speed);
   const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
   const acts = actionList(ship, o);
@@ -580,13 +570,16 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         "button",
         {
           class: "px bb-toggle",
+          disabled: m.animating,
           title: `Potvrzení nevyužitých akcí: ${m.askConfirm ? "ZAPNUTO – před spuštěním kola se hra zeptá, když zbývá volná akce." : "VYPNUTO – kolo se spustí rovnou."} Klik nebo klávesa P přepne; platí pro všechny bitvy v této místnosti.`,
           onclick: () => cb.toggleConfirm(),
         },
         h("span", { class: "sw" }, h("i")),
         h("span", { class: "q" }, "?"),
       ),
-      locked
+      m.animating
+        ? h("button", { class: "px bb-launch waiting", disabled: true }, icon("play", "#e2e8f0", 18), h("span", { class: "l1" }, label("Kolo")), h("span", { class: "sub" }, label("probíhá…")))
+        : locked
         ? h("button", { class: "px bb-launch waiting", title: "Klik = vrátit se k úpravám", onclick: () => cb.unready() }, icon("wait", "#e2e8f0", 18), h("span", { class: "l1" }, label("Čekám")), h("span", { class: "sub" }, label("klik = upravit")))
         : h("button", { class: "px bb-launch", disabled: inHand > 0, title: inHand > 0 ? "Nejdřív rozmísti body štítu" : "Spustit kolo (Enter)", onclick: () => cb.ready() }, icon("play", "#fff", 16), h("span", { class: "l1" }, label("Spustit")), h("span", { class: "l2" }, label("kolo"))),
     ),
