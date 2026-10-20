@@ -702,14 +702,25 @@ export class Renderer {
     const color = TEAM_COLORS[ship.team];
     const pts = samplePath(maneuverPath(ship, man), 24);
     const end = pts[pts.length - 1];
+    // dráha: tenká souvislá čára; rychlost = tečky v místech ujetých dílů (poslední u ducha lodi)
+    const dcol = DIFFICULTY_COLOR[man.difficulty];
     ctx.save();
-    ctx.strokeStyle = DIFFICULTY_COLOR[man.difficulty];
-    ctx.lineWidth = aiming ? 3 : 2;
-    ctx.setLineDash(aiming ? [] : [6, 4]);
+    ctx.strokeStyle = dcol;
+    ctx.lineWidth = aiming ? 2.5 : 1.5;
+    ctx.globalAlpha = aiming ? 0.9 : 0.6;
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (const p of pts) ctx.lineTo(p.x, p.y);
     ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = dcol;
+    const last = pts.length - 1;
+    for (let k = 1; k <= man.speed; k++) {
+      const q = pts[Math.round((k / man.speed) * last)];
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, aiming ? 5 : 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
     if (fire) this.drawArc({ x: ship.x, y: ship.y, heading: laserArc?.heading ?? ship.heading }, color, LASER.range, laserArc?.halfArc ?? LASER.halfArc); // lasery střílí ze startovní pozice, před pohybem
     if (mgArc) this.drawArc({ x: ship.x, y: ship.y, heading: mgArc.heading }, "#fbbf24", mgArc.range, mgArc.halfArc);
@@ -722,23 +733,16 @@ export class Renderer {
     ctx.stroke();
     ctx.restore();
     drawSprite(ctx, this.sprites.fighter(color), end.x, end.y, end.heading, 0.45);
-    // rychlost u konce dráhy: tolik čárek, kolik je rychlost; barva = obtížnost manévru; otočka má navíc ↺
-    ctx.save();
-    ctx.fillStyle = DIFFICULTY_COLOR[man.difficulty];
-    const bw = 4;
-    const bh = 12;
-    const gap = 3;
-    const total = man.speed * bw + (man.speed - 1) * gap;
-    const x0 = Math.round(end.x - total / 2);
-    const y0 = Math.round(end.y - ship.radius - 10 - bh);
-    for (let i = 0; i < man.speed; i++) ctx.fillRect(x0 + i * (bw + gap), y0, bw, bh);
     if (man.koiogran) {
-      ctx.font = "14px Jersey, ui-monospace, Menlo, monospace";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText("↺", x0 + total + 5, y0 - 2);
+      // otočka: značka ↺ nad duchem lodi
+      ctx.save();
+      ctx.fillStyle = dcol;
+      ctx.font = "16px Jersey, ui-monospace, Menlo, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("↺", end.x, end.y - ship.radius - 8);
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   private drawIcons(icons: IconSpot[], cam: Camera) {

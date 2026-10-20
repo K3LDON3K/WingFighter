@@ -566,18 +566,13 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   let confirmPop: HTMLElement | null = null;
   if (m.confirm && !locked) {
     const { unused, total } = m.confirm;
-    const word = unused === 1 ? "volná akce" : unused < 5 ? "volné akce" : "volných akcí";
     confirmPop = h(
       "div",
-      { class: "confirm-pop" },
-      h("div", { class: "cp-title" }, icon("target", "#fbbf24", 12), label("Nevyužité akce")),
-      h("div", { class: "cp-text txt" }, h("b", {}, String(unused)), ` ${word} z ${total}`),
-      h(
-        "div",
-        { class: "cp-btns" },
-        h("button", { class: "px cp-go", onclick: () => cb.confirmLaunch(true) }, icon("play", "#fff", 10), label("spustit"), h("span", { class: "k" }, "ENTER")),
-        h("button", { class: "px cp-back", onclick: () => cb.confirmLaunch(false) }, label("zpět"), h("span", { class: "k" }, "ESC")),
-      ),
+      { class: "confirm-pop", title: "Zbývají volné akce. Enter / klik = přesto spustit, Esc = zpět k plánování." },
+      h("div", { class: "cp-title" }, label("Volné akce")),
+      h("div", { class: "cp-text" }, h("b", {}, String(unused)), h("span", { class: "muted" }, ` / ${total}`)),
+      h("button", { class: "px cp-go", onclick: () => cb.confirmLaunch(true) }, icon("play", "#fff", 10), label("spustit"), h("span", { class: "k" }, "ENTER")),
+      h("div", { class: "cp-esc muted" }, label("esc = zpět")),
     );
   }
   const go = h(

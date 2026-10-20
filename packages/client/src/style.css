@@ -727,23 +727,26 @@ h3,
 .confirm-pop {
   position: absolute;
   bottom: calc(100% + 8px);
-  right: 0;
-  width: 230px;
-  padding: 8px 10px;
+  left: 6px;
+  right: 6px;
+  padding: 6px 4px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   background: #0f2a4a;
   border: 2px solid;
   border-color: #7dd3fc #0c4a6e #0c4a6e #7dd3fc;
   box-shadow: 0 0 0 2px #05070f;
   z-index: 6;
   animation: popup-r 0.22s steps(4, end) both;
+  text-align: center;
 }
 .confirm-pop::after {
   content: "";
   position: absolute;
-  right: 42px;
+  left: 50%;
+  margin-left: -2px;
   bottom: -10px;
   width: 4px;
   height: 10px;
@@ -760,36 +763,32 @@ h3,
   }
 }
 .confirm-pop .cp-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   color: var(--yellow);
-  font-size: 15px;
+  font-size: 12px;
+  line-height: 1;
 }
 .confirm-pop .cp-text {
-  font-size: 15px;
-  color: #cbd5e1;
-}
-.confirm-pop .cp-text b {
+  font-size: 22px;
+  line-height: 1;
   color: var(--yellow);
 }
-.confirm-pop .cp-btns {
-  display: flex;
-  gap: 6px;
-}
-.confirm-pop .cp-btns .px {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 6px 4px;
-  font-size: 15px;
+.confirm-pop .cp-text .muted {
+  font-size: 14px;
 }
 .confirm-pop .cp-go {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 2px;
+  font-size: 15px;
   background: #b91c1c;
   border-color: #fca5a5 #7f1d1d #7f1d1d #fca5a5;
   color: #fff;
+}
+.confirm-pop .cp-esc {
+  font-size: 10px;
 }
 .confirm-pop .k {
   font-size: 10px;

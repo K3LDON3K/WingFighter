@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.30 – rychlost na dráze (varianta C): naplánovaná dráha je tenká souvislá čára v barvě obtížnosti a na ní
+  tolik teček, kolik je rychlost (poslední u ducha lodi); svislé čárky u konce dráhy zmizely, otočka má ↺.
+  Okénko potvrzení volných akcí je úzké jako tlačítko SPUSTIT KOLO, bez tlačítka ZPĚT (Esc = zpět).
 - v3.29 – bílý kroužek kolem vybrané lodi (a slabý při najetí myší) se už nezobrazuje; zapnout jde v ladění
   → Zobrazení („Zobrazit kroužek kolem vybrané lodi“). Žlutý kroužek cíle zůstává. Lišta nad mapou
   přeskládána: POHLED · mezera · − · oko (najít loď) · +.
