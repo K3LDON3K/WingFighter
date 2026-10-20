@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.40 – nastavení mapy: bouře jako pět políček (kolik svítí, tolik bouří, 0–5; klik na poslední = o jednu
+  míň), velikost bouří jako tři políčka jen s velikostí kolečka, komety jako tři políčka s kometou
+  (málo / středně / hodně); přepínač „komety naráží do asteroidů“ na vlastním řádku.
 - v3.39 – místnost: jedna karta **Nastavení hry** místo dvou (Mapa + Nastavení bitvy). Jednotná mřížka řádků
   (popisek | prvek | „?“ s vysvětlivkou), stejně široké selecty, pixelové přepínače ano/ne, související volby na
   jednom řádku (bouře = počet + velikost, komety + naráží do asteroidů, seed + kostka), sekce Mapa / Bitva /

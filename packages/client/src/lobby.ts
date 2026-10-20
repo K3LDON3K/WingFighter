@@ -3,7 +3,7 @@ import {
 import { logoCanvas } from "./logo.ts";
 import { openMusicPanel } from "./main.ts";
 import { renderMapPreview } from "./map-preview.ts";
-import { loadoutTag, renderLoadout } from "./loadout-ui.ts";
+import { loadoutTag, renderLoadout, svgEl } from "./loadout-ui.ts";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 import { renderTuningPanel } from "./tuning-panel.ts";
@@ -246,6 +246,33 @@ function roomView(m: LobbyModel, net: Net) {
       const toggle = (on: boolean, onChange: (v: boolean) => void, title?: string) =>
         h("button", { class: `ptoggle ${on ? "on" : ""}`, disabled: !isHost, title, onclick: () => onChange(!on) }, h("span", { class: "pt-sw" }, h("i")), h("span", { class: "txt pt-lbl" }, on ? "ano" : "ne"));
       const section = (title: string, ...rows: Node[]) => h("div", { class: "fsec" }, h("div", { class: "fsec-h" }, label(title)), ...rows);
+      /** Fialová bouře (SVG) v dané velikosti. */
+      const stormSvg = (r: number, box = 26) => {
+        const s = svgEl("svg", { width: String(box), height: String(box), viewBox: `0 0 ${box} ${box}` });
+        s.append(svgEl("circle", { cx: String(box / 2), cy: String(box / 2), r: String(r), fill: "#a21caf", opacity: "0.8" }), svgEl("circle", { cx: String(box / 2), cy: String(box / 2), r: String(r * 0.55), fill: "#d946ef", opacity: "0.7" }));
+        return s;
+      };
+      const emptySvg = (box = 26, dashed = true) => {
+        const s = svgEl("svg", { width: String(box), height: String(box), viewBox: `0 0 ${box} ${box}` });
+        s.append(svgEl("circle", { cx: String(box / 2), cy: String(box / 2), r: String(box / 2 - 5), fill: "none", stroke: "#334155", "stroke-width": "2", ...(dashed ? { "stroke-dasharray": "3 3" } : {}) }));
+        return s;
+      };
+      /** Řada políček: kolik svítí, tolik je hodnota; klik na poslední rozsvícené = o jednu míň. */
+      const pips = (n: number, value: number, cls: string, lit: (k: number) => Node, dim: (k: number) => Node, title: (k: number) => string, onPick: (v: number) => void, text: string) =>
+        h(
+          "div",
+          { class: "pips-row" },
+          ...Array.from({ length: n }, (_, i) => i + 1).map((k) => h("button", { class: `pip ${cls} ${k <= value ? "on" : ""}`, disabled: !isHost, title: title(k), onclick: () => onPick(k === value ? k - 1 : k) }, k <= value ? lit(k) : dim(k))),
+          h("span", { class: "txt muted pips-txt" }, text),
+        );
+      const cometSvg = (lit: boolean) => {
+        const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+        if (lit) s.append(svgEl("rect", { x: "2", y: "16", width: "12", height: "2", fill: "#67e8f9", opacity: "0.5" }), svgEl("rect", { x: "6", y: "13", width: "9", height: "2", fill: "#67e8f9", opacity: "0.7" }), svgEl("rect", { x: "15", y: "9", width: "7", height: "7", fill: "#e2e8f0" }), svgEl("rect", { x: "17", y: "11", width: "3", height: "3", fill: "#94a3b8" }));
+        else s.append(svgEl("rect", { x: "15", y: "9", width: "7", height: "7", fill: "none", stroke: "#334155", "stroke-width": "2", "stroke-dasharray": "2 2" }));
+        return s;
+      };
+      const COMET_LEVELS: MapSettings["comets"][] = ["none", "few", "medium", "many"];
+      const STORM_SIZES: MapSettings["stormSize"][] = ["small", "medium", "large"];
       const bots = room.players.filter((p) => p.isBot);
       const targetSel = isHost && bots.length ? h("select", { class: "fsel", style: "width:150px", onchange: (e) => (startFor = (e.target as HTMLSelectElement).value || null) }, h("option", { value: "", selected: !startFor }, "já"), ...bots.map((b) => h("option", { value: b.id, selected: startFor === b.id }, b.name))) : null;
       const TILE_COLOR: Record<ModuleType, string> = { laser: "#f87171", torpedo: "#fb923c", mine: "#fbbf24", "shield-segment": "#7dd3fc", mg: "#fde047", scanner: "#a78bfa", "shield-whole": "#38bdf8" };
@@ -295,15 +322,20 @@ function roomView(m: LobbyModel, net: Net) {
               frow("Shluky asteroidů", toggle(map.clusters, (v) => setMap({ clusters: v })), "Asteroidy v hustších shlucích místo rovnoměrného rozptylu."),
               frow(
                 "Bouře",
-                h("div", { class: "fpair" }, sel(String(map.storms), [["0", "žádná"], ["1", "1"], ["2", "2"], ["3", "3"], ["5", "mnoho (5)"]], (v) => setMap({ storms: Number(v) }), "96px"), sel(map.stormSize, [["small", "malé"], ["medium", "střední"], ["large", "velké"]], (v) => setMap({ stormSize: v as MapSettings["stormSize"] }), "118px")),
-                "Počet a velikost elektromagnetických bouří (fialové): uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener jí nepronikne, loď v bouři není vidět.",
+                pips(5, map.storms, "storm", () => stormSvg(9), () => emptySvg(), (k) => `${k} bouří`, (v) => setMap({ storms: v }), map.storms === 0 ? "žádná" : map.storms === 1 ? "1 bouře" : map.storms < 5 ? `${map.storms} bouře` : "5 bouří"),
+                "Počet elektromagnetických bouří (fialové): uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener jí nepronikne, loď v bouři není vidět.",
+              ),
+              frow(
+                "Velikost bouří",
+                h("div", { class: "pips-row" }, ...STORM_SIZES.map((sz, i) => h("button", { class: `pip storm ${map.stormSize === sz ? "on" : ""}`, disabled: !isHost, title: ["malé", "střední", "velké"][i] + " bouře", onclick: () => setMap({ stormSize: sz }) }, stormSvg([4, 7, 10][i])))),
               ),
               frow("Symetrická", toggle(map.symmetric, (v) => setMap({ symmetric: v })), "Zrcadlená mapa – obě strany mají stejné podmínky."),
               frow(
                 "Komety",
-                h("div", { class: "fpair" }, sel(map.comets ?? "none", [["none", "žádné"], ["few", "málo"], ["medium", "středně"], ["many", "hodně"]], (v) => setMap({ comets: v as MapSettings["comets"] }), "118px"), h("span", { class: "txt muted fsub" }, "naráží do asteroidů"), toggle(!!map.cometsHitAsteroids, (v) => setMap({ cometsHitAsteroids: v }), "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím.")),
+                pips(3, Math.max(0, COMET_LEVELS.indexOf(map.comets ?? "none")), "comet", () => cometSvg(true), () => cometSvg(false), (k) => ["málo", "středně", "hodně"][k - 1], (v) => setMap({ comets: COMET_LEVELS[v] }), ["žádné", "málo", "středně", "hodně"][Math.max(0, COMET_LEVELS.indexOf(map.comets ?? "none"))]),
                 "Komety přilétají na okraj mapy a letí přes ni rychleji než torpéda: náraz zraní loď, sestřel dává kredity, průlet ocasem doplní štít.",
               ),
+              frow("", h("div", { class: "fpair" }, h("span", { class: "txt muted fsub" }, "komety naráží do asteroidů"), toggle(!!map.cometsHitAsteroids, (v) => setMap({ cometsHitAsteroids: v }))), "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím."),
               frow(
                 "Seed",
                 h("div", { class: "fpair" }, h("input", { class: "fsel", type: "number", value: String(map.seed), min: "0", max: "999999", disabled: !isHost, style: "width:118px", onchange: (e) => setMap({ seed: Number((e.target as HTMLInputElement).value) || 0 }) }), isHost ? h("button", { class: "fdice", title: "Nová náhodná mapa", onclick: () => setMap({ seed: Math.floor(Math.random() * 100000) }) }, "🎲") : null),
