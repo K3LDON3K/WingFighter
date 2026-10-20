@@ -37,7 +37,13 @@ export function seenBy(eyes: Eye[], p: Vec, radius = 0): boolean {
 }
 
 /** Stav tak, jak ho vidí daný tým. Aktualizuje paměť asteroidů. */
+/** Tým bez živé lodi je pozorovatel – vidí celou mapu. */
+export function isSpectator(state: GameState, team: number): boolean {
+  return state.ships.some((s) => s.team === team) && !state.ships.some((s) => s.team === team && s.alive);
+}
+
 export function stateForTeam(state: GameState, team: number, memory: AsteroidMemory): GameState {
+  if (isSpectator(state, team)) return state;
   const eyes = teamEyes(state, team);
   // hluboký sken: tým vidí všechno v dosahu skeneru kolem svých lodí
   if (state.revealTeams?.includes(team)) for (const s of state.ships) if (s.team === team && s.alive) eyes.push({ x: s.x, y: s.y, r: SCANNER.deepRange });
@@ -60,6 +66,7 @@ export function stateForTeam(state: GameState, team: number, memory: AsteroidMem
  * (z pozic na začátku, podél dráhy i na konci). Aktualizuje paměť asteroidů.
  */
 export function resultForTeam(result: TurnResult, prev: GameState, team: number, memory: AsteroidMemory): TurnResult {
+  if (isSpectator(result.state, team)) return result;
   const move = result.events.find((e) => e.type === "move");
   const paths = move?.type === "move" ? move.paths : [];
   const eyes = [...teamEyes(prev, team), ...teamEyes(result.state, team, paths)];

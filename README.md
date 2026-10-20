@@ -143,6 +143,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.5.1 – pozorovatel: po zničení všech svých lodí hráč vidí celou mapu (bez mlhy) a sleduje zbytek bitvy;
+  v liště má panel POZOROVATEL s tlačítky Tabulka skóre a Opustit hru. Opuštění hry (i z menu) se potvrzuje
+  dialogem (upozorní, že opouštíš i navazující bitvy v místnosti). Tabulka skóre kdykoliv přes Tab,
+  tlačítko SKÓRE nahoře vedle INVENTÁŘE nebo z menu (stejná tabulka jako na konci hry).
 - v3.5 – nová spodní lišta: panel MANÉVR je svislý sloupec mezi portrétem pilota a tlačítkem SPUSTIT KOLO
   (NAKRESLIT dole + nápověda MEZERNÍK), portrét pilota na výšku se jménem dole, SPUSTIT KOLO jen s ikonou a
   nápovědou ENTER. Stav hráčů (odesláno ✔ / plánuje ⌛ / odpojen šedě, barvy týmů, během přehrávání

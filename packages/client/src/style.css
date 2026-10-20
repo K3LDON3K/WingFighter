@@ -1727,3 +1727,19 @@ button.px.tiny {
   justify-content: center;
   align-items: center;
 }
+
+.bb-spectator {
+  grid-column: 1 / -1;
+  text-align: center;
+}
+.bb-spectator .row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.bb-spectator .k {
+  font-size: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  padding: 1px 3px;
+  margin-left: 6px;
+}

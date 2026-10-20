@@ -43,6 +43,9 @@ export interface PlanningCallbacks {
   scanToggle(shipId: string): void;
   scanPickTarget(shipId: string, on: boolean): void;
   scan(shipId: string, mode: "deep" | "cooldown"): void;
+  /** Pozorovatel: tabulka skóre / opuštění hry. */
+  showScore(): void;
+  leave(): void;
   /** Úprava štítu: změna bodů segmentu o ±1, potvrzení rozložení. */
   shieldDelta(shipId: string, segment: number, delta: number): void;
   shieldConfirm(shipId: string): void;
@@ -108,13 +111,30 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   const ship = my.find((s) => s.id === m.selectedShipId) ?? my[0];
 
   if (m.state.status === "finished") return;
-  if (m.animating || !ship) {
+  if (!ship) {
+    root.append(
+      h(
+        "div",
+        { class: "pnl bb-status bb-spectator" },
+        h("div", { class: "bb-big" }, icon("wait", "#7dd3fc", 18), label("Pozorovatel")),
+        h("div", { class: "txt muted" }, m.animating ? "Přehrává se kolo… Všechny tvoje lodě byly zničeny; sleduješ zbytek bitvy a vidíš celou mapu." : "Všechny tvoje lodě byly zničeny. Bitva pokračuje – sleduješ ji jako pozorovatel a vidíš celou mapu."),
+        h(
+          "div",
+          { class: "row" },
+          h("button", { class: "px", onclick: () => cb.showScore() }, icon("log", "currentColor", 10), " ", label("Tabulka skóre"), h("span", { class: "k" }, "TAB")),
+          h("button", { class: "px danger", onclick: () => cb.leave() }, icon("wait", "currentColor", 10), " ", label("Opustit hru")),
+        ),
+      ),
+    );
+    return;
+  }
+  if (m.animating) {
     root.append(
       h(
         "div",
         { class: "pnl bb-status" },
-        h("div", { class: "bb-big" }, icon(m.animating ? "play" : "wait", "#7dd3fc", 18), label(m.animating ? "Vyhodnocení kola" : "Pozorovatel")),
-        h("div", { class: "txt muted" }, m.animating ? "Sleduj mapu…" : "Všechny tvoje lodě byly zničeny. Bitva pokračuje."),
+        h("div", { class: "bb-big" }, icon("play", "#7dd3fc", 18), label("Vyhodnocení kola")),
+        h("div", { class: "txt muted" }, "Sleduj mapu…"),
       ),
     );
     return;

@@ -471,6 +471,7 @@ function mountGame() {
       "div",
       { class: "map-tools" },
       h("button", { class: "gear", id: "inv-btn", title: "Inventář lodi (připravuje se)", onclick: () => ((game!.inventoryOpen = !game!.inventoryOpen), renderSide()) }, icon("inventory", "currentColor", 12), label("inventář")),
+      h("button", { class: "gear", title: "Tabulka skóre (Tab)", onclick: () => toggleStats() }, icon("log", "currentColor", 12), label("skóre")),
       h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => ((tuningOpen = !tuningOpen), renderSide()) }, icon("target", "currentColor", 12), label("ladění")),
       h("button", { class: "gear", title: "Herní menu (Esc)", onclick: () => toggleMenu() }, icon("log", "currentColor", 12), label("menu")),
     ),
@@ -681,16 +682,23 @@ function showScanResult(ship: Ship) {
   renderSide();
 }
 
-/** Okno se statistikami během hry (z menu). */
+/** Okno se statistikami během hry (Tab, tlačítko SKÓRE, menu). */
 function showStats() {
+  toggleStats(true);
+}
+
+function toggleStats(open?: boolean) {
   if (!mapEl || !game) return;
+  const cur = mapEl.querySelector(".scan-wrap.stats");
+  const want = open ?? !cur;
   mapEl.querySelector(".scan-wrap")?.remove();
-  const wrap = h("div", { class: "scan-wrap" });
+  if (!want) return;
+  const wrap = h("div", { class: "scan-wrap stats" });
   wrap.append(
     h(
       "div",
       { class: "pnl scan-card wide" },
-      h("div", { class: "bb-head" }, icon("log", "#7dd3fc", 14), h("span", { class: "ttl" }, label(`Statistiky · kolo ${game.state.turn}`)), h("button", { class: "px tiny", style: "margin-left:auto", onclick: () => wrap.remove() }, "✕")),
+      h("div", { class: "bb-head" }, icon("log", "#7dd3fc", 14), h("span", { class: "ttl" }, label(`Tabulka skóre · kolo ${game.state.turn}`)), h("span", { class: "muted", style: "margin-left:auto;font-size:6px" }, "TAB / ESC = ZAVRIT"), h("button", { class: "px tiny", style: "margin-left:8px", onclick: () => wrap.remove() }, "✕")),
       renderLeaderboard(game.state),
     ),
   );
@@ -738,6 +746,35 @@ function renderLeaderboard(s: GameState): HTMLElement {
   return h("div", { class: "lb-wrap" }, h("div", { class: "ttl", style: "margin:10px 0 6px" }, label("Žebříček")), table);
 }
 
+/** Opuštění hry s potvrzením (bitva ostatních pokračuje; opouští se i případné navazující bitvy v místnosti). */
+function askLeave() {
+  if (!confirmEl || !game) return;
+  game.menuOpen = false;
+  renderMenu();
+  clear(confirmEl);
+  confirmEl.style.display = "grid";
+  const close = () => {
+    clear(confirmEl!);
+    confirmEl!.style.display = "none";
+    (confirmEl as HTMLElement & { _close?: () => void })._close = undefined;
+  };
+  confirmEl.append(
+    h(
+      "div",
+      { class: "pnl confirm" },
+      h("div", { class: "ctl" }, label("Opustit hru")),
+      h("div", { class: "ctx txt" }, "Opustíš místnost ", h("b", {}, room?.name ?? ""), ".", h("br"), "Bitva ostatních pokračuje bez tebe a opouštíš i všechny navazující bitvy v této místnosti.", h("br"), "Opravdu odejít?"),
+      h(
+        "div",
+        { class: "cbtns" },
+        h("button", { class: "px cb primary", onclick: () => (close(), net.send({ type: "leaveRoom" })) }, icon("wait", "#fff", 10), label("odejít")),
+        h("button", { class: "px cb", onclick: close }, label("zůstat"), h("span", { class: "k" }, "ESC")),
+      ),
+    ),
+  );
+  (confirmEl as HTMLElement & { _close?: () => void })._close = close;
+}
+
 function toggleMenu(open?: boolean) {
   if (!game) return;
   game.menuOpen = open ?? !game.menuOpen;
@@ -769,12 +806,12 @@ function renderMenu() {
         : h("div", { class: "muted txt menu-note" }, "Bitvu může pro všechny ukončit jen host."),
       h(
         "button",
-        { class: "px menu-btn danger", title: "Opustí místnost; bitva ostatních pokračuje bez tebe", onclick: () => net.send({ type: "leaveRoom" }) },
+        { class: "px menu-btn danger", title: "Opustí místnost; bitva ostatních pokračuje bez tebe", onclick: () => askLeave() },
         icon("wait", "currentColor", 12),
         " ",
         label("Opustit hru – hlavní menu"),
       ),
-      h("button", { class: "px menu-btn", onclick: () => showStats() }, icon("log", "currentColor", 12), " ", label("Statistiky")),
+      h("button", { class: "px menu-btn", onclick: () => showStats() }, icon("log", "currentColor", 12), " ", label("Tabulka skóre"), h("span", { class: "sub" }, "TAB")),
       h("div", { class: "muted txt menu-note" }, "Esc během plánování nejdřív ruší rozdělanou akci (kreslení dráhy, výběr cíle), prázdný Esc otevře menu."),
     ),
   );
@@ -868,6 +905,9 @@ function renderPlayersStatus() {
 /** Dialog: spustit kolo i s nevyužitými akcemi? */
 function renderConfirm() {
   if (!confirmEl || !game) return;
+  const leaving = (confirmEl as HTMLElement & { _close?: () => void })._close;
+  if (leaving && !game.confirmOpen) return;
+  (confirmEl as HTMLElement & { _close?: () => void })._close = undefined;
   confirmEl.style.display = game.confirmOpen ? "grid" : "none";
   clear(confirmEl);
   if (!game.confirmOpen) return;
@@ -972,7 +1012,9 @@ function renderSide() {
         ensureVisible(id);
         renderSide();
       },
-      ready: submitOrders,
+      ready: () => submitOrders(),
+      showScore: () => toggleStats(true),
+      leave: () => askLeave(),
       unready: () => {
         net.send({ type: "unready" });
         game!.submitted = false;
@@ -1383,6 +1425,25 @@ function bindInput(c: HTMLCanvasElement) {
 
   window.addEventListener("keydown", (e) => {
     if (!game) return;
+    if (e.key === "Tab") {
+      toggleStats();
+      e.preventDefault();
+      return;
+    }
+    const leaveClose = (confirmEl as (HTMLElement & { _close?: () => void }) | null)?._close;
+    if (leaveClose && confirmEl?.style.display !== "none" && !game.confirmOpen) {
+      if (e.key === "Escape") {
+        leaveClose();
+        e.preventDefault();
+      }
+      return;
+    }
+    const stats = mapEl?.querySelector(".scan-wrap.stats");
+    if (stats && e.key === "Escape") {
+      stats.remove();
+      e.preventDefault();
+      return;
+    }
     if (game.confirmOpen) {
       if (e.key === "Enter") confirmLaunch(true);
       else if (e.key === "Escape") confirmLaunch(false);
@@ -1487,4 +1548,4 @@ try {
 }
 
 // Ladicí přístup ke stavu (pro automatické testy v prohlížeči).
-(window as unknown as { __sg: () => unknown }).__sg = () => ({ game, cam, playerId });
+(window as unknown as { __sg: () => unknown }).__sg = () => ({ game, cam, playerId, net });
