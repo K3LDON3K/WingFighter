@@ -38,6 +38,8 @@ export interface IconSpot {
 }
 
 export interface Overlay {
+  /** Ladění: vykreslit kolizní kruhy lodí. */
+  showHitboxes?: boolean;
   selectedShipId?: string;
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
@@ -539,21 +541,23 @@ export class Renderer {
     const hovered = overlay.hoverId === s.id;
     const targeted = overlay.targetId === s.id;
 
-    if (selected) {
-      // vybraná loď: její kolizní model (kruhy těla, přídě a křídel) místo obecného kroužku
+    if (overlay.showHitboxes) {
+      // ladění: kolizní model (kruhy v souřadnicích lodi)
       ctx.save();
-      ctx.strokeStyle = "rgba(248,250,252,0.85)";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(74,222,128,0.85)";
+      ctx.lineWidth = 1;
       for (const c of shipCircles(s, s.colliders)) {
         ctx.beginPath();
         ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.restore();
-    } else if (hovered || targeted) {
+    }
+    if (selected || hovered || targeted) {
+      // kroužek výběru / cíle (kolizní model se běžně nezobrazuje)
       ctx.save();
-      ctx.strokeStyle = targeted ? "#fbbf24" : "rgba(248,250,252,0.5)";
-      ctx.lineWidth = targeted ? 2 : 1;
+      ctx.strokeStyle = targeted ? "#fbbf24" : selected ? "#f8fafc" : "rgba(248,250,252,0.5)";
+      ctx.lineWidth = selected || targeted ? 2 : 1;
       ctx.setLineDash(targeted ? [4, 4] : []);
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.radius + 6, 0, Math.PI * 2);

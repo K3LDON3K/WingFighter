@@ -148,8 +148,9 @@ Příkazy (z kořenové složky):
 - v3.28 – kolize podle modelu lodi: každý trup má sadu kolizních kruhů v souřadnicích lodi
   (`HullDef.colliders`; stíhač = tělo, příď, levé a pravé křídlo, plameny motorů se nepočítají), otáčí se
   s lodí a používají se pro loď × loď, asteroidy, komety, miny, torpéda, výbuchy, okraj mapy i volné místo
-  pro boost / sudový překrut. Lasery a kulomet míří dál na střed lodi. U vybrané lodi se kolizní model
-  kreslí bílými kružnicemi místo obecného kroužku. Nový modul `packages/shared/src/colliders.ts`.
+  pro boost / sudový překrut. Lasery a kulomet míří dál na střed lodi. Hitboxy se běžně nezobrazují; v ladění
+  je nová záložka **Zobrazení** (místní volby, neposílají se na server) s přepínačem „Zobrazit hitboxy
+  lodí“ – zelené kružnice u všech viditelných lodí (v3.28.1). Nový modul `packages/shared/src/colliders.ts`.
 - v3.27 – popisek u konce naplánované dráhy nahrazen čárkami: počet čárek = rychlost (1–4), barva = obtížnost
   manévru (zelená / bílá / červená); číslo rychlosti a údaj o stupních se už nezobrazují, otočka má navíc ↺.
 - v3.26 – potvrzení nevyužitých akcí už není překryvný dialog: vysune se okénko přímo nad tlačítko SPUSTIT

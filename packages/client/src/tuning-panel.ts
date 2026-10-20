@@ -21,10 +21,29 @@ interface Built {
   head: HTMLElement;
   tabs: HTMLElement;
   body: HTMLElement;
+  localRows: HTMLElement[];
   inputs: Map<keyof Tuning, { input: HTMLInputElement; row: HTMLElement; note: HTMLElement }>;
 }
 
-const GROUPS = [...new Set(TUNING_FIELDS.map((f) => f.group))];
+/** Místní (jen tento prohlížeč) volby zobrazení – neposílají se na server. */
+const LOCAL_GROUP = "Zobrazení";
+const KEY_HITBOXES = "wingfighter.showHitboxes";
+export function showHitboxes(): boolean {
+  try {
+    return localStorage.getItem(KEY_HITBOXES) === "1";
+  } catch {
+    return false;
+  }
+}
+function setShowHitboxes(on: boolean) {
+  try {
+    localStorage.setItem(KEY_HITBOXES, on ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+const GROUPS = [...new Set(TUNING_FIELDS.map((f) => f.group)), LOCAL_GROUP];
 let activeTab = GROUPS[0];
 const built = new WeakMap<HTMLElement, Built>();
 
@@ -82,12 +101,13 @@ export function renderTuningPanel(root: HTMLElement, tuning: Tuning, savedTuning
     e.input.classList.toggle("changed", changed);
     e.note.textContent = changed ? (f.bool ? ` (výchozí ${DEFAULT_TUNING[f.key] ? "ano" : "ne"})` : ` (výchozí ${DEFAULT_TUNING[f.key]})`) : "";
   }
+  for (const r of b.localRows) r.style.display = activeTab === LOCAL_GROUP ? "" : "none";
 }
 
 function build(root: HTMLElement, tuning: Tuning, canEdit: boolean, a: TuningActions): Built {
   const inputs: Built["inputs"] = new Map();
   const body = h("div", { class: "tune-body" });
-  const b: Built = { tuning, canEdit, head: h("div", { class: "row tune-head" }), tabs: h("div", { class: "tune-tabs" }), body, inputs };
+  const b: Built = { tuning, canEdit, head: h("div", { class: "row tune-head" }), tabs: h("div", { class: "tune-tabs" }), body, inputs, localRows: [] };
   for (const f of TUNING_FIELDS) {
     const input = f.bool
       ? h("input", { type: "checkbox", checked: tuning[f.key] > 0, disabled: !canEdit })
@@ -108,6 +128,12 @@ function build(root: HTMLElement, tuning: Tuning, canEdit: boolean, a: TuningAct
     inputs.set(f.key, { input, row, note });
     body.append(row);
   }
+  // místní volby zobrazení (platí jen pro tento prohlížeč, může je měnit každý hráč)
+  const hb = h("input", { type: "checkbox", checked: showHitboxes(), onchange: () => setShowHitboxes(hb.checked) });
+  const hbRow = h("label", { class: "tune-row", title: "Vykreslí kolizní kruhy (tělo, příď, křídla) všech viditelných lodí. Jen pro tento prohlížeč." }, h("span", { class: "txt tune-label" }, "Zobrazit hitboxy lodí (kolizní model)"), hb);
+  const noteRow = h("div", { class: "muted txt", style: "padding:6px 0" }, "Volby v této záložce se neposílají na server – mění jen zobrazení v tomto prohlížeči.");
+  b.localRows.push(hbRow, noteRow);
+  body.append(hbRow, noteRow);
   root.append(h("div", { class: "pnl tune-card" }, b.head, b.tabs, body));
   return b;
 }

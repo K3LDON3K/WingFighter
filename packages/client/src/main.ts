@@ -83,7 +83,7 @@ import { DIFFICULTY_COLOR, renderBottomBar, shieldInHand } from "./game/planning
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
-import { renderTuningPanel } from "./tuning-panel.ts";
+import { renderTuningPanel, showHitboxes } from "./tuning-panel.ts";
 import { Net } from "./net.ts";
 
 /* ------------------------------------------------------------------ */
@@ -662,6 +662,7 @@ function buildOverlay(view: ViewModel): Overlay {
   if (g.anim || g.state.status === "finished") return overlay;
   overlay.cometPredict = true;
   overlay.selectedShipId = g.selectedShipId;
+  overlay.showHitboxes = showHitboxes();
   overlay.picking = g.picking ?? undefined;
   overlay.previews = [];
 
