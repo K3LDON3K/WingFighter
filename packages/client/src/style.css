@@ -479,7 +479,7 @@ h3,
 /* ---- spodní lišta (pevné rozměry) ---- */
 .bottombar {
   display: grid;
-  grid-template-columns: 290px 150px 1fr 84px 96px;
+  grid-template-columns: 290px 1fr 84px 84px 96px;
   gap: 6px;
   height: 172px;
   padding: 6px;
@@ -538,17 +538,28 @@ h3,
 .stat .segs i {
   width: 10px;
 }
+.bb-maneuver {
+  padding: 6px !important;
+  align-items: center;
+  text-align: center;
+  gap: 4px !important;
+}
+.bb-maneuver .ttl {
+  font-size: 8px;
+}
 .man-readout {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 34px;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 10px;
+  height: 30px;
 }
 .man-glyph {
   font-family: var(--txt);
   font-size: 28px;
   line-height: 1;
-  width: 28px;
+  width: 24px;
   text-align: center;
 }
 .man-speed {
@@ -561,13 +572,29 @@ h3,
   font-size: 8px;
 }
 .man-diff {
-  font-size: 8px;
-  height: 12px;
+  font-size: 7px;
+  height: 10px;
+}
+.spacer {
+  flex: 1;
 }
 .bb-maneuver button {
-  margin-top: auto;
-  padding: 6px 4px;
-  font-size: 8px;
+  padding: 5px 0;
+  font-size: 5px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+.keycap {
+  font-size: 5px;
+  color: var(--muted);
+  border: 1px solid #475569;
+  background: #0b1020;
+  padding: 2px 5px;
+  margin-top: 2px;
 }
 .apip {
   display: flex;
@@ -663,27 +690,25 @@ h3,
 .bb-launch:hover:not(:disabled) {
   background: #ef4444;
 }
-.bb-launch .big {
-  font-size: 9px;
-  line-height: 1.6;
-  text-align: center;
+.bb-launch .l1 {
+  font-size: 8px;
+  margin-top: 4px;
+}
+.bb-launch .l2 {
+  font-size: 11px;
 }
 .bb-launch .sub {
   font-size: 6px;
   opacity: 0.9;
+  margin-top: 4px;
 }
 .bb-launch.waiting {
   background: var(--panel-3);
   border-color: var(--btn-l) var(--bevel-d) var(--bevel-d) var(--btn-l);
   text-shadow: none;
 }
-.bb-wait {
-  text-align: center;
-  height: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 10px;
+.bb-go .keycap {
+  margin: 2px auto 0;
 }
 @media (max-width: 1100px) {
   .bottombar {
@@ -1245,9 +1270,12 @@ button.px.tiny {
   gap: 6px;
   text-align: center;
 }
+.pilot-badge.vertical {
+  height: 100%;
+}
 .pilot-badge.vertical .pilot-frame {
   width: 62px;
-  height: 62px;
+  height: 84px;
   border-width: 3px;
 }
 .pilot-badge.vertical .pilot-text {
@@ -1592,4 +1620,110 @@ button.px.tiny {
   100% {
     fill: #334155;
   }
+}
+
+/* ---- seznam hráčů (stav kola) ---- */
+.pstat {
+  position: absolute;
+  right: 10px;
+  top: 46px;
+  width: 150px;
+  background: rgba(11, 16, 32, 0.9);
+  border: 3px solid;
+  border-color: var(--bevel-l) var(--bevel-d) var(--bevel-d) var(--bevel-l);
+  padding: 6px 8px;
+  z-index: 3;
+}
+.pstat .pcap {
+  font-size: 7px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.pstat .p {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 7px;
+  height: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pstat .p.me span {
+  text-decoration: underline;
+}
+.pstat .p.off {
+  opacity: 0.5;
+}
+.pstat .leg {
+  margin-top: 4px;
+  border-top: 2px solid var(--bevel-d);
+  padding-top: 4px;
+  font-family: var(--txt);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.3;
+}
+.maplog {
+  top: 46px;
+  right: 170px;
+}
+
+/* ---- potvrzení spuštění kola ---- */
+.confirm-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 7, 15, 0.45);
+}
+.confirm {
+  width: 360px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(18, 26, 48, 0.98);
+  text-align: center;
+}
+.confirm .ctl {
+  color: var(--yellow);
+  font-size: 9px;
+}
+.confirm .ctx {
+  font-size: 13px;
+}
+.confirm .ctx b {
+  color: var(--yellow);
+}
+.confirm .cbtns {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.confirm .cb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+}
+.confirm .cb.primary {
+  background: #dc2626;
+  border-color: #fca5a5 #7f1d1d #7f1d1d #fca5a5;
+  color: #fff;
+}
+.confirm .k {
+  font-size: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  padding: 1px 3px;
+}
+.confirm .cchk {
+  font-family: var(--txt);
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
 }

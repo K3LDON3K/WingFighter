@@ -143,6 +143,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.5 – nová spodní lišta: panel MANÉVR je svislý sloupec mezi portrétem pilota a tlačítkem SPUSTIT KOLO
+  (NAKRESLIT dole + nápověda MEZERNÍK), portrét pilota na výšku se jménem dole, SPUSTIT KOLO jen s ikonou a
+  nápovědou ENTER. Stav hráčů (odesláno ✔ / plánuje ⌛ / odpojen šedě, barvy týmů, během přehrávání
+  „přehrává se“) je ve svislém panelu vpravo na mapě. Při spuštění kola s nevyužitými akcemi se hra zeptá
+  na potvrzení (Enter / Esc, volba „příště se neptat“ pro zbytek bitvy).
 - v3.4.1 – loď v bouři je normálně vidět (bouře ruší jen skener a lasery, ne dohled); po kole se kamera na loď
   jen přesune, zoom zůstává.
 - v3.4 – zoom: tlačítka + / − / CENTROVAT nahoře uprostřed mapy (krok 10 %, stejně kolečko; klávesy +, −, C).

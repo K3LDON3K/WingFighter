@@ -89,7 +89,8 @@ export function pilotBadge(pilotId: string, vertical = false): HTMLElement {
   const el = h(
     "div",
     { class: `pilot-badge ${vertical ? "vertical" : ""}`, title: "" },
-    h("div", { class: "pilot-frame" }, pilotPortrait(pilotId, vertical ? 56 : 28)),
+    h("div", { class: "pilot-frame" }, pilotPortrait(pilotId, vertical ? 58 : 28)),
+    vertical ? h("div", { class: "spacer" }) : null,
     h("div", { class: "pilot-text" }, h("span", { class: "muted pilot-cap" }, label("pilot")), h("span", { class: "pilot-name" }, label(pilot.name))),
   );
   el.addEventListener("mouseenter", () => showBubble(el, pilot));

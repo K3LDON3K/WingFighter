@@ -106,8 +106,6 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   clear(root);
   const my = m.state.ships.filter((s) => s.alive && s.ownerId === m.myId);
   const ship = my.find((s) => s.id === m.selectedShipId) ?? my[0];
-  const humans = m.state.players.filter((p) => !p.isBot);
-  const waiting = humans.filter((p) => !m.ready.includes(p.id) && m.state.ships.some((s) => s.alive && s.ownerId === p.id));
 
   if (m.state.status === "finished") return;
   if (m.animating || !ship) {
@@ -199,7 +197,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     h("div", { class: "bb-shipbody" }, bubble, right),
   );
 
-  /* ---- 2. manévr (kompaktní) ---- */
+  /* ---- 2. manévr (svislý sloupec) ---- */
   const dcolor = man ? DIFFICULTY_COLOR[man.difficulty] : "#f87171";
   const maneuver = h(
     "div",
@@ -210,10 +208,12 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] : "Neplatný manévr" },
       h("span", { class: "man-glyph", style: `color:${dcolor}` }, angleGlyph(cur.angle, cur.koiogran)),
       h("span", { class: "man-speed" }, String(cur.speed)),
-      h("span", { class: "man-angle" }, cur.koiogran ? "180°" : `${Math.abs(cur.angle)}°`),
     ),
+    h("div", { class: "man-angle" }, cur.koiogran ? "180°" : `${Math.abs(cur.angle)}°`),
     h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (stressCost(man.difficulty) > ship.stressPoints ? "chybí stres" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
-    h("button", { class: `px ${aiming ? "on" : ""}`, disabled: locked, title: "Klikni na loď na mapě, nebo sem. Pohyb myši = dráha, klik = potvrdit.", onclick: () => cb.aim(ship.id) }, icon(aiming ? "check" : "pen", "currentColor", 12), label(aiming ? "potvrdit" : "nakreslit")),
+    h("div", { class: "spacer" }),
+    h("button", { class: `px ${aiming ? "on" : ""}`, disabled: locked, title: "Klikni na loď na mapě, nebo sem (mezerník). Pohyb myši = dráha, klik = potvrdit.", onclick: () => cb.aim(ship.id) }, icon(aiming ? "check" : "pen", "currentColor", 10), label(aiming ? "potvrdit" : "nakreslit")),
+    h("div", { class: "keycap" }, label("mezerník")),
   );
 
   /* ---- 3. akce ---- */
@@ -397,13 +397,13 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     "div",
     { class: "pnl bb-go" },
     locked
-      ? h("button", { class: "px bb-launch waiting", title: "Klik = vrátit se k úpravám", onclick: () => cb.unready() }, icon("wait", "#e2e8f0", 18), h("span", { class: "big" }, label("Čekám")), h("span", { class: "sub" }, label("upravit")))
-      : h("button", { class: "px bb-launch", disabled: inHand > 0, title: inHand > 0 ? "Nejdřív rozmísti body štítu" : "Spustit kolo (Enter)", onclick: () => cb.ready() }, icon("play", "#fff", 18), h("span", { class: "big" }, label("Spustit"), h("br"), label("kolo")), h("span", { class: "sub" }, "ENTER")),
-    h("div", { class: "bb-wait muted txt", title: waiting.map((p) => p.name).join(", ") }, waiting.length ? `čeká: ${waiting.map((p) => p.name).join(", ")}` : "všichni připraveni"),
+      ? h("button", { class: "px bb-launch waiting", title: "Klik = vrátit se k úpravám", onclick: () => cb.unready() }, icon("wait", "#e2e8f0", 18), h("span", { class: "l1" }, label("Čekám")), h("span", { class: "sub" }, label("klik = upravit")))
+      : h("button", { class: "px bb-launch", disabled: inHand > 0, title: inHand > 0 ? "Nejdřív rozmísti body štítu" : "Spustit kolo (Enter)", onclick: () => cb.ready() }, icon("play", "#fff", 16), h("span", { class: "l1" }, label("Spustit")), h("span", { class: "l2" }, label("kolo"))),
+    h("div", { class: "keycap" }, "ENTER"),
   );
 
-  /* ---- 5. pilot (svislý sloupec vedle spuštění kola) ---- */
+  /* ---- 5. pilot (svislý sloupec) ---- */
   const pilot = h("div", { class: "pnl bb-pilot" }, pilotBadge(ship.loadout.pilotId, true));
 
-  root.append(status, maneuver, actions, pilot, go);
+  root.append(status, actions, maneuver, pilot, go);
 }

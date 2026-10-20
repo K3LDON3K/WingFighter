@@ -88,6 +88,9 @@ interface GameSession {
   jettisonPick: boolean;
   /** Herní menu (Esc). */
   menuOpen: boolean;
+  /** Potvrzení spuštění kola s nevyužitými akcemi: otevřeno / vypnuto pro zbytek bitvy. */
+  confirmOpen: boolean;
+  skipConfirm: boolean;
   /** Skener: vysunutá tlačítka / výběr cíle skenu lodi. */
   scanOpen: boolean;
   scanPick: boolean;
@@ -202,6 +205,7 @@ net.on((msg) => {
       if (game) {
         game.ready = msg.ready;
         game.submitted = msg.ready.includes(playerId);
+        renderSide();
       }
       break;
     case "scanResult":
@@ -253,6 +257,8 @@ function startGame(state: GameState) {
     inventoryOpen: false,
     jettisonPick: false,
     menuOpen: false,
+    confirmOpen: false,
+    skipConfirm: false,
     scanOpen: false,
     scanPick: false,
     mouse: null,
@@ -371,8 +377,9 @@ function pumpQueue() {
   (game.anim as TurnAnimation & { onDone?: () => void }).onDone = finish;
 }
 
-function submitOrders() {
+function submitOrders(force = false) {
   if (!game || game.submitted) return;
+  if (game.confirmOpen && !force) return;
   for (const [id, o] of game.orders) {
     const ship = game.state.ships.find((x) => x.id === id);
     if (ship && o.action?.type === "jettison" && !ship.loadout.modules.some((m) => m.id === (o.action as { moduleId: string }).moduleId)) {
@@ -391,6 +398,19 @@ function submitOrders() {
       return;
     }
   }
+  if (!force && !game.skipConfirm) {
+    let unused = 0;
+    for (const [id, o] of game.orders) {
+      const ship = game.state.ships.find((x) => x.id === id && x.alive);
+      if (ship) unused += Math.max(0, RULES.actionPoints - actionCost(ship, o));
+    }
+    if (unused > 0) {
+      game.confirmOpen = true;
+      renderSide();
+      return;
+    }
+  }
+  game.confirmOpen = false;
   game.aimingShipId = null;
   game.shieldEdit = false;
   net.send({ type: "submitOrders", orders: [...game.orders.values()] });
@@ -414,6 +434,8 @@ let menuEl: HTMLElement | null = null;
 let tooltipEl: HTMLElement | null = null;
 let tuneEl: HTMLElement | null = null;
 let toastEl: HTMLElement | null = null;
+let pstatEl: HTMLElement | null = null;
+let confirmEl: HTMLElement | null = null;
 let mapEl: HTMLElement | null = null;
 let raf = 0;
 let resizeObs: ResizeObserver | null = null;
@@ -427,6 +449,8 @@ function mountGame() {
   tooltipEl = h("div", { class: "tooltip", style: "display:none" });
   tuneEl = h("div", { class: "tune-wrap", style: "display:none" });
   toastEl = h("div", { class: "toast", style: "display:none" });
+  pstatEl = h("div", { class: "pstat" });
+  confirmEl = h("div", { class: "confirm-wrap", style: "display:none" });
   barEl = h("div", { class: "bottombar" });
   sideEl = h("div", { class: "maplog" });
   mapEl = h(
@@ -450,8 +474,10 @@ function mountGame() {
       h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => ((tuningOpen = !tuningOpen), renderSide()) }, icon("target", "currentColor", 12), label("ladění")),
       h("button", { class: "gear", title: "Herní menu (Esc)", onclick: () => toggleMenu() }, icon("log", "currentColor", 12), label("menu")),
     ),
+    pstatEl,
     tooltipEl,
     overlayEl,
+    confirmEl,
     menuEl,
     tuneEl,
     toastEl,
@@ -822,6 +848,64 @@ function renderTooltip() {
   tooltipEl.style.top = `${y}px`;
 }
 
+/** Svislý seznam hráčů vpravo na mapě: kdo už kolo odeslal. */
+function renderPlayersStatus() {
+  if (!pstatEl || !game) return;
+  clear(pstatEl);
+  const players = room?.players ?? [];
+  const playing = !!game.anim;
+  pstatEl.append(h("div", { class: "pcap" }, label(playing ? "přehrává se" : "hráči")));
+  for (const p of players) {
+    const alive = game.state.ships.some((sh) => sh.ownerId === p.id && sh.alive);
+    const done = p.isBot || game.ready.includes(p.id) || !alive;
+    const off = !p.isBot && !p.connected;
+    const mark = off ? icon("wait", "#64748b", 10) : playing ? icon("play", "#64748b", 10) : done ? icon("check", "#4ade80", 10) : icon("wait", "#facc15", 10);
+    pstatEl.append(h("div", { class: `p ${p.id === playerId ? "me" : ""} ${off ? "off" : ""}`, title: off ? "odpojen" : done ? "kolo odesláno" : "plánuje" }, mark, h("span", { style: `color:${TEAM_COLORS[p.team]}` }, p.name)));
+  }
+  pstatEl.append(h("div", { class: "leg" }, "✔ odesláno · ⌛ plánuje", h("br"), "šedě = odpojen"));
+}
+
+/** Dialog: spustit kolo i s nevyužitými akcemi? */
+function renderConfirm() {
+  if (!confirmEl || !game) return;
+  confirmEl.style.display = game.confirmOpen ? "grid" : "none";
+  clear(confirmEl);
+  if (!game.confirmOpen) return;
+  let unused = 0;
+  for (const [id, o] of game.orders) {
+    const ship = game.state.ships.find((x) => x.id === id && x.alive);
+    if (ship) unused += Math.max(0, RULES.actionPoints - actionCost(ship, o));
+  }
+  const total = RULES.actionPoints * [...game.orders.keys()].filter((id) => game!.state.ships.some((x) => x.id === id && x.alive)).length;
+  const word = unused === 1 ? "volnou akci" : unused < 5 ? "volné akce" : "volných akcí";
+  const chk = h("input", { type: "checkbox", id: "skip-confirm" }) as HTMLInputElement;
+  confirmEl.append(
+    h(
+      "div",
+      { class: "pnl confirm" },
+      h("div", { class: "ctl" }, label("Nevyužité akce")),
+      h("div", { class: "ctx txt" }, "Máš ještě ", h("b", {}, String(unused)), ` ${word} z ${total}.`, h("br"), "Opravdu spustit kolo?"),
+      h(
+        "div",
+        { class: "cbtns" },
+        h("button", { class: "px cb primary", onclick: () => confirmLaunch(true) }, icon("play", "#fff", 10), label("spustit"), h("span", { class: "k" }, "ENTER")),
+        h("button", { class: "px cb", onclick: () => confirmLaunch(false) }, label("zpět"), h("span", { class: "k" }, "ESC")),
+      ),
+      h("label", { class: "cchk", htmlFor: "skip-confirm" }, chk, "příště se neptat (toto kolo bitvy)"),
+    ),
+  );
+  (confirmEl as HTMLElement & { _chk?: HTMLInputElement })._chk = chk;
+}
+
+function confirmLaunch(go: boolean) {
+  if (!game) return;
+  const chk = (confirmEl as (HTMLElement & { _chk?: HTMLInputElement }) | null)?._chk;
+  if (chk?.checked) game.skipConfirm = true;
+  game.confirmOpen = false;
+  if (go) submitOrders(true);
+  else renderSide();
+}
+
 function renderSide() {
   if (!sideEl || !barEl || !game) return;
   clear(sideEl);
@@ -843,6 +927,8 @@ function renderSide() {
     } else clear(tuneEl);
   }
   renderMenu();
+  renderPlayersStatus();
+  renderConfirm();
   renderBottomBar(
     barEl,
     {
@@ -1297,6 +1383,13 @@ function bindInput(c: HTMLCanvasElement) {
 
   window.addEventListener("keydown", (e) => {
     if (!game) return;
+    if (game.confirmOpen) {
+      if (e.key === "Enter") confirmLaunch(true);
+      else if (e.key === "Escape") confirmLaunch(false);
+      else return;
+      e.preventDefault();
+      return;
+    }
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
     if (e.key === "Escape" && game.menuOpen) {
@@ -1304,6 +1397,7 @@ function bindInput(c: HTMLCanvasElement) {
       e.preventDefault();
       return;
     }
+
     if (game.anim) {
       if (e.key === "Escape") toggleMenu(true);
       return;
