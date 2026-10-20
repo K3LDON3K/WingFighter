@@ -1,3 +1,4 @@
+import { ICONS } from "../icons.ts";
 import {
   shipCircles,
   COMET,
@@ -37,6 +38,10 @@ export interface IconSpot {
   hover: boolean;
 }
 
+/** Barvy a ikonky zbraní pro značku cíle (stejné jako v liště akcí). */
+const WEAPON_COLOR: Record<string, string> = { laser: "#f87171", mg: "#fde047", torpedo: "#fb923c", mine: "#fbbf24" };
+const WEAPON_ICON: Record<string, string> = { laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine" };
+
 export interface Overlay {
   /** Ladění: vykreslit kolizní kruhy lodí. */
   showHitboxes?: boolean;
@@ -68,6 +73,8 @@ export interface Overlay {
   targetPoint?: { x: number; y: number };
   /** Šance laserů na zásah u cíle. */
   laserOdds?: { x: number; y: number; text: string; color: string; sub?: string };
+  /** Které zbraně míří na který cíl (id → zbraně); cíl dostane zaměřovací závorky a ikonky zbraní. */
+  targetWeapons?: Record<string, string[]>;
   /** Cíl jen částečně ve výseči: část lodi mimo výseč se ztlumí. */
   partialTarget?: { id: string; x: number; y: number; heading: number; range: number; halfArc: number };
   /** Právě se vybírá cíl kliknutím. */
@@ -155,7 +162,9 @@ export class Renderer {
       ctx.restore();
       drawSprite(ctx, this.sprites.torpedo(TEAM_COLORS[t.team]), t.x, t.y, t.heading);
       if (t.targetPoint && (t.team === overlay.myTeam || overlay.myTeam === undefined)) this.drawPointMarker(t.targetPoint, TEAM_COLORS[t.team], 0.5);
-      if (overlay.targetId === t.id || overlay.hoverId === t.id) {
+      const tw = overlay.targetWeapons?.[t.id];
+      if (tw?.length) this.drawTargetMark(t.x, t.y, 8, tw);
+      else if (overlay.targetId === t.id || overlay.hoverId === t.id) {
         ctx.save();
         ctx.strokeStyle = overlay.targetId === t.id ? "#fbbf24" : "rgba(248,250,252,0.5)";
         ctx.setLineDash([3, 3]);
@@ -326,6 +335,44 @@ export class Renderer {
     }
   }
 
+  /** Pixelová ikonka (z icons.ts) na plátně: 8×8 buněk o velikosti `s`. */
+  private drawPixelIcon(name: string, cx: number, cy: number, s: number, color: string) {
+    const ctx = this.ctx;
+    const rows = ICONS[name] ?? ICONS.target;
+    ctx.fillStyle = color;
+    rows.forEach((row, y) => [...row].forEach((ch, x) => ch === "#" && ctx.fillRect(Math.round(cx - 4 * s + x * s), Math.round(cy - 4 * s + y * s), s, s)));
+  }
+
+  /**
+   * Značka cíle (varianta D): čtyři rohové závorky v barvě zbraně (více zbraní = žlutá) a v pravém horním rohu
+   * plné čtverečky s ikonkami všech zbraní, které na cíl míří.
+   */
+  private drawTargetMark(x: number, y: number, r: number, weapons: string[]) {
+    const ctx = this.ctx;
+    const R = r + 6;
+    const col = weapons.length === 1 ? WEAPON_COLOR[weapons[0]] ?? "#fbbf24" : "#fbbf24";
+    ctx.save();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+      ctx.beginPath();
+      ctx.moveTo(x + dx * R, y + dy * (R - 7));
+      ctx.lineTo(x + dx * R, y + dy * R);
+      ctx.lineTo(x + dx * (R - 7), y + dy * R);
+      ctx.stroke();
+    }
+    const s = 1.4;
+    weapons.forEach((w, i) => {
+      const bx = x + R + i * (14 * s + 2);
+      const by = y - R;
+      const wc = WEAPON_COLOR[w] ?? "#fbbf24";
+      ctx.fillStyle = wc;
+      ctx.fillRect(bx - 7 * s, by - 7 * s, 14 * s, 14 * s);
+      this.drawPixelIcon(WEAPON_ICON[w] ?? w, bx, by, s, "#0b1020");
+    });
+    ctx.restore();
+  }
+
   private drawPointMarker(p: { x: number; y: number }, color: string, alpha: number, now = 0) {
     const ctx = this.ctx;
     ctx.save();
@@ -439,7 +486,9 @@ export class Renderer {
     }
     const targeted = overlay.targetId === c.id;
     const hovered = overlay.hoverId === c.id;
-    if (targeted || hovered) {
+    const cw = overlay.targetWeapons?.[c.id];
+    if (cw?.length) this.drawTargetMark(c.x, c.y, c.radius, cw);
+    else if (targeted || hovered) {
       ctx.save();
       ctx.strokeStyle = targeted ? "#fbbf24" : "rgba(248,250,252,0.6)";
       ctx.setLineDash([3, 3]);
@@ -472,7 +521,9 @@ export class Renderer {
     ctx.fillStyle = TEAM_COLORS[d.team];
     ctx.fillRect(-2, -2, 4, 4);
     ctx.restore();
-    if (targeted || hovered) {
+    const dw = overlay.targetWeapons?.[d.id];
+    if (dw?.length) this.drawTargetMark(d.x, d.y, 8, dw);
+    else if (targeted || hovered) {
       ctx.save();
       ctx.strokeStyle = targeted ? "#fbbf24" : "rgba(248,250,252,0.6)";
       ctx.setLineDash([3, 3]);
@@ -567,7 +618,9 @@ export class Renderer {
       }
       ctx.restore();
     }
-    if (targeted || ((selected || hovered) && overlay.showSelectRing)) {
+    const weapons = overlay.targetWeapons?.[s.id];
+    if (weapons?.length) this.drawTargetMark(s.x, s.y, s.radius, weapons);
+    else if (targeted || ((selected || hovered) && overlay.showSelectRing)) {
       // kroužek cíle vždy; kroužek výběru / najetí jen když je zapnutý v ladění → Zobrazení
       ctx.save();
       ctx.strokeStyle = targeted ? "#fbbf24" : selected ? "#f8fafc" : "rgba(248,250,252,0.5)";

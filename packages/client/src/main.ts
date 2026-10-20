@@ -40,6 +40,7 @@ import {
   SCANNER,
   type Ship,
   LASER,
+  laserReach,
   laserArcOf,
   laserOdds,
   mgArcOf,
@@ -721,6 +722,23 @@ function buildOverlay(view: ViewModel): Overlay {
 
     if (ship.id === g.selectedShipId) {
       if (g.scanOpen && scannerModule(ship.loadout)) overlay.scanRanges = { ship: SCANNER.range, deep: SCANNER.deepRange };
+      // které zbraně na co míří (značka cíle s ikonkami zbraní)
+      {
+        const tw: Record<string, string[]> = {};
+        const add = (id: string | undefined, w: string) => {
+          if (!id) return;
+          (tw[id] ??= []).push(w);
+        };
+        if (o.fire) {
+          const tgt = laserTarget(g.state, ship, o.preferredTargetId, o.laserModuleId);
+          const pt = o.preferredTargetId && !g.state.ships.some((x) => x.id === o.preferredTargetId) ? ((g.state.debris ?? []).find((d) => d.id === o.preferredTargetId) ?? (g.state.comets ?? []).find((c) => c.id === o.preferredTargetId) ?? g.state.torpedoes.find((t) => t.id === o.preferredTargetId)) : undefined;
+          if (pt && !laserReach(g.state, ship, pt, o.laserModuleId)) add(pt.id, "laser");
+          else if (tgt) add(tgt.id, "laser");
+        }
+        if (o.fireMg) add(mgPreview(g.state, ship, o.preferredTargetId, o.mgModuleId)?.targetId, "mg");
+        if (o.special?.type === "torpedo") add(o.special.targetId, "torpedo");
+        overlay.targetWeapons = tw;
+      }
       if (o.special?.type === "torpedo") {
         overlay.targetId = o.special.targetId;
         overlay.targetPoint = o.special.point;

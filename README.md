@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.50 – **Značka cíle podle zbraně** (varianta D): cíl, na který míří zbraň, má místo žlutého kroužku čtyři rohové
+  zaměřovací závorky v barvě zbraně a v pravém horním rohu plné čtverečky s ikonkami všech zbraní, které na něj
+  míří (laser červená, kulomet žlutá, torpédo oranžová). Více zbraní na jeden cíl = ikonky vedle sebe, závorky
+  žluté. Funguje pro lodě, trosky, komety i torpéda; kroužek zůstává pro najetí myší a cíl zvednutí nákladu.
 - v3.49 – **Střelba na cíl částečně ve výseči.** Místo středu lodi se počítá podíl jejích kolizních kruhů uvnitř výseče
   a dostřelu (0–100 %). Jakmile je uvnitř aspoň kousek, cíl jde zaměřit a střelba proběhne; **šance na zásah se
   násobí podílem v dosahu** (lasery: každý zásah na kostkách projde jen s touto pravděpodobností; kulomet: šance
