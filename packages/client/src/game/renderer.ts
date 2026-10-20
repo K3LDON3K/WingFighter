@@ -40,6 +40,8 @@ export interface IconSpot {
 export interface Overlay {
   /** Ladění: vykreslit kolizní kruhy lodí. */
   showHitboxes?: boolean;
+  /** Ladění: kroužek kolem vybrané lodi / při najetí myší. */
+  showSelectRing?: boolean;
   selectedShipId?: string;
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
@@ -553,8 +555,8 @@ export class Renderer {
       }
       ctx.restore();
     }
-    if (selected || hovered || targeted) {
-      // kroužek výběru / cíle (kolizní model se běžně nezobrazuje)
+    if (targeted || ((selected || hovered) && overlay.showSelectRing)) {
+      // kroužek cíle vždy; kroužek výběru / najetí jen když je zapnutý v ladění → Zobrazení
       ctx.save();
       ctx.strokeStyle = targeted ? "#fbbf24" : selected ? "#f8fafc" : "rgba(248,250,252,0.5)";
       ctx.lineWidth = selected || targeted ? 2 : 1;

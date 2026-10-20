@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.29 – bílý kroužek kolem vybrané lodi (a slabý při najetí myší) se už nezobrazuje; zapnout jde v ladění
+  → Zobrazení („Zobrazit kroužek kolem vybrané lodi“). Žlutý kroužek cíle zůstává. Lišta nad mapou
+  přeskládána: POHLED · mezera · − · oko (najít loď) · +.
 - v3.28 – kolize podle modelu lodi: každý trup má sadu kolizních kruhů v souřadnicích lodi
   (`HullDef.colliders`; stíhač = tělo, příď, levé a pravé křídlo, plameny motorů se nepočítají), otáčí se
   s lodí a používají se pro loď × loď, asteroidy, komety, miny, torpéda, výbuchy, okraj mapy i volné místo

@@ -83,7 +83,7 @@ import { DIFFICULTY_COLOR, renderBottomBar, shieldInHand } from "./game/planning
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
-import { renderTuningPanel, showHitboxes } from "./tuning-panel.ts";
+import { renderTuningPanel, showHitboxes, showSelectRing } from "./tuning-panel.ts";
 import { Net } from "./net.ts";
 
 /* ------------------------------------------------------------------ */
@@ -555,10 +555,11 @@ function mountGame() {
     h(
       "div",
       { class: "map-zoom" },
-      h("button", { class: "gear", title: "Přiblížit (+)", onclick: () => zoomBy(ZOOM_STEP) }, "+"),
-      h("button", { class: "gear", title: "Oddálit (−)", onclick: () => zoomBy(1 / ZOOM_STEP) }, "−"),
       (centerBtn = h("button", { class: "gear center-btn", onclick: () => centerOnShip(game?.selectedShipId) })),
-      h("button", { class: "gear", title: "Najít vybranou loď: vycentrovat na ni, zoom zůstane (F)", onclick: () => lookAtShip(game?.selectedShipId) }, icon("eye", "currentColor", 12)),
+      h("span", { class: "mz-gap" }),
+      h("button", { class: "gear mz-sq", title: "Oddálit (−)", onclick: () => zoomBy(1 / ZOOM_STEP) }, "−"),
+      h("button", { class: "gear mz-sq", title: "Najít vybranou loď: vycentrovat na ni, zoom zůstane (F)", onclick: () => lookAtShip(game?.selectedShipId) }, icon("eye", "currentColor", 12)),
+      h("button", { class: "gear mz-sq", title: "Přiblížit (+)", onclick: () => zoomBy(ZOOM_STEP) }, "+"),
     ),
     h(
       "div",
@@ -663,6 +664,7 @@ function buildOverlay(view: ViewModel): Overlay {
   overlay.cometPredict = true;
   overlay.selectedShipId = g.selectedShipId;
   overlay.showHitboxes = showHitboxes();
+  overlay.showSelectRing = showSelectRing();
   overlay.picking = g.picking ?? undefined;
   overlay.previews = [];
 

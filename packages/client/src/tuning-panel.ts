@@ -28,20 +28,24 @@ interface Built {
 /** Místní (jen tento prohlížeč) volby zobrazení – neposílají se na server. */
 const LOCAL_GROUP = "Zobrazení";
 const KEY_HITBOXES = "wingfighter.showHitboxes";
-export function showHitboxes(): boolean {
+const KEY_SELRING = "wingfighter.showSelectRing";
+function localFlag(key: string): boolean {
   try {
-    return localStorage.getItem(KEY_HITBOXES) === "1";
+    return localStorage.getItem(key) === "1";
   } catch {
     return false;
   }
 }
-function setShowHitboxes(on: boolean) {
+function setLocalFlag(key: string, on: boolean) {
   try {
-    localStorage.setItem(KEY_HITBOXES, on ? "1" : "0");
+    localStorage.setItem(key, on ? "1" : "0");
   } catch {
     /* ignore */
   }
 }
+export const showHitboxes = () => localFlag(KEY_HITBOXES);
+/** Bílý kroužek kolem vybrané lodi (a slabý při najetí myší) – výchozí vypnuto. */
+export const showSelectRing = () => localFlag(KEY_SELRING);
 
 const GROUPS = [...new Set(TUNING_FIELDS.map((f) => f.group)), LOCAL_GROUP];
 let activeTab = GROUPS[0];
@@ -129,11 +133,13 @@ function build(root: HTMLElement, tuning: Tuning, canEdit: boolean, a: TuningAct
     body.append(row);
   }
   // místní volby zobrazení (platí jen pro tento prohlížeč, může je měnit každý hráč)
-  const hb = h("input", { type: "checkbox", checked: showHitboxes(), onchange: () => setShowHitboxes(hb.checked) });
+  const hb = h("input", { type: "checkbox", checked: showHitboxes(), onchange: () => setLocalFlag(KEY_HITBOXES, hb.checked) });
+  const sr = h("input", { type: "checkbox", checked: showSelectRing(), onchange: () => setLocalFlag(KEY_SELRING, sr.checked) });
+  const srRow = h("label", { class: "tune-row", title: "Bílý kroužek kolem vybrané lodi a slabý kroužek při najetí myší. Žlutý čárkovaný kroužek cíle zůstává vždy." }, h("span", { class: "txt tune-label" }, "Zobrazit kroužek kolem vybrané lodi"), sr);
   const hbRow = h("label", { class: "tune-row", title: "Vykreslí kolizní kruhy (tělo, příď, křídla) všech viditelných lodí. Jen pro tento prohlížeč." }, h("span", { class: "txt tune-label" }, "Zobrazit hitboxy lodí (kolizní model)"), hb);
   const noteRow = h("div", { class: "muted txt", style: "padding:6px 0" }, "Volby v této záložce se neposílají na server – mění jen zobrazení v tomto prohlížeči.");
-  b.localRows.push(hbRow, noteRow);
-  body.append(hbRow, noteRow);
+  b.localRows.push(srRow, hbRow, noteRow);
+  body.append(srRow, hbRow, noteRow);
   root.append(h("div", { class: "pnl tune-card" }, b.head, b.tabs, body));
   return b;
 }
