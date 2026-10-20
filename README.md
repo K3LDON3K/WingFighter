@@ -145,6 +145,13 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.32 – ekonomika mezi bitvami: každý hráč má v místnosti **kredity** (startovní rozpočet + výdělky z bitev
+  − utracené za výbavu; zobrazeno u „Tvoje výbava“). Změna výbavy je obchod: nový modul za plnou cenu (před
+  bitvou jde vrátit za plnou), použitý modul (po bitvě) se prodá za 60 %, zničený za 10 % (ladění → Moduly).
+  Po bitvě hráči zůstane výbava z lodi: zbývající munice, zničené moduly (červené, jen k prodeji), náklad
+  (v místnosti klik = prodat); poškozené moduly se opraví. Ve vraku zničené lodi je vše, co nevypadlo,
+  zničené. Munice se už sama nedoplňuje – u modulu je tlačítko **+cena** (torpédo 12, mina 12, 10 nábojů
+  kulometu 3; vždy levnější než prodat prázdný modul a koupit nový). Boti mají výbavu zdarma jako dřív.
 - v3.31 – životy modulů a výpad modulů: každý modul má hp (lasery 30, torpédomet 20, miny 20, kulomet 25,
   skener 15, štíty 40; ladění → Moduly). Zranění, které projde do trupu, poškodí i modul (50 % zranění):
   směrovaný zásah modul na zasažené straně (slot podle směru jako u segmentů), výbuch / náraz náhodný modul.

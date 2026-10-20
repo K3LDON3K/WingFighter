@@ -1,4 +1,5 @@
-import { applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
+import {
+  RULES, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
 import { logoCanvas } from "./logo.ts";
 import { openMusicPanel } from "./main.ts";
 import { renderMapPreview } from "./map-preview.ts";
@@ -229,9 +230,9 @@ function roomView(m: LobbyModel, net: Net) {
       ? h(
           "div",
           { class: "card" },
-          h("h3", {}, icon("inventory", "#7dd3fc", 12), " ", label("Tvoje výbava")),
-          h("div", { class: "muted txt" }, `Rozpočet ${budget} kreditů. Co neutratíš, máš ve hře jako kredity; další získáš za sestřely a přežitá kola. Váha modulů snižuje max. rychlost lodi.`),
-          renderLoadout({ loadout: me.loadout, budget, allowed: room.settings.allowedModules, onChange: (lo) => net.send({ type: "setLoadout", loadout: lo }) }),
+          h("h3", {}, icon("inventory", "#7dd3fc", 12), " ", label("Tvoje výbava"), h("span", { class: "spacer" }), h("span", { class: "lo-wallet", title: "Kredity: rozpočet místnosti + výdělky z bitev − utracené za výbavu. Výbava, munice i zničené moduly ti mezi bitvami zůstávají." }, icon("credits", "#fbbf24", 12), ` ${me.credits ?? budget}`)),
+          h("div", { class: "muted txt" }, `Nové moduly kupuješ za plnou cenu (nový jde před bitvou vrátit za plnou cenu, použitý se prodá za ${RULES.usedSellPct} %, zničený za ${RULES.brokenSellPct} %). Munice se mezi bitvami nedoplňuje sama – dokoupíš ji tlačítkem +cena u modulu (levnější než nový modul). Co neutratíš, máš ve hře jako kredity; další získáš za sestřely a přežitá kola. Váha modulů snižuje max. rychlost lodi.`),
+          renderLoadout({ loadout: me.loadout, budget, wallet: me.credits ?? budget, showCargo: !!me.loadout.cargo?.length, allowed: room.settings.allowedModules, onChange: (lo) => net.send({ type: "setLoadout", loadout: lo }) }),
         )
       : null,
     (() => {
@@ -323,7 +324,7 @@ function roomView(m: LobbyModel, net: Net) {
           h("option", { value: "manual", selected: settings.botLoadout === "manual" }, "ruční (naklikám u bota)"),
         ),
       ),
-      h("div", { class: "muted txt", style: "margin-top:6px" }, `Rozpočet na výbavu: ${budget} kreditů (mění se v ladění → Ekonomika). Povolené moduly na hráče:`),
+      h("div", { class: "muted txt", style: "margin-top:6px" }, `Startovní kredity každého hráče: ${budget} (mění se v ladění → Ekonomika; výdělky z bitev se přičítají). Povolené moduly na hráče:`),
       h(
         "div",
         { class: "allowed" },

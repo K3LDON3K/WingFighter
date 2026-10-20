@@ -126,6 +126,7 @@ export interface Tuning {
   moduleDropChance: number;
   brokenSellPct: number;
   moduleHpPct: number;
+  usedSellPct: number;
 }
 
 export const DEFAULT_TUNING: Tuning = {
@@ -234,6 +235,7 @@ export const DEFAULT_TUNING: Tuning = {
   moduleDropChance: 45,
   brokenSellPct: 10,
   moduleHpPct: 100,
+  usedSellPct: 60,
 };
 
 export interface TuningField {
@@ -367,6 +369,7 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "moduleDamagePct", label: "Podíl zranění trupu do modulu (%)", group: "Moduly", min: 0, max: 200, step: 5, hint: "směrovaný zásah poškodí modul na zasažené straně, výbuch/náraz náhodný modul" },
   { key: "moduleDropChance", label: "Šance, že modul vypadne ze zničené lodi (%)", group: "Moduly", min: 0, max: 100, step: 5, hint: "každý modul zvlášť: při 45 % vypadne ze 4 modulů aspoň jeden v 91 %, všechny jen ve 4 %" },
   { key: "brokenSellPct", label: "Prodej zničeného modulu (% ceny)", group: "Moduly", min: 0, max: 100, step: 5 },
+  { key: "usedSellPct", label: "Prodej použitého modulu (% ceny)", group: "Moduly", min: 0, max: 100, step: 5, hint: "modul, který už byl v bitvě; nový se před bitvou vrací za plnou cenu. Dokoupení munice je levnější než prodat prázdný a koupit nový" },
 ];
 
 /** Ořeže neznámé/nesmyslné hodnoty podle TUNING_FIELDS. */
@@ -489,5 +492,6 @@ export function applyTuning(t: Tuning): void {
   RULES.moduleDamagePct = t.moduleDamagePct;
   RULES.moduleDropChance = t.moduleDropChance;
   RULES.brokenSellPct = t.brokenSellPct;
+  RULES.usedSellPct = t.usedSellPct;
   MODULE_HP_PCT.value = t.moduleHpPct;
 }

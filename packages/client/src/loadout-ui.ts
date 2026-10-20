@@ -1,5 +1,8 @@
 import {
   moduleBroken,
+  moduleSellPrice,
+  ammoRefillCost,
+  type ModuleInstance,
   cargoCapacity,
   moduleWeight,
   allowedFacings,
@@ -42,6 +45,8 @@ export interface LoadoutEditorOptions {
   selectedId?: string;
   /** Zobrazit nákladový prostor (ve hře). */
   showCargo?: boolean;
+  /** Obchod v místnosti: kredity hráče; nákup za cenu, prodej za prodejní cenu, dokoupení munice po kusech. */
+  wallet?: number;
 }
 
 const NS = "http://www.w3.org/2000/svg";
@@ -82,11 +87,17 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   const cost = moduleCost(loadout);
   const weight = loadoutWeight(loadout);
   const maxSpeed = maxSpeedFor(loadout);
-  const err = validateLoadout(loadout, { allowed, budget });
+  const shop = opts.wallet !== undefined;
+  const err = validateLoadout(loadout, { allowed, budget: shop ? undefined : budget });
   const ro = !!opts.readonly;
 
   const change = (lo: ShipLoadout) => opts.onChange?.(lo);
-  const remove = (id: string) => change({ ...loadout, modules: loadout.modules.filter((m) => m.id !== id) });
+  const remove = (id: string) => change({ ...loadout, modules: loadout.modules.filter((m) => m.id !== id), cargo: loadout.cargo?.filter((m) => m.id !== id) });
+  const wallet = opts.wallet ?? 0;
+  const refill = (id: string) => {
+    const fix = (m: ModuleInstance) => (m.id === id ? { ...m, ammo: MODULES[m.type].ammo } : m);
+    change({ ...loadout, modules: loadout.modules.map(fix), cargo: loadout.cargo?.map(fix) });
+  };
   const firstFreeSlot = (): SlotId | null => freeSlots(loadout)[0] ?? null;
   const add = (type: ModuleType) => {
     const def = MODULES[type];
@@ -148,11 +159,25 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
           grp.append(arrow);
         }
       }
+      if (!ro && !selectable && shop && !moduleBroken(m) && ammoRefillCost(m) > 0) {
+        const price = ammoRefillCost(m);
+        const can = price <= wallet;
+        const r = svgEl("g", { class: `lo-refill ${can ? "" : "dis"}`, transform: `translate(${box.x + 24}, ${box.y + box.h - 14})` });
+        r.append(svgEl("rect", { x: -16, y: -7, width: 32, height: 14, fill: "#0b1020", stroke: can ? "#fbbf24" : "#64748b", "stroke-width": 1 }));
+        r.append(svgEl("text", { x: 0, y: 4, "font-family": "Jersey", "font-size": 10, fill: can ? "#fbbf24" : "#64748b", "text-anchor": "middle" }, `+${price}`));
+        r.append(svgEl("title", {}, `Doplnit munici (${def.ammo! - (m.ammo ?? 0)} ks) za ${price} kreditů${can ? "" : " – nedostatek kreditů"}`));
+        if (can)
+          r.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            refill(m.id);
+          });
+        grp.append(r);
+      }
       if (!ro && !selectable) {
         const x = svgEl("g", { class: "lo-remove", transform: `translate(${box.x + box.w - 24}, ${box.y + box.h - 14})` });
         x.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: "#0b1020", stroke: "#f87171", "stroke-width": 1 }));
         x.append(svgEl("path", { d: "M-4,-4 L4,4 M4,-4 L-4,4", stroke: "#f87171", "stroke-width": 2 }));
-        x.append(svgEl("title", {}, `Odebrat ${def.name} (vrátí ${def.price} kreditů)`));
+        x.append(svgEl("title", {}, shop ? `Prodat ${def.name} za ${moduleSellPrice(m)} kreditů${m.used ? " (použitý)" : moduleBroken(m) ? " (zničený)" : ""}` : `Odebrat ${def.name} (vrátí ${def.price} kreditů)`));
         x.addEventListener("click", (ev) => {
           ev.stopPropagation();
           remove(m.id);
@@ -208,10 +233,14 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         const words = def.name.toUpperCase().split(" ");
         words.forEach((w, k) => csvg.append(svgEl("text", { x: hexW / 2, y: hexH / 2 + 4 - (words.length - 1) * 5 + k * 10, "font-family": "Jersey, ui-monospace, monospace", "font-size": 11, fill: "#f8fafc", "text-anchor": "middle" }, w)));
         if (m.ammo !== undefined) csvg.append(svgEl("text", { x: hexW / 2, y: 12, "font-family": "Jersey", "font-size": 10, fill: "#fbbf24", "text-anchor": "middle" }, String(m.ammo)));
-        csvg.append(svgEl("title", {}, `${def.name} v nákladu (váha ${moduleWeight(m)}) – nefunguje; lze vyhodit${opts.onSelect ? ", klik = vybrat" : ""}`));
+        csvg.append(svgEl("title", {}, shop ? `${def.name} v nákladu${broken ? " – zničený" : ""}: prodat za ${moduleSellPrice(m)} kreditů (klik)` : `${def.name} v nákladu (váha ${moduleWeight(m)}) – nefunguje; lze vyhodit${opts.onSelect ? ", klik = vybrat" : ""}`));
         if (opts.onSelect) {
           csvg.classList.add("selectable");
           csvg.addEventListener("click", () => opts.onSelect!(m.id));
+        } else if (shop && !ro) {
+          csvg.classList.add("selectable");
+          csvg.append(svgEl("text", { x: hexW / 2, y: hexH - 14, "font-family": "Jersey", "font-size": 9, fill: "#f87171", "text-anchor": "middle" }, `PRODAT ${moduleSellPrice(m)}`));
+          csvg.addEventListener("click", () => remove(m.id));
         }
       } else {
         csvg.append(svgEl("polygon", { points: pts, fill: "none", stroke: "#334155", "stroke-width": 2, "stroke-dasharray": "3 4" }));
@@ -224,7 +253,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   }
 
   /* --- nákup --- */
-  const shop = h("div", { class: "lo-shop" });
+  const shopEl = h("div", { class: "lo-shop" });
   if (!ro) {
     for (const t of MODULE_TYPES) {
       const def = MODULES[t];
@@ -233,10 +262,10 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       let why: string | null = null;
       if (max === 0) why = "v této hře zakázán";
       else if (max !== undefined && have >= max) why = `max. ${max} na hráče`;
-      else if (cost + def.price > budget) why = "nestačí rozpočet";
+      else if (shop ? def.price > wallet : cost + def.price > budget) why = shop ? "nedostatek kreditů" : "nestačí rozpočet";
       else if (!firstFreeSlot()) why = "všechny sloty obsazené";
       else if ((t === "shield-whole" && loadout.modules.some((m) => m.type === "shield-segment")) || (t === "shield-segment" && loadout.modules.some((m) => m.type === "shield-whole"))) why = "nelze kombinovat typy štítů";
-      shop.append(hexBuyButton(t, have, why, () => add(t)));
+      shopEl.append(hexBuyButton(t, have, why, () => add(t)));
     }
   }
 
@@ -251,12 +280,12 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   const summary = h(
     "div",
     { class: "lo-summary" },
-    h("span", { title: "Utraceno z rozpočtu; zbytek máš ve hře jako kredity" }, icon("credits", "#fbbf24", 10), ` ${cost} / ${budget}`),
+    shop ? h("span", { title: "Tvoje kredity: rozpočet místnosti + výdělky z bitev − výbava. Co neutratíš, máš ve hře jako kredity." }, icon("credits", "#fbbf24", 10), ` ${wallet} kreditů`, h("span", { class: "muted" }, ` · výbava ${cost}`)) : h("span", { title: "Utraceno z rozpočtu; zbytek máš ve hře jako kredity" }, icon("credits", "#fbbf24", 10), ` ${cost} / ${budget}`),
     h("span", { title: "Součet váhy modulů (včetně munice). Každých " + "N" + " váhy = −1 max. rychlost" }, icon("weight", "#94a3b8", 10), ` ${weight}`),
     h("span", { title: "Maximální rychlost lodi s touto výbavou" }, icon("speed", "#94a3b8", 10), ` ${maxSpeed}`),
   );
   const root = h("div", { class: `loadout ${opts.compact ? "compact" : ""}` }, opts.hideHead ? null : head, diagram, summary);
-  if (!ro) root.append(shop);
+  if (!ro) root.append(shopEl);
   if (err) root.append(h("div", { class: "error" }, err));
   return root;
 }

@@ -34,6 +34,9 @@ import {
   randomLoadout,
   refillLoadout,
   validateLoadout,
+  applyLoadoutTrade,
+  moduleCost,
+  settleLoadoutAfterBattle,
 } from "@wingfighter/shared";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
@@ -58,6 +61,11 @@ interface RoomMember {
   manualLoadout?: boolean;
   /** Zvolený startovní bod. */
   startIndex?: number;
+  /** Ekonomika mezi bitvami: kredity = rozpočet místnosti + vyděláno − utraceno. */
+  earned: number;
+  spent: number;
+  /** Kredity při startu bitvy (rozdíl na konci = vyděláno). */
+  walletAtStart?: number;
 }
 
 interface RunningGame {
@@ -68,6 +76,8 @@ interface RunningGame {
   memory: Map<number, AsteroidMemory>;
   /** Události provedené hned při plánování (skener) – přidají se do výsledku příštího kola. */
   pendingEvents: TurnEvent[];
+  /** Výbava a kredity už byly po bitvě zapsány členům. */
+  settled?: boolean;
 }
 
 function memoryFor(g: RunningGame, team: number): AsteroidMemory {
@@ -90,10 +100,24 @@ function cleanLoadout(raw: unknown): ShipLoadout | null {
     if (!MODULE_TYPES.includes(mm.type as ModuleType)) return null;
     const def = MODULES[mm.type as ModuleType];
     const facing = typeof mm.facing === "string" ? (mm.facing as ShipLoadout["modules"][number]["facing"]) : undefined;
-    modules.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: mm.slot as ShipLoadout["modules"][number]["slot"], ammo: def.ammo, facing });
+    const ammo = def.ammo === undefined ? undefined : typeof mm.ammo === "number" && Number.isFinite(mm.ammo) ? Math.max(0, Math.min(def.ammo, Math.round(mm.ammo))) : def.ammo;
+    modules.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: mm.slot as ShipLoadout["modules"][number]["slot"], ammo, facing });
   }
   if (modules.length > 8) return null;
-  return { hullId: r.hullId, pilotId: r.pilotId, modules };
+  let cargo: ShipLoadout["cargo"];
+  if (Array.isArray(r.cargo)) {
+    cargo = [];
+    for (const m of r.cargo as unknown[]) {
+      if (!m || typeof m !== "object") return null;
+      const mm = m as Record<string, unknown>;
+      if (typeof mm.id !== "string" || typeof mm.type !== "string" || !MODULE_TYPES.includes(mm.type as ModuleType)) return null;
+      const def = MODULES[mm.type as ModuleType];
+      const ammo = def.ammo === undefined ? undefined : typeof mm.ammo === "number" && Number.isFinite(mm.ammo) ? Math.max(0, Math.min(def.ammo, Math.round(mm.ammo))) : def.ammo;
+      cargo.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: "front", ammo });
+    }
+    if (cargo.length > 8) return null;
+  }
+  return { hullId: r.hullId, pilotId: r.pilotId, modules, cargo: cargo?.length ? cargo : undefined };
 }
 
 function teamOf(g: RunningGame, playerId: string): number {
@@ -136,9 +160,15 @@ class Room {
         ready: m.ready,
         loadout: m.loadout,
         startIndex: m.startIndex,
+        credits: m.isBot ? undefined : this.walletOf(m),
         connected: m.isBot ? true : !!clients.get(m.id)?.ws,
       })),
     };
+  }
+
+  /** Kredity člena: rozpočet místnosti + vyděláno v bitvách − utraceno za výbavu. */
+  walletOf(m: RoomMember): number {
+    return Math.round(this.tuning.startBudget + m.earned - m.spent);
   }
 
   toSummary(): RoomSummary {
@@ -231,7 +261,7 @@ export class Hub {
         const code = this.newCode();
         const r = new Room(code, cleanName(msg.name) || `Místnost ${client.name}`, client.id);
         this.rooms.set(code, r);
-        r.members.set(client.id, { id: client.id, name: client.name, team: 0, isBot: false, ready: false, loadout: structuredClone(DEFAULT_LOADOUT) });
+        r.members.set(client.id, { id: client.id, name: client.name, team: 0, isBot: false, ready: false, loadout: structuredClone(DEFAULT_LOADOUT), earned: 0, spent: moduleCost(DEFAULT_LOADOUT) });
         client.roomCode = code;
         this.broadcastRoom(r);
         this.broadcastRooms();
@@ -243,7 +273,7 @@ export class Hub {
         if (r.game) return this.error(client, "V této místnosti už probíhá hra.");
         if (room && room !== r) this.leaveRoom(client);
         const team = r.settings.mode === "tdm" ? this.smallestTeam(r) : 0;
-        r.members.set(client.id, { id: client.id, name: client.name, team, isBot: false, ready: false, loadout: structuredClone(DEFAULT_LOADOUT) });
+        r.members.set(client.id, { id: client.id, name: client.name, team, isBot: false, ready: false, loadout: structuredClone(DEFAULT_LOADOUT), earned: 0, spent: moduleCost(DEFAULT_LOADOUT) });
         client.roomCode = r.code;
         this.broadcastRoom(r);
         this.broadcastRooms();
@@ -286,10 +316,22 @@ export class Hub {
         if (msg.botId && (room.hostId !== client.id || !m.isBot)) return;
         const lo = cleanLoadout(msg.loadout);
         if (!lo) return this.error(client, "Neplatná výbava.");
-        const err = validateLoadout(lo, { allowed: room.settings.allowedModules, budget: room.tuning.startBudget });
-        if (err) return this.error(client, `Výbava: ${err}.`);
-        m.loadout = lo;
-        if (m.isBot) m.manualLoadout = true;
+        if (m.isBot) {
+          // bot: výbava zdarma (jen platnost a rozpočet)
+          const err = validateLoadout(lo, { allowed: room.settings.allowedModules, budget: room.tuning.startBudget });
+          if (err) return this.error(client, `Výbava: ${err}.`);
+          m.loadout = lo;
+          m.manualLoadout = true;
+        } else {
+          // hráč: změna je obchod – nákup, prodej, dokoupení munice z kreditů
+          const trade = applyLoadoutTrade(m.loadout, lo);
+          if (trade.error) return this.error(client, `Výbava: ${trade.error}.`);
+          const err = validateLoadout(trade.loadout, { allowed: room.settings.allowedModules });
+          if (err) return this.error(client, `Výbava: ${err}.`);
+          if (trade.cost > room.walletOf(m)) return this.error(client, `Nedostatek kreditů (potřeba ${trade.cost}, máš ${room.walletOf(m)}).`);
+          m.spent += trade.cost;
+          m.loadout = trade.loadout;
+        }
         this.broadcastRoom(room);
         return;
       }
@@ -299,7 +341,7 @@ export class Hub {
         const id = `bot-${randomBytes(3).toString("hex")}`;
         const used = new Set([...room.members.values()].map((m) => m.name));
         const name = BOT_NAMES.find((n) => !used.has(`Bot ${n}`)) ?? randomBytes(2).toString("hex");
-        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, MAX_TEAMS_TDM - 1), isBot: true, ready: true, loadout: this.botLoadout(room) });
+        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, MAX_TEAMS_TDM - 1), isBot: true, ready: true, loadout: this.botLoadout(room), earned: 0, spent: 0 });
         this.broadcastRoom(room);
         this.broadcastRooms();
         return;
@@ -413,6 +455,7 @@ export class Hub {
       }
       case "backToLobby": {
         if (!room || room.hostId !== client.id) return;
+        this.settleBattle(room);
         room.game = null;
         for (const m of room.members.values()) m.ready = m.isBot;
         // odpojené hráče vyhodíme
@@ -439,10 +482,11 @@ export class Hub {
     }
     for (const m of members) {
       if (m.isBot && !m.manualLoadout) m.loadout = this.botLoadout(room);
-      const err = validateLoadout(m.loadout, { allowed: room.settings.allowedModules, budget: room.tuning.startBudget });
+      const err = validateLoadout(m.loadout, { allowed: room.settings.allowedModules, budget: m.isBot ? room.tuning.startBudget : undefined });
       if (err) return this.error(host, `${m.name} – výbava: ${err}.`);
+      if (!m.isBot) m.walletAtStart = room.walletOf(m);
     }
-    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadout), startIndex: m.startIndex }));
+    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadout), credits: m.isBot ? undefined : room.walletOf(m), startIndex: m.startIndex }));
     const state = createGame({ players, settings: room.settings, tuning: room.tuning });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     room.game = { state, orders: new Map(), rng, memory: new Map(), pendingEvents: [] };
@@ -534,6 +578,7 @@ export class Hub {
       if (!r) perTeam.set(team, (r = resultForTeam(result, prev, team, memoryFor(g, team))));
       this.send(c, { type: "turnResult", result: r });
     }
+    if (g.state.status === "finished") this.settleBattle(room);
     if (g.state.status !== "finished") {
       this.planBots(room);
       // pokud už nikdo nemusí nic poslat (např. všichni lidé odpojeni), pokračujeme automaticky
@@ -542,6 +587,31 @@ export class Hub {
       } else if (this.waitingFor(room).length === 0) {
         // nikdo není připojen – nic nevyhodnocujeme, hra počká
       }
+    }
+  }
+
+  /**
+   * Po bitvě (konec nebo předčasný návrat): hráčům zůstane výbava z lodi (munice, zničené moduly, náklad),
+   * poškozené moduly se opraví, moduly ve vraku zničené lodi jsou zničené (prodej za zlomek); kredity z bitvy se připíší.
+   */
+  private settleBattle(room: Room) {
+    const g = room.game;
+    if (!g || g.settled) return;
+    g.settled = true;
+    for (const m of room.members.values()) {
+      if (m.isBot) continue;
+      const ship = g.state.ships.find((s) => s.ownerId === m.id);
+      if (ship) {
+        const lo = structuredClone(ship.loadout);
+        if (!ship.alive) {
+          // vrak: co nevypadlo, je zničené
+          for (const mod of [...lo.modules, ...(lo.cargo ?? [])]) mod.hp = 0;
+        }
+        m.loadout = settleLoadoutAfterBattle(lo);
+      }
+      const p = g.state.players.find((x) => x.id === m.id);
+      if (p && p.credits !== undefined && m.walletAtStart !== undefined) m.earned += p.credits - m.walletAtStart;
+      m.walletAtStart = undefined;
     }
   }
 

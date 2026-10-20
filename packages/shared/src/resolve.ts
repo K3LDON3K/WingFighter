@@ -165,6 +165,9 @@ function dropModules(ship: Ship, events: TurnEvent[]): void {
   const all = [...ship.loadout.modules, ...(ship.loadout.cargo ?? [])];
   for (const mod of all) {
     if (rng.next() * 100 >= RULES.moduleDropChance) continue;
+    // vypadlý modul už vraku nepatří (po bitvě se hráči nevrátí)
+    ship.loadout.modules = ship.loadout.modules.filter((m) => m.id !== mod.id);
+    if (ship.loadout.cargo) ship.loadout.cargo = ship.loadout.cargo.filter((m) => m.id !== mod.id);
     const ang = rng.next() * Math.PI * 2;
     const dist = 40 + rng.next() * 50;
     const debris: Debris = {

@@ -125,6 +125,8 @@ export interface ModuleInstance {
   ammo?: number;
   /** Zbývající životy modulu (chybí = plné). 0 = zničený: nefunguje, prodá se jen za zlomek ceny. */
   hp?: number;
+  /** Modul už byl v bitvě – prodá se jen za část ceny (nový se vrací za plnou). */
+  used?: boolean;
   /** Natočení zbraně (lasery: výseč, miny: strana odhozu, torpéda: směr výletu). Štíty směr nemají. */
   facing?: Facing;
   /** Skener: náboje a zbývající kola cooldownu (po něm plné náboje). */

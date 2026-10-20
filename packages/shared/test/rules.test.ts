@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyLoadoutTrade,
+  ammoRefillCost,
+  moduleSellPrice,
+  settleLoadoutAfterBattle,
+  MODULES,
+  RULES,
   computeStats,
   moduleWorking,
   DEFAULT_TUNING,
@@ -1089,5 +1095,36 @@ describe("životy modulů a výpad modulů", () => {
     }
     expect(runs).toBeGreaterThan(0);
     expect(dropped).toBeGreaterThan(0);
+  });
+});
+
+describe("obchod s výbavou mezi bitvami", () => {
+  it("nákup za plnou cenu, vrácení nového za plnou, prodej použitého a zničeného za část; dokoupení munice levnější než výměna", () => {
+    const base = structuredClone(DEFAULT_LOADOUT);
+    // nákup kulometu
+    const withMg = { ...base, modules: [...base.modules, { id: "x1", type: "mg" as const, slot: "right" as const, facing: "right" as const, ammo: 100 }] };
+    const buy = applyLoadoutTrade(base, withMg);
+    expect(buy.error).toBeUndefined();
+    expect(buy.cost).toBe(MODULES.mg.price);
+    // vrácení nového = plná cena zpět
+    const back = applyLoadoutTrade(buy.loadout, base);
+    expect(back.cost).toBe(-MODULES.mg.price);
+    // po bitvě: použité moduly, torpéda vystřílená, jeden modul zničený
+    const after = settleLoadoutAfterBattle({ ...base, modules: base.modules.map((m) => (m.type === "torpedo" ? { ...m, ammo: 0 } : m.type === "laser" ? { ...m, hp: 0 } : m)) });
+    const torp = after.modules.find((m) => m.type === "torpedo")!;
+    const laser = after.modules.find((m) => m.type === "laser")!;
+    expect(moduleSellPrice(laser)).toBe(Math.round((MODULES.laser.price * RULES.brokenSellPct) / 100));
+    expect(moduleSellPrice(torp)).toBe(Math.round((MODULES.torpedo.price * RULES.usedSellPct) / 100));
+    // dokoupení munice
+    const refilled = { ...after, modules: after.modules.map((m) => (m.id === torp.id ? { ...m, ammo: MODULES.torpedo.ammo } : m)) };
+    const refill = applyLoadoutTrade(after, refilled);
+    expect(refill.error).toBeUndefined();
+    expect(refill.cost).toBe(ammoRefillCost(torp));
+    // levnější než prodat prázdný použitý a koupit nový
+    expect(refill.cost).toBeLessThan(MODULES.torpedo.price - moduleSellPrice(torp));
+    // hp / used nejde podvrhnout
+    const cheat = applyLoadoutTrade(after, { ...after, modules: after.modules.map((m) => ({ ...m, hp: undefined, used: undefined })) });
+    expect(cheat.loadout.modules.find((m) => m.id === laser.id)!.hp).toBe(0);
+    expect(cheat.cost).toBe(0);
   });
 });

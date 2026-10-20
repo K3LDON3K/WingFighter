@@ -11,6 +11,8 @@ export interface RoomPlayer {
   connected: boolean;
   loadout: ShipLoadout;
   startIndex?: number;
+  /** Kredity hráče v místnosti (rozpočet + výdělky z bitev − výbava). Boti nemají. */
+  credits?: number;
 }
 
 export interface RoomState {

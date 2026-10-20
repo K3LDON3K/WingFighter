@@ -130,11 +130,70 @@ export function moduleWorking(m: ModuleInstance): boolean {
 export function moduleBroken(m: ModuleInstance): boolean {
   return !moduleWorking(m);
 }
-/** Prodejní cena modulu: zničený jen za zlomek. */
+/** Prodejní cena modulu: zničený jen za zlomek, použitý (po bitvě) za část, nový za plnou cenu. */
 export function moduleSellPrice(m: ModuleInstance): number {
   const def = MODULES[m.type];
   if (!def) return 0;
-  return moduleBroken(m) ? Math.round((def.price * RULES.brokenSellPct) / 100) : def.price;
+  if (moduleBroken(m)) return Math.round((def.price * RULES.brokenSellPct) / 100);
+  if (m.used) return Math.round((def.price * RULES.usedSellPct) / 100);
+  return def.price;
+}
+
+/** Cena dokoupení chybějící munice (0 = plný zásobník nebo modul bez munice). */
+export function ammoRefillCost(m: ModuleInstance): number {
+  const def = MODULES[m.type];
+  if (!def?.ammo || def.ammoPrice === undefined) return 0;
+  const missing = Math.max(0, def.ammo - (m.ammo ?? 0));
+  return Math.ceil(missing * def.ammoPrice);
+}
+
+/**
+ * Změna výbavy v místnosti jako obchod: nové moduly se kupují za plnou cenu (plná munice, nepoškozené),
+ * odebrané se prodávají (nový 100 %, použitý část, zničený zlomek), doplněná munice se platí po kusech.
+ * Vrací vyčištěnou výbavu (hp / used se nedají změnit) a cenu (záporná = výdělek), nebo chybu.
+ */
+export function applyLoadoutTrade(prev: ShipLoadout, next: ShipLoadout): { loadout: ShipLoadout; cost: number; error?: string } {
+  const prevAll = new Map<string, ModuleInstance>();
+  for (const m of [...prev.modules, ...(prev.cargo ?? [])]) prevAll.set(m.id, m);
+  let cost = 0;
+  const fix = (m: ModuleInstance): ModuleInstance | string => {
+    const def = MODULES[m.type];
+    if (!def) return `neznámý modul ${m.type}`;
+    const old = prevAll.get(m.id);
+    if (!old) {
+      // nákup: vždy nový, plný, nepoškozený
+      cost += def.price;
+      return { ...m, ammo: def.ammo, hp: undefined, used: undefined };
+    }
+    if (old.type !== m.type) return "modul nelze změnit na jiný typ";
+    const out: ModuleInstance = { ...m, hp: old.hp, used: old.used };
+    if (def.ammo !== undefined) {
+      const was = old.ammo ?? 0;
+      const want = Math.max(0, Math.min(def.ammo, Math.round(m.ammo ?? was)));
+      if (want > was) {
+        if (moduleBroken(old)) return `${def.name}: zničený modul nejde doplnit`;
+        cost += Math.ceil((want - was) * (def.ammoPrice ?? 0));
+      }
+      out.ammo = Math.max(was, want); // munici nejde „odprodat“ – zůstává
+    }
+    prevAll.delete(m.id);
+    return out;
+  };
+  const modules: ModuleInstance[] = [];
+  for (const m of next.modules) {
+    const r = fix(m);
+    if (typeof r === "string") return { loadout: prev, cost: 0, error: r };
+    modules.push(r);
+  }
+  const cargo: ModuleInstance[] = [];
+  for (const m of next.cargo ?? []) {
+    const r = fix(m);
+    if (typeof r === "string") return { loadout: prev, cost: 0, error: r };
+    cargo.push(r);
+  }
+  // co zbylo v prevAll, bylo prodáno
+  for (const m of prevAll.values()) cost -= moduleSellPrice(m);
+  return { loadout: { ...next, modules, cargo: cargo.length ? cargo : undefined }, cost };
 }
 
 /** Velký modul zabírá příď + záď (zapisuje se do slotu "front"). */
@@ -246,11 +305,17 @@ export function refillLoadout(loadout: ShipLoadout): ShipLoadout {
     ...loadout,
     modules: loadout.modules.map((m) => ({
       ...m,
-      ammo: MODULES[m.type]?.ammo,
+      ammo: MODULES[m.type]?.ammo === undefined ? undefined : Math.max(0, Math.min(MODULES[m.type].ammo!, m.ammo ?? MODULES[m.type].ammo!)),
       facing: hasFacing(m.type) ? (m.facing ?? defaultFacing(m.type, m.slot)) : undefined,
       ...(m.type === "scanner" ? { charges: SCANNER.charges, cooldown: 0 } : { charges: undefined, cooldown: undefined }),
     })),
   };
+}
+
+/** Výbava po bitvě: poškozené moduly se opraví na plné hp (zničené zůstanou), vše je „použité“, munice zůstává. */
+export function settleLoadoutAfterBattle(loadout: ShipLoadout): ShipLoadout {
+  const fix = (m: ModuleInstance): ModuleInstance => ({ ...m, hp: moduleBroken(m) ? 0 : undefined, used: true, charges: undefined, cooldown: undefined });
+  return { ...loadout, modules: loadout.modules.map(fix), cargo: loadout.cargo?.length ? loadout.cargo.map(fix) : undefined };
 }
 
 export function computeStats(loadout: ShipLoadout): ShipStats {

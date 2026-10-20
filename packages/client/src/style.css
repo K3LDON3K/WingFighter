@@ -2106,6 +2106,23 @@ button.px.tiny {
   font-size: 14px;
   text-align: center;
 }
+.lo-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--yellow);
+  font-size: 16px;
+}
+.lo-refill {
+  cursor: pointer;
+  pointer-events: all;
+}
+.lo-refill.dis {
+  cursor: not-allowed;
+}
+.lo-refill:not(.dis):hover rect {
+  fill: #3b2a05;
+}
 .lo-remove {
   cursor: pointer;
   pointer-events: all;

@@ -51,6 +51,8 @@ export const RULES = {
   moduleDamagePct: 50,
   moduleDropChance: 45,
   brokenSellPct: 10,
+  /** Prodej použitého (po bitvě) funkčního modulu – % ceny. */
+  usedSellPct: 60,
 };
 
 export const TORPEDO = {
