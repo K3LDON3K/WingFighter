@@ -407,10 +407,8 @@ function submitOrders(force = false) {
   for (const [id, o] of game.orders) {
     const ship = game.state.ships.find((x) => x.id === id);
     if (ship && o.action?.type === "jettison" && !ship.loadout.modules.some((m) => m.id === (o.action as { moduleId: string }).moduleId)) {
-      showError(`${ship.name}: vyber v inventáři modul k vyhození (nebo akci zruš).`);
+      showError(`${ship.name}: vyber modul k vyhození v okénku nad tlačítkem VYHODIT (nebo akci zruš).`);
       game.selectedShipId = id;
-      game.inventoryOpen = true;
-      game.jettisonPick = true;
       renderSide();
       return;
     }
@@ -1310,10 +1308,7 @@ function chooseIcon(shipId: string, id: string) {
   g.orders.set(shipId, next);
   g.picking = a.pick && a.active(next) ? a.pick : null;
   g.shieldEdit = a.id === "shield" && next.action?.type === "shield";
-  if (a.id === "jettison") {
-    g.jettisonPick = next.action?.type === "jettison";
-    if (g.jettisonPick) g.inventoryOpen = true;
-  }
+  if (a.id === "jettison") g.jettisonPick = false; // výběr modulu probíhá v okénku nad tlačítkem
   g.minePick = a.id === "mine" && next.special?.type === "mine" ? "timer" : null;
   renderSide();
 }

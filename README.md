@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.14.1 – vyhození modulu: okénko s hexovým inventářem nad tlačítkem VYHODIT (klik na modul = výběr);
+  panel INVENTÁŘ se už pro vyhození neotvírá.
 - v3.14 – úprava štítu ve vysouvacím okénku nad tlačítkem ŠTÍT (styl skeneru): bublina, −/+ u segmentů, sloty;
   panel lodi je jen ukazatel (plán s štítkem PLÁN).
 - v3.13.2 – štít na mapě má větší odstup od trupu (14 místo 6); jméno a ukazatele nad štítem.

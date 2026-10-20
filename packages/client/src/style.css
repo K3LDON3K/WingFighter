@@ -1027,6 +1027,44 @@ h3,
   margin-left: -2px;
   background: var(--accent);
 }
+.jettison-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px 6px;
+  z-index: 5;
+  background: #0f2a4a;
+  border: 3px solid;
+  border-color: #7dd3fc #0c4a6e #0c4a6e #7dd3fc;
+  box-shadow: 0 0 0 2px #05070f;
+  animation: popup 0.22s steps(4, end) both;
+}
+.jettison-pop::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -11px;
+  width: 4px;
+  height: 8px;
+  margin-left: -2px;
+  background: var(--accent);
+}
+.jettison-pop .jp-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #7dd3fc;
+  white-space: nowrap;
+}
+.jettison-pop .loadout.compact .lo-summary {
+  display: none;
+}
 .shield-pop .spair {
   display: flex;
   gap: 2px;
