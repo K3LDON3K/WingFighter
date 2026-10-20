@@ -50,7 +50,7 @@ import {
   type TurnResult,
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
-import { audioReady, isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
+import { audioReady, audioRunning, isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
 import { loadLibrary, playMode } from "./music.ts";
 import { renderMusicPanel } from "./music-ui.ts";
 import { replayLogo } from "./logo.ts";
@@ -1685,9 +1685,12 @@ net.connect();
 void loadLibrary();
 // zvuk: odemknout prvním vstupem; v menu se pak znovu přehraje animace loga se zvukem a spustí hudba
 let audioStarted = false;
+let audioHint: HTMLElement | null = null;
 const firstGesture = () => {
   if (audioStarted) return;
   audioStarted = true;
+  audioHint?.remove();
+  audioHint = null;
   unlockAudio();
   if (screen === "game") {
     playMode("game");
@@ -1701,6 +1704,17 @@ const firstGesture = () => {
 };
 window.addEventListener("pointerdown", firstGesture, { once: true });
 window.addEventListener("keydown", firstGesture, { once: true });
+// Prohlížeče povolí zvuk bez kliknutí jen výjimečně (Chrome po častém hraní se zvukem). Zkusíme to hned
+// po načtení; když to projde, logo i hudba startují samy, jinak ukážeme nápovědu, že zvuk čeká na klik.
+void audioReady().then(() => {
+  if (audioStarted) return;
+  if (audioRunning()) {
+    firstGesture();
+    return;
+  }
+  audioHint = h("div", { class: "audio-hint txt" }, icon("wait", "currentColor", 12), " klikni kamkoliv – prohlížeč zapne zvuk až po prvním vstupu");
+  document.body.append(audioHint);
+});
 window.addEventListener("keydown", (e) => {
   if (game) return;
   if (e.key === "Escape" && musicOverlay) closeMusicPanel();

@@ -76,6 +76,11 @@ export function audioReady(): Promise<void> {
   return Promise.race([c.resume().catch(() => undefined), new Promise<void>((r) => setTimeout(r, 400))]);
 }
 
+/** Je audio už povolené prohlížečem (běží bez čekání na vstup)? */
+export function audioRunning() {
+  return ctx?.state === "running";
+}
+
 export function getVolume() {
   return volume;
 }

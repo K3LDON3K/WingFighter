@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.19.2 – zvuk po načtení: hned po otevření stránky se zkusí audio rozběhnout; když to prohlížeč povolí
+  (Chrome u často hraných stránek), logo se zvukem a hudba startují samy. Jinak blikající nápověda dole
+  „klikni kamkoliv“ – prohlížeče zvuk bez prvního vstupu uživatele nepovolí, to obejít nejde.
 - v3.19.1 – odezva zvuku: cvaknutí tlačítek hraje už při stisku (ne až po puštění myši), animace loga
   se zvukem startuje až po rozběhnutí audia (resume je asynchronní – zvuk dřív zaostával za obrazem),
   audio kontext s nízkou latencí.
