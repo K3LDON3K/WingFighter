@@ -145,6 +145,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.13.2 – štít na mapě má větší odstup od trupu (14 místo 6); jméno a ukazatele nad štítem.
 - v3.13.1 – jméno hráče na záložce nad panelem lodi; v panelu tři svislé ukazatele (trup, stres, rychlost);
   VÝZBROJ ukazuje i lasery (∞ – bez munice); pixelové ikony −/+ u úpravy štítu.
 - v3.13 – nový panel lodi: bublina štítu + svislé ukazatele trupu a stresu; „1/1“ se při jedné lodi nezobrazuje.

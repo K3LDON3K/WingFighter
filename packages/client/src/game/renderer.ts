@@ -73,6 +73,8 @@ export interface Overlay {
 }
 
 export const ICON_RADIUS = 13;
+/** Odstup štítu od trupu lodi na mapě (herní jednotky). */
+export const SHIELD_GAP = 14;
 
 export class Renderer {
   readonly sprites = new SpriteCache();
@@ -472,6 +474,7 @@ export class Renderer {
 
   /** Štít na mapě: celolodní = kruh obarvený podle síly; segmentový = 4 oblouky otáčející se s lodí. */
   private drawShield(s: ViewShip, now: number) {
+    const GAP = SHIELD_GAP;
     const ctx = this.ctx;
     if (this.stormsRef && pointInStorm(this.stormsRef, s)) {
       // v bouři štít nefunguje: jen slabý fialový tečkovaný obrys tam, kde býval
@@ -481,7 +484,7 @@ export class Renderer {
       ctx.lineWidth = 1.5;
       ctx.setLineDash([2, 6]);
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.radius + 6, 0, Math.PI * 2);
+      ctx.arc(s.x, s.y, s.radius + GAP, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
       return;
@@ -494,7 +497,7 @@ export class Renderer {
       ctx.globalAlpha = 0.1 + 0.1 * frac;
       ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.radius + 5, 0, Math.PI * 2);
+      ctx.arc(s.x, s.y, s.radius + GAP, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 0.45 + 0.35 * frac;
       ctx.strokeStyle = col;
@@ -505,7 +508,7 @@ export class Renderer {
       ctx.restore();
       return;
     }
-    const r = s.radius + 6;
+    const r = s.radius + GAP;
     const half = (40 * Math.PI) / 180;
     ctx.save();
     ctx.lineWidth = 3;
@@ -595,10 +598,11 @@ export class Renderer {
     ctx.font = "13px Jersey, ui-monospace, Menlo, monospace";
     ctx.textAlign = "center";
     ctx.fillStyle = "rgba(248,250,252,0.9)";
-    ctx.fillText(s.name, s.x, s.y - s.radius - 16);
+    const top = s.radius + SHIELD_GAP + 4; // nad štítem
+    ctx.fillText(s.name, s.x, s.y - top - 10);
     const bw = 34;
     const bx = s.x - bw / 2;
-    const by = s.y - s.radius - 12;
+    const by = s.y - top - 6;
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
     const segTotal = s.segments[0] + s.segments[1] + s.segments[2] + s.segments[3];
@@ -611,9 +615,9 @@ export class Renderer {
     // stresové body (jen vlastní tým vidí detail; ostatní také – informace není tajná)
     for (let i = 0; i < STRESS.max; i++) {
       ctx.fillStyle = i < s.stressPoints ? "#f472b6" : "rgba(244,114,182,0.25)";
-      ctx.fillRect(s.x + s.radius + 6 + i * 5, s.y - s.radius - 10, 3, 3);
+      ctx.fillRect(s.x + s.radius + SHIELD_GAP + 4 + i * 5, s.y - top - 4, 3, 3);
     }
-    let tx = s.x + s.radius + 6;
+    let tx = s.x + s.radius + SHIELD_GAP + 4;
     const ty = s.y - s.radius + 2;
     ctx.font = "10px ui-monospace, Menlo, monospace";
     ctx.textAlign = "left";
@@ -902,7 +906,7 @@ export class Renderer {
         ctx.strokeStyle = "#f8fafc";
         ctx.lineWidth = 5 + 6 * t;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.radius + 6 + 4 * t, mid - half, mid + half);
+        ctx.arc(s.x, s.y, s.radius + SHIELD_GAP + 4 * t, mid - half, mid + half);
         ctx.stroke();
         ctx.restore();
         break;
@@ -915,7 +919,7 @@ export class Renderer {
         ctx.strokeStyle = "#93c5fd";
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.radius + 5, 0, Math.PI * 2);
+        ctx.arc(s.x, s.y, s.radius + SHIELD_GAP, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
         break;
