@@ -99,7 +99,16 @@ function laser(x: CanvasRenderingContext2D, x0: number, y: number, len: number, 
 
 const ease = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
+import { sfx } from "./sound.ts";
+
 let singleton: HTMLCanvasElement | null = null;
+let replay: ((withSound: boolean) => void) | null = null;
+
+/** Přehraje animaci loga znovu (se zvukem); vrací délku animace v ms. */
+export function replayLogo(withSound = true): number {
+  replay?.(withSound);
+  return 1700;
+}
 
 /** Logo jako canvas; animace proběhne jen jednou za načtení stránky (prvek se znovu používá). */
 export function logoCanvas(scale = 4): HTMLCanvasElement {
@@ -120,10 +129,18 @@ export function logoCanvas(scale = 4): HTMLCanvasElement {
     fighter = textLayer("FIGHTER", 47, 14, { y0: 14, y1: 22, stops: [[0, "#fde68a"], [0.5, "#f97316"], [1, "#b91c1c"]] }, "#05070f", { n: 3, color: "#7f1d1d" });
   };
 
-  const start = performance.now();
+  let start = performance.now();
   const DUR = 1500;
+  let sound = false;
+  let laserPlayed = false;
+  let rafId = 0;
   const draw = (now: number) => {
     const t = (now - start) / DUR;
+    if (sound && t >= 0.55 && !laserPlayed) {
+      laserPlayed = true;
+      sfx("laser");
+      setTimeout(() => sfx("laser"), 90);
+    }
     x.clearRect(0, 0, W, H);
     x.drawImage(bg, 0, 0);
     const shipX = -20 + (SHIP_X + 20) * ease(t);
@@ -152,14 +169,22 @@ export function logoCanvas(scale = 4): HTMLCanvasElement {
       x.fillRect(Math.round(shipX) - 10, SHIP_Y + 3, 2, 1);
     }
     drawShip(x, Math.round(shipX), SHIP_Y);
-    if (t < 1.2) requestAnimationFrame(draw);
+    if (t < 1.2) rafId = requestAnimationFrame(draw);
+  };
+  replay = (withSound) => {
+    cancelAnimationFrame(rafId);
+    start = performance.now();
+    sound = withSound;
+    laserPlayed = false;
+    if (withSound) sfx("logoFly");
+    rafId = requestAnimationFrame(draw);
   };
 
   // nejdřív počkáme na font (jinak by se nápis vykreslil náhradním písmem)
   const ready = document.fonts?.load ? document.fonts.load("8px PS2P").catch(() => undefined) : Promise.resolve();
   ready.then(() => {
     buildText();
-    requestAnimationFrame(draw);
+    rafId = requestAnimationFrame(draw);
   });
   return c;
 }

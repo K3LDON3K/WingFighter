@@ -30,13 +30,15 @@ export type SfxName =
   | "join"
   | "win"
   | "lose"
-  | "turnStart";
+  | "turnStart"
+  | "logoFly";
 
 const KEY_VOL = "wingfighter.sfxVolume";
 const KEY_MUTE = "wingfighter.sfxMuted";
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+let music: GainNode | null = null;
 let volume = 0.6;
 let muted = false;
 try {
@@ -54,6 +56,9 @@ function ensure(): AudioContext | null {
     master = ctx.createGain();
     master.gain.value = muted ? 0 : volume;
     master.connect(ctx.destination);
+    music = ctx.createGain();
+    music.gain.value = muted ? 0 : 1;
+    music.connect(ctx.destination);
   }
   if (ctx.state === "suspended") void ctx.resume();
   return ctx;
@@ -82,6 +87,7 @@ export function setVolume(v: number) {
 export function setMuted(m: boolean) {
   muted = m;
   if (master) master.gain.value = muted ? 0 : volume;
+  if (music) music.gain.value = muted ? 0 : 1;
   try {
     localStorage.setItem(KEY_MUTE, muted ? "1" : "0");
   } catch {
@@ -203,6 +209,11 @@ const SFX: Record<SfxName, (c: AudioContext, b: AudioNode) => void> = {
     tone(c, b, { wave: "square", f0: 800, dur: 0.05, gain: 0.12 });
     tone(c, b, { wave: "square", f0: 800, dur: 0.05, gain: 0.12, at: 0.12 });
   },
+  logoFly: (c, b) => {
+    // prolet stíhače: stoupavý šum + tón motoru
+    noise(c, b, { dur: 1.3, gain: 0.22, filter: "bandpass", freq: 300, freqEnd: 2400, q: 0.8 });
+    tone(c, b, { wave: "sawtooth", f0: 80, f1: 320, dur: 1.2, gain: 0.08, decay: "lin" });
+  },
   join: (c, b) => arp(c, b, [523, 659], 0.09, { wave: "triangle", gain: 0.14, dur: 0.15 }),
   win: (c, b) => arp(c, b, [523, 659, 784, 1047, 784, 1047], 0.12, { wave: "square", gain: 0.16, dur: 0.22 }),
   lose: (c, b) => arp(c, b, [392, 349, 311, 262], 0.18, { wave: "sawtooth", gain: 0.14, dur: 0.3 }),
@@ -236,4 +247,13 @@ export function sfxAt(name: SfxName, x: number, y: number) {
   if (!l || l.points.length === 0) return sfx(name);
   const d = Math.min(...l.points.map((p) => Math.hypot(p.x - x, p.y - y)));
   sfx(name, Math.max(0, Math.min(1, (d - l.radius * 0.5) / (l.radius * 1.5))));
+}
+
+/** Audio kontext (po odemknutí) a sběrnice hudby (ztlumení M platí i pro ni). */
+export function audioContext(): AudioContext | null {
+  return ensure();
+}
+export function musicBus(): AudioNode {
+  ensure();
+  return music!;
 }

@@ -1819,15 +1819,103 @@ button.px.tiny {
   border-color: #93c5fd #1e3a8a #1e3a8a #93c5fd;
   color: #fff;
 }
-.menu-sound {
+.music-btn {
+  position: fixed;
+  top: 6px;
+  left: 12px;
+  z-index: 5;
+  font-size: 16px;
+  padding: 4px 10px;
+}
+.mu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 7, 15, 0.6);
+}
+.mu-card {
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 12px;
+  background: rgba(18, 26, 48, 0.98);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mu-card .bb-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  padding: 4px 0;
+  gap: 8px;
+  margin-bottom: 6px;
 }
-.menu-sound input[type="range"] {
-  flex: 1;
+.mu-vol {
+  display: grid;
+  grid-template-columns: 70px 1fr 70px 1fr;
+  align-items: center;
+  gap: 6px 8px;
+  font-size: 16px;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid #1e293b;
+  margin-bottom: 6px;
+}
+.mu-vol > label {
+  grid-column: 1 / -1;
+  font-size: 14px;
+}
+.mu-head,
+.mu-row {
+  display: grid;
+  grid-template-columns: 52px 52px 1fr 60px;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 16px;
+}
+.mu-head {
+  color: var(--muted);
+  font-size: 13px;
+  border-bottom: 1px solid #1e293b;
+}
+.mu-row {
+  border-bottom: 1px dashed #1e293b;
+}
+.mu-row.playing .mu-name {
+  color: var(--yellow);
+}
+.mu-cell {
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+}
+.mu-cell input {
+  width: 16px;
+  height: 16px;
+  accent-color: #38bdf8;
+  cursor: pointer;
+}
+.mu-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mu-now {
+  color: var(--yellow);
+  font-size: 13px;
+}
+.mu-row .px.tiny {
+  justify-self: end;
+}
+.mu-card .row .px {
+  white-space: nowrap;
+}
+.mu-card .row .muted {
+  font-size: 13px;
 }
 .menu-btn.danger {
   border-color: #fca5a5 #7f1d1d #7f1d1d #fca5a5;

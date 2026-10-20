@@ -1,5 +1,6 @@
 import { applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
 import { logoCanvas } from "./logo.ts";
+import { openMusicPanel } from "./main.ts";
 import { renderMapPreview } from "./map-preview.ts";
 import { loadoutTag, renderLoadout } from "./loadout-ui.ts";
 import { clear, h } from "./dom.ts";
@@ -32,6 +33,7 @@ export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName:
   const screen = h("div", { class: "screen" });
   root.append(
     h("div", { class: `status ${m.connected ? "ok" : "bad"}` }, m.connected ? "ONLINE" : "OFFLINE..."),
+    h("button", { class: "px music-btn", title: "Hudba a zvuk (vlastní skladby, hlasitost)", onclick: () => openMusicPanel() }, icon("log", "currentColor", 12), " ", label("Hudba")),
     screen,
   );
   screen.append(h("div", { class: "center" }, h("div", { class: "title" }, logoCanvas(5), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)));

@@ -50,7 +50,29 @@ import {
   type TurnResult,
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
-import { getVolume, isMuted, setMuted, setSfxListener, setVolume, sfx, unlockAudio } from "./sound.ts";
+import { isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
+import { loadLibrary, playMode } from "./music.ts";
+import { renderMusicPanel } from "./music-ui.ts";
+import { replayLogo } from "./logo.ts";
+
+/** Překryvný panel Hudba a zvuk (z lobby i z herního menu). */
+let musicOverlay: HTMLElement | null = null;
+let musicOff: (() => void) | null = null;
+export function openMusicPanel() {
+  if (musicOverlay) return;
+  const body = h("div", { class: "mu-body" });
+  musicOverlay = h("div", { class: "mu-overlay", onclick: (e) => {
+      if (e.target === musicOverlay) closeMusicPanel();
+    } }, body);
+  document.body.append(musicOverlay);
+  musicOff = renderMusicPanel(body, closeMusicPanel);
+}
+function closeMusicPanel() {
+  musicOff?.();
+  musicOverlay?.remove();
+  musicOverlay = null;
+  musicOff = null;
+}
 import { icon, label } from "./icons.ts";
 import { renderLoadout } from "./loadout-ui.ts";
 import { actionById } from "./game/actions.ts";
@@ -277,12 +299,16 @@ function startGame(state: GameState) {
   resetOrders();
   screen = "game";
   mountGame();
+  closeMusicPanel();
+  playMode("game");
 }
 
 function leaveGame() {
   game = null;
   screen = "lobby";
   unmountGame();
+  closeMusicPanel();
+  playMode("menu");
 }
 
 function resetOrders() {
@@ -856,13 +882,7 @@ function renderMenu() {
         label("Opustit hru – hlavní menu"),
       ),
       h("button", { class: "px menu-btn", onclick: () => showStats() }, icon("log", "currentColor", 12), " ", label("Tabulka skóre"), h("span", { class: "sub" }, "TAB")),
-      h(
-        "div",
-        { class: "menu-sound" },
-        h("span", {}, label("Zvuk")),
-        h("input", { type: "range", min: "0", max: "100", value: String(Math.round(getVolume() * 100)), oninput: (e) => setVolume(Number((e.target as HTMLInputElement).value) / 100), onchange: () => sfx("laser") }),
-        h("label", { class: "txt" }, h("input", { type: "checkbox", checked: isMuted(), onchange: (e) => setMuted((e.target as HTMLInputElement).checked) }), " ztlumit (M)"),
-      ),
+      h("button", { class: "px menu-btn", onclick: () => openMusicPanel() }, icon("log", "currentColor", 12), " ", label("Hudba a zvuk"), h("span", { class: "sub" }, "M = ztlumit")),
       h("div", { class: "muted txt menu-note" }, "Esc během plánování nejdřív ruší rozdělanou akci (kreslení dráhy, výběr cíle), prázdný Esc otevře menu."),
     ),
   );
@@ -1535,6 +1555,13 @@ function bindInput(c: HTMLCanvasElement) {
       e.preventDefault();
       return;
     }
+    if (musicOverlay) {
+      if (e.key === "Escape") {
+        closeMusicPanel();
+        e.preventDefault();
+      }
+      return;
+    }
     const leaveClose = (confirmEl as (HTMLElement & { _close?: () => void }) | null)?._close;
     if (leaveClose && confirmEl?.style.display !== "none" && !game.confirmOpen) {
       if (e.key === "Escape") {
@@ -1655,9 +1682,27 @@ function render() {
 
 render();
 net.connect();
-// zvuk: odemknout prvním vstupem; obyčejná tlačítka mimo lištu akcí cvaknou
-window.addEventListener("pointerdown", () => unlockAudio(), { once: true });
-window.addEventListener("keydown", () => unlockAudio(), { once: true });
+void loadLibrary();
+// zvuk: odemknout prvním vstupem; v menu se pak znovu přehraje animace loga se zvukem a spustí hudba
+let audioStarted = false;
+const firstGesture = () => {
+  if (audioStarted) return;
+  audioStarted = true;
+  unlockAudio();
+  if (screen === "game") {
+    playMode("game");
+    return;
+  }
+  const dur = replayLogo(true);
+  setTimeout(() => playMode(screen === "game" ? "game" : "menu"), dur);
+};
+window.addEventListener("pointerdown", firstGesture, { once: true });
+window.addEventListener("keydown", firstGesture, { once: true });
+window.addEventListener("keydown", (e) => {
+  if (game) return;
+  if (e.key === "Escape" && musicOverlay) closeMusicPanel();
+  else if ((e.key === "m" || e.key === "M") && !(e.target instanceof HTMLInputElement)) setMuted(!isMuted());
+});
 document.addEventListener("click", (e) => {
   const b = (e.target as HTMLElement | null)?.closest?.("button");
   if (!b || b.disabled) return;

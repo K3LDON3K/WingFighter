@@ -145,6 +145,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.19 – hudba: dvě vestavěné syntetizované skladby (hlavní menu 84 BPM, bitva 128 BPM) a možnost nahrát
+  vlastní mp3 / ogg / wav (ukládají se jen v prohlížeči, IndexedDB). Panel **HUDBA** vlevo nahoře v lobby
+  a „Hudba a zvuk“ v Esc menu: přepínač, která skladba hraje v menu, zaškrtávátka pro playlist v bitvě
+  (hraje popořadě, po konci další), oddělená hlasitost hudby a efektů, ztlumit vše (**M**). Výběr i hlasitost
+  se pamatují. Po prvním kliknutí / klávese se animace loga přehraje znovu se zvukem (prolet stíhače,
+  dva výstřely) a pak začne hudba menu; start bitvy přepne na playlist bitvy, návrat do lobby zpět.
 - v3.18 – zvuky ve hře: události kola (lasery, kulomet, torpéda, miny, výbuchy, nárazy, štít/trup, úhyb,
   komety, náklad, zničení lodi) hrají prostorově – čím dál od vlastních lodí, tím tišeji; UI (klik, zapnutí
   / zrušení akce, chyba, spuštění kola, nové kolo, sken, bouře), lobby (připojení hráče), konec bitvy
