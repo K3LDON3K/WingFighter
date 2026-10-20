@@ -23,7 +23,7 @@ import {
   type MineSide,
   type Segments,
   type ShipOrders,
-} from "@spacegame/shared";
+} from "@wingfighter/shared";
 import { clear, h } from "../dom.ts";
 import { icon, label, segBar } from "../icons.ts";
 import { ACTIONS, actionAvailable } from "./actions.ts";

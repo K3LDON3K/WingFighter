@@ -1,4 +1,4 @@
-import { radiusAt, type Asteroid } from "@spacegame/shared";
+import { radiusAt, type Asteroid } from "@wingfighter/shared";
 
 /**
  * Procedurální pixel art. Každý sprite se nakreslí do malého offscreen canvasu

@@ -4,7 +4,7 @@ import { networkInterfaces } from "node:os";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import type { ClientMessage } from "@spacegame/shared";
+import type { ClientMessage } from "@wingfighter/shared";
 import { Hub } from "./rooms.ts";
 import { loadSavedTuning, TUNING_FILE } from "./tuning-store.ts";
 

@@ -1,4 +1,4 @@
-import type { Asteroid, Debris, GameState, Mine, Pose, Segments, ShieldType, Ship, Torpedo, TorpedoPhase } from "@spacegame/shared";
+import type { Asteroid, Debris, GameState, Mine, Pose, Segments, ShieldType, Ship, Torpedo, TorpedoPhase } from "@wingfighter/shared";
 
 /** Co se právě kreslí – během plánování kopie stavu, během animace průběžně měněný model. */
 export interface ViewShip extends Pose {

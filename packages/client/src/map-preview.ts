@@ -1,4 +1,4 @@
-import { generateMap, TEAM_COLORS, type MapSettings, type RoomPlayer } from "@spacegame/shared";
+import { generateMap, TEAM_COLORS, type MapSettings, type RoomPlayer } from "@wingfighter/shared";
 import { h } from "./dom.ts";
 
 /**

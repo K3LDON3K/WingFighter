@@ -1,4 +1,4 @@
-import type { Segments, ShieldType } from "@spacegame/shared";
+import type { Segments, ShieldType } from "@wingfighter/shared";
 
 /** Barvy štítů: podle síly (celolodní) a podle bodů segmentu. */
 export const SHIELD_BLUE = "#3b82f6";

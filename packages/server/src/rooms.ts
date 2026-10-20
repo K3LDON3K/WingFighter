@@ -34,7 +34,7 @@ import {
   randomLoadout,
   refillLoadout,
   validateLoadout,
-} from "@spacegame/shared";
+} from "@wingfighter/shared";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
 import { getSavedTuning, initialTuning, saveTuning } from "./tuning-store.ts";

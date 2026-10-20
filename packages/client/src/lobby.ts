@@ -1,4 +1,4 @@
-import { applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@spacegame/shared";
+import { applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
 import { logoCanvas } from "./logo.ts";
 import { renderMapPreview } from "./map-preview.ts";
 import { loadoutTag, renderLoadout } from "./loadout-ui.ts";

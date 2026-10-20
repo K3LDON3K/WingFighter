@@ -45,7 +45,7 @@ import {
   type Segments,
   type ShipOrders,
   type TurnResult,
-} from "@spacegame/shared";
+} from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 import { renderLoadout } from "./loadout-ui.ts";
@@ -103,7 +103,7 @@ interface GameSession {
 const app = document.getElementById("app")!;
 let playerName = (() => {
   try {
-    return localStorage.getItem("spacegame.name") ?? "";
+    return localStorage.getItem("wingfighter.name") ?? "";
   } catch {
     return "";
   }
@@ -138,7 +138,7 @@ net.onStatus = (c) => {
 function setName(n: string) {
   playerName = n;
   try {
-    localStorage.setItem("spacegame.name", n);
+    localStorage.setItem("wingfighter.name", n);
   } catch {
     /* ignore */
   }

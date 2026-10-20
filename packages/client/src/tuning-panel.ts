@@ -1,4 +1,4 @@
-import { DEFAULT_TUNING, TUNING_FIELDS, type Tuning } from "@spacegame/shared";
+import { DEFAULT_TUNING, TUNING_FIELDS, type Tuning } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 

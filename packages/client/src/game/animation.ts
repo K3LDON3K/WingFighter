@@ -1,4 +1,4 @@
-import { MODULES, MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@spacegame/shared";
+import { MODULES, MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
 import { mineToView, shipToView, torpedoToView, viewFromState, type ViewModel } from "./view.ts";
 
 const MOVE_DURATION = 2200;
@@ -116,7 +116,7 @@ export class TurnAnimation {
   private schedule: Scheduled[] = [];
   private tweens: Tween[] = [];
   private total = 0;
-  private pendingMines: { at: number; mine: import("@spacegame/shared").Mine }[] = [];
+  private pendingMines: { at: number; mine: import("@wingfighter/shared").Mine }[] = [];
   private startedAt = 0;
   private started = false;
   finished = false;
@@ -414,7 +414,7 @@ export class TurnAnimation {
         if (!s) break;
         s.shields = e.shieldsAfter;
         s.hull = e.hullAfter;
-        if (e.segmentsAfter) s.segments = [...e.segmentsAfter] as import("@spacegame/shared").Segments;
+        if (e.segmentsAfter) s.segments = [...e.segmentsAfter] as import("@wingfighter/shared").Segments;
         if (e.effAfter !== undefined) s.shieldEff = e.effAfter;
         const absorbed = e.absorbed ?? 0;
         if (absorbed > 0) {

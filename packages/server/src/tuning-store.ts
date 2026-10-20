@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_TUNING, sanitizeTuning, type Tuning } from "@spacegame/shared";
+import { DEFAULT_TUNING, sanitizeTuning, type Tuning } from "@wingfighter/shared";
 
 /** Uložené ladicí parametry: soubor tuning.json v kořeni projektu. */
 const here = fileURLToPath(new URL(".", import.meta.url));

@@ -1,6 +1,6 @@
 # Wingfighter – tahová vesmírná střílečka
 
-(Dříve SpaceGame; složka a balíčky `@spacegame/*` zůstávají kvůli kompatibilitě.)
+(Dříve SpaceGame. Balíčky se jmenují `@wingfighter/shared`, `@wingfighter/server`, `@wingfighter/client`.)
 
 2D tahová multiplayerová hra v prohlížeči. Inspirace: desková hra X-Wing (ciferník manévrů,
 skryté simultánní plánování, kostky) a Space Rangers (vzhled, později inventář lodí).
@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.6.1 – interní přejmenování: balíčky `@wingfighter/*`, kořenový balíček `wingfighter`, klíče v
+  localStorage (`wingfighter.name`, `wingfighter.session` – jméno pilota se zadá znovu).
 - v3.6 – hra se jmenuje **Wingfighter**. Nové pixel art logo na hlavní obrazovce (dvoubarevný nápis s 3D
   stínem, lasery a stíhač); při načtení stránky stíhač přiletí zleva, nápis se za ním odkrývá a lasery
   vystřelí, pak je logo statické (`packages/client/src/logo.ts`). Přejmenován titulek stránky, výpis

@@ -14,7 +14,7 @@ import {
   RULES,
   MODULES,
   pointInStorm,
-} from "@spacegame/shared";
+} from "@wingfighter/shared";
 import type { Camera } from "./camera.ts";
 import { segmentColor, strengthColor } from "./shield-ui.ts";
 import { drawStorms, drawStormSparks } from "./storm-draw.ts";
@@ -71,7 +71,7 @@ export const ICON_RADIUS = 13;
 
 export class Renderer {
   readonly sprites = new SpriteCache();
-  private stormsRef: import("@spacegame/shared").Storm[] | null = null;
+  private stormsRef: import("@wingfighter/shared").Storm[] | null = null;
   private starPattern: CanvasPattern | null = null;
 
   constructor(

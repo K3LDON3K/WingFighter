@@ -18,7 +18,7 @@ import {
   type ModuleType,
   type ShipLoadout,
   type SlotId,
-} from "@spacegame/shared";
+} from "@wingfighter/shared";
 import { h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 

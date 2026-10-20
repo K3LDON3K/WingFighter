@@ -1,4 +1,4 @@
-import type { Storm } from "@spacegame/shared";
+import type { Storm } from "@wingfighter/shared";
 
 /**
  * Elektromagnetická bouře – varianta A: měkké fialovo-růžové mraky, řídký pixelový šum, občasné bílé blesky.

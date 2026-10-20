@@ -1,4 +1,4 @@
-import type { ClientMessage, ServerMessage } from "@spacegame/shared";
+import type { ClientMessage, ServerMessage } from "@wingfighter/shared";
 
 type Handler = (msg: ServerMessage) => void;
 
@@ -14,15 +14,15 @@ export class Net {
 
   get sessionId(): string | undefined {
     try {
-      return localStorage.getItem("spacegame.session") ?? undefined;
+      return localStorage.getItem("wingfighter.session") ?? undefined;
     } catch {
       return undefined;
     }
   }
   set sessionId(v: string | undefined) {
     try {
-      if (v) localStorage.setItem("spacegame.session", v);
-      else localStorage.removeItem("spacegame.session");
+      if (v) localStorage.setItem("wingfighter.session", v);
+      else localStorage.removeItem("wingfighter.session");
     } catch {
       /* ignore */
     }

@@ -1,4 +1,4 @@
-import { RULES, actionCost, inStorm, makeManeuver, mineModule, mineSideOf, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@spacegame/shared";
+import { RULES, actionCost, inStorm, makeManeuver, mineModule, mineSideOf, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -15,7 +15,7 @@ export interface ActionOption {
   /** Po výběru čeká na kliknutí na cíl na mapě. */
   pick?: "torpedo";
   /** Akce je k dispozici jen s tímto modulem na lodi (jinak se tlačítko vůbec nezobrazí). */
-  requiresModule?: import("@spacegame/shared").ModuleType;
+  requiresModule?: import("@wingfighter/shared").ModuleType;
 }
 
 /** Je akce pro loď vůbec k dispozici (má potřebný modul)? */

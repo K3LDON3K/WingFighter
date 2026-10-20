@@ -1,4 +1,4 @@
-import { PILOTS, type PilotDef } from "@spacegame/shared";
+import { PILOTS, type PilotDef } from "@wingfighter/shared";
 import { h } from "./dom.ts";
 import { label } from "./icons.ts";
 
