@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.27 – popisek u konce naplánované dráhy nahrazen čárkami: počet čárek = rychlost (1–4), barva = obtížnost
+  manévru (zelená / bílá / červená); číslo rychlosti a údaj o stupních se už nezobrazují, otočka má navíc ↺.
 - v3.26 – potvrzení nevyužitých akcí už není překryvný dialog: vysune se okénko přímo nad tlačítko SPUSTIT
   KOLO (styl jako skener) s počtem volných akcí a tlačítky SPUSTIT / ZPĚT; potvrdit jde myší, dalším
   Enterem nebo dalším stiskem SPUSTIT KOLO, Esc = zpět. Tlačítko CENTROVAT přejmenováno na **POHLED**

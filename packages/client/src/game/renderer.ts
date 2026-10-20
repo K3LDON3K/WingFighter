@@ -704,13 +704,22 @@ export class Renderer {
     ctx.stroke();
     ctx.restore();
     drawSprite(ctx, this.sprites.fighter(color), end.x, end.y, end.heading, 0.45);
-    // popisek manévru u konce dráhy
+    // rychlost u konce dráhy: tolik čárek, kolik je rychlost; barva = obtížnost manévru; otočka má navíc ↺
     ctx.save();
-    ctx.font = "14px Jersey, ui-monospace, Menlo, monospace";
-    ctx.textAlign = "center";
     ctx.fillStyle = DIFFICULTY_COLOR[man.difficulty];
-    const label = man.koiogran ? `OTOČKA ${man.speed}` : `${man.speed} · ${man.angle === 0 ? "ROVNĚ" : `${Math.abs(man.angle)}° ${man.angle < 0 ? "L" : "P"}`}`;
-    ctx.fillText(label, end.x, end.y - ship.radius - 10);
+    const bw = 4;
+    const bh = 12;
+    const gap = 3;
+    const total = man.speed * bw + (man.speed - 1) * gap;
+    const x0 = Math.round(end.x - total / 2);
+    const y0 = Math.round(end.y - ship.radius - 10 - bh);
+    for (let i = 0; i < man.speed; i++) ctx.fillRect(x0 + i * (bw + gap), y0, bw, bh);
+    if (man.koiogran) {
+      ctx.font = "14px Jersey, ui-monospace, Menlo, monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText("↺", x0 + total + 5, y0 - 2);
+    }
     ctx.restore();
   }
 
