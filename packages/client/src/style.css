@@ -1000,12 +1000,45 @@ h3,
   align-items: center;
   justify-content: center;
 }
-.shield-box.editing {
-  width: 132px;
-  height: auto;
+.shield-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 1px;
-  margin-top: -6px;
+  padding: 6px 8px 8px;
+  z-index: 5;
+  background: #0f2a4a;
+  border: 3px solid;
+  border-color: #7dd3fc #0c4a6e #0c4a6e #7dd3fc;
+  box-shadow: 0 0 0 2px #05070f;
+  animation: popup 0.22s steps(4, end) both;
+}
+.shield-pop::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -11px;
+  width: 4px;
+  height: 8px;
+  margin-left: -2px;
+  background: var(--accent);
+}
+.shield-pop .spair {
+  display: flex;
+  gap: 2px;
+}
+.shield-pop .smid {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.shield-pop .spair.left,
+.shield-pop .spair.right {
+  flex-direction: column;
 }
 .shield-box .spair {
   display: flex;

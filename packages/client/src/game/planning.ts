@@ -166,9 +166,11 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   const editing = !!planned && !locked; // akce ŠTÍT zapnutá → −/+ u segmentů, změny platí hned
   const teamColor = TEAM_COLORS[ship.team];
   const stormed = inStorm(m.state, ship);
-  const bubbleSize = editing ? 84 : 110;
-  const bubble = h("div", { class: `bubble-box ${editing ? "editing" : ""}`, title: ship.shieldType === "whole" ? `Celolodní štít: zásoba ${ship.shields}/${ship.stats.shields}, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Každý zásah ubere 1 bod a je pohlcen celý; při 0 jde zranění do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, bubbleSize, stormed));
-  const shieldBox = h("div", { class: `shield-box ${editing ? "editing" : ""}` }, bubble);
+  const bubbleSize = 110;
+  const bubble = h("div", { class: "bubble-box", title: ship.shieldType === "whole" ? `Celolodní štít: zásoba ${ship.shields}/${ship.stats.shields}, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Každý zásah ubere 1 bod a je pohlcen celý; při 0 jde zranění do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, bubbleSize, stormed));
+  const shieldBox = h("div", { class: "shield-box" }, bubble);
+  /** Vysouvací editor štítu nad tlačítkem ŠTÍT (stejný styl jako skener). */
+  let shieldPop: HTMLElement | null = null;
   if (editing && planned) {
     const btn = (seg: number, d: 1 | -1) => {
       const v = planned[seg];
@@ -179,13 +181,16 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     const total = ship.segments.reduce((a, b) => a + b, 0);
     const slots = h("div", { class: "hand-slots", title: inHand > 0 ? `${inHand} bodů v ruce – polož je tlačítkem +` : "body štítu v ruce (odebrané, ještě nepoložené)" });
     for (let i = 0; i < total; i++) slots.append(h("i", { class: i < inHand ? "on" : "" }));
-    clear(shieldBox);
-    shieldBox.append(
+    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, 84, stormed);
+    shieldPop = h(
+      "div",
+      { class: "shield-pop" },
       h("div", { class: "spair top" }, btn(0, -1), btn(0, 1)),
-      h("div", { class: "smid" }, h("div", { class: "spair left" }, btn(3, 1), btn(3, -1)), bubble, h("div", { class: "spair right" }, btn(1, 1), btn(1, -1))),
+      h("div", { class: "smid" }, h("div", { class: "spair left" }, btn(3, 1), btn(3, -1)), popBubble, h("div", { class: "spair right" }, btn(1, 1), btn(1, -1))),
       h("div", { class: "spair bottom" }, btn(2, -1), btn(2, 1)),
       slots,
     );
+    shieldBox.append(h("span", { class: "bubble-tag" }, label("plán")));
   } else if (planned) shieldBox.append(h("span", { class: "bubble-tag" }, label("plán")));
   const vgauge = (n: number, val: number, color: string, dark: string, name: string, num: string, title: string) => {
     const bar = h("div", { class: "vbar" });
@@ -295,7 +300,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       const stormOff = stormed && (a.id === "laser" || a.id === "shield");
       const why = stormOff ? "systém je v bouři mimo provoz" : a.disabled(ship, m.state, o);
       const dots = dotsFor(a.id); // > 0 = akce je za toto tlačítko utracená
-      row.append(
+      const wbtn =
         h(
           "button",
           {
@@ -308,8 +313,9 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit"))),
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
-        ),
-      );
+        );
+      if (a.id === "shield" && shieldPop) row.append(h("div", { class: "scan-holder" }, wbtn, shieldPop));
+      else row.append(wbtn);
     }
     if (grp.label === "Speciální") {
       const sc = scannerModule(ship.loadout);
