@@ -185,9 +185,15 @@ function damageModule(ship: Ship, hullDamage: number, events: TurnEvent[], from?
 function dropModules(ship: Ship, events: TurnEvent[]): void {
   if (!creditCtx) return;
   const { state, rng, turn } = creditCtx;
-  const all = [...ship.loadout.modules, ...(ship.loadout.cargo ?? [])];
+  let all = [...ship.loadout.modules, ...(ship.loadout.cargo ?? [])];
+  // bot: vždy právě jeden náhodný funkční modul (hráč: každý modul podle šance)
+  const isBot = state.players.find((p) => p.id === ship.ownerId)?.isBot ?? false;
+  if (isBot) {
+    const working = all.filter((m) => moduleWorking(m));
+    all = working.length ? [working[Math.floor(rng.next() * working.length)]] : [];
+  }
   for (const mod of all) {
-    if (rng.next() * 100 >= RULES.moduleDropChance) continue;
+    if (!isBot && rng.next() * 100 >= RULES.moduleDropChance) continue;
     // vypadlý modul už vraku nepatří (po bitvě se hráči nevrátí)
     ship.loadout.modules = ship.loadout.modules.filter((m) => m.id !== mod.id);
     if (ship.loadout.cargo) ship.loadout.cargo = ship.loadout.cargo.filter((m) => m.id !== mod.id);
@@ -300,7 +306,15 @@ export function spawnComet(state: GameState, rng: Rng, id: string): Comet {
   else if (side === 1) [x, y, ex, ey] = [state.width - r, r + fx * (state.height - 2 * r), r, r + tx * (state.height - 2 * r)];
   else if (side === 2) [x, y, ex, ey] = [r + fx * (state.width - 2 * r), r, r + tx * (state.width - 2 * r), state.height - r];
   else [x, y, ex, ey] = [r + fx * (state.width - 2 * r), state.height - r, r + tx * (state.width - 2 * r), r];
-  return { id, x, y, heading: Math.atan2(ey - y, ex - x), speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: r, tailUsed: [] };
+  const heading = Math.atan2(ey - y, ex - x);
+  // objeví se COMET.approachTurns kol letu za okrajem a na mapu teprve přiletí (do té doby je jen vidět)
+  const back = COMET.speed * COMET.approachTurns;
+  return { id, x: x - Math.cos(heading) * back, y: y - Math.sin(heading) * back, heading, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: r, tailUsed: [], entered: false };
+}
+
+/** Je kometa na mapě (střed uvnitř)? Za okrajem je jen vidět – nejde zasáhnout ani do ničeho narazit. */
+export function cometOnMap(state: Pick<GameState, "width" | "height">, c: Vec): boolean {
+  return c.x >= 0 && c.y >= 0 && c.x <= state.width && c.y <= state.height;
 }
 
 /** Kam se mina odhodí vůči startovní pozici lodi. */
@@ -543,7 +557,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     events.push({ type: "spawnComet", comet: c });
   }
   const shotComets = new Set<string>();
-  const cometById = (id: string | undefined) => state.comets!.find((c) => c.id === id && !shotComets.has(c.id));
+  const cometById = (id: string | undefined) => state.comets!.find((c) => c.id === id && !shotComets.has(c.id) && cometOnMap(state, c));
   /** Zásah komety zbraní (před pohybem). */
   const hitComet = (c: Comet, shooterId: string, dmg: number) => {
     const shooter = shipById(state, shooterId)!;
@@ -735,7 +749,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const ts = pref ? state.ships.find((x) => x.id === pref && x.alive && x.team !== ship.team) : undefined;
     const tt = pref ? state.torpedoes.find((x) => x.id === pref && x.team !== ship.team && !shotTorpedoes.has(x.id)) : undefined;
     const td = pref ? state.debris.find((x) => x.id === pref && !shotDebris.has(x.id)) : undefined;
-    const tc = cometById(pref);
+    const tc = cometById(pref); // jen komety na mapě
     if (ts && shipInRange(ts)) target = { kind: "ship", id: ts.id, pos: ts };
     else if (tt && inRange(tt)) target = { kind: "torpedo", id: tt.id, pos: tt };
     else if (td && inRange(td)) target = { kind: "debris", id: td.id, pos: { ...td, heading: 0 } };
@@ -1203,6 +1217,12 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       if (removedComets.has(c.id)) continue;
       const cm = cometMovers.get(c.id)!;
       const cp = cm.samples[k];
+      if (!cometOnMap(state, cp)) {
+        // za okrajem: jen přilétá (nebo odlétá) – žádné srážky; odlet z mapy = konec
+        if (c.entered && (cp.x < -c.radius || cp.y < -c.radius || cp.x > state.width + c.radius || cp.y > state.height + c.radius)) endComet(c, k, "edge");
+        continue;
+      }
+      c.entered = true;
       let done = false;
       for (const s of state.ships) {
         if (!s.alive) continue;
@@ -1257,10 +1277,6 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
           continue;
         }
       }
-      if (cp.x < -c.radius || cp.y < -c.radius || cp.x > state.width + c.radius || cp.y > state.height + c.radius) {
-        endComet(c, k, "edge");
-        continue;
-      }
       // ocas: střed lodi v obdélníku za kometou
       for (const s of state.ships) {
         if (!s.alive || c.tailUsed.includes(s.id)) continue;
@@ -1274,7 +1290,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       const ignore = mineIgnore.get(mine.id)!;
       const shipsIn = state.ships.filter((s) => s.alive && shipHitsCircle(posAt(shipMovers.get(s.id)!, k), s.stats.colliders, mine, mine.radius));
       const torpsIn = state.torpedoes.filter((t) => !removedTorpedoes.has(t.id) && circlesOverlap(posAt(torpMovers.get(t.id)!, k), TORPEDO.radius, mine, mine.radius));
-      const cometsIn = state.comets.filter((c) => !removedComets.has(c.id) && circlesOverlap(cometMovers.get(c.id)!.samples[k], c.radius, mine, mine.radius));
+      const cometsIn = state.comets.filter((c) => !removedComets.has(c.id) && cometOnMap(state, cometMovers.get(c.id)!.samples[k]) && circlesOverlap(cometMovers.get(c.id)!.samples[k], c.radius, mine, mine.radius));
       const inIds = new Set([...shipsIn.map((s) => s.id), ...torpsIn.map((t) => t.id), ...cometsIn.map((c) => c.id)]);
       for (const id of [...ignore]) if (!inIds.has(id)) ignore.delete(id);
       if (![...inIds].some((id) => !ignore.has(id))) continue;
@@ -1540,6 +1556,7 @@ export function laserReach(state: GameState, ship: Ship, p: Vec, laserModuleId?:
   if (inStorm(state, ship)) return "loď je v bouři";
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
+  if (!cometOnMap(state, p)) return "ještě není na mapě";
   if (dist(ship, p) > LASER.range) return "mimo dostřel";
   if (!inArc(aim, p, laserHalfArc(lmod?.facing))) return "mimo výseč laseru";
   if (lineBlocked(state.asteroids, ship, p)) return "v cestě je asteroid";
@@ -1619,7 +1636,7 @@ export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: stri
   const ts = state.ships.find((x) => x.id === preferredTargetId && x.alive && x.team !== ship.team);
   const tt = state.torpedoes.find((x) => x.id === preferredTargetId && x.team !== ship.team);
   const td = (state.debris ?? []).find((x) => x.id === preferredTargetId);
-  const tc = (state.comets ?? []).find((x) => x.id === preferredTargetId);
+  const tc = (state.comets ?? []).find((x) => x.id === preferredTargetId && cometOnMap(state, x));
   if (ts && shipInRange(ts)) target = ts;
   else if (tt && inRange(tt)) target = tt;
   else if (td && inRange(td)) target = td;

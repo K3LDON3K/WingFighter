@@ -3,6 +3,9 @@ import {
   applyLoadoutTrade,
   laserTarget,
   laserOdds,
+  laserReach,
+  cometOnMap,
+  COMET,
   ammoRefillCost,
   moduleSellPrice,
   settleLoadoutAfterBattle,
@@ -38,7 +41,6 @@ import {
   resultForTeam,
   spawnComet,
   inCometTail,
-  COMET,
   type Comet,
   sanitizeOrders,
   stateForTeam,
@@ -847,8 +849,16 @@ describe("komety", () => {
     const g = createGame({ players, settings: settingsWith("many"), tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
     g.asteroids = [];
     const c = spawnComet(g, createRng(5), "cx");
-    const onEdge = c.x === c.radius || c.y === c.radius || c.x === g.width - c.radius || c.y === g.height - c.radius;
+    // objeví se COMET.approachTurns kol letu za okrajem a míří dovnitř
+    expect(cometOnMap(g, c)).toBe(false);
+    const f = { x: Math.cos(c.heading), y: Math.sin(c.heading) };
+    const edgePt = { x: c.x + f.x * COMET.speed * COMET.approachTurns, y: c.y + f.y * COMET.speed * COMET.approachTurns };
+    const onEdge = Math.abs(edgePt.x - c.radius) < 1e-6 || Math.abs(edgePt.y - c.radius) < 1e-6 || Math.abs(edgePt.x - (g.width - c.radius)) < 1e-6 || Math.abs(edgePt.y - (g.height - c.radius)) < 1e-6;
     expect(onEdge).toBe(true);
+    // za okrajem na ni nejde střílet ani ji netrefí loď
+    const gc = structuredClone(g);
+    gc.comets = [c];
+    expect(laserReach(gc, gc.ships[0], c)).toBe("ještě není na mapě");
     // 100% šance → každé kolo nová (max. 6)
     let r = resolveTurn(g, noOrders(g), createRng(1));
     expect(r.events.some((e) => e.type === "spawnComet")).toBe(true);
@@ -858,7 +868,7 @@ describe("komety", () => {
     // kometa mířící ven zmizí
     const g2 = createGame({ players, settings: settingsWith("none"), tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
     g2.asteroids = [];
-    g2.comets = [cometAt(g2.width - 20, 500, 0)];
+    g2.comets = [{ ...cometAt(g2.width - 20, 500, 0), entered: true }];
     r = resolveTurn(g2, noOrders(g2), createRng(1));
     expect(r.state.comets!.length).toBe(0);
     expect(r.events.some((e) => e.type === "cometGone" && e.reason === "edge")).toBe(true);
@@ -1097,6 +1107,28 @@ describe("životy modulů a výpad modulů", () => {
     }
     expect(runs).toBeGreaterThan(0);
     expect(dropped).toBeGreaterThan(0);
+  });
+
+  it("ze zničeného bota vypadne vždy právě jeden funkční modul", () => {
+    const g = game();
+    g.players.find((p) => p.id === "p2")!.isBot = true;
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 640, 500, Math.PI);
+    const t = g.ships[1];
+    t.hull = 1;
+    t.shieldType = "none";
+    t.segments = [0, 0, 0, 0];
+    t.loadout.modules[0].hp = 0; // zničený modul nevypadne
+    let runs = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(seed));
+      if (!r.events.some((e) => e.type === "destroyed")) continue;
+      runs++;
+      const drops = r.events.filter((e) => e.type === "jettison" && e.dropped);
+      expect(drops.length).toBe(1);
+      expect(r.state.debris[0].module?.id).not.toBe(t.loadout.modules[0].id);
+    }
+    expect(runs).toBeGreaterThan(0);
   });
 });
 

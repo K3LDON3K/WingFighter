@@ -243,6 +243,8 @@ export interface Comet extends Pose {
   radius: number;
   /** Lodě, které už ocas této komety využily. */
   tailUsed: string[];
+  /** Už vletěla na mapu (do té doby je jen vidět za okrajem; při odletu z mapy zmizí). */
+  entered?: boolean;
 }
 
 export interface Mine {

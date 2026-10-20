@@ -322,6 +322,23 @@ export class TurnAnimation {
       const pose = interp(tw.points, p);
       const list = tw.kind === "ship" ? this.view.ships : tw.kind === "comet" ? this.view.comets : this.view.torpedoes;
       let ent = list.find((x) => x.id === tw.id);
+      if (!ent && tw.kind === "ship") {
+        // cizí loď, která vletěla do dohledu během kola: zobrazíme ji od začátku její dráhy
+        const src = this.result.state.ships.find((x) => x.id === tw.id);
+        if (src) {
+          const ns = shipToView(src);
+          this.view.ships.push(ns);
+          ent = ns;
+        }
+      }
+      if (!ent && tw.kind === "torpedo") {
+        const src = this.result.state.torpedoes.find((x) => x.id === tw.id);
+        if (src) {
+          const nt = torpedoToView(src);
+          this.view.torpedoes.push(nt);
+          ent = nt;
+        }
+      }
       if (!ent && tw.kind === "comet") {
         // kometa, kterou jsme neviděli přilétat (vletěla do dohledu během kola)
         const src = this.result.state.comets?.find((c) => c.id === tw.id);

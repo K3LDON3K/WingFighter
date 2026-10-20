@@ -145,6 +145,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.51 – **Boti:** ze zničeného bota vypadne vždy právě jeden náhodný funkční modul (u hráčů dál platí šance na každý
+  modul). **Fog of war:** cizí loď (i torpédo), která vletí do dohledu během kola, se teď animuje po celé své dráze
+  od začátku kola – dřív se objevila až na konci pohybu. **Komety** se objevují 2 kola letu za okrajem mapy a teprve
+  přilétají: za okrajem jsou jen vidět (jde na ně kliknout, ale „ještě není na mapě – nevystřelí“), nedá se na ně
+  střílet, nenaráží do ničeho a nespouští miny; zmizí až když mapu opustí.
 - v3.50 – **Značka cíle podle zbraně** (varianta D): cíl, na který míří zbraň, má místo žlutého kroužku čtyři rohové
   zaměřovací závorky v barvě zbraně a v pravém horním rohu plné čtverečky s ikonkami všech zbraní, které na něj
   míří (laser červená, kulomet žlutá, torpédo oranžová). Více zbraní na jeden cíl = ikonky vedle sebe, závorky
