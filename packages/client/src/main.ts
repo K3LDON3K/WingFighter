@@ -1058,6 +1058,17 @@ function renderSide() {
       ready: () => submitOrders(),
       toggleConfirm: () => setAskConfirm(game!.skipConfirm),
       showScore: () => toggleStats(true),
+      jettisonChosen: (id, moduleId) => {
+        const g = game!;
+        const o = g.orders.get(id);
+        if (!o) return;
+        const ship = g.state.ships.find((x) => x.id === id);
+        const mod = ship?.loadout.modules.find((x) => x.id === moduleId) ?? ship?.loadout.cargo?.find((x) => x.id === moduleId);
+        g.orders.set(id, { ...o, action: { type: "jettison", moduleId } });
+        g.cargoOpen = false; // potvrzení = okénko se zavře
+        if (mod) showNotice(`Vyhodí se: ${MODULES[mod.type].name} (na začátku kola)`);
+        renderSide();
+      },
       cargoToggle: (id) => {
         game!.selectedShipId = id;
         game!.cargoOpen = !game!.cargoOpen;

@@ -53,6 +53,8 @@ export interface PlanningCallbacks {
   showScore(): void;
   leave(): void;
   cargoToggle(shipId: string): void;
+  /** Vybraný modul k vyhození – potvrdí a zavře okénko nákladu. */
+  jettisonChosen(shipId: string, moduleId: string): void;
   /** Přepnout potvrzování nevyužitých akcí (přepínač nad SPUSTIT KOLO, klávesa P). */
   toggleConfirm(): void;
   /** Úprava štítu: změna bodů segmentu o ±1, potvrzení rozložení. */
@@ -379,7 +381,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
             chosen
               ? h("div", { class: "jp-head ok" }, icon("check", "#4ade80", 12), label(`vyhodí se: ${MODULES[chosen.type].name}`), h("span", { class: "muted" }, label("· na začátku kola · jiný modul = klik")))
               : h("div", { class: "jp-head warn" }, icon("debris", "#fbbf24", 12), label("klikni na modul, který vyhodíš")),
-            renderLoadout({ loadout: ship.loadout, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.setOrders(ship.id, { action: { type: "jettison", moduleId: id } }) }),
+            renderLoadout({ loadout: ship.loadout, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.jettisonChosen(ship.id, id) }),
           );
         } else if (pickOn) {
           const wantId = o.action?.type === "pickup" ? o.action.targetId : undefined;
