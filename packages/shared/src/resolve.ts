@@ -70,6 +70,7 @@ import type {
   TurnEvent,
   TurnResult,
 } from "./types.ts";
+import { boundingRadius, shipHitsAsteroid, shipHitsCircle, shipInsideMap, shipsOverlap } from "./colliders.ts";
 
 /* ------------------------------------------------------------------ */
 /* Pomocné                                                              */
@@ -921,10 +922,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   for (const ship of state.ships) {
     if (!ship.alive) continue;
     const set = new Set<string>();
-    const r = ship.stats.radius + 1;
-    if (!isInsideMap(state, ship, r)) set.add("edge");
-    for (const a of state.asteroids) if (circleHitsAsteroid(a, ship, r)) set.add(a.id);
-    for (const o of state.ships) if (o !== ship && o.alive && circlesOverlap(ship, r, o, o.stats.radius)) set.add(o.id);
+    const cols = ship.stats.colliders.map((c) => ({ ...c, r: c.r + 1 }));
+    if (!shipInsideMap(state.width, state.height, ship, cols)) set.add("edge");
+    for (const a of state.asteroids) if (shipHitsAsteroid(a, ship, cols)) set.add(a.id);
+    for (const o of state.ships) if (o !== ship && o.alive && shipsOverlap(ship, cols, o, o.stats.colliders)) set.add(o.id);
     touching.set(ship.id, set);
   }
   const stillTouching = (shipId: string, obstacleId: string, overlapping: boolean): boolean => {
@@ -941,7 +942,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   const mineIgnore = new Map<string, Set<string>>();
   for (const mine of state.mines) {
     const set = new Set<string>();
-    for (const s of state.ships) if (s.alive && circlesOverlap(s, s.stats.radius, mine, mine.radius)) set.add(s.id);
+    for (const s of state.ships) if (s.alive && shipHitsCircle(s, s.stats.colliders, mine, mine.radius)) set.add(s.id);
     for (const t of state.torpedoes) if (circlesOverlap(t, TORPEDO.radius, mine, mine.radius)) set.add(t.id);
     mineIgnore.set(mine.id, set);
   }
@@ -951,7 +952,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const hits: { shipId: string; damage: number }[] = [];
     for (const s of state.ships) {
       if (!s.alive || (exceptOwnerId && s.ownerId === exceptOwnerId)) continue;
-      if (circlesOverlap(posAt(shipMovers.get(s.id)!, k), s.stats.radius, c, radius)) hits.push({ shipId: s.id, damage: scaleEvade(s, damage) });
+      if (shipHitsCircle(posAt(shipMovers.get(s.id)!, k), s.stats.colliders, c, radius)) hits.push({ shipId: s.id, damage: scaleEvade(s, damage) });
     }
     for (const a of state.asteroids) {
       if (removedAsteroids.has(a.id)) continue;
@@ -1010,7 +1011,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       if (mine.timer <= 0) blastMine(mine, 0);
       continue;
     }
-    const enemyInside = state.ships.some((s) => s.alive && s.team !== mine.team && circlesOverlap(s, s.stats.radius, mine, mine.radius));
+    const enemyInside = state.ships.some((s) => s.alive && s.team !== mine.team && shipHitsCircle(s, s.stats.colliders, mine, mine.radius));
     if (enemyInside) blastMine(mine, 0);
   }
 
@@ -1023,21 +1024,23 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
         const m = shipMovers.get(ship.id)!;
         if (m.frozenAt !== null) continue;
         const p = posAt(m, k);
-        const r = ship.stats.radius;
+        const cols = ship.stats.colliders;
+        const br = boundingRadius(cols);
         const t = k / MOVE_STEPS;
         let hit: { with: "edge" | "asteroid" | "ship"; otherId?: string; heading: number } | null = null;
 
-        const outside = !isInsideMap(state, p, r);
+        const outside = !shipInsideMap(state.width, state.height, p, cols);
         if (outside && !stillTouching(ship.id, "edge", true)) {
+          // která hrana: podle opsané kružnice modelu (kolizní kruhy mohou vyčnívat dřív než střed)
           let h = p.heading;
-          if (p.x < r || p.x > state.width - r) h = Math.PI - h;
-          if (p.y < r || p.y > state.height - r) h = -h;
+          if (p.x < br || p.x > state.width - br) h = Math.PI - h;
+          if (p.y < br || p.y > state.height - br) h = -h;
           hit = { with: "edge", heading: normalizeAngle(h + scatter()) };
         } else {
           if (!outside) stillTouching(ship.id, "edge", false);
           for (const a of state.asteroids) {
             if (removedAsteroids.has(a.id)) continue;
-            const ov = circleHitsAsteroid(a, p, r);
+            const ov = shipHitsAsteroid(a, p, cols);
             // úhybný manévr: asteroidem proletí (kromě posledního vzorku – nesmí v něm skončit, jinak dvojité zranění)
             if (ov && k < MOVE_STEPS && evading.has(ship.id)) {
               const key = `${ship.id}:${a.id}`;
@@ -1059,7 +1062,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
             if (other === ship || !other.alive) continue;
             const om = shipMovers.get(other.id)!;
             const op = posAt(om, k);
-            const ov = circlesOverlap(p, r, op, other.stats.radius);
+            const ov = shipsOverlap(p, cols, op, other.stats.colliders);
             if (!ov) {
               stillTouching(ship.id, other.id, false);
               continue;
@@ -1102,7 +1105,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               ? posAt(shipMovers.get(hit.otherId!)!, k)
               : hit.with === "asteroid"
                 ? state.asteroids.find((a) => a.id === hit!.otherId)!
-                : { x: p.x < r ? p.x - 10 : p.x > state.width - r ? p.x + 10 : p.x, y: p.y < r ? p.y - 10 : p.y > state.height - r ? p.y + 10 : p.y };
+                : { x: p.x < br ? p.x - 10 : p.x > state.width - br ? p.x + 10 : p.x, y: p.y < br ? p.y - 10 : p.y > state.height - br ? p.y + 10 : p.y };
           const dbl = hit.with === "asteroid" && evading.has(ship.id) ? 2 : 1; // úhyb skončil v asteroidu
           applyDamage(ship, hit.with === "ship" ? RULES.collisionShip : hit.with === "asteroid" ? RULES.collisionAsteroid * dbl : RULES.collisionEdge, events, src);
           if (!ship.alive) m.frozenAt = k - 1;
@@ -1122,7 +1125,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
         if (!s.alive) continue;
         const sm = shipMovers.get(s.id)!;
         const sp = posAt(sm, k);
-        if (!circlesOverlap(cp, c.radius, sp, s.stats.radius)) continue;
+        if (!shipHitsCircle(sp, s.stats.colliders, cp, c.radius)) continue;
         if (k < MOVE_STEPS && evading.has(s.id)) {
           const key = `${s.id}:${c.id}`;
           if (!passedThrough.has(key)) {
@@ -1186,7 +1189,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     for (const mine of state.mines) {
       if (!mine.armed || removedMines.has(mine.id) || mine.timer !== undefined) continue;
       const ignore = mineIgnore.get(mine.id)!;
-      const shipsIn = state.ships.filter((s) => s.alive && circlesOverlap(posAt(shipMovers.get(s.id)!, k), s.stats.radius, mine, mine.radius));
+      const shipsIn = state.ships.filter((s) => s.alive && shipHitsCircle(posAt(shipMovers.get(s.id)!, k), s.stats.colliders, mine, mine.radius));
       const torpsIn = state.torpedoes.filter((t) => !removedTorpedoes.has(t.id) && circlesOverlap(posAt(torpMovers.get(t.id)!, k), TORPEDO.radius, mine, mine.radius));
       const cometsIn = state.comets.filter((c) => !removedComets.has(c.id) && circlesOverlap(cometMovers.get(c.id)!.samples[k], c.radius, mine, mine.radius));
       const inIds = new Set([...shipsIn.map((s) => s.id), ...torpsIn.map((t) => t.id), ...cometsIn.map((c) => c.id)]);
@@ -1207,7 +1210,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       for (const s of state.ships) {
         if (!s.alive) continue;
         if (safe && s.ownerId === t.ownerId) continue;
-        if (circlesOverlap(p, TORPEDO.radius, posAt(shipMovers.get(s.id)!, k), s.stats.radius)) {
+        if (shipHitsCircle(posAt(shipMovers.get(s.id)!, k), s.stats.colliders, p, TORPEDO.radius)) {
           hitShip = s;
           break;
         }
@@ -1313,11 +1316,12 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   /* ---------- 2. Akce ---------- */
   const canAct = (ship: Ship) => ship.alive && !shipMovers.get(ship.id)!.collided;
 
-  const spotFree = (self: Ship, p: Vec): boolean => {
-    if (!isInsideMap(state, p, self.stats.radius)) return false;
-    if (hitsAsteroid(state, p, self.stats.radius)) return false;
+  const spotFree = (self: Ship, p: Pose): boolean => {
+    const cols = self.stats.colliders;
+    if (!shipInsideMap(state.width, state.height, p, cols)) return false;
+    if (state.asteroids.some((a) => shipHitsAsteroid(a, p, cols))) return false;
     for (const o of state.ships) {
-      if (o !== self && o.alive && circlesOverlap(p, self.stats.radius, o, o.stats.radius)) return false;
+      if (o !== self && o.alive && shipsOverlap(p, cols, o, o.stats.colliders)) return false;
     }
     return true;
   };

@@ -15,6 +15,13 @@ export const HULLS: Record<string, HullDef> = {
     name: "Stíhač",
     description: "Malá rychlá loď. Čtyři malé sloty: příď, záď, levobok, pravobok. Příď + záď jde spojit v jeden velký slot.",
     radius: 16,
+    // kolizní model z pixelového spritu: tělo, příď, levé a pravé křídlo (plameny motorů se nepočítají)
+    colliders: [
+      { x: -4, y: -1.5, r: 13 },
+      { x: 17, y: -1.5, r: 7 },
+      { x: -12, y: -16, r: 7 },
+      { x: -12, y: 13, r: 7 },
+    ],
     hull: 100,
     cargo: 1,
     slots: [
@@ -235,6 +242,7 @@ export function computeStats(loadout: ShipLoadout): ShipStats {
     torpedoes: 0,
     mines: 0,
     radius: hull.radius,
+    colliders: hull.colliders ?? [{ x: 0, y: 0, r: hull.radius }],
     vision: VISION_REF.value,
     segmentModules: 0,
   };

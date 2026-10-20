@@ -17,6 +17,8 @@ export interface ViewShip extends Pose {
   roll?: number;
   stressPoints: number;
   radius: number;
+  /** Kolizní kruhy v souřadnicích lodi. */
+  colliders: { x: number; y: number; r: number }[];
   alive: boolean;
   tokens: { focus: number; evade: number };
   lockTargetId?: string;
@@ -97,6 +99,7 @@ export function shipToView(s: Ship): ViewShip {
     segments: [...s.segments] as Segments,
     stressPoints: s.stressPoints,
     radius: s.stats.radius,
+    colliders: s.stats.colliders,
     alive: s.alive,
     tokens: { ...s.tokens },
     lockTargetId: s.lockTargetId,

@@ -72,8 +72,10 @@ export interface HullDef {
   id: string;
   name: string;
   description: string;
-  /** Poloměr pro kolize a vykreslení. */
+  /** Poloměr pro vykreslení, výběr a hrubé testy (opsaná kružnice modelu se nepoužívá pro kolize). */
   radius: number;
+  /** Kolizní kruhy v souřadnicích lodi (+x příď, +y pravobok); bez nich se použije jeden kruh `radius`. */
+  colliders?: { x: number; y: number; r: number }[];
   hull: number;
   /** Obratnost (kostky obrany). */
   agility?: number;
@@ -141,6 +143,8 @@ export interface ShipStats {
   torpedoes: number;
   mines: number;
   radius: number;
+  /** Kolizní kruhy v souřadnicích lodi (viz HullDef.colliders). */
+  colliders: { x: number; y: number; r: number }[];
   /** Dohled (fog of war). */
   vision: number;
   /** Počet segmentových štítových modulů (životy segmentu = počet × segmentHp). */
