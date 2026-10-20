@@ -29,6 +29,19 @@ const noAp = (ship: Ship, o: ShipOrders, active: boolean) => (!active && actionC
 
 export const ACTIONS: ActionOption[] = [
   {
+    id: "move",
+    glyph: "↗",
+    label: "Manévr (1 akce)",
+    description: "Změna směru nebo rychlosti: klik na tlačítko (nebo mezerník / klik na vlastní loď) začne kreslit dráhu myší – pohyb myši = směr a rychlost, kolečko / 1–5 = rychlost, klik nebo mezerník = potvrdit. Rovně stejnou rychlostí je zdarma; jiná rychlost nebo zatočení stojí 1 akci.",
+    disabled: (ship, _s, o) => {
+      const cur = parseManeuverId(o.maneuverId);
+      const costs = !!cur && (cur.speed !== ship.speed || cur.angle !== 0 || cur.koiogran);
+      return noAp(ship, o, costs);
+    },
+    active: () => false,
+    apply: () => ({}),
+  },
+  {
     id: "laser",
     glyph: "⚡",
     label: "Lasery (1 akce)",
@@ -99,8 +112,8 @@ export const ACTIONS: ActionOption[] = [
   {
     id: "koiogran",
     glyph: "⟲",
-    label: "Otočka 180° (1 akce)",
-    description: `Loď poletí rovně a na konci se otočí o 180°; její rychlost pak klesne o ${RULES.koiogranSpeedDrop}. Jde jen při rychlosti 3–4; jiná rychlost než aktuální stojí další akci (úprava pohybu). Otočka je červený manévr (1 stresový bod) – jiný postih není.`,
+    label: "Otočka 180° (2 akce)",
+    description: `Loď poletí rovně a na konci se otočí o 180°; její rychlost pak klesne o ${RULES.koiogranSpeedDrop}. Jde jen při rychlosti 3–4. Stojí obě akce kola. Otočka je červený manévr (1 stresový bod) – jiný postih není.`,
     disabled: (ship, _s, o) => {
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.koiogran) return null;

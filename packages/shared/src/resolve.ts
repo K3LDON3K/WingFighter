@@ -256,8 +256,8 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
   const out: { id: ActionId; label: string }[] = [];
   const m = parseManeuverId(o.maneuverId);
   if (m) {
-    if (m.speed !== ship.speed || (!m.koiogran && m.angle !== 0)) out.push({ id: "move", label: "úprava pohybu" });
-    if (m.koiogran) out.push({ id: "koiogran", label: "otočka 180°" });
+    if (m.koiogran) out.push({ id: "move", label: "úprava pohybu" }, { id: "koiogran", label: "otočka 180°" }); // otočka stojí 2 akce
+    else if (m.speed !== ship.speed || m.angle !== 0) out.push({ id: "move", label: "úprava pohybu" });
   }
   if (o.action?.type === "evade") out.push({ id: "evade", label: "úhybný manévr" });
   if (o.action?.type === "shield") out.push({ id: "shield", label: "úprava štítu" });

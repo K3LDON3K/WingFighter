@@ -145,6 +145,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.10 – akce: nové tlačítko **MANÉVR** (první v Pohybu) nahrazuje NAKRESLIT – klik začne kreslit dráhu,
+  znovu = potvrdit (mezerník a klik na loď fungují dál); panel MANÉVR vpravo je jen informativní. Za co
+  byly akce vyčerpány ukazují červené pilulky: v hlavičce AKCE (použité červeně + „2/2 použito“) a vlevo
+  dole na tlačítku dané akce. **Otočka stojí 2 akce** (dvě pilulky). Tlačítka bez volné akce jsou ztlumená.
+  Tlačítka akcí jsou větší (72×62). Skener: místo řádku vpravo vyjedou tři stejně velká tlačítka nad
+  tlačítko SKENER (přes okraj lišty): SKEN LODI ·1, VESMÍR ·2, COOLDOWN.
 - v3.9 – ladění „Komety“: zaškrtávátko **Naráží do asteroidů i do sebe** – zapnuto = kometa se roztříští o
   asteroid (vykousne kráter) a dvě komety se při srážce zničí navzájem (doplňuje volbu v nastavení mapy,
   která řeší jen asteroidy). Ladicí panel umí zaškrtávací pole.
