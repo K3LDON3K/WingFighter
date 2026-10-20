@@ -1607,8 +1607,9 @@ function bindInput(c: HTMLCanvasElement) {
       const id = aimDrag;
       aimDrag = null;
       if (moved) {
-        // dráha zůstává nakreslená; ťuknutí kamkoliv / SPUSTIT KOLO ji potvrdí, ✕ pod MANÉVR ji vrátí
+        // dotyk: nakreslená dráha platí hned; tlačítko MANÉVR zezelená a jeho stisk manévr resetuje
         g.mouse = null;
+        if (g.aimingShipId === id && !confirmManeuver(id)) cancelAiming(id);
         renderSide();
         return;
       }

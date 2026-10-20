@@ -2025,6 +2025,40 @@ body.touch .game canvas {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+/* MANÉVR nakreslen: zelené tlačítko, tužka s ✓, dole proužek ↺ RESET (stisk = reset) */
+.bb-weapon.done {
+  background: #166534;
+  border-color: #86efac #14532d #14532d #86efac;
+  color: #fff;
+  padding-bottom: 10px;
+}
+.bb-weapon.done .pen-done {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+.bb-weapon.done .pd-tick {
+  position: absolute;
+  right: -10px;
+  top: -6px;
+  line-height: 0;
+}
+.bb-weapon.done .reset-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 10px;
+  background: #0f3d22;
+  color: #bbf7d0;
+  font-size: 9px;
+  line-height: 10px;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+.bb-weapon.done:hover {
+  background: #15803d;
+}
 /* větší drobné prvky pro prsty */
 body.touch .sbtn {
   width: 28px;
