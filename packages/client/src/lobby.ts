@@ -119,7 +119,7 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
                 h("span", {}, r.name),
                 h("span", { class: "muted" }, `${r.players} hráčů`),
                 h("div", { class: "spacer" }),
-                r.inGame ? h("span", { class: "muted" }, label("hra probíhá")) : h("button", { onclick: () => (commitName(), net.send({ type: "joinRoom", code: r.code })) }, label("Připojit")),
+                r.inGame ? h("span", { class: "muted" }, label("hra probíhá")) : !r.open ? h("span", { class: "muted txt", style: "font-size:13px", title: "Zakladatel ještě nastavuje mapu, lodě a moduly. Jakmile místnost otevře, půjde se připojit." }, "⏳ zakladatel dokončuje nastavení…") : h("button", { onclick: () => (commitName(), net.send({ type: "joinRoom", code: r.code })) }, label("Připojit")),
               ),
             ),
           ),
@@ -151,6 +151,8 @@ function roomView(m: LobbyModel, net: Net) {
   const isHost = room.hostId === m.playerId;
   const me = room.players.find((p) => p.id === m.playerId);
   const tdm = room.settings.mode === "tdm";
+  /** Místnost ještě není otevřená: host dokončuje nastavení, ostatní se nemohou připojit. */
+  const setup = !room.open;
 
   applyTuning(room.tuning);
   const budget = room.tuning.startBudget;
@@ -284,10 +286,12 @@ function roomView(m: LobbyModel, net: Net) {
         h("div", { class: "spacer" }),
         h("button", { onclick: () => net.send({ type: "leaveRoom" }) }, label("Opustit")),
       ),
-      h("div", { class: "muted txt" }, "Řekni kód ostatním, nebo ať místnost najdou v seznamu."),
+      setup
+        ? h("div", { class: "setup-note txt" }, "⏳ ", isHost ? "Místnost je zatím zavřená – nastav mapu, bitvu, lodě a moduly a pak ji tlačítkem OTEVŘÍT MÍSTNOST zpřístupni ostatním. Tým a svoje lodě si vybereš až potom, podle nastavení." : "Zakladatel upravuje nastavení místnosti. Jakmile ji znovu otevře, vyberete si tým a lodě.")
+        : h("div", { class: "muted txt" }, "Řekni kód ostatním, nebo ať místnost najdou v seznamu."),
     ),
-    teamsTable(),
-    me
+    setup ? null : teamsTable(),
+    me && !setup
       ? h(
           "div",
           { class: "card" },
@@ -391,8 +395,26 @@ function roomView(m: LobbyModel, net: Net) {
         ...PAGES.map((t, i) => h("button", { class: `wiz-step ${i === gamePage ? "on" : ""} ${i < gamePage ? "done" : ""}`, onclick: () => ((gamePage = i), rerender()) }, h("span", { class: "wiz-n" }, String(i + 1)), label(t))),
         h("span", { class: "spacer" }),
         h("button", { class: "px", disabled: gamePage === 0, onclick: () => ((gamePage = Math.max(0, gamePage - 1)), rerender()) }, "‹ ", label("zpět")),
-        h("button", { class: "px primary", disabled: gamePage === PAGES.length - 1, onclick: () => ((gamePage = Math.min(PAGES.length - 1, gamePage + 1)), rerender()) }, label("další"), " ›"),
+        gamePage === PAGES.length - 1 && isHost
+          ? h("button", { class: "px primary", onclick: () => net.send({ type: "openRoom", open: true }) }, icon("tick", "currentColor", 12), " ", label("Otevřít místnost"))
+          : h("button", { class: "px primary", disabled: gamePage === PAGES.length - 1, onclick: () => ((gamePage = Math.min(PAGES.length - 1, gamePage + 1)), rerender()) }, label("další"), " ›"),
       );
+      // otevřená místnost: nastavení jen jako souhrn (host může zpět do úprav), zůstává náhled mapy se startovním bodem
+      if (!setup)
+        return h(
+          "div",
+          { class: "card gamecard open" },
+          h("h3", { style: "display:flex;align-items:center;gap:8px" }, icon("target", "#7dd3fc", 12), " ", label("Nastavení hry"), h("span", { class: "txt muted", style: "font-size:13px" }, "hotovo, místnost otevřená"), h("span", { class: "spacer" }), isHost ? h("button", { class: "px tiny", title: "Místnost se zavře pro nové hráče, dokud nastavení znovu nedokončíš", onclick: () => ((gamePage = 0), net.send({ type: "openRoom", open: false })) }, icon("pen", "currentColor", 10), " ", label("upravit")) : null),
+          h("div", { class: "txt muted", style: "margin-bottom:8px;font-size:13px" }, summary),
+          h(
+            "div",
+            { class: "game-side" },
+            h("div", { class: "fsec-h" }, label("Náhled mapy · startovní bod")),
+            renderMapPreview(map, room.players, startFor ?? m.playerId, (index) => net.send({ type: "setStart", index, ...(startFor ? { botId: startFor } : {}) })),
+            h("div", { class: "muted txt" }, "Klikni na kroužek na okraji = tvůj start (barva = tým, ostatní vidí, kde kdo startuje). Bez volby dostaneš volný bod."),
+            targetSel ? h("div", { class: "frow" }, h("span", { class: "txt flbl" }, "Start pro"), h("div", { class: "fctl" }, targetSel), h("span")) : null,
+          ),
+        );
       const pageOf = (i: number, ...nodes: (Node | null)[]) => (gamePage === i ? nodes : []);
       return h(
         "div",
@@ -578,7 +600,13 @@ function roomView(m: LobbyModel, net: Net) {
       { class: "row" },
       h("div", { class: "error" }, m.error),
       h("div", { class: "spacer" }),
-      isHost ? h("button", { class: "primary", onclick: () => net.send({ type: "startGame" }) }, icon("play", "currentColor", 12), label("Zahájit bitvu")) : h("span", { class: "muted txt" }, "Čeká se, až host zahájí bitvu…"),
+      setup
+        ? isHost
+          ? h("button", { class: "primary", onclick: () => net.send({ type: "openRoom", open: true }) }, icon("tick", "currentColor", 12), label("Otevřít místnost"))
+          : h("span", { class: "muted txt" }, "Čeká se, až zakladatel dokončí nastavení…")
+        : isHost
+          ? h("button", { class: "primary", onclick: () => net.send({ type: "startGame" }) }, icon("play", "currentColor", 12), label("Zahájit bitvu"))
+          : h("span", { class: "muted txt" }, "Čeká se, až host zahájí bitvu…"),
     ),
   );
 }

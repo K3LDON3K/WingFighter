@@ -27,6 +27,8 @@ export interface RoomState {
   savedTuning: Tuning | null;
   players: RoomPlayer[];
   inGame: boolean;
+  /** Místnost otevřená pro ostatní (host dokončil nastavení). */
+  open: boolean;
   /** Piloti platní na serveru (editovatelní v ladění). */
   pilots: PilotDef[];
 }
@@ -36,6 +38,8 @@ export interface RoomSummary {
   name: string;
   players: number;
   inGame: boolean;
+  /** false = zakladatel ještě dokončuje nastavení, připojit se nejde. */
+  open: boolean;
 }
 
 /** Klient → server */
@@ -48,6 +52,8 @@ export type ClientMessage =
   | { type: "leaveRoom" }
   | { type: "setTeam"; team: number; playerId?: string }
   | { type: "balanceTeams"; shuffle?: boolean }
+  /** Host otevře místnost pro ostatní (open=true) nebo se vrátí k nastavení (open=false). */
+  | { type: "openRoom"; open: boolean }
   /** Startovní bod (null = uvolnit); host může nastavit botovi. */
   | { type: "setStart"; index: number | null; botId?: string }
   /** Vlastní výbava, nebo (host) výbava bota. */

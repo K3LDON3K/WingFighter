@@ -144,6 +144,8 @@ class Room {
   tuning: Tuning = initialTuning();
   members = new Map<string, RoomMember>();
   game: RunningGame | null = null;
+  /** Host dokončil nastavení → ostatní se mohou připojit. */
+  open = false;
 
   constructor(code: string, name: string, hostId: string) {
     this.code = code;
@@ -164,6 +166,7 @@ class Room {
       tuning: this.tuning,
       savedTuning: getSavedTuning(),
       inGame: !!this.game,
+      open: this.open,
       pilots: pilotList(),
       players: [...this.members.values()].map((m) => ({
         id: m.id,
@@ -205,7 +208,7 @@ class Room {
   }
 
   toSummary(): RoomSummary {
-    return { code: this.code, name: this.name, players: this.members.size, inGame: !!this.game };
+    return { code: this.code, name: this.name, players: this.members.size, inGame: !!this.game, open: this.open };
   }
 }
 
@@ -304,6 +307,7 @@ export class Hub {
         const r = this.rooms.get(msg.code.trim().toUpperCase());
         if (!r) return this.error(client, "Místnost s tímto kódem neexistuje.");
         if (r.game) return this.error(client, "V této místnosti už probíhá hra.");
+        if (!r.open) return this.error(client, "Zakladatel ještě dokončuje nastavení místnosti. Zkus to za chvíli.");
         if (room && room !== r) this.leaveRoom(client);
         const team = r.settings.mode === "tdm" ? this.smallestTeam(r) : 0;
         r.members.set(client.id, { id: client.id, name: client.name, team, isBot: false, ready: false, loadouts: r.newFleet(), earned: 0, spent: moduleCost(DEFAULT_LOADOUT) });
@@ -496,8 +500,15 @@ export class Hub {
         }
         return;
       }
+      case "openRoom": {
+        if (!room || room.game || room.hostId !== client.id) return;
+        room.open = !!msg.open;
+        this.broadcastRoom(room);
+        this.broadcastRooms();
+        return;
+      }
       case "startGame":
-        if (!room || room.hostId !== client.id || room.game) return;
+        if (!room || room.hostId !== client.id || room.game || !room.open) return;
         return this.startGame(room, client);
       case "submitOrders": {
         if (!room?.game) return;

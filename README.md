@@ -145,6 +145,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.46 – **Místnost se otevírá až po nastavení**: nově vytvořená místnost je zavřená – zakladatel projde průvodce
+  (Mapa · Bitva · Lodě a piloti · Moduly) a na konci dá **OTEVŘÍT MÍSTNOST** (i tlačítko dole). Do té doby ji ostatní
+  v seznamu vidí s poznámkou „zakladatel dokončuje nastavení…“ a připojení (i kódem) server odmítne. Po otevření se
+  zobrazí tabulka Hráči a týmy a Tvoje výbava (i pro zakladatele – lodě se vybírají podle hotového nastavení);
+  nastavení je jen souhrn + náhled mapy se startovním bodem, host se může vrátit tlačítkem UPRAVIT (místnost se
+  pro nové hráče zase zavře). Bitvu jde zahájit jen v otevřené místnosti.
 - v3.45 – **Hráči a týmy jako přehledná tabulka**: jeden panel, pruh týmu (jméno · N hráčů · N lodí · N bodů,
   PŘEJÍT SEM, + BOT), pod ním řádky hráčů (jméno, HOST / BOT, letka jako čipy s portrétem pilota a ikonkami
   modulů – najetí ukáže celou výbavu, stav ✓ připraven / ⚠ chyba letky / odpojen, tlačítka ⇄ přesun do dalšího
