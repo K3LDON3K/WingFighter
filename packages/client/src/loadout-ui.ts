@@ -1,5 +1,7 @@
 import {
   moduleBroken,
+  type PilotDef,
+  type PilotMods,
   moduleSellPrice,
   ammoRefillCost,
   type ModuleInstance,
@@ -27,6 +29,7 @@ import {
 } from "@wingfighter/shared";
 import { h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
+import { pilotPortrait } from "./pilot-ui.ts";
 
 export interface LoadoutEditorOptions {
   loadout: ShipLoadout;
@@ -274,37 +277,58 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     }
   }
 
-  /* --- hlavička: loď + pilot --- */
+  /* --- hlavička: výběr lodi a pilota z dlaždic (podobizna, jméno, infografika schopností) --- */
+  const MOD_ICON: { key: keyof PilotMods; icon: string; name: string }[] = [
+    { key: "attack", icon: "laser", name: "útok" },
+    { key: "agility", icon: "evade", name: "obrana" },
+    { key: "stressMax", icon: "target", name: "stres" },
+    { key: "maxSpeed", icon: "speed", name: "rychlost" },
+    { key: "hullPct", icon: "shield", name: "trup" },
+  ];
+  const modInfo = (pd: PilotDef) => {
+    const row = h("span", { class: "pk-mods" });
+    const any = MOD_ICON.filter((m) => pd.mods[m.key] !== 0);
+    if (!any.length) {
+      row.append(h("span", { class: "pk-none" }, "—"));
+      return row;
+    }
+    for (const m of any) {
+      const v = pd.mods[m.key];
+      row.append(h("span", { class: `pk-mod ${v > 0 ? "up" : "down"}` }, icon(m.icon, v > 0 ? "#86efac" : "#fca5a5", 10), h("i", {}, `${v > 0 ? "+" : ""}${v}${m.key === "hullPct" ? "%" : ""}`)));
+    }
+    return row;
+  };
+  const canPick = !ro && !!opts.onChange;
+  const hullTiles = Object.values(HULLS)
+    .filter((x) => x.id === loadout.hullId || !opts.hullChoices || opts.hullChoices.includes(x.id))
+    .map((x) => {
+      const on = x.id === loadout.hullId;
+      return h(
+        "button",
+        { class: `pk-tile hull ${on ? "on" : ""}`, disabled: !canPick || !opts.hullChoices, title: `${x.name}\n${x.description}\nLodní body: ${x.points} · trup ${x.hull} · sloty: ${x.slots.map((sl) => sl.name).join(", ")} · náklad ${x.cargo}`, onclick: () => change({ ...loadout, hullId: x.id }) },
+        h("span", { class: "pk-pic" }, icon("ship", on ? "#7dd3fc" : "#64748b", 28)),
+        h("span", { class: "pk-name" }, label(x.name)),
+        h("span", { class: "pk-sub" }, `${x.points} ${x.points === 1 ? "bod" : "body"}`),
+      );
+    });
+  const pilotTiles = Object.values(PILOTS)
+    .filter((x) => x.id === loadout.pilotId || !opts.pilotChoices || opts.pilotChoices.includes(x.id))
+    .map((x) => {
+      const on = x.id === loadout.pilotId;
+      const taken = x.unique && !on && (opts.pilotsTaken ?? []).includes(x.id);
+      return h(
+        "button",
+        { class: `pk-tile pilot ${on ? "on" : ""} ${taken ? "taken" : ""}`, disabled: !canPick || !opts.pilotChoices || taken, title: `${x.name}\n${x.description}${x.abilities.length ? `\n${x.abilities.join("\n")}` : "\nBez zvláštních schopností."}\n${x.unique ? "Unikátní – v letce jen jednou." : "Může se v letce opakovat."}${taken ? "\nNelze: už je v jiné lodi tvé letky." : ""}`, onclick: () => change({ ...loadout, pilotId: x.id }) },
+        h("span", { class: "pk-pic" }, pilotPortrait(x.id, 40)),
+        h("span", { class: "pk-name" }, label(x.name)),
+        modInfo(x),
+      );
+    });
   const head = h(
     "div",
-    { class: "lo-head" },
-    h(
-      "label",
-      {},
-      h("span", {}, label("Loď")),
-      h(
-        "select",
-        { disabled: !opts.hullChoices || ro, title: `${HULLS[loadout.hullId]?.description ?? ""}\nLodní body: ${HULLS[loadout.hullId]?.points ?? 1}`, onchange: (e) => change({ ...loadout, hullId: (e.target as HTMLSelectElement).value }) },
-        ...Object.values(HULLS)
-          .filter((x) => x.id === loadout.hullId || !opts.hullChoices || opts.hullChoices.includes(x.id))
-          .map((x) => h("option", { value: x.id, selected: x.id === loadout.hullId }, `${x.name} · ${x.points} b.`)),
-      ),
-    ),
-    h(
-      "label",
-      {},
-      h("span", {}, label("Pilot")),
-      h(
-        "select",
-        { disabled: !opts.pilotChoices || ro, title: `${PILOTS[loadout.pilotId]?.description ?? ""}${PILOTS[loadout.pilotId]?.abilities.length ? `\n${PILOTS[loadout.pilotId].abilities.join(", ")}` : ""}`, onchange: (e) => change({ ...loadout, pilotId: (e.target as HTMLSelectElement).value }) },
-        ...Object.values(PILOTS)
-          .filter((x) => x.id === loadout.pilotId || !opts.pilotChoices || opts.pilotChoices.includes(x.id))
-          .map((x) => {
-            const taken = x.unique && x.id !== loadout.pilotId && (opts.pilotsTaken ?? []).includes(x.id);
-            return h("option", { value: x.id, selected: x.id === loadout.pilotId, disabled: taken }, `${x.name}${x.abilities.length ? ` (${x.abilities.join(", ")})` : ""}${taken ? " – už v letce" : ""}`);
-          }),
-      ),
-    ),
+    { class: "lo-head pick" },
+    h("div", { class: "pk-group" }, h("span", { class: "pk-lbl" }, label("Loď")), h("div", { class: "pk-row" }, ...hullTiles)),
+    h("div", { class: "pk-group" }, h("span", { class: "pk-lbl" }, label("Pilot")), h("div", { class: "pk-row" }, ...pilotTiles)),
   );
 
   const summary = h(

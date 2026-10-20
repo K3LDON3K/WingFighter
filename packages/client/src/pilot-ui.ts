@@ -27,8 +27,83 @@ const PORTRAITS: Record<string, { rows: string[]; pal: Record<string, string> }>
   },
 };
 
+// další piloti: stejná šablona, jiné vlasy / barvy / doplňky
+PORTRAITS.eso = {
+  pal: { h: "#111827", s: "#d9a57c", e: "#0ea5e9", w: "#f8fafc", m: "#9a3412", u: "#b91c1c", c: "#fca5a5", b: "#0b1020", g: "#fde047", v: "#0ea5e9" },
+  rows: [
+    "....hhhhhhhh....",
+    "...hhhhhhhhhh...",
+    "..hhhhhhhhhhhh..",
+    "..hhvvvvvvvvhh..",
+    "..hvvvvvvvvvvvh.",
+    "..hsswsssswsss..",
+    "..hssessssesss..",
+    "..ssssssssssss..",
+    "..sssssmmsssss..",
+    "...ssssssssss...",
+    "....ssssssss....",
+    ".....uuuuuu.....",
+    "...uuuuccuuuu...",
+    "..uuuuuccuuuuu..",
+    "..uuuugcccguuu..",
+    "..uuuuuuuuuuuu..",
+  ],
+};
+PORTRAITS.strelec = {
+  pal: { h: "#7c2d12", s: "#e8b58a", e: "#1e293b", w: "#f8fafc", m: "#b45309", u: "#166534", c: "#86efac", b: "#0b1020", g: "#fbbf24", k: "#334155" },
+  rows: [
+    "....hhhhhhhh....",
+    "...hhhhhhhhhh...",
+    "..hhhhhhhhhhhh..",
+    "..hhsssssssshh..",
+    "..hsssssssssssh.",
+    "..hsswssskkkss..",
+    "..hssesssskess..",
+    "..ssssssssssss..",
+    "..sssssmmsssss..",
+    "...sssmmmmsss...",
+    "....ssssssss....",
+    ".....uuuuuu.....",
+    "...uuuuccuuuu...",
+    "..uuuuuccuuuuu..",
+    "..uuuugcccguuu..",
+    "..uuuuuuuuuuuu..",
+  ],
+};
+PORTRAITS.kapitan = {
+  pal: { h: "#9ca3af", s: "#e8b58a", e: "#1e293b", w: "#f8fafc", m: "#9ca3af", u: "#1e3a8a", c: "#fbbf24", b: "#0b1020", g: "#fbbf24", t: "#1e3a8a" },
+  rows: [
+    "...tttttttttt...",
+    "..tttttttttttt..",
+    "..ttttggggtttt..",
+    "..hhsssssssshh..",
+    "..hsssssssssssh.",
+    "..hsswsssswsss..",
+    "..hssessssesss..",
+    "..ssssssssssss..",
+    "..ssmmmmmmmmss..",
+    "...ssmmmmmmss...",
+    "....ssssssss....",
+    ".....uuuuuu.....",
+    "...uuuuccuuuu...",
+    "..uuuuuccuuuuu..",
+    "..uuuugcccguuu..",
+    "..uuuuuuuuuuuu..",
+  ],
+};
+/** Neznámý (editovaný) pilot: podobizna Kadeta s barvou vlasů a uniformy podle id. */
+function portraitFor(pilotId: string) {
+  if (PORTRAITS[pilotId]) return PORTRAITS[pilotId];
+  let hsh = 0;
+  for (const ch of pilotId) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+  const hairs = ["#2b1d0e", "#111827", "#7c2d12", "#9ca3af", "#fde047", "#dc2626"];
+  const unis = ["#1d4ed8", "#b91c1c", "#166534", "#7c3aed", "#0f766e", "#a16207"];
+  const base = PORTRAITS.kadet;
+  return { rows: base.rows, pal: { ...base.pal, h: hairs[hsh % hairs.length], u: unis[(hsh >> 3) % unis.length] } };
+}
+
 export function pilotPortrait(pilotId: string, size = 32): SVGSVGElement {
-  const p = PORTRAITS[pilotId] ?? PORTRAITS.kadet;
+  const p = portraitFor(pilotId);
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("viewBox", "0 0 16 16");

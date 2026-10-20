@@ -145,6 +145,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.43 – výběr lodi a pilota z dlaždic místo seznamů: pilot = pixelová podobizna (Kadet, Eso, Střelec, Kapitán;
+  editovaní piloti dostanou podobiznu s barvou podle id), jméno a malá infografika schopností (ikona + hodnota,
+  zelená plus / červená minus); vybraný svítí, ostatní ztlumené, pilot použitý v jiné lodi letky je zašedlý.
+  Loď = ikona, název, lodní body. Podrobnosti ve vysvětlivce po najetí / podržení. Nastavení bitvy: řádek
+  „Limit kol“ odstraněn (hra je vždy bez limitu), místo něj **Startovní kredity** (číslo + rychlé volby
+  300 / 500 / 800 / 1200; totéž co ladění → Ekonomika).
 - v3.42 – letka a piloti. **Lodní body na hráče** (1–3) místo „lodí na hráče“: každý trup stojí body (stíhač 1),
   hráč je musí využít přesně; všechny lodě hráče mají jednu peněženku. „Tvoje výbava“ má záložky LOĎ 1/2/3
   (trup, pilot, moduly, náklad zvlášť); výběr trupu a pilota je odemčený. Zakladatel volí **dostupné lodě

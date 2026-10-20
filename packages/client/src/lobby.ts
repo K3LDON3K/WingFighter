@@ -358,7 +358,7 @@ function roomView(m: LobbyModel, net: Net) {
           );
         }),
       );
-      const summary = `${MAP_SIZES[map.size]?.label ?? map.size} · asteroidy ${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids} · ${map.storms === 0 ? "bez bouří" : `${map.storms} bouře`} · komety ${{ none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"]} · seed ${map.seed} · ${settings.mode === "tdm" ? "týmový deathmatch" : "deathmatch"}${settings.turnLimit ? ` · ${settings.turnLimit} kol` : ""} · startovní kredity ${budget}`;
+      const summary = `${MAP_SIZES[map.size]?.label ?? map.size} · asteroidy ${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids} · ${map.storms === 0 ? "bez bouří" : `${map.storms} bouře`} · komety ${{ none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"]} · seed ${map.seed} · ${settings.mode === "tdm" ? "týmový deathmatch" : "deathmatch"} · startovní kredity ${budget}`;
       return h(
         "div",
         { class: "card gamecard" },
@@ -438,7 +438,11 @@ function roomView(m: LobbyModel, net: Net) {
             section(
               "Bitva",
               frow("Herní mód", sel(settings.mode, [["tdm", "Týmový deathmatch"], ["dm", "Deathmatch (všichni proti všem)"]], (v) => set({ mode: v as "tdm" | "dm" }))),
-              frow("Limit kol", sel(String(settings.turnLimit), [0, 10, 15, 20, 30, 40].map((n) => [String(n), n === 0 ? "bez limitu" : `${n} kol`]), (v) => set({ turnLimit: Number(v) })), "Při limitu kol vyhrává tým s největším součtem zbývajícího trupu a štítů."),
+              frow(
+                "Startovní kredity",
+                h("div", { class: "fpair" }, h("input", { class: "fsel", type: "number", value: String(budget), min: "0", max: "5000", step: "50", disabled: !isHost, style: "width:118px", onchange: (e) => net.send({ type: "setTuning", tuning: { startBudget: Math.max(0, Math.min(5000, Math.round(Number((e.target as HTMLInputElement).value) || 0))) } }) }), ...(isHost ? [300, 500, 800, 1200].map((n) => h("button", { class: `px tiny ${budget === n ? "on" : ""}`, onclick: () => net.send({ type: "setTuning", tuning: { startBudget: n } }) }, String(n))) : [])),
+                "Kredity každého hráče na začátku (výbava se z nich kupuje; výdělky z bitev se přičítají). Totéž co ladění → Ekonomika → Rozpočet na výbavu.",
+              ),
               frow(
                 "Lodní body na hráče",
                 pips(3, settings.shipPoints, "size", () => icon("ship", "#7dd3fc", 18), () => icon("ship", "#334155", 18), (k) => `${k} lodní body`, (v) => set({ shipPoints: Math.max(1, v) }), `${settings.shipPoints} ${settings.shipPoints === 1 ? "bod" : "body"} · stíhač = 1`),
