@@ -145,6 +145,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.33.1 – čipy potvrzení dráhy na dotyku jsou čtvercové (56 px) jen s ✓ / ✕.
 - v3.33 – dotykové ovládání (tablety): vstup mapy přes Pointer Events; v dotykovém režimu (automaticky podle
   zařízení, přepínač v ladění → Zobrazení) jeden prst = posun, dva prsty = pinch zoom kolem středu prstů,
   ťuknutí = klik, podržení ~0,45 s = info o objektu. Tažení prstem z vlastní lodi kreslí dráhu (duch lodi

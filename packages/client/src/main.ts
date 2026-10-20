@@ -563,8 +563,8 @@ function mountGame() {
   chipsEl = h(
     "div",
     { class: "aim-chips", style: "display:none" },
-    h("button", { class: "px chip ok", onclick: () => game?.aimingShipId && confirmManeuver(game.aimingShipId) }, "✓ ", label("potvrdit")),
-    h("button", { class: "px chip no", onclick: () => game?.aimingShipId && cancelAiming(game.aimingShipId) }, "✕ ", label("zrušit")),
+    h("button", { class: "px chip ok", title: "Potvrdit dráhu", onclick: () => game?.aimingShipId && confirmManeuver(game.aimingShipId) }, icon("tick", "#fff", 22)),
+    h("button", { class: "px chip no", title: "Zrušit – vrátit původní dráhu", onclick: () => game?.aimingShipId && cancelAiming(game.aimingShipId) }, "✕"),
   );
   barEl = h("div", { class: "bottombar" });
   sideEl = h("div", { class: "maplog" });
@@ -1014,9 +1014,9 @@ function renderAimChips() {
   const end = maneuverPath(ship, man)(1);
   const sp = cam.toScreen(end.x, end.y);
   chipsEl.style.display = "flex";
-  const w = chipsEl.offsetWidth || 200;
+  const w = chipsEl.offsetWidth || 124;
   chipsEl.style.left = `${Math.max(8, Math.min(mapEl.clientWidth - w - 8, sp.x - w / 2))}px`;
-  chipsEl.style.top = `${Math.max(8, Math.min(mapEl.clientHeight - 60, sp.y - 90))}px`;
+  chipsEl.style.top = `${Math.max(8, Math.min(mapEl.clientHeight - 70, sp.y - 100))}px`;
 }
 
 function renderTooltip() {
