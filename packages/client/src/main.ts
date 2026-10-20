@@ -50,10 +50,10 @@ import {
   type TurnResult,
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
-import { audioReady, audioRunning, isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
+import { audioReady, isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
 import { loadLibrary, playMode } from "./music.ts";
 import { renderMusicPanel } from "./music-ui.ts";
-import { replayLogo } from "./logo.ts";
+import { logoCanvas, replayLogo } from "./logo.ts";
 
 /** Překryvný panel Hudba a zvuk (z lobby i z herního menu). */
 let musicOverlay: HTMLElement | null = null;
@@ -298,6 +298,7 @@ function startGame(state: GameState) {
   };
   resetOrders();
   screen = "game";
+  splash = false;
   mountGame();
   closeMusicPanel();
   playMode("game");
@@ -1672,9 +1673,37 @@ function hitPos(hit: Entity): { x: number; y: number } {
 /* Vykreslení                                                           */
 /* ------------------------------------------------------------------ */
 
+/** Úvodní obrazovka: jen logo a SPUSTIT HRU – klik povolí zvuk, pak v menu proběhne animace loga s hudbou. */
+let splash = true;
+function renderSplash() {
+  clear(app);
+  app.append(
+    h(
+      "div",
+      { class: "screen splash" },
+      h(
+        "div",
+        { class: "center" },
+        logoCanvas(6, true),
+        h("button", { class: "primary splash-btn", onclick: () => enterMenu() }, icon("play", "currentColor", 16), " ", label("Spustit hru")),
+        h("div", { class: "muted txt splash-note" }, "Tahová vesmírná střílečka pro více hráčů"),
+      ),
+    ),
+  );
+}
+function enterMenu() {
+  splash = false;
+  render();
+  firstGesture();
+}
+
 function render() {
   if (screen === "game") {
     renderSide();
+    return;
+  }
+  if (splash) {
+    renderSplash();
     return;
   }
   renderLobby(app, { playerId, name: playerName, rooms, room, error: error || notice, connected }, net, setName);
@@ -1685,12 +1714,11 @@ net.connect();
 void loadLibrary();
 // zvuk: odemknout prvním vstupem; v menu se pak znovu přehraje animace loga se zvukem a spustí hudba
 let audioStarted = false;
-let audioHint: HTMLElement | null = null;
 const firstGesture = () => {
   if (audioStarted) return;
+  // na úvodní obrazovce čekáme na tlačítko SPUSTIT HRU (klik = povolení zvuku prohlížečem)
+  if (splash && screen !== "game") return;
   audioStarted = true;
-  audioHint?.remove();
-  audioHint = null;
   unlockAudio();
   if (screen === "game") {
     playMode("game");
@@ -1702,19 +1730,9 @@ const firstGesture = () => {
     setTimeout(() => playMode(screen === "game" ? "game" : "menu"), dur);
   });
 };
-window.addEventListener("pointerdown", firstGesture, { once: true });
-window.addEventListener("keydown", firstGesture, { once: true });
-// Prohlížeče povolí zvuk bez kliknutí jen výjimečně (Chrome po častém hraní se zvukem). Zkusíme to hned
-// po načtení; když to projde, logo i hudba startují samy, jinak ukážeme nápovědu, že zvuk čeká na klik.
-void audioReady().then(() => {
-  if (audioStarted) return;
-  if (audioRunning()) {
-    firstGesture();
-    return;
-  }
-  audioHint = h("div", { class: "audio-hint txt" }, icon("wait", "currentColor", 12), " klikni kamkoliv – prohlížeč zapne zvuk až po prvním vstupu");
-  document.body.append(audioHint);
-});
+// po přímém návratu do rozehrané bitvy (bez úvodní obrazovky) odemkne zvuk první vstup
+window.addEventListener("pointerdown", firstGesture);
+window.addEventListener("keydown", firstGesture);
 window.addEventListener("keydown", (e) => {
   if (game) return;
   if (e.key === "Escape" && musicOverlay) closeMusicPanel();

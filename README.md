@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.20 – úvodní obrazovka: po načtení jen statické logo a tlačítko **SPUSTIT HRU**. Klik povolí zvuk
+  v prohlížeči, přepne do hlavního menu, kde proběhne animace loga se zvukem a naváže hudba menu
+  (nahrazuje nápovědu „klikni kamkoliv“ z v3.19.2). Při návratu do rozehrané bitvy se úvodní obrazovka
+  přeskočí.
 - v3.19.2 – zvuk po načtení: hned po otevření stránky se zkusí audio rozběhnout; když to prohlížeč povolí
   (Chrome u často hraných stránek), logo se zvukem a hudba startují samy. Jinak blikající nápověda dole
   „klikni kamkoliv“ – prohlížeče zvuk bez prvního vstupu uživatele nepovolí, to obejít nejde.

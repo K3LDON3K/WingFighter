@@ -111,8 +111,12 @@ export function replayLogo(withSound = true): number {
 }
 
 /** Logo jako canvas; animace proběhne jen jednou za načtení stránky (prvek se znovu používá). */
-export function logoCanvas(scale = 4): HTMLCanvasElement {
-  if (singleton) return singleton;
+export function logoCanvas(scale = 4, still = false): HTMLCanvasElement {
+  if (singleton) {
+    singleton.style.width = `${W * scale}px`;
+    singleton.style.height = `${H * scale}px`;
+    return singleton;
+  }
   const [c, x] = small(W, H);
   c.className = "logo";
   c.style.width = `${W * scale}px`;
@@ -129,8 +133,9 @@ export function logoCanvas(scale = 4): HTMLCanvasElement {
     fighter = textLayer("FIGHTER", 47, 14, { y0: 14, y1: 22, stops: [[0, "#fde68a"], [0.5, "#f97316"], [1, "#b91c1c"]] }, "#05070f", { n: 3, color: "#7f1d1d" });
   };
 
-  let start = performance.now();
   const DUR = 1500;
+  // still = vykreslit rovnou konečný snímek (úvodní obrazovka), animace až na vyžádání
+  let start = performance.now() - (still ? DUR * 1.3 : 0);
   let sound = false;
   let laserPlayed = false;
   let rafId = 0;

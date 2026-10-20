@@ -1819,27 +1819,16 @@ button.px.tiny {
   border-color: #93c5fd #1e3a8a #1e3a8a #93c5fd;
   color: #fff;
 }
-.audio-hint {
-  position: fixed;
-  left: 50%;
-  bottom: 14px;
-  transform: translateX(-50%);
-  z-index: 6;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: 14px;
-  color: var(--yellow);
-  background: rgba(18, 26, 48, 0.95);
-  border: 1px solid #334155;
-  pointer-events: none;
-  animation: hint-blink 1.6s ease-in-out infinite;
+.splash .center {
+  justify-items: center;
+  gap: 28px;
 }
-@keyframes hint-blink {
-  50% {
-    opacity: 0.55;
-  }
+.splash-btn {
+  font-size: 26px;
+  padding: 12px 36px;
+}
+.splash-note {
+  font-size: 16px;
 }
 .music-btn {
   position: fixed;
