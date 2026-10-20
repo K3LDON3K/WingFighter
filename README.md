@@ -145,6 +145,13 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.33 – dotykové ovládání (tablety): vstup mapy přes Pointer Events; v dotykovém režimu (automaticky podle
+  zařízení, přepínač v ladění → Zobrazení) jeden prst = posun, dva prsty = pinch zoom kolem středu prstů,
+  ťuknutí = klik, podržení ~0,45 s = info o objektu. Tažení prstem z vlastní lodi kreslí dráhu (duch lodi
+  se drží nad prstem); po zvednutí zůstane dráha čekající a nad duchem jsou čipy **✓ POTVRDIT / ✕ ZRUŠIT**
+  (✕ vrátí původní manévr, potvrdit jde i tlačítkem POTVRDIT v liště). Tlačítko **☰ MENU** místo Esc,
+  dotyková nápověda pod mapou, zákaz gest prohlížeče na mapě (touch-action, viewport bez škálování,
+  100dvh), větší −/+ u štítu a položky v okénkách. Myš se chová jako dřív.
 - v3.32.1 – záchranná výbava: kdo po bitvě nemá žádný funkční modul ani kredity na nejlevnější, dostane
   startovní loď zdarma (zbytky se automaticky prodají); záchranné moduly nejdou prodat (0 kreditů), jinak
   se používají normálně.

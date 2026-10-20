@@ -17,6 +17,7 @@ import {
   normalizeAngle,
   parseManeuverId,
   resolveManeuver,
+  maneuverPath,
   rightOf,
   stressCost,
   TEAM_COLORS,
@@ -84,6 +85,21 @@ import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/rende
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
 import { renderTuningPanel, showHitboxes, showSelectRing } from "./tuning-panel.ts";
+import { applyTouchClass, isTouchMode } from "./touch.ts";
+
+/** Manévr před začátkem kreslení (dotyk: ✕ ho vrátí). */
+const aimBackup = new Map<string, string>();
+function cancelAiming(id: string) {
+  const g = game;
+  if (!g) return;
+  const prev = aimBackup.get(id);
+  const o = g.orders.get(id);
+  if (prev && o) g.orders.set(id, { ...o, maneuverId: prev });
+  aimBackup.delete(id);
+  g.speedLock.delete(id);
+  if (g.aimingShipId === id) g.aimingShipId = null;
+  renderSide();
+}
 import { Net } from "./net.ts";
 
 /* ------------------------------------------------------------------ */
@@ -524,6 +540,7 @@ let hudEl: HTMLElement | null = null;
 let overlayEl: HTMLElement | null = null;
 let menuEl: HTMLElement | null = null;
 let tooltipEl: HTMLElement | null = null;
+let chipsEl: HTMLElement | null = null;
 let tuneEl: HTMLElement | null = null;
 let toastEl: HTMLElement | null = null;
 let pstatEl: HTMLElement | null = null;
@@ -543,6 +560,12 @@ function mountGame() {
   toastEl = h("div", { class: "toast", style: "display:none" });
   pstatEl = h("div", { class: "pstat" });
   confirmEl = h("div", { class: "confirm-wrap", style: "display:none" });
+  chipsEl = h(
+    "div",
+    { class: "aim-chips", style: "display:none" },
+    h("button", { class: "px chip ok", onclick: () => game?.aimingShipId && confirmManeuver(game.aimingShipId) }, "✓ ", label("potvrdit")),
+    h("button", { class: "px chip no", onclick: () => game?.aimingShipId && cancelAiming(game.aimingShipId) }, "✕ ", label("zrušit")),
+  );
   barEl = h("div", { class: "bottombar" });
   sideEl = h("div", { class: "maplog" });
   mapEl = h(
@@ -550,7 +573,8 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ"),
+    h("div", { class: "hint mouse-only" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ"),
+    h("div", { class: "hint touch-only" }, "TÁHNOUT Z VLASTNÍ LODI = DRÁHA (PAK ✓ / ✕) · ŤUKNOUT NA NEPŘÍTELE = CÍL · TÁHNOUT = POSUN · 2 PRSTY = ZOOM · PODRŽET = INFO"),
     sideEl,
     h(
       "div",
@@ -565,12 +589,14 @@ function mountGame() {
       "div",
       { class: "map-tools" },
       h("button", { class: "gear", id: "inv-btn", title: "Inventář lodi (připravuje se)", onclick: () => ((game!.inventoryOpen = !game!.inventoryOpen), renderSide()) }, icon("inventory", "currentColor", 12), label("inventář")),
+      h("button", { class: "gear touch-only", title: "Menu", onclick: () => toggleMenu(!game?.menuOpen) }, "☰ ", label("menu")),
       h("button", { class: "gear", title: "Tabulka skóre (Tab)", onclick: () => toggleStats() }, icon("log", "currentColor", 12), label("skóre")),
       h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => ((tuningOpen = !tuningOpen), renderSide()) }, icon("target", "currentColor", 12), label("ladění")),
       h("button", { class: "gear", title: "Herní menu (Esc)", onclick: () => toggleMenu() }, icon("log", "currentColor", 12), label("menu")),
     ),
     pstatEl,
     tooltipEl,
+    chipsEl,
     overlayEl,
     confirmEl,
     menuEl,
@@ -611,7 +637,7 @@ function mountGame() {
 function unmountGame() {
   cancelAnimationFrame(raf);
   resizeObs?.disconnect();
-  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = null;
+  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = chipsEl = null;
   render();
 }
 
@@ -626,6 +652,7 @@ function frame(now: number) {
   }
   const view = game.anim ? game.anim.view : game.view;
   updateCenterBtn();
+  renderAimChips();
   const overlay = buildOverlay(view);
   if (game.hoverIcon && !game.icons.some((i) => `${i.shipId}:${i.id}` === game!.hoverIcon)) game.hoverIcon = undefined;
   renderer.draw(game.state, view, cam, overlay, now, window.devicePixelRatio || 1);
@@ -967,6 +994,29 @@ function renderHud() {
       clear(overlayEl);
     }
   }
+}
+
+/** Dotyk: čipy ✓ / ✕ nad duchem lodi, dokud se čekající dráha nepotvrdí. */
+function renderAimChips() {
+  if (!chipsEl || !game || !cam || !mapEl) return;
+  const id = game.aimingShipId;
+  const ship = id ? game.state.ships.find((s) => s.id === id) : undefined;
+  const o = id ? game.orders.get(id) : undefined;
+  if (!isTouchMode() || !ship || !o || game.submitted || game.anim || game.mouse) {
+    chipsEl.style.display = "none";
+    return;
+  }
+  const man = resolveManeuver(profileOf(ship.loadout), o.maneuverId, ship.speed);
+  if (!man) {
+    chipsEl.style.display = "none";
+    return;
+  }
+  const end = maneuverPath(ship, man)(1);
+  const sp = cam.toScreen(end.x, end.y);
+  chipsEl.style.display = "flex";
+  const w = chipsEl.offsetWidth || 200;
+  chipsEl.style.left = `${Math.max(8, Math.min(mapEl.clientWidth - w - 8, sp.x - w / 2))}px`;
+  chipsEl.style.top = `${Math.max(8, Math.min(mapEl.clientHeight - 60, sp.y - 90))}px`;
 }
 
 function renderTooltip() {
@@ -1419,23 +1469,190 @@ function bindInput(c: HTMLCanvasElement) {
   let lastX = 0;
   let lastY = 0;
 
-  const worldPos = (e: MouseEvent) => {
+  const worldPos = (e: { clientX: number; clientY: number }) => {
     const rect = c.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     return { ...cam!.toWorld(sx, sy), sx, sy };
   };
 
-  c.addEventListener("mousedown", (e) => {
+  /* ---------- dotyk: prsty, pinch, tažení z lodi, podržení ---------- */
+  const fingers = new Map<number, { x: number; y: number }>();
+  let pinch: { dist: number; mx: number; my: number } | null = null;
+  let aimDrag: string | null = null; // loď, ze které se táhne dráha
+  let longPress = 0;
+  let longPressed = false;
+  const TAP_SLOP = 8;
+  const AIM_OFFSET = 50; // duch lodi se drží nad prstem, aby ho prst nezakrýval
+
+  const startAiming = (shipId: string): boolean => {
+    const g = game!;
+    const ship = g.state.ships.find((s) => s.id === shipId)!;
+    const o = g.orders.get(shipId)!;
+    const curCost = actionCost(ship, o);
+    const adjusting = curCost > actionCost(ship, { ...o, maneuverId: defaultOrders(ship).maneuverId });
+    if (curCost >= RULES.actionPoints && !adjusting) {
+      showError("Úprava pohybu stojí akci a obě už máš použité. Odeber zbraň.");
+      return false;
+    }
+    g.selectedShipId = shipId;
+    g.picking = null;
+    g.aimingShipId = shipId;
+    aimBackup.set(shipId, o.maneuverId);
+    return true;
+  };
+
+  c.addEventListener("pointerdown", (e) => {
     if (!game || !cam) return;
+    if (e.pointerType === "mouse" && !isTouchMode()) {
+      if (e.button !== 0) return;
+      moved = false;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      panning = true;
+      return;
+    }
+    // dotykový režim
+    e.preventDefault();
+    c.setPointerCapture(e.pointerId);
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    clearTimeout(longPress);
+    longPressed = false;
+    if (fingers.size === 2) {
+      const [a, b] = [...fingers.values()];
+      pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+      if (aimDrag) {
+        // druhý prst při kreslení = zrušit kreslení, vrátit původní dráhu
+        cancelAiming(aimDrag);
+        aimDrag = null;
+      }
+      return;
+    }
+    if (fingers.size > 2) return;
     moved = false;
     lastX = e.clientX;
     lastY = e.clientY;
-    panning = true;
+    const w = worldPos(e);
+    game.mouse = w;
+    game.hoverId = undefined;
+    game.hoverIcon = undefined;
+    const hit = !game.anim && !game.submitted ? entityAt(w.x, w.y) : undefined;
+    if (hit?.kind === "ship" && hit.ownerId === playerId && !iconAt(w.x, w.y)) {
+      // tažení z vlastní lodi = kreslení dráhy (rozhodne se až po pohybu)
+      aimDrag = hit.id;
+    } else {
+      aimDrag = null;
+      // podržení = info o objektu pod prstem
+      longPress = window.setTimeout(() => {
+        if (!game) return;
+        longPressed = true;
+        const ent = entityAt(w.x, w.y);
+        game.hoverId = ent?.id;
+        const ic = iconAt(w.x, w.y);
+        game.hoverIcon = ic ? `${ic.shipId}:${ic.id}` : undefined;
+        game.mouse = w;
+      }, 450);
+    }
+  });
+
+  const touchMove = (e: PointerEvent) => {
+    if (!game || !cam) return;
+    const f = fingers.get(e.pointerId);
+    if (!f) return;
+    f.x = e.clientX;
+    f.y = e.clientY;
+    if (pinch && fingers.size >= 2) {
+      const [a, b] = [...fingers.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      const rect = c.getBoundingClientRect();
+      if (pinch.dist > 0) cam.zoomAt(mx - rect.left, my - rect.top, dist / pinch.dist);
+      cam.panBy(mx - pinch.mx, my - pinch.my);
+      cam.clampTo(game.state.width, game.state.height);
+      pinch = { dist, mx, my };
+      moved = true;
+      return;
+    }
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    if (!moved && !aimDragMoved(e)) return;
+    moved = true;
+    clearTimeout(longPress);
+    if (aimDrag) {
+      if (game.aimingShipId !== aimDrag && !startAiming(aimDrag)) {
+        aimDrag = null;
+        return;
+      }
+      const w = worldPos({ clientX: e.clientX, clientY: e.clientY - AIM_OFFSET });
+      game.mouse = w;
+      aimAt(w.x, w.y);
+      renderSide();
+      return;
+    }
+    cam.panBy(dx, dy);
+    cam.clampTo(game.state.width, game.state.height);
+    lastX = e.clientX;
+    lastY = e.clientY;
+  };
+  // pomocná: první pohyb nad mrtvou zónou (měří se od místa dotyku)
+  let downX = 0;
+  let downY = 0;
+  const aimDragMoved = (e: PointerEvent) => Math.hypot(e.clientX - downX, e.clientY - downY) >= TAP_SLOP;
+  c.addEventListener("pointerdown", (e) => {
+    downX = e.clientX;
+    downY = e.clientY;
+  });
+
+  c.addEventListener("pointermove", (e) => {
+    if (e.pointerType === "mouse" && !isTouchMode()) return; // myš řeší window.mousemove
+    e.preventDefault();
+    touchMove(e);
+  });
+
+  const touchEnd = (e: PointerEvent) => {
+    if (!fingers.has(e.pointerId)) return;
+    fingers.delete(e.pointerId);
+    clearTimeout(longPress);
+    if (fingers.size < 2) pinch = null;
+    if (fingers.size > 0) return;
+    if (!game || !cam) return;
+    const g = game;
+    if (aimDrag) {
+      const id = aimDrag;
+      aimDrag = null;
+      if (moved) {
+        // dráha zůstává čekající – potvrdí se čipem ✓ nebo tlačítkem POTVRDIT
+        g.mouse = null;
+        renderSide();
+        return;
+      }
+      // ťuknutí na vlastní loď = jen výběr
+      g.selectedShipId = id;
+      g.picking = null;
+      renderSide();
+      return;
+    }
+    if (moved || longPressed) {
+      longPressed = false;
+      return;
+    }
+    if (g.anim || g.submitted) return;
+    tapAt(worldPos(e), true);
+  };
+  c.addEventListener("pointerup", (e) => {
+    if (e.pointerType === "mouse" && !isTouchMode()) return;
+    touchEnd(e);
+  });
+  c.addEventListener("pointercancel", (e) => {
+    fingers.delete(e.pointerId);
+    pinch = null;
+    aimDrag = null;
+    clearTimeout(longPress);
   });
 
   window.addEventListener("mousemove", (e) => {
-    if (!cam || !game) return;
+    if (!cam || !game || isTouchMode()) return;
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
     if (panning) {
@@ -1466,12 +1683,15 @@ function bindInput(c: HTMLCanvasElement) {
   });
 
   c.addEventListener("click", (e) => {
-    if (moved || !cam || !game || game.anim || game.submitted) return;
-    const g = game;
-    const w = worldPos(e);
+    if (isTouchMode() || moved || !cam || !game || game.anim || game.submitted) return;
+    tapAt(worldPos(e), false);
+  });
 
-    // 1) míření: klik kamkoliv potvrdí dráhu
-    if (g.aimingShipId) {
+  /** Klik / ťuknutí na mapu. Na dotyku se čekající dráha nepotvrzuje klikem kamkoliv (čipy ✓ / ✕). */
+  function tapAt(w: { x: number; y: number; sx: number; sy: number }, touch: boolean) {
+    const g = game!;
+    // 1) míření: klik kamkoliv potvrdí dráhu (jen myš)
+    if (g.aimingShipId && !touch) {
       confirmManeuver(g.aimingShipId);
       return;
     }
@@ -1487,17 +1707,15 @@ function bindInput(c: HTMLCanvasElement) {
       renderSide();
       return;
     }
-    // 3) vlastní loď: označit a začít kreslit dráhu
+    // 3) vlastní loď: označit a začít kreslit dráhu (myš); na dotyku se kreslí tažením
     if (hit?.kind === "ship" && hit.ownerId === playerId) {
-      g.selectedShipId = hit.id;
-      g.picking = null;
-      const ship = g.state.ships.find((s) => s.id === hit.id)!;
-      const o = g.orders.get(hit.id)!;
-      const curCost = actionCost(ship, o);
-      const adjusting = actionCost(ship, o) > actionCost(ship, { ...o, maneuverId: defaultOrders(ship).maneuverId });
-      if (curCost >= RULES.actionPoints && !adjusting) showError("Úprava pohybu stojí akci a obě už máš použité. Odeber zbraň.");
-      else g.aimingShipId = hit.id;
-      renderSide();
+      if (touch) {
+        g.selectedShipId = hit.id;
+        g.picking = null;
+        renderSide();
+        return;
+      }
+      if (startAiming(hit.id)) renderSide();
       return;
     }
     const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
@@ -1539,7 +1757,7 @@ function bindInput(c: HTMLCanvasElement) {
         renderSide();
       } else showError("Bod je dál než dolet torpéda (1200).");
     }
-  });
+  }
 
   c.addEventListener(
     "wheel",
@@ -1730,6 +1948,7 @@ function render() {
   renderLobby(app, { playerId, name: playerName, rooms, room, error: error || notice, connected }, net, setName);
 }
 
+applyTouchClass();
 render();
 net.connect();
 void loadLibrary();

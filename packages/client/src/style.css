@@ -67,6 +67,12 @@ body,
   margin: 0;
   background: var(--bg);
 }
+@supports (height: 100dvh) {
+  body,
+  #app {
+    height: 100dvh;
+  }
+}
 /* volný text s češtinou */
 .txt,
 input,
@@ -1999,6 +2005,64 @@ button.px.tiny {
 }
 .splash-note {
   font-size: 16px;
+}
+/* dotykový režim: ovládací prvky jen pro dotyk / jen pro myš */
+.touch-only {
+  display: none !important;
+}
+body.touch .touch-only {
+  display: inline-flex !important;
+}
+body.touch .mouse-only {
+  display: none !important;
+}
+body.touch .game canvas {
+  cursor: default;
+}
+.game canvas {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.aim-chips {
+  position: absolute;
+  z-index: 7;
+  display: flex;
+  gap: 8px;
+}
+.aim-chips .chip {
+  font-size: 18px;
+  padding: 10px 16px;
+  min-width: 96px;
+  box-shadow: 0 0 0 2px #05070f;
+}
+.aim-chips .chip.ok {
+  background: #166534;
+  border-color: #86efac #14532d #14532d #86efac;
+  color: #fff;
+}
+.aim-chips .chip.no {
+  background: #7f1d1d;
+  border-color: #fca5a5 #450a0a #450a0a #fca5a5;
+  color: #fff;
+}
+/* větší drobné prvky pro prsty */
+body.touch .sbtn {
+  width: 28px;
+  height: 28px;
+}
+body.touch .bb-toggle {
+  min-height: 30px;
+}
+body.touch .scan-pop .bb-weapon,
+body.touch .cargo-pop .px,
+body.touch .shield-pop .px {
+  min-height: 44px;
+}
+body.touch .lo-remove,
+body.touch .lo-refill {
+  transform-box: fill-box;
 }
 .music-btn {
   position: fixed;

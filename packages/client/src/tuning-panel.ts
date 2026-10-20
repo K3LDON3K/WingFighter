@@ -1,6 +1,7 @@
 import { DEFAULT_TUNING, TUNING_FIELDS, type Tuning } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
+import { setTouchSetting, touchSetting, deviceIsTouch, type TouchSetting } from "./touch.ts";
 
 /**
  * Ladicí menu parametrů hry. Host hodnoty mění (posílají se na server a platí pro všechny),
@@ -137,9 +138,11 @@ function build(root: HTMLElement, tuning: Tuning, canEdit: boolean, a: TuningAct
   const sr = h("input", { type: "checkbox", checked: showSelectRing(), onchange: () => setLocalFlag(KEY_SELRING, sr.checked) });
   const srRow = h("label", { class: "tune-row", title: "Bílý kroužek kolem vybrané lodi a slabý kroužek při najetí myší. Žlutý čárkovaný kroužek cíle zůstává vždy." }, h("span", { class: "txt tune-label" }, "Zobrazit kroužek kolem vybrané lodi"), sr);
   const hbRow = h("label", { class: "tune-row", title: "Vykreslí kolizní kruhy (tělo, příď, křídla) všech viditelných lodí. Jen pro tento prohlížeč." }, h("span", { class: "txt tune-label" }, "Zobrazit hitboxy lodí (kolizní model)"), hb);
+  const tsel = h("select", { onchange: () => setTouchSetting(tsel.value as TouchSetting) }, ...(["auto", "on", "off"] as TouchSetting[]).map((v) => h("option", { value: v, selected: touchSetting() === v }, v === "auto" ? `automaticky (${deviceIsTouch() ? "dotykové zařízení" : "myš"})` : v === "on" ? "zapnuto" : "vypnuto")));
+  const tRow = h("label", { class: "tune-row", title: "Dotykové ovládání: tažení = posun, dva prsty = zoom, tažení z vlastní lodi = kreslení dráhy s potvrzením ✓ / ✕, podržení = info, tlačítko ☰ místo Esc." }, h("span", { class: "txt tune-label" }, "Dotykové ovládání (tablet)"), tsel);
   const noteRow = h("div", { class: "muted txt", style: "padding:6px 0" }, "Volby v této záložce se neposílají na server – mění jen zobrazení v tomto prohlížeči.");
-  b.localRows.push(srRow, hbRow, noteRow);
-  body.append(srRow, hbRow, noteRow);
+  b.localRows.push(tRow, srRow, hbRow, noteRow);
+  body.append(tRow, srRow, hbRow, noteRow);
   root.append(h("div", { class: "pnl tune-card" }, b.head, b.tabs, body));
   return b;
 }
