@@ -345,7 +345,8 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
 }
 
 /** Nákupní tlačítko ve tvaru hexagonu: ikona, název, cena, počet kusů; stejná barva kategorie jako v plástvi. */
-function hexBuyButton(t: ModuleType, have: number, why: string | null, onClick: () => void): HTMLElement {
+/** Hexagon modulu (obchod, dostupné moduly): ikona, název, podtext; `dim` = zašedlý. */
+export function moduleHexSvg(t: ModuleType, sub: string, dim: boolean): SVGSVGElement {
   const def = MODULES[t];
   const col = moduleColor(t);
   const W = 112;
@@ -355,16 +356,22 @@ function hexBuyButton(t: ModuleType, have: number, why: string | null, onClick: 
   const cy = Hh / 2;
   const svg = svgEl("svg", { viewBox: `0 0 ${W} ${Hh}`, width: W, height: Hh, class: "lo-hexbuy-svg" });
   const pts = [0, 60, 120, 180, 240, 300].map((a) => `${(cx + R * Math.cos((a * Math.PI) / 180)).toFixed(1)},${(cy + (R * Math.sqrt(3)) / 2 / (Math.sqrt(3) / 2) * Math.sin((a * Math.PI) / 180) * 0.86).toFixed(1)}`).join(" ");
-  svg.append(svgEl("polygon", { points: pts, fill: "#0f172a", stroke: why ? "#334155" : col, "stroke-width": 3, "stroke-linejoin": "miter", class: "hexbg" }));
-  svg.append(svgEl("polygon", { points: pts, fill: why ? "#334155" : col, opacity: 0.16 }));
-  const ic = icon(def.icon, why ? "#64748b" : col, 16);
+  svg.append(svgEl("polygon", { points: pts, fill: "#0f172a", stroke: dim ? "#334155" : col, "stroke-width": 3, "stroke-linejoin": "miter", class: "hexbg" }));
+  svg.append(svgEl("polygon", { points: pts, fill: dim ? "#334155" : col, opacity: 0.16 }));
+  const ic = icon(def.icon, dim ? "#64748b" : col, 16);
   ic.setAttribute("x", String(cx - 8));
   ic.setAttribute("y", "14");
   svg.append(ic);
   const words = def.name.toUpperCase().split(" ");
   const fs = Math.max(...words.map((w) => w.length)) > 8 ? 13 : 15;
-  words.forEach((w, i) => svg.append(svgEl("text", { x: cx, y: 46 + i * 11, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: why ? "#64748b" : "#f8fafc", "text-anchor": "middle" }, w)));
-  svg.append(svgEl("text", { x: cx, y: 46 + words.length * 11 + 4, "font-family": "Jersey", "font-size": 12, fill: why ? "#64748b" : "#fbbf24", "text-anchor": "middle" }, `${def.price}${have ? ` ×${have}` : ""}`));
+  words.forEach((w, i) => svg.append(svgEl("text", { x: cx, y: 46 + i * 11, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: dim ? "#64748b" : "#f8fafc", "text-anchor": "middle" }, w)));
+  if (sub) svg.append(svgEl("text", { x: cx, y: 46 + words.length * 11 + 4, "font-family": "Jersey", "font-size": 12, fill: dim ? "#64748b" : "#fbbf24", "text-anchor": "middle" }, sub));
+  return svg;
+}
+
+function hexBuyButton(t: ModuleType, have: number, why: string | null, onClick: () => void): HTMLElement {
+  const def = MODULES[t];
+  const svg = moduleHexSvg(t, `${def.price}${have ? ` ×${have}` : ""}`, !!why);
   const btn = h("button", { class: `lo-hexbuy ${why ? "dis" : ""}`, disabled: !!why, title: `${def.name}\n${def.description}\nCena ${def.price} · váha ${def.weight}${def.ammo ? ` + ${def.ammoWeight} × ${def.ammo} munice` : ""}${why ? `\nNelze: ${why}` : ""}`, onclick: onClick }, svg);
   return btn;
 }

@@ -3126,3 +3126,89 @@ button.pk-tile.pilot.on:hover:not(:disabled) {
   font-size: 11px;
   color: #475569;
 }
+
+/* průvodce Nastavení hry: stránky */
+.wiz-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 12px;
+  flex-wrap: wrap;
+}
+.wiz-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #0a0e1c;
+  border: 2px solid;
+  border-color: #1e293b #0a0e1c #0a0e1c #1e293b;
+  color: #64748b;
+  font-size: 14px;
+}
+.wiz-step .wiz-n {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #334155;
+  font-size: 11px;
+}
+button.wiz-step.on,
+button.wiz-step.on:hover:not(:disabled) {
+  background: #0f2a4a;
+  border-color: #7dd3fc #0c4a6e #0c4a6e #7dd3fc;
+  color: #f8fafc;
+}
+.wiz-step.on .wiz-n {
+  background: #7dd3fc;
+  color: #05070f;
+  border-color: #7dd3fc;
+}
+.wiz-step.done .wiz-n {
+  border-color: #86efac;
+  color: #86efac;
+}
+.wiz-sum {
+  margin-left: 14px;
+  font-size: 12px;
+  color: #64748b;
+  max-width: 60%;
+  text-align: right;
+}
+.game-grid.single {
+  grid-template-columns: 1fr;
+}
+.mod-hexes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+.mod-hex,
+button.mod-hex.on,
+button.mod-hex.on:hover:not(:disabled),
+button.mod-hex:hover:not(:disabled) {
+  position: relative;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.mod-hex.off {
+  opacity: 0.6;
+}
+.mod-hex:disabled {
+  cursor: default;
+}
+.mod-hex .hex-chk {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+}
+.mt-portrait svg {
+  outline: 1px solid #334155;
+}
+.mt-portrait.off svg {
+  filter: grayscale(1) brightness(0.6);
+}

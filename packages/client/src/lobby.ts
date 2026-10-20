@@ -6,7 +6,8 @@ import {
 import { logoCanvas } from "./logo.ts";
 import { openMusicPanel } from "./main.ts";
 import { renderMapPreview } from "./map-preview.ts";
-import { loadoutTag, renderLoadout, svgEl } from "./loadout-ui.ts";
+import { loadoutTag, moduleHexSvg, renderLoadout, svgEl } from "./loadout-ui.ts";
+import { pilotPortrait } from "./pilot-ui.ts";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 import { renderTuningPanel } from "./tuning-panel.ts";
@@ -140,6 +141,8 @@ let botEdit: string | null = null;
 /** Vybraná loď (záložka) v „Tvoje výbava“ a v editoru bota. */
 let fleetTab = 0;
 let botTab = 0;
+/** Stránka průvodce Nastavení hry (0 mapa, 1 bitva, 2 lodě a piloti, 3 moduly). */
+let gamePage = 0;
 /** Komu host vybírá startovní bod (null = sobě). */
 let startFor: string | null = null;
 
@@ -345,30 +348,40 @@ function roomView(m: LobbyModel, net: Net) {
       const onCount = MODULE_TYPES.filter(allowedOn).length;
       const tiles = h(
         "div",
-        { class: "mod-tiles" },
+        { class: "mod-hexes" },
         ...MODULE_TYPES.map((t) => {
           const on = allowedOn(t);
-          const col = TILE_COLOR[t];
           return h(
             "button",
-            { class: `mod-tile ${on ? "on" : ""}`, disabled: !isHost, style: on ? `border-color:${col} #0b1020 #0b1020 ${col}` : "", title: `${MODULES[t].name}\n${MODULES[t].description}\n${on ? "Klik = vyřadit z této hry" : "Klik = povolit v této hře"}`, onclick: () => setAllowed(t, !on) },
-            icon(MODULES[t].icon, on ? col : "#475569", 26),
-            h("span", { class: "mt-name" }, label(MODULES[t].name)),
-            h("span", { class: "mt-chk" }, on ? "✓" : ""),
+            { class: `lo-hexbuy mod-hex ${on ? "on" : "off"}`, disabled: !isHost, title: `${MODULES[t].name}\n${MODULES[t].description}\n${on ? "Ve hře · klik = vyřadit" : "Vyřazen · klik = povolit"}`, onclick: () => setAllowed(t, !on) },
+            moduleHexSvg(t, on ? "VE HŘE" : "VYŘAZEN", !on),
           );
         }),
       );
       const summary = `${MAP_SIZES[map.size]?.label ?? map.size} · asteroidy ${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids} · ${map.storms === 0 ? "bez bouří" : `${map.storms} bouře`} · komety ${{ none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"]} · seed ${map.seed} · ${settings.mode === "tdm" ? "týmový deathmatch" : "deathmatch"} · startovní kredity ${budget}`;
+      const PAGES = ["Mapa", "Bitva", "Lodě a piloti", "Moduly"];
+      const pageBar = h(
+        "div",
+        { class: "wiz-bar" },
+        ...PAGES.map((t, i) => h("button", { class: `wiz-step ${i === gamePage ? "on" : ""} ${i < gamePage ? "done" : ""}`, onclick: () => ((gamePage = i), rerender()) }, h("span", { class: "wiz-n" }, String(i + 1)), label(t))),
+        h("span", { class: "spacer" }),
+        h("button", { class: "px", disabled: gamePage === 0, onclick: () => ((gamePage = Math.max(0, gamePage - 1)), rerender()) }, "‹ ", label("zpět")),
+        h("button", { class: "px primary", disabled: gamePage === PAGES.length - 1, onclick: () => ((gamePage = Math.min(PAGES.length - 1, gamePage + 1)), rerender()) }, label("další"), " ›"),
+      );
+      const pageOf = (i: number, ...nodes: (Node | null)[]) => (gamePage === i ? nodes : []);
       return h(
         "div",
         { class: "card gamecard" },
-        h("h3", {}, icon("target", "#7dd3fc", 12), " ", label("Nastavení hry"), isHost ? "" : h("span", { class: "muted" }, label(" (mění host)"))),
+        h("h3", {}, icon("target", "#7dd3fc", 12), " ", label("Nastavení hry"), isHost ? "" : h("span", { class: "muted" }, label(" (mění host)")), h("span", { class: "spacer" }), h("span", { class: "txt muted wiz-sum" }, summary)),
+        pageBar,
         h(
           "div",
-          { class: "game-grid" },
+          { class: `game-grid ${gamePage === 0 ? "" : "single"}` },
           h(
             "div",
             { class: "game-form" },
+            ...pageOf(
+              0,
             section(
               "Mapa",
               frow(
@@ -435,6 +448,9 @@ function roomView(m: LobbyModel, net: Net) {
                 "Stejný seed = stejná mapa.",
               ),
             ),
+            ),
+            ...pageOf(
+              1,
             section(
               "Bitva",
               frow("Herní mód", sel(settings.mode, [["tdm", "Týmový deathmatch"], ["dm", "Deathmatch (všichni proti všem)"]], (v) => set({ mode: v as "tdm" | "dm" }))),
@@ -450,8 +466,11 @@ function roomView(m: LobbyModel, net: Net) {
               ),
               frow("Výbava botů", sel(settings.botLoadout, [["default", "výchozí sestava"], ["random", "náhodná"], ["manual", "ruční (naklikám u bota)"]], (v) => set({ botLoadout: v as "default" | "random" | "manual" }))),
             ),
+            ),
+            ...pageOf(
+              2,
             section(
-              "Dostupné lodě a piloti",
+              "Dostupné lodě",
               h(
                 "div",
                 { class: "mod-tiles" },
@@ -466,14 +485,21 @@ function roomView(m: LobbyModel, net: Net) {
                     h("span", { class: "mt-chk" }, on ? "✓" : ""),
                   );
                 }),
-                h("span", { class: "mt-gap" }),
+              ),
+              h("div", { class: "txt muted mt-foot" }, "Hráč skládá letku z povolených trupů tak, aby využil přesně své lodní body."),
+            ),
+            section(
+              "Dostupní piloti",
+              h(
+                "div",
+                { class: "mod-tiles" },
                 ...Object.values(PILOTS).map((pd) => {
                   const on = settings.allowedPilots?.[pd.id] !== 0;
                   const locked = pd.id === "kadet";
                   return h(
                     "button",
-                    { class: `mod-tile pilot ${on ? "on" : ""}`, disabled: !isHost || locked, style: on ? "border-color:#fbbf24 #0b1020 #0b1020 #fbbf24" : "", title: `${pd.name}\n${pd.description}${pd.abilities.length ? `\n${pd.abilities.join(", ")}` : ""}\n${pd.unique ? "Unikátní: v letce jen jednou." : "Může se v letce opakovat."}${locked ? "\nKadet je vždy k dispozici." : on ? "\nKlik = vyřadit z této hry" : "\nKlik = povolit"}`, onclick: () => set({ allowedPilots: { ...settings.allowedPilots, [pd.id]: on ? 0 : undefined } as Partial<Record<string, number>> }) },
-                    icon("people", on ? "#fbbf24" : "#475569", 26),
+                    { class: `mod-tile pilot ${on ? "on" : ""}`, disabled: !isHost || locked, style: on ? "border-color:#fbbf24 #0b1020 #0b1020 #fbbf24" : "", title: `${pd.name}\n${pd.description}${pd.abilities.length ? `\n${pd.abilities.join("\n")}` : ""}\n${pd.unique ? "Unikátní: v letce jen jednou." : "Může se v letce opakovat."}${locked ? "\nKadet je vždy k dispozici." : on ? "\nKlik = vyřadit z této hry" : "\nKlik = povolit"}`, onclick: () => set({ allowedPilots: { ...settings.allowedPilots, [pd.id]: on ? 0 : undefined } as Partial<Record<string, number>> }) },
+                    h("span", { class: `mt-portrait ${on ? "" : "off"}` }, pilotPortrait(pd.id, 40)),
                     h("span", { class: "mt-name" }, label(pd.name)),
                     h("span", { class: "mt-chk" }, on ? "✓" : ""),
                   );
@@ -481,20 +507,25 @@ function roomView(m: LobbyModel, net: Net) {
               ),
               h("div", { class: "txt muted mt-foot" }, "Piloti se schopnostmi jsou v letce unikátní, Kadet se může opakovat. Pilot zničené lodi zahyne – příští bitvu nastoupí Kadet. Piloty lze upravit v Ladění → Piloti."),
             ),
+            ),
+            ...pageOf(
+              3,
             section(
               "Dostupné moduly",
               tiles,
               h("div", { class: "txt muted mt-foot" }, `${onCount} ze ${MODULE_TYPES.length} modulů ve hře`, isHost ? h("span", {}, " · ", h("a", { href: "#", onclick: (e: Event) => (e.preventDefault(), setAll(true)) }, "všechny"), " · ", h("a", { href: "#", onclick: (e: Event) => (e.preventDefault(), setAll(false)) }, "žádný")) : null, " · vyřazený modul nejde koupit; kdo ho má v sestavě, musí ho před bitvou prodat."),
             ),
+            ),
           ),
-          h(
+          gamePage !== 0
+            ? null
+            : h(
             "div",
             { class: "game-side" },
             h("div", { class: "fsec-h" }, label("Náhled mapy · startovní bod")),
             renderMapPreview(map, room.players, startFor ?? m.playerId, (index) => net.send({ type: "setStart", index, ...(startFor ? { botId: startFor } : {}) })),
             h("div", { class: "muted txt" }, "Klikni na kroužek na okraji = tvůj start (barva = tým, ostatní vidí, kde kdo startuje). Bez volby dostaneš volný bod."),
             targetSel ? h("div", { class: "frow" }, h("span", { class: "txt flbl" }, "Start pro"), h("div", { class: "fctl" }, targetSel), h("span")) : null,
-            h("div", { class: "txt muted game-summary" }, summary),
           ),
         ),
       );

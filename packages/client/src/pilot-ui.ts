@@ -2,94 +2,124 @@ import { PILOTS, type PilotDef } from "@wingfighter/shared";
 import { h } from "./dom.ts";
 import { label } from "./icons.ts";
 
-/** Pixelové podobizny pilotů (16 × 16). */
+/** Pixelové podobizny pilotů (24 × 24, hrubé stínování ve stylu stavové lišty). */
 const PORTRAITS: Record<string, { rows: string[]; pal: Record<string, string> }> = {
   kadet: {
-    pal: { h: "#2b1d0e", s: "#e8b58a", e: "#1e293b", w: "#f8fafc", m: "#b45309", u: "#1d4ed8", c: "#60a5fa", b: "#0b1020", g: "#fbbf24" },
+    pal: { H: "#2b1d0e", h: "#4a3418", s: "#b07a52", S: "#e2a877", d: "#7a4e2e", b: "#2b1d0e", w: "#f8fafc", E: "#1e293b", n: "#b07a52", m: "#7a2e1e", u: "#1d4ed8", c: "#60a5fa" },
     rows: [
-      "....hhhhhhhh....",
-      "...hhhhhhhhhh...",
-      "..hhhhhhhhhhhh..",
-      "..hhsssssssshh..",
-      "..hsssssssssssh.",
-      "..hsswsssswsss..",
-      "..hssessssesss..",
-      "..ssssssssssss..",
-      "..sssssmmsssss..",
-      "...ssssssssss...",
-      "....ssssssss....",
-      ".....uuuuuu.....",
-      "...uuuuccuuuu...",
-      "..uuuuuccuuuuu..",
-      "..uuuugcccguuu..",
-      "..uuuuuuuuuuuu..",
+      "........................",
+      "........................",
+      "......HHHHHHHHHHHH......",
+      "....HHHHHHHHHHHHHHHH....",
+      "...HHHHHHhhhhhhHHHHHH...",
+      "...HHHhhhhhhhhhhhhHHH...",
+      "...HHhhhhhhhhhhhhhhHH...",
+      "...HHsssssssssssssssH...",
+      "...HsssSSSSSSSSSSsssH...",
+      "...HssSSSSSSSSSSSSssH...",
+      "...HssSSSSSSSSSSSSssd...",
+      "...HssSbbSSSSSSbbSssd...",
+      "...dssSSwESSSSSEwSssd...",
+      "...dsSSSSSSSSSSSSSSsd...",
+      "...dsSSSSSSSnnSSSSSsd...",
+      "....sSSSSSSnnnSSSSSs....",
+      "....sSSSSSSSSSSSSSSs....",
+      "....dsSSSSSSSSSSSSsd....",
+      ".....dsSSmmmmmmSSsd.....",
+      ".....ddsSSSSSSSSsdd.....",
+      "......ddssSSSSssdd......",
+      ".......uuuuuuuuuu.......",
+      ".....uuuuuuccuuuuuu.....",
+      "....uuuuuuuccuuuuuuu....",
     ],
   },
-};
-
-// další piloti: stejná šablona, jiné vlasy / barvy / doplňky
-PORTRAITS.eso = {
-  pal: { h: "#111827", s: "#d9a57c", e: "#0ea5e9", w: "#f8fafc", m: "#9a3412", u: "#b91c1c", c: "#fca5a5", b: "#0b1020", g: "#fde047", v: "#0ea5e9" },
-  rows: [
-    "....hhhhhhhh....",
-    "...hhhhhhhhhh...",
-    "..hhhhhhhhhhhh..",
-    "..hhvvvvvvvvhh..",
-    "..hvvvvvvvvvvvh.",
-    "..hsswsssswsss..",
-    "..hssessssesss..",
-    "..ssssssssssss..",
-    "..sssssmmsssss..",
-    "...ssssssssss...",
-    "....ssssssss....",
-    ".....uuuuuu.....",
-    "...uuuuccuuuu...",
-    "..uuuuuccuuuuu..",
-    "..uuuugcccguuu..",
-    "..uuuuuuuuuuuu..",
-  ],
-};
-PORTRAITS.strelec = {
-  pal: { h: "#7c2d12", s: "#e8b58a", e: "#1e293b", w: "#f8fafc", m: "#b45309", u: "#166534", c: "#86efac", b: "#0b1020", g: "#fbbf24", k: "#334155" },
-  rows: [
-    "....hhhhhhhh....",
-    "...hhhhhhhhhh...",
-    "..hhhhhhhhhhhh..",
-    "..hhsssssssshh..",
-    "..hsssssssssssh.",
-    "..hsswssskkkss..",
-    "..hssesssskess..",
-    "..ssssssssssss..",
-    "..sssssmmsssss..",
-    "...sssmmmmsss...",
-    "....ssssssss....",
-    ".....uuuuuu.....",
-    "...uuuuccuuuu...",
-    "..uuuuuccuuuuu..",
-    "..uuuugcccguuu..",
-    "..uuuuuuuuuuuu..",
-  ],
-};
-PORTRAITS.kapitan = {
-  pal: { h: "#9ca3af", s: "#e8b58a", e: "#1e293b", w: "#f8fafc", m: "#9ca3af", u: "#1e3a8a", c: "#fbbf24", b: "#0b1020", g: "#fbbf24", t: "#1e3a8a" },
-  rows: [
-    "...tttttttttt...",
-    "..tttttttttttt..",
-    "..ttttggggtttt..",
-    "..hhsssssssshh..",
-    "..hsssssssssssh.",
-    "..hsswsssswsss..",
-    "..hssessssesss..",
-    "..ssssssssssss..",
-    "..ssmmmmmmmmss..",
-    "...ssmmmmmmss...",
-    "....ssssssss....",
-    ".....uuuuuu.....",
-    "...uuuuccuuuu...",
-    "..uuuuuccuuuuu..",
-    "..uuuugcccguuu..",
-    "..uuuuuuuuuuuu..",
-  ],
+  eso: {
+    pal: { H: "#111827", h: "#1f2937", s: "#b07a52", S: "#e2a877", d: "#7a4e2e", b: "#2b1d0e", w: "#f8fafc", E: "#1e293b", n: "#b07a52", m: "#7a2e1e", u: "#b91c1c", c: "#fca5a5", k: "#0ea5e9" },
+    rows: [
+      "........................",
+      "........................",
+      "........................",
+      "....HHHHHHHHHHHHHHHH....",
+      "...HHHHHHhhhhhhHHHHHH...",
+      "...HHHhhhhhhhhhhhhHHH...",
+      "...HHhhhhhhhhhhhhhhHH...",
+      "...HHsssssssssssssssH...",
+      "...HsssSSSSSSSSSSsssH...",
+      "...HssSSSSSSSSSSSSssH...",
+      "...kssSSSSSSSSSSSSssk...",
+      "..kkssSbbSSSSSSbbSsskk..",
+      "...kssSSwESSSSSEwSssk...",
+      "...dsSSSSSSSSSSSSSSsd...",
+      "...dsSSSSSSSnnSSSSSsd...",
+      "....sSSSSSSnnnSSSSSs....",
+      "....sSSSSSSSSSSSSSSs....",
+      "....dsSSSSSSSSSSSSsd....",
+      ".....dsSSmmmmmmSSsd.....",
+      ".....ddsSSSSSSSSsdd.....",
+      "......ddssSSSSssdd......",
+      ".......uuuuuuuuuu.......",
+      ".....uuuuuuccuuuuuu.....",
+      "....uuuuuuuccuuuuuuu....",
+    ],
+  },
+  strelec: {
+    pal: { H: "#7c2d12", h: "#9a3412", s: "#b07a52", S: "#e2a877", d: "#7a4e2e", b: "#2b1d0e", w: "#f8fafc", E: "#1e293b", n: "#b07a52", m: "#7a2e1e", u: "#166534", c: "#86efac" },
+    rows: [
+      "........................",
+      "........................",
+      "......HHHHHHHHHHHH......",
+      "....HHHHHHHHHHHHHHHH....",
+      "...HHHHHHhhhhhhHHHHHH...",
+      "...HHHhhhhhhhhhhhhHHH...",
+      "...HHhhhhhhhhhhhhhhHH...",
+      "...HHsssssssssssssssH...",
+      "...HsssSSSSSSSSSSsssH...",
+      "...HssSSSSSSESSSSSEsH...",
+      "...HssSSSSSSSESSSEssd...",
+      "...HssSbbSSSSSEEESssd...",
+      "...dssSSwESSSSEEESssd...",
+      "...dsSSSSSSSSSSSSSSsd...",
+      "...dsSSSSSSSnnSSSSSsd...",
+      "....sSSSSSSnnnSSSSSs....",
+      "....sSSSSSSSSSSSSSSs....",
+      "....dsSSSSSSSSSSSSsd....",
+      ".....dsSSmmmmmmSSsd.....",
+      ".....ddsSSSSSSSSsdd.....",
+      "......ddssSSSSssdd......",
+      ".......uuuuuuuuuu.......",
+      ".....uuuuuuccuuuuuu.....",
+      "....uuuuuuuccuuuuuuu....",
+    ],
+  },
+  kapitan: {
+    pal: { H: "#9ca3af", h: "#cbd5e1", s: "#b07a52", S: "#e2a877", d: "#7a4e2e", b: "#2b1d0e", w: "#f8fafc", E: "#1e293b", n: "#b07a52", m: "#7a2e1e", u: "#1e3a8a", c: "#fbbf24", t: "#1e3a8a", g: "#fbbf24", M: "#9ca3af" },
+    rows: [
+      "........................",
+      "........................",
+      "......tttttttttttt......",
+      "....tttttttttttttttt....",
+      "...tttttttttttttttttt...",
+      "...gggggggggggggggggg...",
+      "...HHhhhhhhhhhhhhhhHH...",
+      "...HHsssssssssssssssH...",
+      "...HsssSSSSSSSSSSsssH...",
+      "...HssSSSSSSSSSSSSssH...",
+      "...HssSSSSSSSSSSSSssd...",
+      "...HssSbbSSSSSSbbSssd...",
+      "...dssSSwESSSSSEwSssd...",
+      "...dsSSSSSSSSSSSSSSsd...",
+      "...dsSSSSSSSnnSSSSSsd...",
+      "....sSSSSSSnnnSSSSSs....",
+      "....sSSSSSSSSSSSSSSs....",
+      "....dsSSMMMMMMMMSSsd....",
+      ".....dsMMMMMMMMMMsd.....",
+      ".....ddsSSSSSSSSsdd.....",
+      "......ddssSSSSssdd......",
+      ".......uuuuuuuuuu.......",
+      ".....uuuuuuccuuuuuu.....",
+      "....uuuuuuuccuuuuuuu....",
+    ],
+  },
 };
 /** Neznámý (editovaný) pilot: podobizna Kadeta s barvou vlasů a uniformy podle id. */
 function portraitFor(pilotId: string) {
@@ -106,13 +136,13 @@ export function pilotPortrait(pilotId: string, size = 32): SVGSVGElement {
   const p = portraitFor(pilotId);
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("width", String(size));
   svg.setAttribute("height", String(size));
   svg.setAttribute("shape-rendering", "crispEdges");
   const bg = document.createElementNS(NS, "rect");
-  bg.setAttribute("width", "16");
-  bg.setAttribute("height", "16");
+  bg.setAttribute("width", "24");
+  bg.setAttribute("height", "24");
   bg.setAttribute("fill", "#0b1020");
   svg.append(bg);
   p.rows.forEach((row, y) =>

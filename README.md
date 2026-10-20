@@ -145,6 +145,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.44 – Nastavení hry jako **průvodce po stránkách** (1 Mapa · 2 Bitva · 3 Lodě a piloti · 4 Moduly; kroky
+  nahoře, Zpět / Další, souhrn hry v hlavičce). Dostupné moduly jako **hexagony** v barvách obchodu (VE HŘE /
+  VYŘAZEN). Dostupné lodě a piloti rozděleny do dvou sekcí; piloti s podobiznami. **Portréty pilotů** nově
+  24 × 24 ve stylu stavové lišty (hrubé stínování, tvář zpředu): Kadet, Eso (sluchátka, červená uniforma),
+  Střelec (zrzavý, páska přes oko), Kapitán (šedivý, knír, čepice); editovaní piloti dostanou variantu Kadeta.
 - v3.43 – výběr lodi a pilota z dlaždic místo seznamů: pilot = pixelová podobizna (Kadet, Eso, Střelec, Kapitán;
   editovaní piloti dostanou podobiznu s barvou podle id), jméno a malá infografika schopností (ikona + hodnota,
   zelená plus / červená minus); vybraný svítí, ostatní ztlumené, pilot použitý v jiné lodi letky je zašedlý.
