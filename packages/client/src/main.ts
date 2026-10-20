@@ -259,7 +259,7 @@ function startGame(state: GameState) {
     jettisonPick: false,
     menuOpen: false,
     confirmOpen: false,
-    skipConfirm: false,
+    skipConfirm: !loadAskConfirm(),
     scanOpen: false,
     scanPick: false,
     mouse: null,
@@ -376,6 +376,29 @@ function pumpQueue() {
     pumpQueue();
   };
   (game.anim as TurnAnimation & { onDone?: () => void }).onDone = finish;
+}
+
+/** Potvrzování nevyužitých akcí: pamatuje se v prohlížeči pro kód místnosti (všechny její bitvy). */
+function confirmKey() {
+  return `wingfighter.confirm.${room?.code ?? "x"}`;
+}
+function loadAskConfirm(): boolean {
+  try {
+    return localStorage.getItem(confirmKey()) !== "off";
+  } catch {
+    return true;
+  }
+}
+function setAskConfirm(ask: boolean) {
+  if (!game) return;
+  game.skipConfirm = !ask;
+  try {
+    localStorage.setItem(confirmKey(), ask ? "on" : "off");
+  } catch {
+    /* ignore */
+  }
+  showNotice(ask ? "Potvrzení nevyužitých akcí: zapnuto" : "Potvrzení nevyužitých akcí: vypnuto – kolo se spustí rovnou");
+  renderSide();
 }
 
 function submitOrders(force = false) {
@@ -942,7 +965,7 @@ function renderConfirm() {
         h("button", { class: "px cb primary", onclick: () => confirmLaunch(true) }, icon("play", "#fff", 10), label("spustit"), h("span", { class: "k" }, "ENTER")),
         h("button", { class: "px cb", onclick: () => confirmLaunch(false) }, label("zpět"), h("span", { class: "k" }, "ESC")),
       ),
-      h("label", { class: "cchk", htmlFor: "skip-confirm" }, chk, "příště se neptat (toto kolo bitvy)"),
+      h("label", { class: "cchk", htmlFor: "skip-confirm" }, chk, "vypnout potvrzování (přepínač nad tlačítkem, klávesa P)"),
     ),
   );
   (confirmEl as HTMLElement & { _chk?: HTMLInputElement })._chk = chk;
@@ -951,8 +974,8 @@ function renderConfirm() {
 function confirmLaunch(go: boolean) {
   if (!game) return;
   const chk = (confirmEl as (HTMLElement & { _chk?: HTMLInputElement }) | null)?._chk;
-  if (chk?.checked) game.skipConfirm = true;
   game.confirmOpen = false;
+  if (chk?.checked) setAskConfirm(false);
   if (go) submitOrders(true);
   else renderSide();
 }
@@ -997,6 +1020,7 @@ function renderSide() {
       inventoryOpen: game.inventoryOpen,
       scanOpen: game.scanOpen,
       scanPick: game.scanPick,
+      askConfirm: !game.skipConfirm,
     },
     {
       select: (id) => {
@@ -1024,6 +1048,7 @@ function renderSide() {
         renderSide();
       },
       ready: () => submitOrders(),
+      toggleConfirm: () => setAskConfirm(game!.skipConfirm),
       showScore: () => toggleStats(true),
       leave: () => askLeave(),
       unready: () => {
@@ -1492,6 +1517,10 @@ function bindInput(c: HTMLCanvasElement) {
     }
     if (e.key === "c" || e.key === "C") {
       centerOnShip(game.selectedShipId);
+      return;
+    }
+    if (e.key === "p" || e.key === "P") {
+      setAskConfirm(game.skipConfirm);
       return;
     }
     const id = game.selectedShipId;

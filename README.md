@@ -145,6 +145,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.8 – přepínač potvrzení nad tlačítkem SPUSTIT KOLO (stejný styl, napojený shora): zapnuto = celé tlačítko
+  tmavě červené se žlutým jezdcem vpravo a hra se před spuštěním ptá na nevyužité akce; vypnuto = běžná
+  červená, kolo se spustí rovnou. Přepíná klik nebo klávesa P (animovaný jezdec), popis po najetí myší.
+  Volba se pamatuje v prohlížeči pro kód místnosti (všechny její bitvy); zaškrtávátko v dialogu
+  NEVYUŽITÉ AKCE přepíná tentýž stav.
 - v3.7.2 – úhybný manévr proletí i asteroidem a kometou bez srážky (vlnka + řádek v logu); loď ale nesmí
   v tělese skončit – konec dráhy v asteroidu nebo v kometě = normální srážka s dvojitým zraněním.
 - v3.7.1 – oprava: server zahazoval kometu jako cíl laserů/kulometu (střelba na kometu neproběhla). V panelu
