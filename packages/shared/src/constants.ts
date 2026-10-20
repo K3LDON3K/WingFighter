@@ -107,6 +107,16 @@ export const COMET = {
   collide: false,
 };
 
+/** Náklad (hodnoty mutuje ladění). */
+export const CARGO = {
+  /** Dosah zvednutí kolem lodi (ze startovní pozice kola). */
+  range: 120,
+  /** Max. rychlost manévru v kole, kdy se zvedá. */
+  maxSpeed: 2,
+  /** Kapacita stíhače (malé moduly). */
+  fighter: 1,
+};
+
 export const MINE = {
   /** Poloměr pole působnosti. */
   radius: 70,

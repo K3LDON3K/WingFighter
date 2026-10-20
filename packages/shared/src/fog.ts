@@ -163,6 +163,9 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
       case "jettison":
         if (visibleShip.has(e.shipId)) events.push(e);
         break;
+      case "pickup":
+        if (visibleShip.has(e.shipId) || seenBy(eyes, e, 20)) events.push(e);
+        break;
       case "debrisShot":
         if (visibleShip.has(e.shooterId) || seenBy(eyes, e, 20)) events.push(e);
         break;

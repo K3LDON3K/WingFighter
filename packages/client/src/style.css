@@ -1065,6 +1065,25 @@ h3,
 .jettison-pop .loadout.compact .lo-summary {
   display: none;
 }
+.lo-cargo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 2px solid var(--bevel-d);
+}
+.lo-cargo-cap {
+  font-size: 12px;
+  color: #a7f3d0;
+  margin-right: 6px;
+}
+.lo-cargo-hex.selectable {
+  cursor: pointer;
+}
+.lo-cargo-hex.selectable:hover polygon:first-child {
+  stroke: #fbbf24;
+}
 .shield-pop .spair {
   display: flex;
   gap: 2px;

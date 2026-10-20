@@ -2,7 +2,7 @@
  * Ladicí parametry hry (balanc). Host je může měnit v lobby i během bitvy;
  * server je aplikuje před každým vyhodnocením, klient před vykreslením.
  */
-import { COMET, CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
+import { CARGO, COMET, CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
 import { HULLS, LASER_DICE, MODULES, WEIGHT } from "./ships.ts";
 
@@ -112,6 +112,10 @@ export interface Tuning {
   cometMaxMany: number;
   /** 1 = komety naráží do asteroidů (jako nastavení mapy) a také do sebe navzájem. */
   cometCollide: number;
+  // náklad
+  cargoRange: number;
+  cargoMaxSpeed: number;
+  cargoFighter: number;
   // ekonomika
   startBudget: number;
   creditsPerKill: number;
@@ -214,6 +218,9 @@ export const DEFAULT_TUNING: Tuning = {
   cometMaxMedium: 4,
   cometMaxMany: 6,
   cometCollide: 0,
+  cargoRange: 120,
+  cargoMaxSpeed: 2,
+  cargoFighter: 1,
   startBudget: 500,
   creditsPerKill: 200,
   creditsPerTurn: 10,
@@ -337,6 +344,10 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "cometMaxMedium", label: "Středně – max. na mapě", group: "Komety", min: 1, max: 20, step: 1 },
   { key: "cometChanceMany", label: "Hodně – šance za kolo %", group: "Komety", min: 0, max: 100, step: 5 },
   { key: "cometMaxMany", label: "Hodně – max. na mapě", group: "Komety", min: 1, max: 20, step: 1 },
+  // --- náklad ---
+  { key: "cargoRange", label: "Dosah zvednutí", group: "Náklad", min: 20, max: 600, step: 10, hint: "kruh kolem lodi ze startovní pozice kola" },
+  { key: "cargoMaxSpeed", label: "Max. rychlost při zvedání", group: "Náklad", min: 1, max: 5, step: 1 },
+  { key: "cargoFighter", label: "Kapacita stíhače (modulů)", group: "Náklad", min: 0, max: 4, step: 1 },
   // --- ekonomika ---
   { key: "startBudget", label: "Rozpočet na výbavu", group: "Ekonomika", min: 0, max: 5000, step: 50, hint: "co hráč neutratí, má jako kredity ve hře" },
   { key: "creditsPerKill", label: "Odměna za sestřel", group: "Ekonomika", min: 0, max: 5000, step: 10 },
@@ -455,6 +466,9 @@ export function applyTuning(t: Tuning): void {
   COMET.chance = { few: t.cometChanceFew, medium: t.cometChanceMedium, many: t.cometChanceMany };
   COMET.max = { few: t.cometMaxFew, medium: t.cometMaxMedium, many: t.cometMaxMany };
   COMET.collide = t.cometCollide > 0;
+  CARGO.range = t.cargoRange;
+  CARGO.maxSpeed = t.cargoMaxSpeed;
+  CARGO.fighter = t.cargoFighter;
   RULES.creditsPerKill = t.creditsPerKill;
   RULES.creditsPerTurn = t.creditsPerTurn;
   RULES.debrisRewardPct = t.debrisRewardPct;

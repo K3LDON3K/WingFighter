@@ -1,4 +1,4 @@
-import { COMET, MODULES, MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
+import { CARGO, COMET, MODULES, MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
 import { cometToView, mineToView, shipToView, torpedoToView, viewFromState, type ViewModel } from "./view.ts";
 
 const MOVE_DURATION = 2200;
@@ -90,6 +90,21 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
         break;
       case "jettison":
         lines.push(`${name(e.shipId)} vyhodil modul ${MODULES[e.debris.type]?.name ?? e.debris.type} (sestřelení = +${e.debris.value} kreditů).`);
+        break;
+      case "pickup":
+        lines.push(
+          e.ok
+            ? `${name(e.shipId)} zvedl náklad: ${e.module ? MODULES[e.module.type]?.name ?? e.module.type : "modul"}.`
+            : e.reason === "lost"
+              ? `${name(e.shipId)} se přetahoval o náklad, ale ${name(e.winnerId!)} byl pomalejší/blíž a získal ho.`
+              : e.reason === "speed"
+                ? `${name(e.shipId)} nezvedl náklad – letěl rychleji než ${CARGO.maxSpeed}.`
+                : e.reason === "full"
+                  ? `${name(e.shipId)} nezvedl náklad – nákladový prostor je plný.`
+                  : e.reason === "gone"
+                    ? `${name(e.shipId)} nezvedl náklad – předmět už tam není.`
+                    : `${name(e.shipId)} nezvedl náklad – nic v dosahu.`,
+        );
         break;
       case "debrisShot":
         lines.push(e.destroyed ? `  ${name(e.shooterId)} sestřelil vyhozený modul: +${e.reward} kreditů.` : `  ${name(e.shooterId)} minul vyhozený modul.`);
@@ -225,6 +240,12 @@ export class TurnAnimation {
         case "jettison":
           time = 0;
           break;
+        case "pickup":
+          if (!movePassed) {
+            time = preCount * LASER_GAP;
+            preCount++;
+          } else time = moveStart;
+          break;
         case "debrisShot":
           if (!movePassed) {
             time = preCount * LASER_GAP;
@@ -352,6 +373,15 @@ export class TurnAnimation {
         const sh = v.ships.find((x) => x.id === e.shipId);
         v.debris.push({ ...e.debris });
         if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: `VYHOZEN ${MODULES[e.debris.type]?.short ?? ""}`, color: "#94a3b8", start: now, duration: 1000 });
+        break;
+      }
+      case "pickup": {
+        const sh = v.ships.find((x) => x.id === e.shipId);
+        if (e.ok) {
+          v.debris = v.debris.filter((d) => d.id !== e.debrisId);
+          if (sh) v.effects.push({ kind: "drop", from: { x: e.x, y: e.y }, to: { x: sh.x, y: sh.y }, color: "#a7f3d0", start: now, duration: 500 });
+          if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: "+NÁKLAD", color: "#a7f3d0", start: now + 400, duration: 1000 });
+        } else if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: e.reason === "lost" ? "NÁKLAD UCHVÁCEN" : e.reason === "speed" ? "MOC RYCHLE" : "NÁKLAD NEZVEDNUT", color: "#fca5a5", start: now, duration: 1000 });
         break;
       }
       case "debrisShot": {

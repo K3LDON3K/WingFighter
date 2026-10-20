@@ -31,8 +31,10 @@ export type ActionOrder =
   | { type: "lock"; targetId: string }
   | { type: "boost"; dir: "straight" | "left" | "right" }
   | { type: "shield"; segments: Segments }
-  /** Vyhození modulu z lodi (odlehčení) – modul zůstane jako trosky, které jde sestřelit za odměnu. */
+  /** Vyhození modulu z lodi nebo z nákladu (odlehčení) – modul zůstane jako trosky, které jde sestřelit za odměnu. */
   | { type: "jettison"; moduleId: string }
+  /** Zvednutí nákladu (trosek) v dosahu kolem lodi do nákladového prostoru; před pohybem, rychlost ≤ limit. */
+  | { type: "pickup"; targetId?: string }
   | { type: "barrelRoll"; side: Side };
 
 export type ShieldType = "whole" | "segment" | "none";
@@ -77,6 +79,8 @@ export interface HullDef {
   agility?: number;
   /** Sloty: small = 1 malý modul, flex = 1 velký nebo 2 malé. */
   slots: { id: SlotId; name: string; size: "small" | "flex" }[];
+  /** Nákladový prostor: počet malých modulů, které loď uveze (nefungují, jen váží). */
+  cargo: number;
   /** Pohybové možnosti lodi. */
   profile: ManeuverProfile;
 }
@@ -125,6 +129,8 @@ export interface ShipLoadout {
   hullId: string;
   pilotId: string;
   modules: ModuleInstance[];
+  /** Náklad: zvednuté moduly (nefungují, jen váží; lze je vyhodit, mezi bitvami nasadit nebo prodat). */
+  cargo?: ModuleInstance[];
 }
 
 export interface ShipStats {
@@ -251,6 +257,8 @@ export interface Debris {
   team: number;
   /** Odměna za sestřelení. */
   value: number;
+  /** Původní modul (s municí) – při zvednutí se vrátí do nákladu. */
+  module?: ModuleInstance;
 }
 
 /** Nastavení generované mapy. */
@@ -359,6 +367,8 @@ export type TurnEvent =
   | { type: "torpedoShot"; torpedoId: string; shooterId: string; x: number; y: number; attackDice: DieFace[]; defenseDice: DieFace[]; destroyed: boolean }
   | { type: "debrisShot"; debrisId: string; shooterId: string; x: number; y: number; destroyed: boolean; reward: number }
   | { type: "jettison"; shipId: string; debris: Debris }
+  /** Zvednutí nákladu: ok = zvednuto; jinak důvod (lost = předmět uchvátila jiná loď). */
+  | { type: "pickup"; shipId: string; debrisId: string; x: number; y: number; ok: boolean; reason?: "lost" | "range" | "speed" | "full" | "gone"; winnerId?: string; module?: ModuleInstance }
   | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" | "comet" | "tail" }
   /** Skener (vyhodnocuje se hned při plánování, ale zapisuje se do logu kola). */
   | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }

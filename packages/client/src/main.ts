@@ -23,6 +23,7 @@ import {
   TEAM_NAMES,
   TORPEDO,
   COMET,
+  CARGO,
   MINE,
   applyTuning,
   computeStats,
@@ -643,6 +644,10 @@ function buildOverlay(view: ViewModel): Overlay {
           }
         }
       }
+      if (o.action?.type === "pickup") {
+        overlay.rangeCircle = { radius: CARGO.range, label: `zvednutí nákladu · dosah ${CARGO.range} · rychlost ≤ ${CARGO.maxSpeed}` };
+        if (o.action.targetId) overlay.targetId = o.action.targetId;
+      }
       if (o.special?.type === "mine") {
         const side = mineSideOf(mineModule(ship)?.facing);
         if (g.minePick === "side") {
@@ -1138,6 +1143,7 @@ function renderSide() {
                 budget: g.state.tuning.startBudget,
                 allowed: g.state.settings.allowedModules,
                 compact: true,
+                showCargo: true,
                 selectedId: chosenId,
                 onSelect: (id) => {
                   const cur = g.orders.get(sh.id);
@@ -1170,7 +1176,7 @@ function renderSide() {
           } else {
             wrap.append(
               h("div", { class: "txt muted" }, `${sh.name} · kredity ${me?.credits ?? 0}.${chosen ? ` Na začátku kola vyhodí ${MODULES[chosen.type].name}.` : ""}`),
-              renderLoadout({ loadout: sh.loadout, readonly: true, hideHead: true, budget: g.state.tuning.startBudget, allowed: g.state.settings.allowedModules, compact: true, selectedId: chosenId }),
+              renderLoadout({ loadout: sh.loadout, readonly: true, hideHead: true, budget: g.state.tuning.startBudget, allowed: g.state.settings.allowedModules, compact: true, showCargo: true, selectedId: chosenId }),
             );
             if (!g.submitted && g.state.status !== "finished" && sh.ownerId === playerId)
               wrap.append(h("div", { class: "row", style: "margin-top:8px" }, h("button", { class: "px", onclick: () => (chosen ? ((g.jettisonPick = true), renderSide()) : chooseIcon(sh.id, "jettison")) }, icon("debris", "currentColor", 10), " ", label(chosen ? "změnit vyhození" : "vyhodit modul (1 akce)"))));
@@ -1411,7 +1417,12 @@ function bindInput(c: HTMLCanvasElement) {
       renderSide();
       return;
     }
-    // 4) výběr cíle pro označenou loď (trosky / kometa = cíl laserů a kulometu)
+    // 4) výběr cíle pro označenou loď (trosky / kometa = cíl laserů a kulometu; trosky při zvedání = náklad)
+    if (hit && hit.kind === "debris" && o.action?.type === "pickup") {
+      g.orders.set(sel.id, { ...o, action: { type: "pickup", targetId: hit.id } });
+      renderSide();
+      return;
+    }
     if (hit && (hit.kind === "debris" || hit.kind === "comet")) {
       g.orders.set(sel.id, { ...o, preferredTargetId: o.preferredTargetId === hit.id ? undefined : hit.id });
       renderSide();

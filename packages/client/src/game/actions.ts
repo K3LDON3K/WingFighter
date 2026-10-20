@@ -1,4 +1,4 @@
-import { RULES, actionCost, inStorm, makeManeuver, mineModule, mineSideOf, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
+import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, parseManeuverId, profileOf, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -134,6 +134,28 @@ export const ACTIONS: ActionOption[] = [
     },
   },
 ];
+
+ACTIONS.push({
+  id: "pickup",
+  glyph: "⬒",
+  label: "Zvednout náklad (1 akce)",
+  description: `Po střelbě, před pohybem: zvedne vyhozený modul (trosky) v dosahu ${CARGO.range} kolem lodi do nákladového prostoru. Jde jen při rychlosti manévru ≤ ${CARGO.maxSpeed}. Klik na trosky = cíl (jinak nejbližší). Když o stejný předmět usiluje víc lodí, vyhrává pomalejší, pak bližší. Náklad nefunguje, jen váží; lze ho vyhodit, mezi bitvami nasadit nebo prodat.`,
+  disabled: (ship, s, o) => {
+    const cap = cargoCapacity(ship.loadout);
+    if (cap <= 0) return "loď nemá nákladový prostor";
+    if ((ship.loadout.cargo ?? []).length >= cap) return "nákladový prostor je plný";
+    if (!(s.debris ?? []).some((d) => dist(ship, d) <= CARGO.range)) return `v dosahu ${CARGO.range} nejsou žádné trosky`;
+    const sp = parseManeuverId(o.maneuverId)?.speed ?? ship.speed;
+    if (sp > CARGO.maxSpeed && o.action?.type !== "pickup") return `zpomal na rychlost ${CARGO.maxSpeed}`;
+    return noAp(ship, o, o.action?.type === "pickup");
+  },
+  active: (o) => o.action?.type === "pickup",
+  apply: (o, ship, s) => {
+    if (o.action?.type === "pickup") return { action: undefined };
+    const near = (s.debris ?? []).filter((d) => dist(ship, d) <= CARGO.range).sort((a, b) => dist(ship, a) - dist(ship, b))[0];
+    return { action: { type: "pickup", targetId: near?.id } };
+  },
+});
 
 export function actionById(id: string): ActionOption | undefined {
   return ACTIONS.find((a) => a.id === id);

@@ -1,5 +1,6 @@
 import { asteroidDestroyed, carveCrater, circleHitsAsteroid, lineBlocked } from "./asteroids.ts";
 import {
+  CARGO,
   COLLISION_SCATTER,
   COMET,
   LASER,
@@ -30,7 +31,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { computeStats, facingAngle, laserHalfArc, mineSideOf, MODULES, profileOf } from "./ships.ts";
+import { cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, MODULES, profileOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 
 /** Je loď/bod v elektromagnetické bouři? */
@@ -250,7 +251,7 @@ export function defaultOrders(ship: Ship): ShipOrders {
 }
 
 /** Rozpis akcí rozkazu (každá stojí 1 bod). */
-export type ActionId = "move" | "koiogran" | "laser" | "mg" | "torpedo" | "mine" | "evade" | "shield" | "jettison";
+export type ActionId = "move" | "koiogran" | "laser" | "mg" | "torpedo" | "mine" | "evade" | "shield" | "jettison" | "pickup";
 
 export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: string }[] {
   const out: { id: ActionId; label: string }[] = [];
@@ -262,6 +263,7 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
   if (o.action?.type === "evade") out.push({ id: "evade", label: "úhybný manévr" });
   if (o.action?.type === "shield") out.push({ id: "shield", label: "úprava štítu" });
   if (o.action?.type === "jettison") out.push({ id: "jettison", label: "vyhození modulu" });
+  if (o.action?.type === "pickup") out.push({ id: "pickup", label: "zvednutí nákladu" });
   if (o.fire) out.push({ id: "laser", label: "lasery" });
   if (o.fireMg) out.push({ id: "mg", label: "kulomet" });
   if (o.special?.type === "torpedo") out.push({ id: "torpedo", label: "torpédo" });
@@ -336,7 +338,10 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     else if (raw.action?.type === "shield") action = validShieldAction(ship, raw.action.segments) ? { type: "shield", segments: raw.action.segments.map((n) => Math.round(Number(n))) as Segments } : undefined;
     else if (raw.action?.type === "jettison") {
       const wantedId = raw.action.moduleId;
-      action = ship.loadout.modules.some((m) => m.id === wantedId) ? { type: "jettison", moduleId: wantedId } : undefined;
+      action = ship.loadout.modules.some((m) => m.id === wantedId) || (ship.loadout.cargo ?? []).some((m) => m.id === wantedId) ? { type: "jettison", moduleId: wantedId } : undefined;
+    } else if (raw.action?.type === "pickup") {
+      const tid = raw.action.targetId;
+      action = { type: "pickup", targetId: typeof tid === "string" && state.debris.some((d) => d.id === tid) ? tid : undefined };
     }
     let special = raw.special;
     if (special?.type === "torpedo") {
@@ -500,8 +505,9 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!ship.alive || o?.action?.type !== "jettison") continue;
     const wanted = o.action.moduleId;
     const idx = ship.loadout.modules.findIndex((m) => m.id === wanted);
-    if (idx < 0) continue;
-    const [mod] = ship.loadout.modules.splice(idx, 1);
+    const cidx = (ship.loadout.cargo ?? []).findIndex((m) => m.id === wanted);
+    if (idx < 0 && cidx < 0) continue;
+    const [mod] = idx >= 0 ? ship.loadout.modules.splice(idx, 1) : ship.loadout.cargo!.splice(cidx, 1);
     refreshShip(ship);
     if (ship.shieldType !== "none" && ship.stats.segmentModules === 0 && ship.stats.shields === 0) {
       ship.shieldType = "none";
@@ -520,6 +526,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       y: clamp(ship.y - f.y * back, 0, state.height),
       team: ship.team,
       value: Math.round((MODULES[mod.type].price * RULES.debrisRewardPct) / 100),
+      module: { ...mod },
     };
     state.debris.push(debris);
     events.push({ type: "jettison", shipId: ship.id, debris });
@@ -698,6 +705,51 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   state.torpedoes = state.torpedoes.filter((t) => !shotTorpedoes.has(t.id));
   state.debris = state.debris.filter((d) => !shotDebris.has(d.id));
   state.comets = state.comets.filter((c) => !shotComets.has(c.id));
+
+  /* ---------- 1c. Zvednutí nákladu (po střelbě, před pohybem) ---------- */
+  {
+    const claims = new Map<string, { ship: Ship; speed: number; d: number }[]>();
+    for (const ship of state.ships) {
+      const o = orders.get(ship.id);
+      if (!ship.alive || o?.action?.type !== "pickup") continue;
+      const wantId = o.action.targetId;
+      const speed = parseManeuverId(o.maneuverId)?.speed ?? ship.speed;
+      const cap = cargoCapacity(ship.loadout);
+      const held = (ship.loadout.cargo ?? []).length;
+      const inRange = state.debris.filter((d) => dist(ship, d) <= CARGO.range);
+      const target = wantId ? inRange.find((d) => d.id === wantId) : inRange.sort((a, b) => dist(ship, a) - dist(ship, b))[0];
+      const fail = (reason: "range" | "speed" | "full" | "gone", debrisId = wantId ?? "") => events.push({ type: "pickup", shipId: ship.id, debrisId, x: ship.x, y: ship.y, ok: false, reason });
+      if (held >= cap) {
+        fail("full");
+        continue;
+      }
+      if (speed > CARGO.maxSpeed) {
+        fail("speed");
+        continue;
+      }
+      if (!target) {
+        fail(wantId && !state.debris.some((d) => d.id === wantId) ? "gone" : "range");
+        continue;
+      }
+      const list = claims.get(target.id) ?? [];
+      list.push({ ship, speed, d: dist(ship, target) });
+      claims.set(target.id, list);
+    }
+    const picked = new Set<string>();
+    for (const [debrisId, list] of claims) {
+      const deb = state.debris.find((d) => d.id === debrisId)!;
+      // přednost: nižší rychlost, pak menší vzdálenost, pak náhoda
+      list.sort((a, b) => a.speed - b.speed || a.d - b.d || rng.next() - 0.5);
+      const winner = list[0];
+      const mod: ModuleInstance = deb.module ? { ...deb.module } : { id: `cargo-${turn}-${winner.ship.id}`, type: deb.type, slot: "front", ammo: MODULES[deb.type].ammo };
+      winner.ship.loadout.cargo = [...(winner.ship.loadout.cargo ?? []), mod];
+      refreshShip(winner.ship);
+      picked.add(debrisId);
+      events.push({ type: "pickup", shipId: winner.ship.id, debrisId, x: deb.x, y: deb.y, ok: true, module: mod });
+      for (const l of list.slice(1)) events.push({ type: "pickup", shipId: l.ship.id, debrisId, x: deb.x, y: deb.y, ok: false, reason: "lost", winnerId: winner.ship.id });
+    }
+    state.debris = state.debris.filter((d) => !picked.has(d.id));
+  }
 
 
   /* ---------- 2. Pohyb (lodě i torpéda současně) ---------- */
@@ -1272,7 +1324,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
 
   for (const ship of state.ships) {
     const o = orders.get(ship.id);
-    if (!o?.action || o.action.type === "evade" || o.action.type === "shield") continue;
+    if (!o?.action || o.action.type === "evade" || o.action.type === "shield" || o.action.type === "jettison" || o.action.type === "pickup") continue;
     if (!canAct(ship)) {
       events.push({ type: "action", shipId: ship.id, action: o.action, ok: false });
       continue;

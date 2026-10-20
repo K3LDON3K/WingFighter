@@ -1,6 +1,6 @@
 import { VISION_REF } from "./fog.ts";
 import { FIGHTER_PROFILE } from "./maneuvers.ts";
-import { LASER, SCANNER } from "./constants.ts";
+import { CARGO, LASER, SCANNER } from "./constants.ts";
 import type { Facing, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
 
 /**
@@ -16,6 +16,7 @@ export const HULLS: Record<string, HullDef> = {
     description: "Malá rychlá loď. Čtyři malé sloty: příď, záď, levobok, pravobok. Příď + záď jde spojit v jeden velký slot.",
     radius: 16,
     hull: 100,
+    cargo: 1,
     slots: [
       { id: "front", name: "příď", size: "small" },
       { id: "back", name: "záď", size: "small" },
@@ -128,14 +129,24 @@ export function freeSlots(loadout: ShipLoadout): SlotId[] {
 }
 
 /** Celková váha sestavy (včetně zbývající munice). */
+export function moduleWeight(m: ModuleInstance): number {
+  const def = MODULES[m.type];
+  return def ? def.weight + (def.ammoWeight ?? 0) * (m.ammo ?? 0) : 0;
+}
+
+/** Váha výbavy včetně nákladu. */
 export function loadoutWeight(loadout: ShipLoadout): number {
   let w = 0;
-  for (const m of loadout.modules) {
-    const def = MODULES[m.type];
-    if (!def) continue;
-    w += def.weight + (def.ammoWeight ?? 0) * (m.ammo ?? 0);
-  }
+  for (const m of loadout.modules) w += moduleWeight(m);
+  for (const m of loadout.cargo ?? []) w += moduleWeight(m);
   return w;
+}
+
+/** Kapacita nákladového prostoru trupu (ladění může přepsat stíhač). */
+export function cargoCapacity(loadout: ShipLoadout): number {
+  const hull = HULLS[loadout.hullId];
+  if (!hull) return 0;
+  return hull.id === "fighter" ? CARGO.fighter : hull.cargo;
 }
 
 export function moduleCost(loadout: ShipLoadout): number {

@@ -1,6 +1,8 @@
 import {
   RULES,
   COMET,
+  CARGO,
+  dist,
   actionList,
   laserOdds,
   FACING_NAMES,
@@ -98,10 +100,10 @@ const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: 
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
   { label: "Pohyb", ids: ["move", "evade", "koiogran"] },
-  { label: "Speciální", ids: ["shield", "jettison"] },
+  { label: "Speciální", ids: ["shield", "jettison", "pickup"] },
 ];
 const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
-const ACTION_ICON: Record<string, string> = { move: "pen", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
+const ACTION_ICON: Record<string, string> = { pickup: "cargo", move: "pen", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
   if (koiogran) return "⟲";
@@ -233,12 +235,12 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   let jettisonPop: HTMLElement | null = null;
   if (o.action?.type === "jettison" && !locked) {
     const curId = o.action.moduleId;
-    const chosen = ship.loadout.modules.find((x) => x.id === curId);
+    const chosen = ship.loadout.modules.find((x) => x.id === curId) ?? (ship.loadout.cargo ?? []).find((x) => x.id === curId);
     jettisonPop = h(
       "div",
       { class: "jettison-pop" },
       h("div", { class: "jp-head" }, icon("debris", "#7dd3fc", 12), label(chosen ? `vyhodit: ${MODULES[chosen.type].name}` : "klikni na modul, který vyhodíš")),
-      renderLoadout({ loadout: ship.loadout, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, selectedId: curId, onSelect: (id) => cb.setOrders(ship.id, { action: { type: "jettison", moduleId: id } }) }),
+      renderLoadout({ loadout: ship.loadout, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.setOrders(ship.id, { action: { type: "jettison", moduleId: id } }) }),
     );
   }
 
@@ -325,7 +327,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
           },
           costPips(a.id === "koiogran" ? 2 : 1, dots > 0 ? "spent" : "red", a.id === "koiogran" ? "stojí 2 akce" : a.id === "move" ? "stojí 1 akci (rovně stejnou rychlostí zdarma)" : "stojí 1 akci"),
           icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
-          h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit"))),
+          h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
         );
       if (a.id === "shield" && shieldPop) row.append(h("div", { class: "scan-holder" }, wbtn, shieldPop));
@@ -443,12 +445,21 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     if (m.minePick === "timer") details.append(h("span", { class: "warn" }, label("← klikni na mapě na čas výbuchu (✕ = jiné místo)")));
   } else if (o.action?.type === "jettison") {
     const cur = o.action.moduleId;
-    const chosen = ship.loadout.modules.find((x) => x.id === cur);
+    const chosen = ship.loadout.modules.find((x) => x.id === cur) ?? (ship.loadout.cargo ?? []).find((x) => x.id === cur);
     details.append(icon("debris", "#94a3b8"));
     if (chosen) {
-      const after = { ...ship.loadout, modules: ship.loadout.modules.filter((x) => x.id !== cur) };
+      const after = { ...ship.loadout, modules: ship.loadout.modules.filter((x) => x.id !== cur), cargo: (ship.loadout.cargo ?? []).filter((x) => x.id !== cur) };
       details.append(h("span", { class: "txt" }, `vyhodit: ${MODULES[chosen.type].name}`), h("span", { class: "muted" }, label(`· váha ${loadoutWeight(ship.loadout)} → ${loadoutWeight(after)} · max. rychlost ${profileOf(ship.loadout).maxSpeed} → ${profileOf(after).maxSpeed}`)));
     } else details.append(h("span", { class: "warn" }, label("↑ vyber modul v okénku nad tlačítkem")));
+  } else if (o.action?.type === "pickup") {
+    const wantId = o.action.targetId;
+    const tgt = wantId ? (m.state.debris ?? []).find((d) => d.id === wantId) : undefined;
+    const sp = cur.speed;
+    details.append(icon("cargo", "#a7f3d0"));
+    if (tgt) details.append(h("span", { class: "txt" }, `zvednout: ${MODULES[tgt.type].name}`), h("span", { class: "muted" }, label(`· ${Math.round(dist(ship, tgt))} / ${CARGO.range}`)));
+    else details.append(h("span", { class: "warn" }, label("klikni na trosky v dosahu")));
+    if (sp > CARGO.maxSpeed) details.append(h("span", { class: "warn" }, label(`rychlost ${sp} > ${CARGO.maxSpeed} – nezvedne!`)));
+    else details.append(h("span", { class: "muted" }, label(`· rychlost ${sp} ok · po střelbě, před pohybem`)));
   } else if (o.action?.type === "shield") {
     details.append(icon("segments", "#60a5fa"), h("span", { class: "txt" }, `štít ${o.action.segments.join(" / ")}`), inHand > 0 ? h("span", { class: "warn" }, label(`← rozmísti ${inHand} b. v panelu lodi`)) : h("span", { class: "muted" }, label("· platí od začátku kola")));
   } else if (o.fire) {

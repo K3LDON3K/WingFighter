@@ -1,4 +1,6 @@
 import {
+  cargoCapacity,
+  moduleWeight,
   allowedFacings,
   FACING_NAMES,
   freeSlots,
@@ -37,6 +39,8 @@ export interface LoadoutEditorOptions {
   /** Výběr modulu (např. vyhození): klik na modul ho označí místo odebrání. */
   onSelect?: (moduleId: string) => void;
   selectedId?: string;
+  /** Zobrazit nákladový prostor (ve hře). */
+  showCargo?: boolean;
 }
 
 const NS = "http://www.w3.org/2000/svg";
@@ -178,6 +182,41 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   }
   for (const sl of hull.slots) if (!drawn.has(sl.id)) slotBox(sl.id, SLOT_BOX[sl.id]);
   const diagram = h("div", { class: "lo-diagram" }, svg);
+
+  /* --- náklad: zvednuté moduly (nefungují, jen váží) --- */
+  if (opts.showCargo) {
+    const cap = cargoCapacity(loadout);
+    const items = loadout.cargo ?? [];
+    const row = h("div", { class: "lo-cargo" }, h("span", { class: "lo-cargo-cap" }, label(`Náklad ${items.length}/${cap}`)));
+    const hexW = 64;
+    const hexH = 56;
+    for (let i = 0; i < Math.max(cap, items.length); i++) {
+      const m = items[i];
+      const csvg = svgEl("svg", { viewBox: `0 0 ${hexW} ${hexH}`, width: hexW, height: hexH, class: "lo-cargo-hex" });
+      const pts = hexPoints({ x: 2, y: 2, w: hexW - 4, h: hexH - 4 });
+      if (m) {
+        const def = MODULES[m.type];
+        const selected = opts.selectedId === m.id;
+        const col = selected ? "#fb923c" : moduleColor(m.type);
+        csvg.append(svgEl("polygon", { points: pts, fill: "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
+        csvg.append(svgEl("polygon", { points: pts, fill: col, opacity: selected ? 0.3 : 0.18 }));
+        const words = def.name.toUpperCase().split(" ");
+        words.forEach((w, k) => csvg.append(svgEl("text", { x: hexW / 2, y: hexH / 2 + 4 - (words.length - 1) * 5 + k * 10, "font-family": "Jersey, ui-monospace, monospace", "font-size": 11, fill: "#f8fafc", "text-anchor": "middle" }, w)));
+        if (m.ammo !== undefined) csvg.append(svgEl("text", { x: hexW / 2, y: 12, "font-family": "Jersey", "font-size": 10, fill: "#fbbf24", "text-anchor": "middle" }, String(m.ammo)));
+        csvg.append(svgEl("title", {}, `${def.name} v nákladu (váha ${moduleWeight(m)}) – nefunguje; lze vyhodit${opts.onSelect ? ", klik = vybrat" : ""}`));
+        if (opts.onSelect) {
+          csvg.classList.add("selectable");
+          csvg.addEventListener("click", () => opts.onSelect!(m.id));
+        }
+      } else {
+        csvg.append(svgEl("polygon", { points: pts, fill: "none", stroke: "#334155", "stroke-width": 2, "stroke-dasharray": "3 4" }));
+        csvg.append(svgEl("text", { x: hexW / 2, y: hexH / 2 + 4, "font-family": "Jersey", "font-size": 10, fill: "#64748b", "text-anchor": "middle" }, "VOLNÉ"));
+        csvg.append(svgEl("title", {}, "Volné místo v nákladu – akce Zvednout náklad"));
+      }
+      row.append(csvg);
+    }
+    diagram.append(row);
+  }
 
   /* --- nákup --- */
   const shop = h("div", { class: "lo-shop" });

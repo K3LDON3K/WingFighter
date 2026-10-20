@@ -145,6 +145,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.15 – **Nákladový prostor**: stíhač uveze 1 malý modul (ladění, skupina „Náklad“: dosah 120, max. rychlost 2,
+  kapacita). Nová akce **Zvednout náklad** (Speciální, 1 akce): po střelbě a před pohybem zvedne vyhozený modul
+  (trosky) v dosahu kolem lodi – klik na trosky = cíl, jinak nejbližší; jde jen s manévrem rychlosti ≤ 2.
+  Přetahování o stejný předmět vyhrává pomalejší, pak bližší loď (v logu). Náklad nefunguje, jen váží
+  (snižuje max. rychlost), v inventáři je sekce NÁKLAD a lze ho vyhodit (akce Vyhodit → zase trosky).
+  Zvednutý modul si pamatuje munici. Mezi bitvami půjde (až budou navazující bitvy) nasadit zdarma nebo prodat.
 - v3.14.1 – vyhození modulu: okénko s hexovým inventářem nad tlačítkem VYHODIT (klik na modul = výběr);
   panel INVENTÁŘ se už pro vyhození neotvírá.
 - v3.14 – úprava štítu ve vysouvacím okénku nad tlačítkem ŠTÍT (styl skeneru): bublina, −/+ u segmentů, sloty;

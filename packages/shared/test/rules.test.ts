@@ -1001,3 +1001,44 @@ describe("úhyb skrz asteroid a kometu", () => {
     expect(r.events.some((e) => e.type === "cometGone" && e.reason === "ship")).toBe(false);
   });
 });
+
+describe("náklad", () => {
+  it("zvednutí trosek: dosah, rychlost ≤ 2, kapacita; přetahování vyhrává pomalejší a bližší; náklad váží a jde vyhodit", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    const foe = place(g, "ship-p2-0", 700, 500, Math.PI);
+    g.debris = [{ id: "d1", type: "scanner", x: 600, y: 500, team: 0, value: 65, module: { id: "sc-x", type: "scanner", slot: "left", charges: 2 } }];
+    const noFire = (id: string, man: string, action?: import("../src/index.ts").ActionOrder): ShipOrders => ({ shipId: id, maneuverId: man, fire: false, action });
+    // oba chtějí d1: já rychlost 2, soupeř rychlost 1 → vyhraje soupeř (pomalejší), i když je stejně daleko
+    let r = resolveTurn(g, [noFire(me.id, "m2a0", { type: "pickup", targetId: "d1" }), noFire(foe.id, "m1a0", { type: "pickup", targetId: "d1" })], createRng(1));
+    const evs = r.events.filter((e) => e.type === "pickup");
+    expect(evs.length).toBe(2);
+    expect(evs.some((e) => e.type === "pickup" && e.ok && e.shipId === foe.id)).toBe(true);
+    expect(evs.some((e) => e.type === "pickup" && !e.ok && e.reason === "lost" && e.shipId === me.id)).toBe(true);
+    expect(r.state.ships[1].loadout.cargo?.length).toBe(1);
+    expect(r.state.ships[1].loadout.cargo?.[0].id).toBe("sc-x");
+    expect(r.state.debris.length).toBe(0);
+    // váha nákladu snižuje rychlost: loď s nákladem má větší váhu
+    const before = loadoutWeight(g.ships[1].loadout);
+    expect(loadoutWeight(r.state.ships[1].loadout)).toBeGreaterThan(before);
+    // rychlost 3 → neúspěch (speed); mimo dosah → range; plný náklad → full
+    const g2 = structuredClone(g);
+    r = resolveTurn(g2, [noFire(me.id, "m3a0", { type: "pickup", targetId: "d1" }), noFire(foe.id, "m1a0")], createRng(1));
+    expect(r.events.some((e) => e.type === "pickup" && !e.ok && e.reason === "speed")).toBe(true);
+    expect(r.state.debris.length).toBe(1);
+    const g3 = structuredClone(g);
+    g3.debris[0].x = 900;
+    r = resolveTurn(g3, [noFire(me.id, "m1a0", { type: "pickup", targetId: "d1" }), noFire(foe.id, "m1a0")], createRng(1));
+    expect(r.events.some((e) => e.type === "pickup" && !e.ok && e.reason === "range")).toBe(true);
+    const g4 = structuredClone(g);
+    g4.ships[0].loadout.cargo = [{ id: "c0", type: "mine", slot: "front", ammo: 2 }];
+    r = resolveTurn(g4, [noFire(me.id, "m1a0", { type: "pickup", targetId: "d1" }), noFire(foe.id, "m1a0")], createRng(1));
+    expect(r.events.some((e) => e.type === "pickup" && !e.ok && e.reason === "full")).toBe(true);
+    // vyhození nákladu: modul z carga se stane troskami i s původním id
+    r = resolveTurn(g4, [noFire(me.id, "m1a0", { type: "jettison", moduleId: "c0" }), noFire(foe.id, "m1a0")], createRng(1));
+    expect(r.state.ships[0].loadout.cargo?.length).toBe(0);
+    expect(r.state.debris.some((d) => d.module?.id === "c0")).toBe(true);
+    // sanitizace: zvednutí je 1 akce
+    expect(actionCost(g.ships[0], noFire(me.id, "m2a0", { type: "pickup", targetId: "d1" }))).toBe(1);
+  });
+});
