@@ -112,9 +112,9 @@ function angleGlyph(angle: number, koiogran: boolean): string {
 
 /** Spodní lišta: stav lodi, manévr, zbraně, spuštění kola. Pevné rozměry – text nemění velikost UI. */
 /** Cena akce vpravo nahoře na tlačítku: červené čtverečky = akce, žluté = náboje skeneru. */
-function costPips(n: number, color: "red" | "yellow", title: string): HTMLElement {
+function costPips(n: number, color: "red" | "yellow" | "spent", title: string): HTMLElement {
   const el = h("span", { class: `cost-pips ${color}`, title });
-  for (let i = 0; i < n; i++) el.append(h("i"));
+  for (let i = 0; i < n; i++) el.append(h("i", {}, color === "spent" ? icon("tick", "#86efac", 9) : null));
   return el;
 }
 
@@ -250,7 +250,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
 
   /* ---- 3. akce ---- */
   const apips = h("div", { class: "apip" });
-  for (let i = 0; i < RULES.actionPoints; i++) apips.append(h("i", { class: i < acts.length ? "on" : "" }));
+  for (let i = 0; i < RULES.actionPoints; i++) apips.append(h("i", { class: i < RULES.actionPoints - acts.length ? "on" : "" }));
   /** Kolik akcí tlačítko právě stojí (tečky): otočka 2, manévr 1 (jen když se liší od rovně stejnou rychlostí), ostatní 1. */
   const dotsFor = (id: string) => (id === "koiogran" ? (acts.some((a) => a.id === "koiogran") ? 2 : 0) : id === "move" ? (acts.some((a) => a.id === "move") && !acts.some((a) => a.id === "koiogran") ? 1 : 0) : acts.some((a) => a.id === id) ? 1 : 0);
   const buttons = h("div", { class: "bb-weapons" });
@@ -264,22 +264,19 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
       const active = isMove ? aiming : a.active(o);
       const stormOff = stormed && (a.id === "laser" || a.id === "shield");
       const why = stormOff ? "systém je v bouři mimo provoz" : a.disabled(ship, m.state, o);
-      const dots = dotsFor(a.id);
-      const dotEl = dots > 0 ? h("span", { class: "adots" }) : null;
-      for (let i = 0; i < dots; i++) dotEl!.append(h("i"));
+      const dots = dotsFor(a.id); // > 0 = akce je za toto tlačítko utracená
       row.append(
         h(
           "button",
           {
-            class: `px bb-weapon ${active && !stormOff ? "on" : ""} ${stormOff ? "stormed" : ""} ${dots > 0 ? "used" : ""}`,
+            class: `px bb-weapon ${active && !stormOff ? "on" : ""} ${stormOff ? "stormed" : ""} ${dots > 0 ? "spent" : ""}`,
             disabled: locked || stormOff || (!!why && !active && dots === 0),
             title: `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`,
             onclick: () => (isMove ? cb.aim(ship.id) : cb.chooseAction(ship.id, a.id)),
           },
-          costPips(a.id === "koiogran" ? 2 : 1, "red", a.id === "koiogran" ? "stojí 2 akce" : a.id === "move" ? "stojí 1 akci (rovně stejnou rychlostí zdarma)" : "stojí 1 akci"),
+          costPips(a.id === "koiogran" ? 2 : 1, dots > 0 ? "spent" : "red", a.id === "koiogran" ? "stojí 2 akce" : a.id === "move" ? "stojí 1 akci (rovně stejnou rychlostí zdarma)" : "stojí 1 akci"),
           icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit"))),
-          dotEl,
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
         ),
       );
@@ -438,7 +435,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   const actions = h(
     "div",
     { class: "pnl bb-actions" },
-    h("div", { class: "bb-head" }, h("span", { class: "ttl" }, label("Akce")), apips, h("span", { class: "muted bb-acts" }, label(acts.length ? `${acts.length}/${RULES.actionPoints} použito` : `${RULES.actionPoints} volné`))),
+    h("div", { class: "bb-head" }, h("span", { class: "ttl" }, label("Akce")), apips, h("span", { class: "muted bb-acts" }, label(`${RULES.actionPoints - acts.length}/${RULES.actionPoints} volné`))),
     buttons,
     details,
   );

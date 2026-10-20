@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.11 – akce: v hlavičce svítí červeně **volné** akce (utracené se odbarví, „1/2 volné“); na tlačítku se
+  cenové čtverečky po aktivaci odbarví a objeví se v nich pixel art fajfka; červené pilulky vlevo dole zrušeny.
 - v3.10.3 – cena akce na tlačítkách jako čtverečky: červené = akce (otočka 2), žluté = náboje skeneru.
 - v3.10.1 – každé tlačítko akce má vpravo nahoře žlutou cenu v akcích (1, otočka 2); tlačítko skeneru ukazuje
   jen náboje (2 políčka), při cooldownu 3 políčka s odpočtem.

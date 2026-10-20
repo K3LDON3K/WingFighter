@@ -618,6 +618,11 @@ h3,
   background: #ef4444;
   border-color: #7f1d1d;
 }
+.cost-pips.spent i {
+  background: #0b1020;
+  border-color: #166534;
+}
+
 /* tečky na tlačítku akce: za co byly akce vyčerpány (stejný styl jako pilulky v hlavičce) */
 .adots {
   position: absolute;
@@ -1561,10 +1566,13 @@ button.px.tiny {
   gap: 2px;
 }
 .cost-pips i {
-  width: 7px;
-  height: 7px;
+  width: 11px;
+  height: 11px;
   border: 1px solid #0a0e1c;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
 }
 .cost-pips.red i {
   background: #ef4444;
