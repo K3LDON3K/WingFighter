@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.37 – ukazatel RYCHLOST v panelu lodi (varianta C): dílky nad maximem daným váhou jsou tmavě červené
+  s rámečkem, maximum v čísle červeně a vedle ikona váhy; tooltip říká, které rychlosti váha blokuje.
 - v3.36 – během bitvy se obrazovka neuspává (Screen Wake Lock API; iPadOS 16.4+, Chrome, Android). Zámek se
   obnoví po návratu z pozadí a uvolní při odchodu z bitvy. Vyžaduje HTTPS nebo localhost – na vlastní síti
   přes http:// ho Safari nepovolí (viz poznámka níže).

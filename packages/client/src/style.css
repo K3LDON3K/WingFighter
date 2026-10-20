@@ -1383,6 +1383,13 @@ h3,
   border: 1px solid #0a0e1c;
   display: block;
 }
+.vbar i.blocked {
+  background: #2a0d0d;
+  border-color: #7f1d1d;
+}
+.vmax-blocked {
+  color: #f87171;
+}
 .vname {
   font-size: 10px;
   color: var(--text);

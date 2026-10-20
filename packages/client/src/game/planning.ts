@@ -202,9 +202,10 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     );
     shieldBox.append(h("span", { class: "bubble-tag" }, label("plán")));
   } else if (planned) shieldBox.append(h("span", { class: "bubble-tag" }, label("plán")));
-  const vgauge = (n: number, val: number, color: string, dark: string, name: string, num: string, title: string) => {
+  const vgauge = (n: number, val: number, color: string, dark: string, name: string, num: string | Node, title: string, blockedFrom = n) => {
     const bar = h("div", { class: "vbar" });
-    for (let i = 0; i < n; i++) bar.append(h("i", { style: `background:${i < val ? color : dark}` }));
+    // dílky nad blockedFrom jsou blokované váhou (tmavě červené s rámečkem)
+    for (let i = 0; i < n; i++) bar.append(h("i", { class: i >= blockedFrom ? "blocked" : "", style: i >= blockedFrom ? "" : `background:${i < val ? color : dark}` }));
     return h("div", { class: "vgauge", title }, bar, h("span", { class: "vname" }, label(name)), h("span", { class: "vnum", style: `color:${color}` }, num));
   };
   const hullBlocks = Math.max(ship.hull > 0 ? 1 : 0, Math.round((10 * ship.hull) / ship.stats.hull));
@@ -214,7 +215,16 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     { class: "gauges" },
     vgauge(10, hullBlocks, ship.hull <= ship.stats.hull * 0.3 ? "#ef4444" : "#4ade80", "#14341f", "trup", String(ship.hull), `Trup ${ship.hull}/${ship.stats.hull}`),
     vgauge(STRESS.max, ship.stressPoints, "#f472b6", "#3b1a2e", "stres", `${ship.stressPoints}/${STRESS.max}`, "Stresové body: červený manévr −1, nebezpečný −2, zelený +1"),
-    vgauge(5, ship.speed, "#94a3b8", "#1e293b", "rychlost", `${ship.speed}/${maxSp}`, `Aktuální rychlost ${ship.speed}, max. s touto váhou ${maxSp} (váha ${loadoutWeight(ship.loadout)})`),
+    vgauge(
+      5,
+      ship.speed,
+      "#94a3b8",
+      "#1e293b",
+      "rychlost",
+      maxSp < 5 ? h("span", {}, `${ship.speed}/`, h("span", { class: "vmax-blocked" }, String(maxSp)), " ", icon("weight", "#f87171", 9)) : `${ship.speed}/${maxSp}`,
+      maxSp < 5 ? `Aktuální rychlost ${ship.speed}. Váha výbavy (${loadoutWeight(ship.loadout)}) blokuje rychlost ${maxSp + 1}–5: max. ${maxSp}. Lehčí výbava = vyšší rychlost.` : `Aktuální rychlost ${ship.speed}, max. ${maxSp} (váha ${loadoutWeight(ship.loadout)})`,
+      maxSp,
+    ),
   );
   const right = h("div", { class: "bb-shipinfo" }, gauges);
   const shieldLine =
