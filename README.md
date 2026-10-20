@@ -145,6 +145,15 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.7 – **Komety**: nastavení mapy „Komety“ (žádné / málo / středně / hodně – šance za kolo a limit v ladění)
+  a „Komety naráží do asteroidů“. Kometa přiletí na začátku kola na okraj mapy a letí přímo na protější
+  okraj (rychlost 300/kolo, torpédo 240), pohybuje se s loděmi; při plánování je vidět předpověď dráhy.
+  Náraz do lodi = zranění (štít normálně, v bouři ne) + odmrštění a zpomalení; kometa zmizí. Lasery i
+  kulomet ji sestřelí (klik na kometu = cíl), torpédo i mina ji zničí; za sestřel kredity + statistika.
+  **Ocas komety** (tyrkysová zóna za jádrem): průlet doplní štít – celolodní +25 % maxima, segmentový +1
+  bod náhodnému neplnému segmentu; při plném štítu +10 % trupu; při plném trupu kredity; loď bez štítového
+  modulu dostane plný stres + víc kreditů. Každá loď může každou kometu využít jen jednou (srážka s jádrem
+  bonus ruší). Nová skupina ladění „Komety“.
 - v3.6.1 – interní přejmenování: balíčky `@wingfighter/*`, kořenový balíček `wingfighter`, klíče v
   localStorage (`wingfighter.name`, `wingfighter.session` – jméno pilota se zadá znovu).
 - v3.6 – hra se jmenuje **Wingfighter**. Nové pixel art logo na hlavní obrazovce (dvoubarevný nápis s 3D

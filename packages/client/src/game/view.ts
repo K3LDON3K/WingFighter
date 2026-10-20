@@ -1,4 +1,4 @@
-import type { Asteroid, Debris, GameState, Mine, Pose, Segments, ShieldType, Ship, Torpedo, TorpedoPhase } from "@wingfighter/shared";
+import type { Asteroid, Comet, Debris, GameState, Mine, Pose, Segments, ShieldType, Ship, Torpedo, TorpedoPhase } from "@wingfighter/shared";
 
 /** Co se právě kreslí – během plánování kopie stavu, během animace průběžně měněný model. */
 export interface ViewShip extends Pose {
@@ -60,10 +60,21 @@ export type Effect =
 
 export type ViewDebris = Debris;
 
+export interface ViewComet extends Pose {
+  id: string;
+  radius: number;
+  hull: number;
+  maxHull: number;
+  speed: number;
+  /** Lodě, které ocas už využily (pro zobrazení). */
+  tailUsed: string[];
+}
+
 export interface ViewModel {
   ships: ViewShip[];
   torpedoes: ViewTorpedo[];
   debris: ViewDebris[];
+  comets: ViewComet[];
   mines: ViewMine[];
   asteroids: Asteroid[];
   effects: Effect[];
@@ -97,6 +108,10 @@ export function torpedoToView(t: Torpedo): ViewTorpedo {
   return { id: t.id, team: t.team, x: t.x, y: t.y, heading: t.heading, targetPoint: t.targetPoint, phase: t.phase, speed: t.speed, lost: t.lost };
 }
 
+export function cometToView(c: Comet): ViewComet {
+  return { id: c.id, x: c.x, y: c.y, heading: c.heading, radius: c.radius, hull: c.hull, maxHull: c.maxHull, speed: c.speed, tailUsed: [...c.tailUsed] };
+}
+
 export function mineToView(m: Mine): ViewMine {
   return { id: m.id, team: m.team, x: m.x, y: m.y, radius: m.radius, armed: m.armed, timer: m.timer };
 }
@@ -106,6 +121,7 @@ export function viewFromState(state: GameState): ViewModel {
     ships: state.ships.filter((s) => s.alive).map(shipToView),
     torpedoes: state.torpedoes.map(torpedoToView),
     debris: (state.debris ?? []).map((d) => ({ ...d })),
+    comets: (state.comets ?? []).map(cometToView),
     mines: state.mines.map(mineToView),
     asteroids: structuredClone(state.asteroids),
     effects: [],

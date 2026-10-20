@@ -1,5 +1,5 @@
-import { MODULES, MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
-import { mineToView, shipToView, torpedoToView, viewFromState, type ViewModel } from "./view.ts";
+import { COMET, MODULES, MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
+import { cometToView, mineToView, shipToView, torpedoToView, viewFromState, type ViewModel } from "./view.ts";
 
 const MOVE_DURATION = 2200;
 const ACTION_DURATION = 450;
@@ -13,7 +13,7 @@ interface Scheduled {
 
 interface Tween {
   id: string;
-  kind: "ship" | "torpedo";
+  kind: "ship" | "torpedo" | "comet";
   points: Pose[];
   start: number;
   duration: number;
@@ -41,7 +41,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
             ? `${name(e.shipId)} se srazil s ${name(e.otherId!)} a byl odmrštěn.`
             : e.with === "asteroid"
               ? `${name(e.shipId)} narazil do asteroidu a byl odmrštěn.`
-              : `${name(e.shipId)} narazil do okraje mapy.`,
+              : e.with === "comet"
+                ? `☄ ${name(e.shipId)} byl zasažen kometou a odmrštěn.`
+                : `${name(e.shipId)} narazil do okraje mapy.`,
         );
         break;
       case "asteroidHit":
@@ -105,6 +107,38 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "spawnMine":
         lines.push(`${owner(e.mine.ownerId)} položil minu.`);
         break;
+      case "spawnComet":
+        lines.push(`☄ Na okraj mapy přilétá kometa.`);
+        break;
+      case "cometShot":
+        lines.push(e.destroyed ? `  ${name(e.shooterId)} sestřelil kometu: +${e.reward} kreditů.` : e.damage > 0 ? `  ${name(e.shooterId)} zasáhl kometu (−${e.damage}, zbývá ${e.hullAfter}).` : `  ${name(e.shooterId)} minul kometu.`);
+        break;
+      case "cometGone":
+        lines.push(
+          e.reason === "ship"
+            ? `☄ Kometa narazila do ${name(e.shipId!)} (−${e.damage}).`
+            : e.reason === "asteroid"
+              ? `☄ Kometa se roztříštila o asteroid.`
+              : e.reason === "torpedo"
+                ? `☄ Kometa se srazila s torpédem.`
+                : e.reason === "mine"
+                  ? `☄ Kometa spustila minu.`
+                  : `☄ Kometa odletěla z mapy.`,
+        );
+        break;
+      case "cometTail":
+        lines.push(
+          e.effect === "shield"
+            ? `  ${name(e.shipId)} proletěl ocasem komety: štít +${e.amount}.`
+            : e.effect === "segment"
+              ? `  ${name(e.shipId)} proletěl ocasem komety: segment ${["předek", "pravobok", "záď", "levobok"][e.segment ?? 0]} +1.`
+              : e.effect === "hull"
+                ? `  ${name(e.shipId)} proletěl ocasem komety: trup +${e.amount}.`
+                : e.effect === "stress"
+                  ? `  ${name(e.shipId)} proletěl ocasem komety: stres obnoven, +${e.amount} kreditů.`
+                  : `  ${name(e.shipId)} proletěl ocasem komety: +${e.amount} kreditů.`,
+        );
+        break;
     }
   }
   return lines;
@@ -137,7 +171,7 @@ export class TurnAnimation {
     let laserCount = 0;
     const actionCount = ev.filter((e) => e.type === "action" && e.ok && e.path).length;
     // lasery se střílí na začátku kola (před pohybem): nejdřív salvy, pak start pohybu
-    const preLasers = ev.filter((e, i) => (e.type === "laser" || e.type === "torpedoShot") && !ev.slice(0, i).some((x) => x.type === "move")).length;
+    const preLasers = ev.filter((e, i) => (e.type === "laser" || e.type === "torpedoShot" || e.type === "cometShot" || e.type === "mg" || e.type === "debrisShot") && !ev.slice(0, i).some((x) => x.type === "move")).length;
     const moveStart = preLasers > 0 ? preLasers * LASER_GAP + 350 : 0;
     actionTime = moveStart + MOVE_DURATION;
     const lasersStart = moveStart + MOVE_DURATION + (actionCount > 0 ? ACTION_DURATION + 200 : 200);
@@ -156,7 +190,22 @@ export class TurnAnimation {
         case "mineBlast":
         case "torpedoHit":
         case "asteroidHit":
+        case "cometGone":
+        case "cometTail":
           time = moveStart + e.t * MOVE_DURATION;
+          break;
+        case "spawnComet":
+          time = 0;
+          break;
+        case "cometShot":
+          if (!movePassed) {
+            time = preCount * LASER_GAP;
+            preCount++;
+          } else {
+            time = lasersStart + laserCount * LASER_GAP;
+            laserCount++;
+            laserTime = time;
+          }
           break;
         case "torpedoExpire":
           time = moveStart + MOVE_DURATION;
@@ -230,7 +279,7 @@ export class TurnAnimation {
 
     for (const s of this.schedule) {
       if (s.fired || s.time > t) continue;
-      if (s.event.type !== "spawnTorpedo") continue;
+      if (s.event.type !== "spawnTorpedo" && s.event.type !== "spawnComet") continue;
       s.fired = true;
       this.fire(s.event, now);
     }
@@ -238,8 +287,15 @@ export class TurnAnimation {
       const p = Math.min(1, Math.max(0, (t - tw.start) / tw.duration));
       if (p <= 0) continue;
       const pose = interp(tw.points, p);
-      const list = tw.kind === "ship" ? this.view.ships : this.view.torpedoes;
-      const ent = list.find((x) => x.id === tw.id);
+      const list = tw.kind === "ship" ? this.view.ships : tw.kind === "comet" ? this.view.comets : this.view.torpedoes;
+      let ent = list.find((x) => x.id === tw.id);
+      if (!ent && tw.kind === "comet") {
+        // kometa, kterou jsme neviděli přilétat (vletěla do dohledu během kola)
+        const src = this.result.state.comets?.find((c) => c.id === tw.id);
+        const nc = src ? cometToView(src) : { id: tw.id, x: pose.x, y: pose.y, heading: pose.heading, radius: COMET.radius, hull: COMET.hull, maxHull: COMET.hull, speed: COMET.speed, tailUsed: [] };
+        this.view.comets.push(nc);
+        ent = nc;
+      }
       if (ent) {
         ent.x = pose.x;
         ent.y = pose.y;
@@ -439,6 +495,45 @@ export class TurnAnimation {
         v.torpedoes.push(torpedoToView(e.torpedo));
         v.effects.push({ kind: "launch", x: e.torpedo.x, y: e.torpedo.y, heading: e.torpedo.heading, color: TEAM_COLORS[e.torpedo.team], start: now, duration: 700 });
         break;
+      case "spawnComet":
+        if (!v.comets.some((c) => c.id === e.comet.id)) v.comets.push(cometToView(e.comet));
+        v.effects.push({ kind: "text", x: e.comet.x, y: e.comet.y, text: "KOMETA", color: "#a5f3fc", start: now, duration: 1200 });
+        break;
+      case "cometShot": {
+        const shooter = v.ships.find((x) => x.id === e.shooterId);
+        const com = v.comets.find((x) => x.id === e.cometId);
+        const to = com ?? { x: e.x, y: e.y };
+        if (shooter) v.effects.push({ kind: "laser", from: { x: shooter.x, y: shooter.y, heading: shooter.heading }, to: { x: to.x, y: to.y, heading: 0 }, color: TEAM_COLORS[shooter.team], start: now, duration: 420, hit: e.damage > 0 });
+        if (com) com.hull = e.hullAfter;
+        if (e.destroyed) {
+          v.comets = v.comets.filter((x) => x.id !== e.cometId);
+          v.effects.push({ kind: "explosion", x: to.x, y: to.y, size: 26, start: now + 150, duration: 600, color: "#a5f3fc" });
+          v.effects.push({ kind: "text", x: to.x, y: to.y, text: `+${e.reward} CR`, color: "#fbbf24", start: now + 250, duration: 1000 });
+        } else v.effects.push({ kind: "text", x: to.x, y: to.y, text: e.damage > 0 ? `−${e.damage}` : "minul", color: e.damage > 0 ? "#a5f3fc" : "#cbd5e1", start: now + 150, duration: 700 });
+        break;
+      }
+      case "cometGone":
+        v.comets = v.comets.filter((x) => x.id !== e.cometId);
+        if (e.reason === "edge") break;
+        v.effects.push({ kind: "explosion", x: e.x, y: e.y, size: e.reason === "ship" ? 36 : 24, start: now, duration: 600, color: "#a5f3fc" });
+        if (e.reason === "ship") v.effects.push({ kind: "ring", x: e.x, y: e.y, radius: 40, color: "#67e8f9", start: now, duration: 500 });
+        break;
+      case "cometTail": {
+        const s = v.ships.find((x) => x.id === e.shipId);
+        const com = v.comets.find((x) => x.id === e.cometId);
+        if (com && !com.tailUsed.includes(e.shipId)) com.tailUsed.push(e.shipId);
+        v.effects.push({ kind: "ripple", x: e.x, y: e.y, color: "#67e8f9", start: now, duration: 700 });
+        const segName = ["PŘEDEK", "PRAVOBOK", "ZÁĎ", "LEVOBOK"];
+        const txt = e.effect === "shield" ? `+${e.amount} ŠTÍT` : e.effect === "segment" ? `+1 ŠTÍT ${segName[e.segment ?? 0]}` : e.effect === "hull" ? `+${e.amount} TRUP` : e.effect === "stress" ? `STRES OBNOVEN · +${e.amount} CR` : `+${e.amount} CR`;
+        v.effects.push({ kind: "text", x: e.x, y: (s?.y ?? e.y) - 4, text: txt, color: e.effect === "credits" || e.effect === "stress" ? "#fbbf24" : "#67e8f9", start: now + 100, duration: 1100 });
+        if (s) {
+          if (e.effect === "shield") s.shields = Math.min(s.maxShields, s.shields + e.amount);
+          if (e.effect === "segment" && e.segment !== undefined) s.segments[e.segment] = s.segments[e.segment] + 1;
+          if (e.effect === "hull") s.hull = Math.min(s.maxHull, s.hull + e.amount);
+          if (e.effect !== "credits") v.effects.push({ kind: "shield", shipId: s.id, start: now, duration: 600 });
+        }
+        break;
+      }
       case "spawnMine": {
         // odhození: mina letí od lodi na místo, pak se objeví s polem
         const owner = v.ships.find((s) => s.id.startsWith(`ship-${e.mine.ownerId}-`) && s.team === e.mine.team);

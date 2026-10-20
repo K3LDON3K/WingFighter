@@ -1,4 +1,5 @@
 import {
+  COMET,
   LASER,
   MINE,
   STRESS,
@@ -20,7 +21,7 @@ import { segmentColor, strengthColor } from "./shield-ui.ts";
 import { drawStorms, drawStormSparks } from "./storm-draw.ts";
 import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
-import type { ViewDebris, ViewModel, ViewShip } from "./view.ts";
+import type { ViewComet, ViewDebris, ViewModel, ViewShip } from "./view.ts";
 
 export interface IconSpot {
   id: string;
@@ -65,6 +66,10 @@ export interface Overlay {
   /** Právě se vybírá cíl kliknutím. */
   picking?: "torpedo" | "lock";
   myTeam?: number;
+  /** Plánování: kreslit předpověď dráhy komet v tomto kole. */
+  cometPredict?: boolean;
+  /** Vlastní lodě (ocas komety, který už využily, se kreslí vybledle). */
+  myShipIds?: string[];
 }
 
 export const ICON_RADIUS = 13;
@@ -98,6 +103,7 @@ export class Renderer {
     for (const a of view.asteroids) this.drawAsteroid(a);
     for (const m of view.mines) this.drawMine(m, now);
     for (const d of view.debris) this.drawDebris(d, overlay, now);
+    for (const c of view.comets) this.drawComet(c, overlay, now);
 
     const sel = overlay.selectedShipId ? view.ships.find((x) => x.id === overlay.selectedShipId) : undefined;
     if (sel && overlay.rangeCircle2) this.drawRange(sel, overlay.rangeCircle2.radius, "rgba(251,191,36,0.35)", "");
@@ -325,6 +331,114 @@ export class Renderer {
   }
 
   /** Vyhozený modul: pomalu rotující šedý blok s ikonou; jde zaměřit lasery. */
+  /** Kometa (ledová, varianta C): zóna ocasu, pixelový ohon s krystaly, kámen, předpověď dráhy. */
+  private drawComet(c: ViewComet, overlay: Overlay, now: number) {
+    const ctx = this.ctx;
+    const f = forward(c.heading);
+    const n = { x: -f.y, y: f.x };
+    const L = COMET.tailLength;
+    const W = COMET.tailWidth;
+    const used = overlay.myShipIds?.length ? overlay.myShipIds.every((id) => c.tailUsed.includes(id)) : false;
+    // zóna ocasu (obdélník za jádrem)
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.heading);
+    ctx.fillStyle = used ? "rgba(148,163,184,0.05)" : "rgba(103,232,249,0.09)";
+    ctx.fillRect(-c.radius - L, -W / 2, L, W);
+    ctx.strokeStyle = used ? "rgba(148,163,184,0.25)" : "rgba(103,232,249,0.35)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 5]);
+    ctx.strokeRect(-c.radius - L, -W / 2, L, W);
+    ctx.setLineDash([]);
+    // pixelový ohon: jasná osa + krystaly
+    const step = 4;
+    const cnt = Math.floor(L / step);
+    for (let i = 0; i < cnt; i++) {
+      const x = -c.radius - i * step;
+      const k = i / cnt;
+      const flick = Math.sin(now / 90 + i * 1.3) > 0.2;
+      ctx.fillStyle = k < 0.3 ? "#f0f9ff" : k < 0.6 ? "#a5f3fc" : "#0e7490";
+      ctx.globalAlpha = (used ? 0.4 : 1) * (1 - k * 0.6);
+      ctx.fillRect(x, -2, step, 4);
+      if (i % 3 === 0 && flick) {
+        ctx.fillStyle = "#67e8f9";
+        const off = 4 + (i % 2) * 4 + k * (W / 2 - 8);
+        ctx.fillRect(x, -off - 2, 3, 3);
+        ctx.fillRect(x + 2, off, 3, 3);
+      }
+      if (i > 10 && i % 5 === 0) {
+        ctx.fillStyle = "#164e63";
+        ctx.fillRect(x - 1, -W / 2 + 4 + (i % 4) * 3, 3, 3);
+        ctx.fillRect(x + 1, W / 2 - 7 - (i % 3) * 3, 3, 3);
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    // jádro: pixelový kámen
+    const ROCK = ["...###...", ".#######.", ".##L####.", "###LL####", "####K####", "####KK###", ".###KK##.", ".#######.", "...###..."];
+    const pal: Record<string, string> = { "#": "#a8a29e", L: "#f5f5f4", K: "#57534e" };
+    const px = (c.radius * 2) / 9;
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(now / 900 + c.x);
+    ROCK.forEach((row, yy) =>
+      [...row].forEach((ch, xx) => {
+        const col = pal[ch];
+        if (!col) return;
+        ctx.fillStyle = col;
+        ctx.fillRect((xx - 4.5) * px, (yy - 4.5) * px, px + 0.5, px + 0.5);
+      }),
+    );
+    ctx.restore();
+    // odolnost (jen pokud je poškozená)
+    if (c.hull < c.maxHull) {
+      ctx.save();
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(c.x - 12, c.y + c.radius + 4, 24, 3);
+      ctx.fillStyle = "#67e8f9";
+      ctx.fillRect(c.x - 12, c.y + c.radius + 4, (24 * c.hull) / c.maxHull, 3);
+      ctx.restore();
+    }
+    // předpověď dráhy v tomto kole
+    if (overlay.cometPredict) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(165,243,252,0.45)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(c.x + f.x * c.radius, c.y + f.y * c.radius);
+      ctx.lineTo(c.x + f.x * c.speed, c.y + f.y * c.speed);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const tip = { x: c.x + f.x * c.speed, y: c.y + f.y * c.speed };
+      ctx.fillStyle = "rgba(165,243,252,0.7)";
+      ctx.beginPath();
+      ctx.moveTo(tip.x, tip.y);
+      ctx.lineTo(tip.x - f.x * 8 + n.x * 4, tip.y - f.y * 8 + n.y * 4);
+      ctx.lineTo(tip.x - f.x * 8 - n.x * 4, tip.y - f.y * 8 - n.y * 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    const targeted = overlay.targetId === c.id;
+    const hovered = overlay.hoverId === c.id;
+    if (targeted || hovered) {
+      ctx.save();
+      ctx.strokeStyle = targeted ? "#fbbf24" : "rgba(248,250,252,0.6)";
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, c.radius + 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.font = "7px PS2P, ui-monospace, Menlo, monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#a5f3fc";
+    ctx.fillText(`KOMETA${targeted ? " · CIL" : ""}`, c.x, c.y - c.radius - 6);
+    ctx.restore();
+  }
+
   private drawDebris(d: ViewDebris, overlay: Overlay, now: number) {
     const ctx = this.ctx;
     const targeted = overlay.targetId === d.id;

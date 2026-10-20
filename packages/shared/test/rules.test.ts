@@ -26,6 +26,10 @@ import {
   resolveAttack,
   resolveTurn,
   resultForTeam,
+  spawnComet,
+  inCometTail,
+  COMET,
+  type Comet,
   sanitizeOrders,
   stateForTeam,
   TORPEDO,
@@ -742,7 +746,7 @@ describe("skener", () => {
 });
 
 describe("generovaná mapa a bouře", () => {
-  const map = { size: "medium" as const, asteroids: "medium" as const, clusters: false, storms: 2, stormSize: "medium" as const, seed: 42, symmetric: true };
+  const map = { size: "medium" as const, asteroids: "medium" as const, clusters: false, storms: 2, stormSize: "medium" as const, seed: 42, symmetric: true, comets: "none" as const, cometsHitAsteroids: false };
   it("generátor je deterministický, symetrický a startovní body jsou mimo překážky", () => {
     const a = generateMap(map);
     const b = generateMap(map);
@@ -821,5 +825,120 @@ describe("kulomet", () => {
     me.loadout.modules.push(newModule("laser", "left", "l1"), newModule("torpedo", "back", "t1"));
     const fixed = sanitizeOrders(g, "p1", [{ shipId: me.id, maneuverId: "m1a0", fire: true, fireMg: true, special: { type: "torpedo", point: { x: 900, y: 500 } } }]);
     expect(fixed[0].fireMg).toBe(false);
+  });
+});
+
+describe("komety", () => {
+  const settingsWith = (comets: "none" | "few" | "medium" | "many", cometsHitAsteroids = false) => ({ mode: "tdm" as const, turnLimit: 0, shipsPerPlayer: 1, allowedModules: {}, botLoadout: "default" as const, map: { size: "medium" as const, asteroids: "none" as const, clusters: false, storms: 0, stormSize: "medium" as const, seed: 3, symmetric: false, comets, cometsHitAsteroids } });
+  const noOrders = (g: GameState): ShipOrders[] => g.ships.map((s) => ({ shipId: s.id, maneuverId: "m1a0", fire: false }));
+  const cometAt = (x: number, y: number, heading: number, id = "c1"): Comet => ({ id, x, y, heading, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: COMET.radius, tailUsed: [] });
+
+  it("kometa přilétá na okraj mapy a letí přes mapu; mimo mapu zmizí", () => {
+    const g = createGame({ players, settings: settingsWith("many"), tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g.asteroids = [];
+    const c = spawnComet(g, createRng(5), "cx");
+    const onEdge = c.x === c.radius || c.y === c.radius || c.x === g.width - c.radius || c.y === g.height - c.radius;
+    expect(onEdge).toBe(true);
+    // 100% šance → každé kolo nová (max. 6)
+    let r = resolveTurn(g, noOrders(g), createRng(1));
+    expect(r.events.some((e) => e.type === "spawnComet")).toBe(true);
+    expect(r.state.comets!.length).toBe(1);
+    const moved = r.events.find((e) => e.type === "move");
+    expect(moved && moved.type === "move" && moved.paths.some((p) => p.kind === "comet")).toBe(true);
+    // kometa mířící ven zmizí
+    const g2 = createGame({ players, settings: settingsWith("none"), tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g2.asteroids = [];
+    g2.comets = [cometAt(g2.width - 20, 500, 0)];
+    r = resolveTurn(g2, noOrders(g2), createRng(1));
+    expect(r.state.comets!.length).toBe(0);
+    expect(r.events.some((e) => e.type === "cometGone" && e.reason === "edge")).toBe(true);
+  });
+
+  it("náraz do lodi: zranění, odmrštění, kometa zmizí; sestřelení laserem dává kredity", () => {
+    const g = createGame({ players, settings: settingsWith("none"), tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g.asteroids = [];
+    const me = place(g, "ship-p1-0", 600, 500, 0); // letí pomalu stejným směrem, kometa ho dožene
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    g.comets = [cometAt(400, 500, 0)];
+    const hullBefore = me.hull + me.segments.reduce((a, b) => a + b, 0);
+    let r = resolveTurn(g, noOrders(g), createRng(1));
+    const gone = r.events.find((e) => e.type === "cometGone");
+    expect(gone && gone.type === "cometGone" && gone.reason === "ship" && gone.shipId === me.id).toBe(true);
+    expect(r.events.some((e) => e.type === "collision" && e.with === "comet" && e.shipId === me.id)).toBe(true);
+    expect(r.events.some((e) => e.type === "damage" && e.shipId === me.id && e.amount === COMET.damage)).toBe(true);
+    expect(r.state.ships[0].hull + r.state.ships[0].segments.reduce((a, b) => a + b, 0)).toBeLessThan(hullBefore);
+    expect(r.state.comets!.length).toBe(0);
+    // sestřelení: laser s jistým zásahem (6 kostek) a odolnost 15 → padne na jeden zásah
+    const g2 = createGame({ players, settings: settingsWith("none"), tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, laserDice: 6, cometHull: 15 } });
+    g2.asteroids = [];
+    const s2 = place(g2, "ship-p1-0", 500, 500, 0);
+    s2.loadout.modules = [newModule("laser", "front", "l1")];
+    place(g2, "ship-p2-0", 1500, 1200, 0);
+    g2.comets = [{ ...cometAt(620, 500, Math.PI / 2), hull: 15, maxHull: 15 }];
+    r = resolveTurn(g2, [{ shipId: s2.id, maneuverId: "m1a0", fire: true, preferredTargetId: "c1" }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(2));
+    const shot = r.events.find((e) => e.type === "cometShot");
+    expect(shot && shot.type === "cometShot" && shot.destroyed).toBe(true);
+    expect(r.state.comets!.length).toBe(0);
+    expect(r.state.players[0].credits).toBe(DEFAULT_TUNING.startBudget - moduleCost(DEFAULT_LOADOUT) + COMET.reward + DEFAULT_TUNING.creditsPerTurn);
+    expect(r.state.stats!.p1.cometsShot).toBe(1);
+  });
+
+  it("průlet ocasem doplní štít (celolodní %, segmentový +1), při plném štítu trup, bez štítu stres + kredity; jen jednou za kometu", () => {
+    expect(inCometTail({ x: 500, y: 500, heading: 0 }, { x: 400, y: 505 })).toBe(true);
+    expect(inCometTail({ x: 500, y: 500, heading: 0 }, { x: 600, y: 500 })).toBe(false);
+    expect(inCometTail({ x: 500, y: 500, heading: 0 }, { x: 400, y: 560 })).toBe(false);
+    const base = () => {
+      const g = createGame({ players, settings: settingsWith("none"), tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+      g.asteroids = [];
+      place(g, "ship-p2-0", 1500, 1200, 0);
+      // kometa letí doprava daleko vpravo od lodi; loď stojí v jejím ocasu během celého kola
+      g.comets = [cometAt(700, 500, 0)];
+      return g;
+    };
+    // segmentový: loď v ocasu, segment předek snížený
+    let g = base();
+    let me = place(g, "ship-p1-0", 640, 500, 0);
+    me.segments = [1, 2, 2, 2];
+    let r = resolveTurn(g, noOrders(g), createRng(1));
+    let tail = r.events.find((e) => e.type === "cometTail");
+    expect(tail && tail.type === "cometTail" && tail.effect === "segment" && tail.segment === 0).toBe(true);
+    expect(r.state.ships[0].segments[0]).toBe(2);
+    expect(r.state.comets![0].tailUsed).toContain(me.id);
+    // podruhé stejná kometa už nic nedá
+    const r2 = resolveTurn(r.state, noOrders(r.state), createRng(1));
+    expect(r2.events.some((e) => e.type === "cometTail")).toBe(false);
+    // plný štít → trup
+    g = base();
+    me = place(g, "ship-p1-0", 640, 500, 0);
+    me.hull = 50;
+    r = resolveTurn(g, noOrders(g), createRng(1));
+    tail = r.events.find((e) => e.type === "cometTail");
+    expect(tail && tail.type === "cometTail" && tail.effect === "hull" && tail.amount === 10).toBe(true);
+    expect(r.state.ships[0].hull).toBe(60);
+    // vše plné → kredity
+    g = base();
+    me = place(g, "ship-p1-0", 640, 500, 0);
+    r = resolveTurn(g, noOrders(g), createRng(1));
+    tail = r.events.find((e) => e.type === "cometTail");
+    expect(tail && tail.type === "cometTail" && tail.effect === "credits").toBe(true);
+    expect(r.state.players[0].credits).toBe(DEFAULT_TUNING.startBudget - moduleCost(DEFAULT_LOADOUT) + COMET.bonusCredits + DEFAULT_TUNING.creditsPerTurn);
+    // celolodní štít 25 % maxima
+    g = base();
+    me = place(g, "ship-p1-0", 640, 500, 0);
+    me.shieldType = "whole";
+    me.stats.shields = 40;
+    me.shields = 10;
+    r = resolveTurn(g, noOrders(g), createRng(1));
+    tail = r.events.find((e) => e.type === "cometTail");
+    expect(tail && tail.type === "cometTail" && tail.effect === "shield" && tail.amount === 10).toBe(true);
+    // bez štítu: stres zpět na max + kredity
+    g = base();
+    me = place(g, "ship-p1-0", 640, 500, 0);
+    me.shieldType = "none";
+    me.stressPoints = 0;
+    r = resolveTurn(g, noOrders(g), createRng(1));
+    tail = r.events.find((e) => e.type === "cometTail");
+    expect(tail && tail.type === "cometTail" && tail.effect === "stress").toBe(true);
+    expect(r.state.ships[0].stressPoints).toBe(3);
   });
 });

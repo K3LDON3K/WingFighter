@@ -1,4 +1,4 @@
-import { SCANNER, TORPEDO } from "./constants.ts";
+import { COMET, SCANNER, TORPEDO } from "./constants.ts";
 import type { Vec } from "./geometry.ts";
 import type { Asteroid, GameState, MovePath, TurnEvent, TurnResult } from "./types.ts";
 
@@ -57,6 +57,7 @@ export function stateForTeam(state: GameState, team: number, memory: AsteroidMem
     torpedoes: state.torpedoes.filter((t) => t.team === team || seenBy(eyes, t, TORPEDO.radius)),
     mines: state.mines.filter((m) => m.team === team || seenBy(eyes, m, m.radius)),
     debris: (state.debris ?? []).filter((d) => seenBy(eyes, d, 12)),
+    comets: (state.comets ?? []).filter((c) => seenBy(eyes, c, c.radius + COMET.tailLength / 2)),
     asteroids: [...memory.values()].map((a) => structuredClone(a)),
   };
 }
@@ -77,10 +78,16 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
   const pathVisible = (p: MovePath) => p.points.some((pt, i) => i % 3 === 0 && seenBy(eyes, pt, 20));
   const visibleShip = new Set<string>();
   const visibleTorp = new Set<string>();
+  const visibleComet = new Set<string>();
   for (const p of paths) {
+    if (p.kind === "comet") {
+      if (pathVisible(p)) visibleComet.add(p.id);
+      continue;
+    }
     const own = p.kind === "ship" ? shipTeam(p.id) === team : torpTeam(p.id) === team;
     if (own || pathVisible(p)) (p.kind === "ship" ? visibleShip : visibleTorp).add(p.id);
   }
+  for (const c of result.state.comets ?? []) if (seenBy(eyes, c, c.radius)) visibleComet.add(c.id);
   for (const s of result.state.ships) if (s.team === team || seenBy(eyes, s, s.stats.radius)) visibleShip.add(s.id);
   for (const t of result.state.torpedoes) if (t.team === team || seenBy(eyes, t, TORPEDO.radius)) visibleTorp.add(t.id);
 
@@ -88,7 +95,7 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
   for (const e of result.events) {
     switch (e.type) {
       case "move":
-        events.push({ type: "move", paths: paths.filter((p) => (p.kind === "ship" ? visibleShip.has(p.id) : visibleTorp.has(p.id))) });
+        events.push({ type: "move", paths: paths.filter((p) => (p.kind === "ship" ? visibleShip.has(p.id) : p.kind === "comet" ? visibleComet.has(p.id) : visibleTorp.has(p.id))) });
         break;
       case "collision":
       case "stress":
@@ -121,7 +128,22 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
         break;
       case "laser":
       case "mg":
-        if (visibleShip.has(e.shooterId) || visibleShip.has(e.targetId) || visibleTorp.has(e.targetId)) events.push(e);
+        if (visibleShip.has(e.shooterId) || visibleShip.has(e.targetId) || visibleTorp.has(e.targetId) || visibleComet.has(e.targetId)) events.push(e);
+        break;
+      case "spawnComet":
+        if (seenBy(eyes, e.comet, e.comet.radius)) {
+          events.push(e);
+          visibleComet.add(e.comet.id);
+        }
+        break;
+      case "cometShot":
+        if (visibleShip.has(e.shooterId) || visibleComet.has(e.cometId)) events.push(e);
+        break;
+      case "cometGone":
+        if (visibleComet.has(e.cometId) || seenBy(eyes, e, 40)) events.push(e);
+        break;
+      case "cometTail":
+        if (visibleShip.has(e.shipId)) events.push(e);
         break;
       case "spawnTorpedo":
         if (e.torpedo.team === team || seenBy(eyes, e.torpedo, 20)) {

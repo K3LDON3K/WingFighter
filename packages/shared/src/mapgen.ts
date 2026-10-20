@@ -18,7 +18,7 @@ export const MAP_SIZES: Record<MapSettings["size"], { w: number; h: number; labe
 /** Startovní pásmo u okraje mapy (startovní body leží v této vzdálenosti od okraje). */
 export const START_MARGIN = 160;
 
-export const DEFAULT_MAP: MapSettings = { size: "medium", asteroids: "medium", clusters: false, storms: 2, stormSize: "medium", seed: 1, symmetric: false };
+export const DEFAULT_MAP: MapSettings = { size: "medium", asteroids: "medium", clusters: false, storms: 2, stormSize: "medium", seed: 1, symmetric: false, comets: "few", cometsHitAsteroids: false };
 
 export interface GeneratedMap {
   width: number;
@@ -40,6 +40,8 @@ export function sanitizeMapSettings(raw: unknown, base: MapSettings = DEFAULT_MA
   if (r.stormSize === "small" || r.stormSize === "medium" || r.stormSize === "large") out.stormSize = r.stormSize;
   if (typeof r.seed === "number" && Number.isFinite(r.seed)) out.seed = Math.max(0, Math.min(999999, Math.round(r.seed)));
   if (typeof r.symmetric === "boolean") out.symmetric = r.symmetric;
+  if (r.comets === "none" || r.comets === "few" || r.comets === "medium" || r.comets === "many") out.comets = r.comets;
+  if (typeof r.cometsHitAsteroids === "boolean") out.cometsHitAsteroids = r.cometsHitAsteroids;
   return out;
 }
 

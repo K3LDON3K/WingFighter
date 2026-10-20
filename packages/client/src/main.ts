@@ -22,6 +22,7 @@ import {
   TEAM_COLORS,
   TEAM_NAMES,
   TORPEDO,
+  COMET,
   MINE,
   applyTuning,
   computeStats,
@@ -564,7 +565,9 @@ function buildOverlay(view: ViewModel): Overlay {
     .filter((s) => s.team === me?.team)
     .map((s) => ({ x: s.x, y: s.y, r: g.state.ships.find((q) => q.id === s.id)?.stats.vision ?? 960 }));
   overlay.visionRing = true;
+  overlay.myShipIds = g.state.ships.filter((s) => s.alive && s.ownerId === playerId).map((s) => s.id);
   if (g.anim || g.state.status === "finished") return overlay;
+  overlay.cometPredict = true;
   overlay.selectedShipId = g.selectedShipId;
   overlay.picking = g.picking ?? undefined;
   overlay.previews = [];
@@ -719,7 +722,7 @@ function renderLeaderboard(s: GameState): HTMLElement {
   const table = h(
     "table",
     { class: "lb" },
-    h("thead", {}, h("tr", {}, th("#"), th("hráč"), th("sestřely"), th("poškození", "Uděleno / utrženo (trup i štít)"), th("kredity", "Vydělané kredity (bez startovního rozpočtu)"), th("manévry", "zelený / bílý / červený / nebezpečný · otočky"), th("lasery", "zásahy / salvy"), th("kulomet", "zásahy / projektily"), th("torp.", "vystřelená torpéda"), th("miny"), th("skeny"))),
+    h("thead", {}, h("tr", {}, th("#"), th("hráč"), th("sestřely"), th("poškození", "Uděleno / utrženo (trup i štít)"), th("kredity", "Vydělané kredity (bez startovního rozpočtu)"), th("manévry", "zelený / bílý / červený / nebezpečný · otočky"), th("lasery", "zásahy / salvy"), th("kulomet", "zásahy / projektily"), th("torp.", "vystřelená torpéda"), th("miny"), th("skeny"), th("komety", "sestřelené komety / průlety ocasem"))),
     h(
       "tbody",
       {},
@@ -738,6 +741,7 @@ function renderLeaderboard(s: GameState): HTMLElement {
           td(`${st!.mgHits ?? 0} / ${st!.mgShots ?? 0}`, "num"),
           td(st!.torpedoesFired, "num"),
           td(st!.minesDropped, "num"),
+          td(`${st!.cometsShot ?? 0} / ${st!.cometTails ?? 0}`, "num"),
           td(st!.scans, "num"),
         );
       }),
@@ -871,12 +875,19 @@ function renderTooltip() {
   const [hShip, hAct] = (game.hoverIcon ?? "").split(":");
   const a = hAct ? actionById(hAct) : undefined;
   const sel = game.state.ships.find((s) => s.id === hShip);
-  if (!a || !game.mouse || !sel) {
+  const hoverComet = !a && game.hoverId ? (game.anim ? game.anim.view : game.view).comets.find((c) => c.id === game!.hoverId) : undefined;
+  if ((!a || !sel) && !hoverComet) {
     tooltipEl.style.display = "none";
     return;
   }
-  const why = a.disabled(sel, game.state, game.orders.get(sel.id)!);
-  const html = `<b>${a.label}</b>${a.description}${why ? `<div class="warn">Nelze: ${why}.</div>` : ""}`;
+  if (!game.mouse) {
+    tooltipEl.style.display = "none";
+    return;
+  }
+  const why = a && sel ? a.disabled(sel, game.state, game.orders.get(sel.id)!) : "";
+  const html = hoverComet
+    ? `<b>Kometa</b>Odolnost ${hoverComet.hull}/${hoverComet.maxHull}, rychlost ${hoverComet.speed}/kolo. Náraz zraní loď (−${COMET.damage}) a odmrští ji. Sestřelení: +${COMET.reward} CR.<div class="ok">Průlet ocasem (tyrkysová zóna za kometou) doplní štít (${COMET.shieldPct} % / +1 segment) – každá loď jednou za kometu.</div>`
+    : `<b>${a!.label}</b>${a!.description}${why ? `<div class="warn">Nelze: ${why}.</div>` : ""}`;
   if (tooltipEl.innerHTML !== html) tooltipEl.innerHTML = html;
   tooltipEl.style.display = "block";
   const x = Math.min(game.mouse.sx + 16, mapEl.clientWidth - 300);
@@ -1161,7 +1172,7 @@ let logOpen = true;
 /* ------------------------------------------------------------------ */
 
 interface Entity {
-  kind: "ship" | "torpedo" | "debris";
+  kind: "ship" | "torpedo" | "debris" | "comet";
   id: string;
   team: number;
   ownerId?: string;
@@ -1183,6 +1194,10 @@ function entityAt(x: number, y: number): Entity | undefined {
   for (const db of view.debris) {
     const d = Math.hypot(db.x - x, db.y - y);
     if (d <= 16 && (!best || d < best.d)) best = { e: { kind: "debris", id: db.id, team: -1 }, d };
+  }
+  for (const c of view.comets) {
+    const d = Math.hypot(c.x - x, c.y - y);
+    if (d <= c.radius + 8 && (!best || d < best.d)) best = { e: { kind: "comet", id: c.id, team: -1 }, d };
   }
   return best?.e;
 }
@@ -1373,8 +1388,8 @@ function bindInput(c: HTMLCanvasElement) {
       renderSide();
       return;
     }
-    // 4) výběr cíle pro označenou loď (trosky = jen cíl laserů)
-    if (hit && hit.kind === "debris") {
+    // 4) výběr cíle pro označenou loď (trosky / kometa = cíl laserů a kulometu)
+    if (hit && (hit.kind === "debris" || hit.kind === "comet")) {
       g.orders.set(sel.id, { ...o, preferredTargetId: o.preferredTargetId === hit.id ? undefined : hit.id });
       renderSide();
       return;
@@ -1522,7 +1537,7 @@ function bindInput(c: HTMLCanvasElement) {
 
 function hitPos(hit: Entity): { x: number; y: number } {
   const view = game!.view;
-  const s = hit.kind === "ship" ? view.ships.find((x) => x.id === hit.id) : hit.kind === "torpedo" ? view.torpedoes.find((x) => x.id === hit.id) : view.debris.find((x) => x.id === hit.id);
+  const s = hit.kind === "ship" ? view.ships.find((x) => x.id === hit.id) : hit.kind === "torpedo" ? view.torpedoes.find((x) => x.id === hit.id) : hit.kind === "comet" ? view.comets.find((x) => x.id === hit.id) : view.debris.find((x) => x.id === hit.id);
   return s ?? { x: 0, y: 0 };
 }
 

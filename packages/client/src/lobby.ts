@@ -255,13 +255,15 @@ function roomView(m: LobbyModel, net: Net) {
             sel("Bouře", String(map.storms), [["0", "žádná"], ["1", "1"], ["2", "2"], ["3", "3"], ["5", "mnoho (5)"]], (v) => setMap({ storms: Number(v) })),
             sel("Velikost bouří", map.stormSize, [["small", "malé"], ["medium", "střední"], ["large", "velké"]], (v) => setMap({ stormSize: v as MapSettings["stormSize"] })),
             h("label", {}, h("span", {}, "Symetrická"), h("input", { type: "checkbox", checked: map.symmetric, disabled: !isHost, title: "Zrcadlená mapa – obě strany stejné podmínky", onchange: (e) => setMap({ symmetric: (e.target as HTMLInputElement).checked }) })),
+            sel("Komety", map.comets ?? "none", [["none", "žádné"], ["few", "málo"], ["medium", "středně"], ["many", "hodně"]], (v) => setMap({ comets: v as MapSettings["comets"] })),
+            h("label", {}, h("span", {}, "Komety naráží do asteroidů"), h("input", { type: "checkbox", checked: !!map.cometsHitAsteroids, disabled: !isHost, title: "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím.", onchange: (e) => setMap({ cometsHitAsteroids: (e.target as HTMLInputElement).checked }) })),
             h(
               "label",
               {},
               h("span", {}, "Seed"),
               h("span", { class: "row", style: "gap:4px" }, h("input", { type: "number", value: String(map.seed), min: "0", max: "999999", disabled: !isHost, style: "width:90px", onchange: (e) => setMap({ seed: Number((e.target as HTMLInputElement).value) || 0 }) }), isHost ? h("button", { title: "Nová náhodná mapa", onclick: () => setMap({ seed: Math.floor(Math.random() * 100000) }) }, "🎲") : null),
             ),
-            h("div", { class: "muted txt", style: "margin-top:6px" }, "Stejný seed = stejná mapa. Elektromagnetická bouře (fialová): uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener a dohled jí neprojdou."),
+            h("div", { class: "muted txt", style: "margin-top:6px" }, "Stejný seed = stejná mapa. Elektromagnetická bouře (fialová): uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener jí nepronikne. Komety přilétají na okraj mapy a letí přes ni rychleji než torpéda: náraz zraní loď, sestřel dává kredity, průlet ocasem doplní štít."),
           ),
           h(
             "div",

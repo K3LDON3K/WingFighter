@@ -186,6 +186,21 @@ export interface Torpedo extends Pose {
 }
 export type TorpedoPhase = "launch" | "lock" | "cruise";
 
+/**
+ * Kometa: malý kámen letící vysokou rychlostí přímo přes mapu. Lze ji sestřelit zbraněmi; náraz zraní loď.
+ * Za kometou je ocas – loď, která jím proletí, si doplní štít (každá loď jednou za kometu).
+ */
+export interface Comet extends Pose {
+  id: string;
+  /** Ujetá vzdálenost za kolo. */
+  speed: number;
+  hull: number;
+  maxHull: number;
+  radius: number;
+  /** Lodě, které už ocas této komety využily. */
+  tailUsed: string[];
+}
+
 export interface Mine {
   id: string;
   ownerId: string;
@@ -250,6 +265,10 @@ export interface MapSettings {
   seed: number;
   /** Zrcadlově symetrická mapa (férová pro týmy). */
   symmetric: boolean;
+  /** Komety: jak často přilétají (šance za kolo a limit – v ladění). */
+  comets: "none" | "few" | "medium" | "many";
+  /** Komety naráží do asteroidů (zmizí a vykousnou kráter); jinak jimi proletí. */
+  cometsHitAsteroids: boolean;
 }
 
 /** Elektromagnetická bouře: shluk kruhů. Uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener a dohled nepronikne. */
@@ -293,6 +312,9 @@ export interface PlayerStats {
   torpedoesFired: number;
   minesDropped: number;
   scans: number;
+  /** Sestřelené komety a průlety ocasem. */
+  cometsShot?: number;
+  cometTails?: number;
 }
 
 export interface GameState {
@@ -308,6 +330,7 @@ export interface GameState {
   torpedoes: Torpedo[];
   mines: Mine[];
   debris: Debris[];
+  comets?: Comet[];
   players: PlayerInfo[];
   /** Týmy, které mají do konce kola odkrytou mapu (hluboký sken). */
   revealTeams?: number[];
@@ -322,7 +345,13 @@ export type DieFace = "hit" | "crit" | "focus" | "blank" | "evade";
 /** Události jednoho kola – klient podle nich animuje. */
 export type TurnEvent =
   | { type: "move"; paths: MovePath[] }
-  | { type: "collision"; shipId: string; with: "ship" | "asteroid" | "edge"; otherId?: string; t: number; newHeading: number }
+  | { type: "collision"; shipId: string; with: "ship" | "asteroid" | "edge" | "comet"; otherId?: string; t: number; newHeading: number }
+  /** Kometa: přílet na okraj mapy, zásah zbraní (lasery/kulomet před pohybem), zánik během pohybu (náraz do lodi/asteroidu/torpéda/miny, odlet z mapy). */
+  | { type: "spawnComet"; comet: Comet }
+  | { type: "cometShot"; cometId: string; shooterId: string; x: number; y: number; damage: number; hullAfter: number; destroyed: boolean; reward: number }
+  | { type: "cometGone"; cometId: string; x: number; y: number; t: number; reason: "ship" | "asteroid" | "torpedo" | "mine" | "edge"; shipId?: string; damage?: number }
+  /** Průlet ocasem komety: co loď dostala. */
+  | { type: "cometTail"; cometId: string; shipId: string; t: number; x: number; y: number; effect: "shield" | "segment" | "hull" | "credits" | "stress"; amount: number; segment?: number }
   | { type: "mineBlast"; mineId: string; x: number; y: number; t: number; hits: { shipId: string; damage: number }[] }
   | { type: "torpedoHit"; torpedoId: string; shipId?: string; x: number; y: number; t: number; damage: number; blast: boolean }
   | { type: "asteroidHit"; asteroidId: string; x: number; y: number; t: number; profile: number[]; destroyed: boolean }
@@ -330,7 +359,7 @@ export type TurnEvent =
   | { type: "torpedoShot"; torpedoId: string; shooterId: string; x: number; y: number; attackDice: DieFace[]; defenseDice: DieFace[]; destroyed: boolean }
   | { type: "debrisShot"; debrisId: string; shooterId: string; x: number; y: number; destroyed: boolean; reward: number }
   | { type: "jettison"; shipId: string; debris: Debris }
-  | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" }
+  | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" | "comet" | "tail" }
   /** Skener (vyhodnocuje se hned při plánování, ale zapisuje se do logu kola). */
   | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }
   | { type: "action"; shipId: string; action: ActionOrder; ok: boolean; path?: Pose[] }
@@ -370,7 +399,7 @@ export type TurnEvent =
 
 export interface MovePath {
   id: string;
-  kind: "ship" | "torpedo";
+  kind: "ship" | "torpedo" | "comet";
   /** Vzorky dráhy (MOVE_STEPS + 1). Po zastavení se poslední pozice opakuje. */
   points: Pose[];
 }

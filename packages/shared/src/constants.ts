@@ -81,6 +81,30 @@ export const TORPEDO = {
   blastDamage: 30,
 };
 
+/** Komety (hodnoty mutuje ladění). */
+export const COMET = {
+  /** Ujetá vzdálenost za kolo (o něco víc než torpédo). */
+  speed: 300,
+  hull: 30,
+  /** Zranění lodi při nárazu. */
+  damage: 30,
+  radius: 12,
+  /** Odměna za sestřelení. */
+  reward: 25,
+  /** Ocas: délka a šířka (herní jednotky). */
+  tailLength: 180,
+  tailWidth: 40,
+  /** Průlet ocasem: % maxima celolodního štítu; když je štít plný, % trupu; když je i trup plný, kredity. */
+  shieldPct: 25,
+  hullPct: 10,
+  bonusCredits: 50,
+  /** Loď bez štítového modulu: reset stresu + kredity. */
+  noShieldCredits: 100,
+  /** Šance (%) na novou kometu za kolo a max. počet komet na mapě podle nastavení mapy. */
+  chance: { few: 25, medium: 50, many: 100 } as Record<"few" | "medium" | "many", number>,
+  max: { few: 2, medium: 4, many: 6 } as Record<"few" | "medium" | "many", number>,
+};
+
 export const MINE = {
   /** Poloměr pole působnosti. */
   radius: 70,

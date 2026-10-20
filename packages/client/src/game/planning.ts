@@ -1,5 +1,6 @@
 import {
   RULES,
+  COMET,
   actionList,
   laserOdds,
   FACING_NAMES,
@@ -383,8 +384,9 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
     const picker = modulePicker("laser", o.laserModuleId, (id) => cb.setOrders(ship.id, { laserModuleId: id }));
     if (picker) details.append(picker);
     const debrisTarget = o.preferredTargetId ? (m.state.debris ?? []).find((d) => d.id === o.preferredTargetId) : undefined;
-    const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? (debrisTarget ? `trosky ${MODULES[debrisTarget.type].short} (+${debrisTarget.value})` : "torpédo")) : null;
-    const target = debrisTarget ? undefined : laserTarget(m.state, ship, o.preferredTargetId, o.laserModuleId);
+    const cometTarget = o.preferredTargetId ? (m.state.comets ?? []).find((c) => c.id === o.preferredTargetId) : undefined;
+    const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? (debrisTarget ? `trosky ${MODULES[debrisTarget.type].short} (+${debrisTarget.value})` : cometTarget ? `kometa (${cometTarget.hull} HP, +${COMET.reward})` : "torpédo")) : null;
+    const target = debrisTarget || cometTarget ? undefined : laserTarget(m.state, ship, o.preferredTargetId, o.laserModuleId);
     details.append(icon("target", target ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, tname ?? (target ? `nejbližší: ${target.name}` : "nikdo ve výseči")));
     if (target) {
       const odds = laserOdds(ship, target);
@@ -397,7 +399,7 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
         ),
         h("span", { class: "muted" }, label(`· průměr ${Math.round(odds.expectedDamage)} zranění`)),
       );
-    } else if (o.preferredTargetId && !debrisTarget) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
+    } else if (o.preferredTargetId && !debrisTarget && !cometTarget) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
     details.append(h("span", { class: "muted" }, label("· klik na nepřítele = cíl")));
   } else if (stormed) {
     details.append(h("span", { class: "pv" }, label("⚡ v bouři: lasery, štít a skener dočasně mimo provoz · torpéda letí rovně")));

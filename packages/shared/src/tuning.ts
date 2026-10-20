@@ -2,7 +2,7 @@
  * Ladicí parametry hry (balanc). Host je může měnit v lobby i během bitvy;
  * server je aplikuje před každým vyhodnocením, klient před vykreslením.
  */
-import { CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
+import { COMET, CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
 import { HULLS, LASER_DICE, MODULES, WEIGHT } from "./ships.ts";
 
@@ -92,6 +92,24 @@ export interface Tuning {
   scannerCooldown: number;
   priceScanner: number;
   weightScanner: number;
+  // komety
+  cometSpeed: number;
+  cometHull: number;
+  cometDamage: number;
+  cometRadius: number;
+  cometReward: number;
+  cometTailLength: number;
+  cometTailWidth: number;
+  cometShieldPct: number;
+  cometHullPct: number;
+  cometBonusCredits: number;
+  cometNoShieldCredits: number;
+  cometChanceFew: number;
+  cometChanceMedium: number;
+  cometChanceMany: number;
+  cometMaxFew: number;
+  cometMaxMedium: number;
+  cometMaxMany: number;
   // ekonomika
   startBudget: number;
   creditsPerKill: number;
@@ -176,6 +194,23 @@ export const DEFAULT_TUNING: Tuning = {
   scannerCooldown: 3,
   priceScanner: 130,
   weightScanner: 1,
+  cometSpeed: 300,
+  cometHull: 30,
+  cometDamage: 30,
+  cometRadius: 12,
+  cometReward: 25,
+  cometTailLength: 180,
+  cometTailWidth: 40,
+  cometShieldPct: 25,
+  cometHullPct: 10,
+  cometBonusCredits: 50,
+  cometNoShieldCredits: 100,
+  cometChanceFew: 25,
+  cometChanceMedium: 50,
+  cometChanceMany: 100,
+  cometMaxFew: 2,
+  cometMaxMedium: 4,
+  cometMaxMany: 6,
   startBudget: 500,
   creditsPerKill: 200,
   creditsPerTurn: 10,
@@ -278,6 +313,24 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "scannerCooldown", label: "Cooldown po hlubokém skenu (kola)", group: "Skener", min: 1, max: 10, step: 1, hint: "vynucený cooldown = tato hodnota − zbývající náboje" },
   { key: "priceScanner", label: "Modul – cena", group: "Skener", min: 0, max: 2000, step: 10 },
   { key: "weightScanner", label: "Modul – váha", group: "Skener", min: 0, max: 20, step: 0.5 },
+  // --- komety ---
+  { key: "cometSpeed", label: "Rychlost / kolo", group: "Komety", min: 50, max: 1000, step: 10, hint: "torpédo má 240" },
+  { key: "cometHull", label: "Odolnost (trup komety)", group: "Komety", min: 5, max: 300, step: 5 },
+  { key: "cometDamage", label: "Zranění lodi při nárazu", group: "Komety", min: 0, max: 200, step: 5 },
+  { key: "cometRadius", label: "Poloměr jádra", group: "Komety", min: 4, max: 40, step: 1 },
+  { key: "cometReward", label: "Odměna za sestřelení", group: "Komety", min: 0, max: 500, step: 5 },
+  { key: "cometTailLength", label: "Ocas – délka", group: "Komety", min: 0, max: 600, step: 10 },
+  { key: "cometTailWidth", label: "Ocas – šířka", group: "Komety", min: 10, max: 200, step: 5 },
+  { key: "cometShieldPct", label: "Průlet ocasem – % štítu", group: "Komety", min: 0, max: 100, step: 5, hint: "celolodní: % maxima; segmentový: +1 bod náhodnému segmentu" },
+  { key: "cometHullPct", label: "Průlet – % trupu (když je štít plný)", group: "Komety", min: 0, max: 100, step: 5 },
+  { key: "cometBonusCredits", label: "Průlet – kredity (když není co doplnit)", group: "Komety", min: 0, max: 1000, step: 10 },
+  { key: "cometNoShieldCredits", label: "Průlet bez štítového modulu – kredity", group: "Komety", min: 0, max: 1000, step: 10, hint: "loď bez štítu dostane navíc plný stres" },
+  { key: "cometChanceFew", label: "Málo – šance za kolo %", group: "Komety", min: 0, max: 100, step: 5 },
+  { key: "cometMaxFew", label: "Málo – max. na mapě", group: "Komety", min: 1, max: 20, step: 1 },
+  { key: "cometChanceMedium", label: "Středně – šance za kolo %", group: "Komety", min: 0, max: 100, step: 5 },
+  { key: "cometMaxMedium", label: "Středně – max. na mapě", group: "Komety", min: 1, max: 20, step: 1 },
+  { key: "cometChanceMany", label: "Hodně – šance za kolo %", group: "Komety", min: 0, max: 100, step: 5 },
+  { key: "cometMaxMany", label: "Hodně – max. na mapě", group: "Komety", min: 1, max: 20, step: 1 },
   // --- ekonomika ---
   { key: "startBudget", label: "Rozpočet na výbavu", group: "Ekonomika", min: 0, max: 5000, step: 50, hint: "co hráč neutratí, má jako kredity ve hře" },
   { key: "creditsPerKill", label: "Odměna za sestřel", group: "Ekonomika", min: 0, max: 5000, step: 10 },
@@ -382,6 +435,19 @@ export function applyTuning(t: Tuning): void {
   SCANNER.cooldown = t.scannerCooldown;
   MODULES.scanner.price = t.priceScanner;
   MODULES.scanner.weight = t.weightScanner;
+  COMET.speed = t.cometSpeed;
+  COMET.hull = t.cometHull;
+  COMET.damage = t.cometDamage;
+  COMET.radius = t.cometRadius;
+  COMET.reward = t.cometReward;
+  COMET.tailLength = t.cometTailLength;
+  COMET.tailWidth = t.cometTailWidth;
+  COMET.shieldPct = t.cometShieldPct;
+  COMET.hullPct = t.cometHullPct;
+  COMET.bonusCredits = t.cometBonusCredits;
+  COMET.noShieldCredits = t.cometNoShieldCredits;
+  COMET.chance = { few: t.cometChanceFew, medium: t.cometChanceMedium, many: t.cometChanceMany };
+  COMET.max = { few: t.cometMaxFew, medium: t.cometMaxMedium, many: t.cometMaxMany };
   RULES.creditsPerKill = t.creditsPerKill;
   RULES.creditsPerTurn = t.creditsPerTurn;
   RULES.debrisRewardPct = t.debrisRewardPct;
