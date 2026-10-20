@@ -3371,3 +3371,51 @@ button.mod-hex:hover:not(:disabled) {
 .gamecard.open .game-side {
   max-width: 560px;
 }
+.gamecard.open .game-side {
+  max-width: none;
+}
+.gamecard.open .fsec-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.start-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+button.start-chip,
+button.start-chip:hover:not(:disabled) {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 4px;
+  font-family: var(--ui);
+  font-size: 15px;
+  color: #cbd5e1;
+  background: #0b1020;
+  border: 2px solid #334155;
+  border-left: 5px solid var(--team);
+  cursor: pointer;
+}
+button.start-chip:hover:not(:disabled) {
+  border-color: #64748b;
+  border-left-color: var(--team);
+}
+button.start-chip.on,
+button.start-chip.on:hover:not(:disabled) {
+  background: var(--accent);
+  color: #0b1020;
+  border-color: var(--accent);
+  border-left-color: var(--team);
+}
+.start-chip svg {
+  display: block;
+  image-rendering: pixelated;
+}
+.start-chip .sc-tick {
+  display: inline-flex;
+  margin-left: 2px;
+}

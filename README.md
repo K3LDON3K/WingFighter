@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.47 – V otevřené místnosti je **náhled mapy přes celou šířku** panelu (značky a jména se škálují). Startovní bod:
+  každý hráč volí jen sobě; host navíc botům – místo seznamu jsou **čipy** (já + boti s ikonkou): klik na bota, klik na
+  kroužek v mapě, bot dostane **✓**. Po výběru se volba vrátí na „já“.
 - v3.46 – **Místnost se otevírá až po nastavení**: nově vytvořená místnost je zavřená – zakladatel projde průvodce
   (Mapa · Bitva · Lodě a piloti · Moduly) a na konci dá **OTEVŘÍT MÍSTNOST** (i tlačítko dole). Do té doby ji ostatní
   v seznamu vidí s poznámkou „zakladatel dokončuje nastavení…“ a připojení (i kódem) server odmítne. Po otevření se

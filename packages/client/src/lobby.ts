@@ -360,7 +360,25 @@ function roomView(m: LobbyModel, net: Net) {
       const ROCK_LEVEL: [number, number, number][][] = [[[13, 13, 4]], [[8, 9, 3.5], [18, 17, 4]], [[7, 7, 3], [19, 8, 3.5], [9, 19, 3.5], [19, 19, 2.5], [14, 13, 2]]];
       const STORM_SIZES: MapSettings["stormSize"][] = ["small", "medium", "large"];
       const bots = room.players.filter((p) => p.isBot);
-      const targetSel = isHost && bots.length ? h("select", { class: "fsel", style: "width:150px", onchange: (e) => (startFor = (e.target as HTMLSelectElement).value || null) }, h("option", { value: "", selected: !startFor }, "já"), ...bots.map((b) => h("option", { value: b.id, selected: startFor === b.id }, b.name))) : null;
+      // Startovní bod: hráč volí jen sobě; host navíc botům – klikne na čip bota, pak na kroužek v mapě.
+      if (startFor && !bots.some((b) => b.id === startFor)) startFor = null;
+      const startChip = (p: RoomPlayer | null) => {
+        const id = p?.id ?? null;
+        const on = startFor === id;
+        const set = p ? p.startIndex !== undefined : me?.startIndex !== undefined;
+        return h(
+          "button",
+          { class: `start-chip ${on ? "on" : ""} ${set ? "set" : ""}`, style: `--team:${TEAM_COLORS[(p ?? me)?.team ?? 0]}`, title: p ? `${p.name}: ${set ? "start zvolen · klik = vybírat znovu" : "klikni a pak vyber kroužek na mapě"}` : set ? "Tvůj start je zvolený" : "Vyber si kroužek na mapě", onclick: () => ((startFor = id), rerender()) },
+          p ? icon("bot", on ? "#0b1020" : "currentColor", 12) : pilotPortrait(me?.loadouts?.[0]?.pilotId ?? me?.loadout.pilotId ?? "kadet", 16),
+          h("span", { class: "sc-name" }, p ? p.name.replace(/^Bot /, "") : "já"),
+          set ? h("span", { class: "sc-tick" }, icon("tick", "#4ade80", 10)) : null,
+        );
+      };
+      const startChips = isHost && bots.length ? h("div", { class: "start-chips" }, h("span", { class: "txt muted", style: "font-size:13px" }, "Start pro"), startChip(null), ...bots.map((b) => startChip(b))) : null;
+      const pickStart = (index: number | null) => {
+        net.send({ type: "setStart", index, ...(startFor ? { botId: startFor } : {}) });
+        startFor = null;
+      };
       const TILE_COLOR: Record<ModuleType, string> = { laser: "#f87171", torpedo: "#fb923c", mine: "#fbbf24", "shield-segment": "#7dd3fc", mg: "#fde047", scanner: "#a78bfa", "shield-whole": "#38bdf8" };
       const allowedOn = (t: ModuleType) => settings.allowedModules[t] !== 0;
       const setAllowed = (t: ModuleType, on: boolean) => {
@@ -409,10 +427,9 @@ function roomView(m: LobbyModel, net: Net) {
           h(
             "div",
             { class: "game-side" },
-            h("div", { class: "fsec-h" }, label("Náhled mapy · startovní bod")),
-            renderMapPreview(map, room.players, startFor ?? m.playerId, (index) => net.send({ type: "setStart", index, ...(startFor ? { botId: startFor } : {}) })),
-            h("div", { class: "muted txt" }, "Klikni na kroužek na okraji = tvůj start (barva = tým, ostatní vidí, kde kdo startuje). Bez volby dostaneš volný bod."),
-            targetSel ? h("div", { class: "frow" }, h("span", { class: "txt flbl" }, "Start pro"), h("div", { class: "fctl" }, targetSel), h("span")) : null,
+            h("div", { class: "fsec-h" }, label("Mapa · startovní bod"), h("span", { class: "spacer" }), startChips),
+            renderMapPreview(map, room.players, startFor ?? m.playerId, pickStart, 1200),
+            h("div", { class: "muted txt" }, startFor ? `Vybíráš start pro ${room.players.find((p) => p.id === startFor)?.name ?? "bota"} – klikni na kroužek na okraji mapy.` : "Klikni na kroužek na okraji = tvůj start (barva = tým, ostatní vidí, kde kdo startuje). Bez volby dostaneš volný bod."),
           ),
         );
       const pageOf = (i: number, ...nodes: (Node | null)[]) => (gamePage === i ? nodes : []);
@@ -570,9 +587,9 @@ function roomView(m: LobbyModel, net: Net) {
             "div",
             { class: "game-side" },
             h("div", { class: "fsec-h" }, label("Náhled mapy · startovní bod")),
-            renderMapPreview(map, room.players, startFor ?? m.playerId, (index) => net.send({ type: "setStart", index, ...(startFor ? { botId: startFor } : {}) })),
+            renderMapPreview(map, room.players, startFor ?? m.playerId, pickStart, 520),
             h("div", { class: "muted txt" }, "Klikni na kroužek na okraji = tvůj start (barva = tým, ostatní vidí, kde kdo startuje). Bez volby dostaneš volný bod."),
-            targetSel ? h("div", { class: "frow" }, h("span", { class: "txt flbl" }, "Start pro"), h("div", { class: "fctl" }, targetSel), h("span")) : null,
+            startChips,
           ),
         ),
       );

@@ -8,6 +8,8 @@ import { h } from "./dom.ts";
 export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], myId: string, onPick: (index: number | null) => void, width = 520): HTMLElement {
   const gen = generateMap(settings);
   const scale = width / gen.width;
+  /** Měřítko značek a písma vůči základní šířce 520 px. */
+  const k = Math.max(1, width / 520);
   const height = Math.round(gen.height * scale);
   const canvas = h("canvas", { width, height, class: "map-preview" });
   const ctx = canvas.getContext("2d")!;
@@ -54,23 +56,23 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
     const x = st.x * scale;
     const y = st.y * scale;
     ctx.beginPath();
-    ctx.arc(x, y, p ? 7 : 5, 0, Math.PI * 2);
+    ctx.arc(x, y, (p ? 7 : 5) * k, 0, Math.PI * 2);
     if (p) {
       ctx.fillStyle = TEAM_COLORS[p.team];
       ctx.fill();
       if (p.id === myId) {
         ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 * k;
         ctx.stroke();
       }
       ctx.fillStyle = "#e2e8f0";
-      ctx.font = "9px Jersey, ui-monospace, monospace";
+      ctx.font = `${Math.round(9 * k)}px Jersey, ui-monospace, monospace`;
       ctx.textAlign = x > width / 2 ? "right" : "left";
-      ctx.fillText(p.name, x + (x > width / 2 ? -10 : 10), y + 3);
+      ctx.fillText(p.name, x + (x > width / 2 ? -10 : 10) * k, y + 3 * k);
     } else {
       ctx.strokeStyle = "rgba(148,163,184,0.8)";
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([2, 2]);
+      ctx.lineWidth = 1.5 * k;
+      ctx.setLineDash([2 * k, 2 * k]);
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -83,7 +85,7 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
     const mx = ((ev.clientX - r.left) / r.width) * width;
     const my = ((ev.clientY - r.top) / r.height) * height;
     let best = -1;
-    let bd = 14;
+    let bd = 14 * k;
     gen.starts.forEach((st, i) => {
       const d = Math.hypot(st.x * scale - mx, st.y * scale - my);
       if (d < bd) {
