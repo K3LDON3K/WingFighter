@@ -4095,7 +4095,9 @@ button.start-chip.on:hover:not(:disabled) {
 .mod-pop {
   position: absolute;
   z-index: 25;
-  width: 300px;
+  width: 380px;
+  max-width: calc(100% - 8px);
+  box-sizing: border-box;
   background: #0f172a;
   border: 3px solid;
   border-color: #475569 #0b1020 #0b1020 #475569;
@@ -4124,6 +4126,12 @@ button.start-chip.on:hover:not(:disabled) {
   align-items: center;
   gap: 6px;
   min-height: 24px;
+  min-width: 0;
+}
+.mp-row > .px {
+  flex: none;
+  white-space: nowrap;
+  margin-left: auto;
 }
 .mp-k {
   font-family: var(--ui);
@@ -4158,7 +4166,9 @@ button.start-chip.on:hover:not(:disabled) {
 .mp-ammo {
   display: inline-flex;
   gap: 3px;
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
 }
 .mp-ammo i {

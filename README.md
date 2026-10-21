@@ -147,6 +147,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.81 – Okénko modulu je širší (380 px), tlačítka DOPLNIT / OPRAVIT / PRODAT se vždy vejdou (kulomet 60/100).
 - v3.80 – Šířka místnosti je pevná (1140 px, na menších obrazovkách 94 % šířky) a obsah ji už nikdy neroztáhne:
   5 bitev má stejnou šířku jako 2; záložky bitev se v úzkém sloupci zúží (bez podtextu), souhrn má kratší čipy
   (velikost mapy, „2 týmy“) a neořezává je.
