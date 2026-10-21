@@ -147,6 +147,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.103 – Sady výbavy: nad výbavou lodi tlačítka Prázdný · Útočník · Obránce · Taktik (rychlý start, pak jde vše
+  upravit). Sada se plní v pořadí priorit podle kreditů – co se nevejde nebo je zakázané, vynechá; moduly stejného
+  typu ponechá, ostatní prodá; nápověda ukáže, co koupí/prodá a kolik zůstane. Rozpočet na výbavu má minimum 100
+  (nejlevnější zbraň); náhodná výbava bota obsahuje zbraň, když na ni je. Hráč s lodí beze zbraně musí při
+  PŘIPRAVEN potvrdit, že letí beze zbraně (host se neptá); „⚠ bez zbraně“ vidí jen spoluhráči v týmu (v
+  deathmatchi nikdo).
 - v3.102 – Výchozí umístění na mapě je náhodné a výchozí výbava botů náhodná (obojí jde v nastavení změnit).
 - v3.101 – Balanc celolodního štítu (varianta C): zásoba 50 → 80, dobíjení +5 za kolo (dřív 0), účinnost už
   neklesá (pokles 0 %; v ladění jde vrátit – pak se opět ukazuje prstenec účinnosti). Cena a váha beze změny.

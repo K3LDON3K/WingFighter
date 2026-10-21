@@ -95,6 +95,8 @@ export const MODULES: Record<ModuleType, ModuleDef> = {
   "shield-whole": { id: "shield-whole", name: "Celolodní štít", short: "CEL", icon: "shield", size: "small", weight: 2, price: 120, hp: 40, shieldType: "whole", shields: 80, description: "Zásoba 80 kolem celé lodi – pohltí zranění z kterékoli strany, dokud zásoba stačí; každé kolo se dobíjí o 5. Nelze kombinovat se segmentovým." },
 };
 export const MODULE_TYPES = Object.keys(MODULES) as ModuleType[];
+/** Zbraně – s nimi jde aktivně vyhrát (sestřelit soupeře). */
+export const WEAPON_TYPES: ModuleType[] = ["laser", "torpedo", "mine", "mg"];
 
 /** Výchozí sestava (lasery, torpéda, miny, segmentový štít). */
 export const DEFAULT_LOADOUT: ShipLoadout = {
@@ -520,6 +522,14 @@ export function randomLoadout(rng: () => number, allowed: Partial<Record<ModuleT
   const lo: ShipLoadout = { hullId: "fighter", pilotId: "kadet", modules: [] };
   const order = [...MODULE_TYPES].sort(() => rng() - 0.5);
   let spent = 0;
+  // nejdřív zbraň (pokud na ni rozpočet stačí) – bot beze zbraně by jen čekal na smrt
+  const weapons = order.filter((t) => WEAPON_TYPES.includes(t) && (allowed[t] ?? 99) > 0 && MODULES[t].price <= budget);
+  if (weapons.length) {
+    const t = weapons[0];
+    const slot = freeSlots(lo).find((sl) => !(t === "mine" && sl === "front"))!;
+    lo.modules.push(newModule(t, slot, "b1"));
+    spent += MODULES[t].price;
+  }
   for (let round = 0; round < 3; round++) {
     for (const t of order) {
       const def = MODULES[t];

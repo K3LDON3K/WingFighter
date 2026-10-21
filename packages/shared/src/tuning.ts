@@ -388,7 +388,7 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "cargoMaxSpeed", label: "Max. rychlost při zvedání", group: "Náklad", min: 1, max: 5, step: 1 },
   { key: "cargoFighter", label: "Kapacita stíhače (modulů)", group: "Náklad", min: 0, max: 4, step: 1 },
   // --- ekonomika ---
-  { key: "startBudget", label: "Rozpočet na výbavu", group: "Ekonomika", min: 0, max: 5000, step: 50, hint: "co hráč neutratí, má jako kredity ve hře" },
+  { key: "startBudget", label: "Rozpočet na výbavu", group: "Ekonomika", min: 100, max: 5000, step: 50, hint: "nejméně 100 = nejlevnější zbraň; pod 250 se nevejde zbraň + štít; co hráč neutratí, má jako kredity ve hře" },
   { key: "creditsPerKill", label: "Odměna za sestřel", group: "Ekonomika", min: 0, max: 5000, step: 10 },
   { key: "creditsPerTurn", label: "Odměna za přežité kolo", group: "Ekonomika", min: 0, max: 500, step: 5 },
   { key: "debrisRewardPct", label: "Sestřelený vyhozený modul – % ceny", group: "Ekonomika", min: 0, max: 200, step: 10 },

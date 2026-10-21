@@ -2,7 +2,8 @@ import {
   RULES,
   HULLS,
   PILOTS,
-  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner } from "@wingfighter/shared";
+  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner, LOADOUT_PRESETS, applyPreset, unarmedShips, hasWeapon } from "@wingfighter/shared";
+import { confirmDialog } from "./dialog.ts";
 import { logoCanvas } from "./logo.ts";
 import { openRoadmap } from "./roadmap.ts";
 import { openMusicPanel } from "./main.ts";
@@ -191,6 +192,17 @@ function roomView(m: LobbyModel, net: Net) {
       h("span", { class: "sc-mods" }, ...(l.modules.length ? l.modules.map((m) => icon(MODULES[m.type].icon, m.hp !== undefined && m.hp <= 0 ? "#f87171" : "#60a5fa", 10)) : [h("span", { class: "muted", style: "font-size:11px" }, "–")])),
     );
   };
+  /** Potvrzení připravenosti; loď beze zbraně se nejdřív potvrzuje (hráč si za to odpovídá sám). */
+  const readyUp = () => {
+    const fleet = me ? (me.loadouts?.length ? me.loadouts : [me.loadout]) : [];
+    const bad = unarmedShips(fleet);
+    if (!bad.length) return net.send({ type: "setLobbyReady", ready: true });
+    const which = fleet.length > 1 ? `Loď ${bad.map((i) => `č. ${i}`).join(", ")} nemá` : "Tvoje loď nemá";
+    confirmDialog(
+      { title: "Letíš beze zbraně", text: `${which} žádnou zbraň (lasery, torpédomet, miny, kulomet). Nikoho nesestřelíš – vyhrát můžeš jen přežitím, a asteroidy, komety i okrajová bouře tě zabíjet budou. Opravdu letět beze zbraně?`, ok: "Ano, letím beze zbraně", cancel: "Zpět k výbavě", danger: true },
+      () => net.send({ type: "setLobbyReady", ready: true }),
+    );
+  };
   /** Hráči (bez botů a hosta), kteří ještě nepotvrdili připravenost. */
   const notReady = room.players.filter((p) => !p.isBot && p.id !== room.hostId && !p.lobbyReady);
   const fleetOf = (p: RoomPlayer) => (p.loadouts?.length ? p.loadouts : [p.loadout]);
@@ -200,6 +212,9 @@ function roomView(m: LobbyModel, net: Net) {
     const fleet = fleetOf(p);
     const err = validateFleet(fleet, room.settings);
     const status = !p.connected ? ["off", "odpojen"] : err ? ["warn", `⚠ ${err}`] : p.id === room.hostId ? ["ok", "✓ host"] : p.lobbyReady ? ["ok", "✓ připraven"] : ["wait", "⌛ ještě upravuje"];
+    // beze zbraně: vidí jen spoluhráči ve stejném týmu (v deathmatchi nikdo)
+    const unarmed = !p.isBot && p.connected && !err && room.settings.mode === "tdm" && me && me.team === p.team && unarmedShips(fleet).length > 0;
+    if (unarmed) status[1] += " · ⚠ bez zbraně";
     const canMove = nTeams > 1 && (isHost || p.id === m.playerId);
     const open = botEdit === p.id;
     return h(
@@ -310,7 +325,7 @@ function roomView(m: LobbyModel, net: Net) {
         !setup && !isHost && me
           ? me.lobbyReady
             ? h("button", { class: "on", title: "Jsi připraven. Klik = vzít zpět a ještě něco upravit (po každé vlastní změně se připravenost ruší sama).", onclick: () => net.send({ type: "setLobbyReady", ready: false }) }, icon("tick", "currentColor", 12), label("Připraven · upravit"))
-            : h("button", { class: "go", title: "Potvrdit, že máš hotovo – host může spustit bitvu, až budou připraveni všichni.", onclick: () => net.send({ type: "setLobbyReady", ready: true }) }, icon("tick", "currentColor", 12), label("Připraven"))
+            : h("button", { class: "go", title: "Potvrdit, že máš hotovo – host může spustit bitvu, až budou připraveni všichni.", onclick: () => readyUp() }, icon("tick", "currentColor", 12), label("Připraven"))
           : null,
         !setup && isHost
           ? h("button", { class: "go", disabled: notReady.length > 0, title: notReady.length ? `Čeká se na: ${notReady.map((p) => p.name).join(", ")}` : room.series?.finished ? "Stejné nastavení, nové mapy (seedy), skóre od nuly" : "", onclick: () => net.send({ type: "startGame" }) }, icon("play", "currentColor", 12), label(room.series ? (room.series.finished ? "Nová série" : `Zahájit bitvu ${room.series.played + 1}/${room.series.total}`) : "Zahájit bitvu"))
@@ -337,6 +352,17 @@ function roomView(m: LobbyModel, net: Net) {
               "div",
               {},
               fleet.length > 1 || settings.shipPoints > 1 ? h("div", { class: "row", style: "align-items:center;gap:10px" }, fleetTabs(fleet, t, (i) => ((fleetTab = i), rerender())), h("span", { class: "txt muted", style: "font-size:13px" }, `lodní body ${pts}/${settings.shipPoints} · jedna peněženka pro celou letku`)) : null,
+              (() => {
+                const wallet = me.credits ?? budget;
+                const btns = LOADOUT_PRESETS.map((ps) => {
+                  const r = applyPreset(lo, ps, wallet, room.settings.allowedModules);
+                  const nm = (t: ModuleType) => MODULES[t]?.name ?? t;
+                  const sold = [...lo.modules, ...(lo.cargo ?? [])].filter((m) => !r.loadout.modules.some((x) => x.id === m.id)).map((m) => nm(m.type));
+                  const tip = [ps.description, r.buy.length ? `Koupí: ${r.buy.map(nm).join(", ")}` : "", r.reuse.length ? `Ponechá: ${r.reuse.map(nm).join(", ")}` : "", sold.length ? `Prodá: ${sold.join(", ")}` : "", r.skipped.length ? `Nevejde se / zakázané: ${r.skipped.map(nm).join(", ")}` : "", `Zůstane ${r.left} CR`].filter(Boolean).join("\n");
+                  return h("button", { class: "px tiny", title: tip, onclick: () => net.send({ type: "setLoadout", loadout: r.loadout, index: t }) }, label(ps.name));
+                });
+                return h("div", { class: "row preset-row", style: "align-items:center;gap:6px;flex-wrap:wrap" }, h("span", { class: "txt muted", style: "font-size:13px" }, "Sada:"), ...btns, h("span", { class: "txt muted", style: "font-size:12px" }, "rychlý start – pak si výbavu uprav; co se do kreditů nevejde, sada vynechá"));
+              })(),
               renderLoadout({ loadout: lo, budget, wallet: me.credits ?? budget, showCargo: !!lo.cargo?.length, allowed: room.settings.allowedModules, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (nl) => net.send({ type: "setLoadout", loadout: nl, index: t }) }),
             );
           })(),
