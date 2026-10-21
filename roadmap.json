@@ -35,9 +35,9 @@
     "id": "mapa-vizual",
     "group": "Prvky na mapě",
     "title": "Vizuální prvky bez efektů",
-    "text": "",
-    "status": "next",
-    "done": false
+    "text": "Vzdálené paralaxní pozadí (galaxie, mlhoviny, planety; 4 motivy volitelné v nastavení mapy) – hotovo ve v3.104. Další dekorace (vraky, trosky) později.",
+    "status": "done",
+    "done": true
   },
   {
     "id": "feedback",
