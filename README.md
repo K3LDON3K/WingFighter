@@ -145,6 +145,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.67 – Editor výbavy: **váha modulů jako počet závaží** v hexagonech obchodu (půl závaží = 0,5); **pruh váhy a
+  rychlosti** pod nákresem lodi (dílky podle výsledné max. rychlosti, žluté značky = prahy, text „váha X → max.
+  rychlost Y“); **výběr slotu přímo v nákresu**: klik na volný slot (svítí „SEM ◆“) a pak na modul v obchodě, nebo
+  klik na modul (žlutý) a pak na volný slot („+“ pulzuje). Esc / klik mimo editor výběr zruší; bez výběru jde modul
+  do prvního volného slotu jako dřív.
 - v3.66 – Úhybný manévr: loď v animaci přesně sleduje nakreslenou dráhu i rychlost (zrušeno vlnění do stran, zůstal
   jen sudový překrut a modrý obrys). Vyhodnocení na serveru dráhu i rychlost už dřív používalo beze změny.
 - v3.65 – Okénka tlačítek (štít, droid, skener, náklad) se zavřou klikem vedle (na mapu), volbou jiné akce i při

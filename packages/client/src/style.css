@@ -3705,3 +3705,80 @@ button.start-chip.on:hover:not(:disabled) {
 .vgauge .vplan {
   color: #7dd3fc;
 }
+
+/* editor výbavy: výběr slotu / modulu, pruh váhy */
+.lo-g.slot-free {
+  cursor: pointer;
+}
+.lo-g.slot-free:hover polygon {
+  fill: rgba(125, 211, 252, 0.12);
+}
+.lo-g.slot-hot polygon {
+  animation: slotPulse 1s ease-in-out infinite;
+}
+@keyframes slotPulse {
+  0%, 100% { fill-opacity: 1; }
+  50% { fill-opacity: 0.4; }
+}
+.lo-hexbuy.picked .hexbg {
+  stroke: #fde047 !important;
+}
+.lo-hexbuy.picked {
+  filter: drop-shadow(0 0 4px rgba(253, 224, 71, 0.6));
+}
+.lo-pickhint {
+  font-size: 13px;
+  color: #7dd3fc;
+  padding: 4px 0;
+}
+.lo-wbar {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0 2px;
+}
+.lo-wbar .wlbl {
+  font-size: 11px;
+  color: #64748b;
+  letter-spacing: 1px;
+}
+.lo-wbar .wrow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.lo-wbar .wbar {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+.lo-wbar .wbar i {
+  display: block;
+  height: 12px;
+  border: 1px solid #0a0e1c;
+}
+.lo-wbar .wbar i.wseg {
+  width: 10px;
+  background: #1e293b;
+}
+.lo-wbar .wbar i.wseg.g {
+  background: #4ade80;
+}
+.lo-wbar .wbar i.wseg.y {
+  background: #fbbf24;
+}
+.lo-wbar .wbar i.wseg.r {
+  background: #f87171;
+}
+.lo-wbar .wbar i.wedge {
+  width: 3px;
+  background: #fbbf24;
+  border-color: #78350f;
+}
+.lo-wbar .wover {
+  color: #f87171;
+  font-size: 14px;
+}
+.lo-wbar .wtxt {
+  font-size: 12px;
+}

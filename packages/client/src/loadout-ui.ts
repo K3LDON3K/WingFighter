@@ -23,6 +23,7 @@ import {
   occupiedSlots,
   PILOTS,
   validateLoadout,
+  WEIGHT,
   type Facing,
   type ModuleType,
   type ShipLoadout,
@@ -119,6 +120,17 @@ export function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Recor
   return el;
 }
 
+/** Výběr slotu / modulu v editoru: nejdřív slot a pak modul z obchodu, nebo naopak. Esc / klik vedle = zrušit. */
+let pickSlot: SlotId | null = null;
+let pickType: ModuleType | null = null;
+/** Zruší rozpracovaný výběr (volá se po umístění, při Esc a při kliku mimo editor). */
+export function clearLoadoutPick(): boolean {
+  const had = !!(pickSlot || pickType);
+  pickSlot = null;
+  pickType = null;
+  return had;
+}
+
 /** Editor / náhled výbavy: loď, pilot, sloty s moduly, nákup modulů, souhrn (cena, váha, rychlost). */
 export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   const { loadout, budget, allowed } = opts;
@@ -131,6 +143,12 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   const ro = !!opts.readonly;
 
   const change = (lo: ShipLoadout) => opts.onChange?.(lo);
+  /** Překreslení editoru na místě (změna výběru slotu/modulu bez změny výbavy). */
+  const rerender = () => {
+    const next = renderLoadout(opts);
+    rootRef?.replaceWith(next);
+  };
+  let rootRef: HTMLElement | null = null;
   const remove = (id: string) => change({ ...loadout, modules: loadout.modules.filter((m) => m.id !== id), cargo: loadout.cargo?.filter((m) => m.id !== id) });
   const wallet = opts.wallet ?? 0;
   const refill = (id: string) => {
@@ -138,12 +156,29 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     change({ ...loadout, modules: loadout.modules.map(fix), cargo: loadout.cargo?.map(fix) });
   };
   const firstFreeSlot = (): SlotId | null => freeSlots(loadout)[0] ?? null;
-  const add = (type: ModuleType) => {
+  /** Přidá modul: do vybraného slotu (pickSlot), jinak do prvního volného. */
+  const add = (type: ModuleType, into?: SlotId | null) => {
     const def = MODULES[type];
-    const slot = def.size === "large" ? (LARGE_SLOTS.every((sl) => freeSlots(loadout).includes(sl)) ? LARGE_SLOTS[0] : null) : firstFreeSlot();
+    const want = into ?? pickSlot;
+    const slot = def.size === "large" ? (LARGE_SLOTS.every((sl) => freeSlots(loadout).includes(sl)) ? LARGE_SLOTS[0] : null) : want && freeSlots(loadout).includes(want) ? want : firstFreeSlot();
     if (!slot) return;
+    clearLoadoutPick();
     change({ ...loadout, modules: [...loadout.modules, newModule(type, slot)] });
   };
+  /** Lze teď koupit (vybraný modul z obchodu)? Stejná pravidla jako tlačítko v obchodě. */
+  const buyWhy = (t: ModuleType): string | null => {
+    const def = MODULES[t];
+    const have = loadout.modules.filter((m) => m.type === t).length;
+    const max = allowed[t];
+    if (max === 0) return "v této hře zakázán";
+    if (max !== undefined && have >= max) return `max. ${max} na hráče`;
+    if (shop ? def.price > wallet : cost + def.price > budget) return shop ? "nedostatek kreditů" : "nestačí rozpočet";
+    if (!firstFreeSlot()) return "všechny sloty obsazené";
+    if ((t === "shield-whole" && loadout.modules.some((m) => m.type === "shield-segment")) || (t === "shield-segment" && loadout.modules.some((m) => m.type === "shield-whole"))) return "nelze kombinovat typy štítů";
+    return null;
+  };
+  if (pickType && (ro || buyWhy(pickType))) pickType = null;
+  if (pickSlot && (ro || !freeSlots(loadout).includes(pickSlot))) pickSlot = null;
 
   /* --- nákres lodi s hexagonovými sloty --- */
   const scale = opts.compact ? 0.62 : 1;
@@ -226,9 +261,35 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       if (selectable) grp.addEventListener("click", () => opts.onSelect!(m.id));
     } else {
       const name = hull.slots.find((x) => x.id === slot)?.name ?? slot;
-      grp.append(svgEl("polygon", { points: pts, fill: "rgba(5,7,15,0.55)", stroke: "#7dd3fc", "stroke-width": 3, "stroke-dasharray": "6 4" }));
-      grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "Jersey, ui-monospace, monospace", "font-size": 15, fill: "#7dd3fc", "text-anchor": "middle" }, name.toUpperCase()));
-      grp.append(svgEl("title", {}, `${name}: volný malý slot`));
+      const picked = pickSlot === slot;
+      const hot = !!pickType && !ro; // vybraný modul v obchodě → sloty čekají na klik
+      if (picked) {
+        grp.classList.add("slot-pick");
+        grp.append(svgEl("polygon", { points: pts, fill: "rgba(125,211,252,0.25)", stroke: "#7dd3fc", "stroke-width": 5 }));
+        grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 5, "font-family": "Jersey, ui-monospace, monospace", "font-size": 16, fill: "#7dd3fc", "text-anchor": "middle" }, "SEM ◆"));
+        grp.append(svgEl("title", {}, `${name}: vybraný slot – klikni na modul v obchodě (znovu klik = zrušit)`));
+      } else if (hot) {
+        grp.classList.add("slot-hot");
+        grp.append(svgEl("polygon", { points: pts, fill: "rgba(125,211,252,0.14)", stroke: "#7dd3fc", "stroke-width": 3, "stroke-dasharray": "6 4" }));
+        grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 8, "font-family": "Jersey, ui-monospace, monospace", "font-size": 24, fill: "#7dd3fc", "text-anchor": "middle" }, "+"));
+        grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 22, "font-family": "Jersey, ui-monospace, monospace", "font-size": 11, fill: "#7dd3fc", "text-anchor": "middle" }, name.toUpperCase()));
+        grp.append(svgEl("title", {}, `${name}: sem umístit ${MODULES[pickType!].name}`));
+      } else {
+        grp.append(svgEl("polygon", { points: pts, fill: "rgba(5,7,15,0.55)", stroke: ro ? "#7dd3fc" : "#7dd3fc", "stroke-width": 3, "stroke-dasharray": "6 4" }));
+        grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "Jersey, ui-monospace, monospace", "font-size": 15, fill: "#7dd3fc", "text-anchor": "middle" }, name.toUpperCase()));
+        grp.append(svgEl("title", {}, ro ? `${name}: volný malý slot` : `${name}: volný slot – klik = vybrat, pak modul v obchodě`));
+      }
+      if (!ro && !selectable) {
+        grp.classList.add("slot-free");
+        grp.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          if (pickType) add(pickType, slot);
+          else {
+            pickSlot = picked ? null : slot;
+            rerender();
+          }
+        });
+      }
     }
     svg.append(grp);
   };
@@ -303,7 +364,20 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       else if (shop ? def.price > wallet : cost + def.price > budget) why = shop ? "nedostatek kreditů" : "nestačí rozpočet";
       else if (!firstFreeSlot()) why = "všechny sloty obsazené";
       else if ((t === "shield-whole" && loadout.modules.some((m) => m.type === "shield-segment")) || (t === "shield-segment" && loadout.modules.some((m) => m.type === "shield-whole"))) why = "nelze kombinovat typy štítů";
-      shopEl.append(hexBuyButton(t, have, why, () => add(t)));
+      const btn = hexBuyButton(t, have, why, () => {
+        if (pickSlot) add(t, pickSlot);
+        else if (pickType === t) {
+          pickType = null;
+          rerender();
+        } else if (why) return;
+        else {
+          // bez vybraného slotu: modul se vybere a čeká na klik do slotu (klik znovu = koupit do prvního volného)
+          pickType = t;
+          rerender();
+        }
+      });
+      if (pickType === t) btn.classList.add("picked");
+      shopEl.append(btn);
     }
   }
 
@@ -365,18 +439,42 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     "div",
     { class: "lo-summary" },
     shop ? h("span", { title: "Tvoje kredity: rozpočet místnosti + výdělky z bitev − výbava. Co neutratíš, máš ve hře jako kredity." }, icon("credits", "#fbbf24", 10), ` ${wallet} kreditů`, h("span", { class: "muted" }, ` · výbava ${cost}`)) : h("span", { title: "Utraceno z rozpočtu; zbytek máš ve hře jako kredity" }, icon("credits", "#fbbf24", 10), ` ${cost} / ${budget}`),
-    h("span", { title: "Součet váhy modulů (včetně munice). Každých " + "N" + " váhy = −1 max. rychlost" }, icon("weight", "#94a3b8", 10), ` ${weight}`),
+    h("span", { title: `Součet váhy modulů (včetně munice). Každých ${WEIGHT.perSpeed} váhy = −1 max. rychlost` }, icon("weight", "#94a3b8", 10), ` ${weight}`),
     h("span", { title: "Maximální rychlost lodi s touto výbavou" }, icon("speed", "#94a3b8", 10), ` ${maxSpeed}`),
   );
-  const root = h("div", { class: `loadout ${opts.compact ? "compact" : ""}` }, opts.hideHead ? null : head, diagram, summary);
+  /* --- pruh váhy a rychlosti: dílky po 0,5, barva podle výsledné max. rychlosti, žluté značky = prahy --- */
+  const weightBar = (() => {
+    const per = Math.max(0.1, WEIGHT.perSpeed);
+    const base = (HULLS[loadout.hullId] ?? HULLS.fighter).profile.maxSpeed + (PILOTS[loadout.pilotId]?.mods.maxSpeed ?? 0);
+    const maxW = per * (base - 1) + per; // až do rychlosti 1
+    const step = Math.max(0.5, Math.ceil((maxW / 24) * 2) / 2); // nejvýš ~24 dílků
+    const bar = h("div", { class: "wbar" });
+    for (let w = 0; w < maxW - 1e-9; w += step) {
+      const sp = Math.max(1, base - Math.floor(w / per));
+      const edge = w > 0 && Math.abs((w / per) % 1) < 1e-9;
+      if (edge) bar.append(h("i", { class: "wedge", title: `od váhy ${w}: max. rychlost ${sp}` }));
+      bar.append(h("i", { class: `wseg ${w < weight ? (sp >= base - 1 ? "g" : sp >= base - 2 ? "y" : "r") : ""}`, title: `váha ${w}–${w + step}: max. rychlost ${sp}` }));
+    }
+    const over = weight >= maxW ? h("span", { class: "wover" }, "+") : null;
+    return h(
+      "div",
+      { class: "lo-wbar" },
+      h("span", { class: "wlbl" }, label("Váha a rychlost")),
+      h("div", { class: "wrow" }, bar, over),
+      h("span", { class: "txt muted wtxt" }, `váha ${weight} → max. rychlost ${maxSpeed} · každých ${per} váhy = −1 rychlost`),
+    );
+  })();
+  const hint = !ro && (pickSlot || pickType) ? h("div", { class: "lo-pickhint txt" }, pickSlot ? `Slot „${hull.slots.find((x) => x.id === pickSlot)?.name ?? pickSlot}“ vybraný – klikni na modul v obchodě (Esc = zrušit).` : `${MODULES[pickType!].name}: klikni na volný slot v nákresu, kam ho dát (nebo znovu na modul = zrušit).`) : null;
+  const root = h("div", { class: `loadout ${opts.compact ? "compact" : ""}` }, opts.hideHead ? null : head, diagram, weightBar, hint, summary);
   if (!ro) root.append(shopEl);
+  rootRef = root;
   if (err) root.append(h("div", { class: "error" }, err));
   return root;
 }
 
 /** Nákupní tlačítko ve tvaru hexagonu: ikona, název, cena, počet kusů; stejná barva kategorie jako v plástvi. */
 /** Hexagon modulu (obchod, dostupné moduly): ikona, název, podtext; `dim` = zašedlý. */
-export function moduleHexSvg(t: ModuleType, sub: string, dim: boolean): SVGSVGElement {
+export function moduleHexSvg(t: ModuleType, sub: string, dim: boolean, weight?: number): SVGSVGElement {
   const def = MODULES[t];
   const col = moduleColor(t);
   const W = 112;
@@ -396,12 +494,35 @@ export function moduleHexSvg(t: ModuleType, sub: string, dim: boolean): SVGSVGEl
   const fs = Math.max(...words.map((w) => w.length)) > 8 ? 13 : 15;
   words.forEach((w, i) => svg.append(svgEl("text", { x: cx, y: 46 + i * 11, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: dim ? "#64748b" : "#f8fafc", "text-anchor": "middle" }, w)));
   if (sub) svg.append(svgEl("text", { x: cx, y: 46 + words.length * 11 + 4, "font-family": "Jersey", "font-size": 12, fill: dim ? "#64748b" : "#fbbf24", "text-anchor": "middle" }, sub));
+  if (weight !== undefined && weight > 0) {
+    // váha jako počet závaží (půlka = oříznutá ikona)
+    const n = Math.floor(weight);
+    const half = weight % 1 > 0;
+    const total = n + (half ? 0.5 : 0);
+    const iw = 9;
+    const x0 = cx - (total * (iw + 1)) / 2;
+    const yy = 46 + words.length * 11 + 8;
+    for (let i = 0; i < n; i++) {
+      const w = icon("weight", dim ? "#64748b" : "#94a3b8", iw);
+      w.setAttribute("x", String(x0 + i * (iw + 1)));
+      w.setAttribute("y", String(yy));
+      svg.append(w);
+    }
+    if (half) {
+      const w = icon("weight", dim ? "#64748b" : "#94a3b8", iw);
+      w.setAttribute("x", String(x0 + n * (iw + 1)));
+      w.setAttribute("y", String(yy));
+      w.setAttribute("viewBox", "0 0 4 8");
+      w.setAttribute("width", String(iw / 2));
+      svg.append(w);
+    }
+  }
   return svg;
 }
 
 function hexBuyButton(t: ModuleType, have: number, why: string | null, onClick: () => void): HTMLElement {
   const def = MODULES[t];
-  const svg = moduleHexSvg(t, `${def.price}${have ? ` ×${have}` : ""}`, !!why);
+  const svg = moduleHexSvg(t, `${def.price}${have ? ` ×${have}` : ""}`, !!why, def.weight);
   const btn = h("button", { class: `lo-hexbuy ${why ? "dis" : ""}`, disabled: !!why, title: `${def.name}\n${def.description}\nCena ${def.price} · váha ${def.weight}${def.ammo ? ` + ${def.ammoWeight} × ${def.ammo} munice` : ""}${why ? `\nNelze: ${why}` : ""}`, onclick: onClick }, svg);
   return btn;
 }

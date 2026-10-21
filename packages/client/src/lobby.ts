@@ -6,7 +6,7 @@ import {
 import { logoCanvas } from "./logo.ts";
 import { openMusicPanel } from "./main.ts";
 import { renderMapPreview } from "./map-preview.ts";
-import { moduleHexSvg, renderLoadout, svgEl } from "./loadout-ui.ts";
+import { clearLoadoutPick, moduleHexSvg, renderLoadout, svgEl } from "./loadout-ui.ts";
 import { pilotPortrait } from "./pilot-ui.ts";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
@@ -27,8 +27,20 @@ export interface LobbyModel {
 /** Rozepsané hodnoty formulářů – přežijí překreslení při každé zprávě ze serveru. */
 const drafts = { name: null as string | null, roomName: "", code: "" };
 
+let pickHooks = false;
 export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName: (n: string) => void) {
   rerender = () => renderLobby(root, m, net, setName);
+  if (!pickHooks) {
+    pickHooks = true;
+    // výběr slotu / modulu v editoru výbavy: Esc nebo klik mimo editor ho zruší
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && clearLoadoutPick()) rerender();
+    });
+    document.addEventListener("click", (e) => {
+      if (!(e.target instanceof Element) || e.target.closest(".loadout")) return;
+      if (clearLoadoutPick()) rerender();
+    });
+  }
   const activeId = (document.activeElement as HTMLElement | null)?.id;
   const selStart = (document.activeElement as HTMLInputElement | null)?.selectionStart ?? null;
   // při překreslení zachovat posun stránky (jinak každá změna v místnosti skočí nahoru)
