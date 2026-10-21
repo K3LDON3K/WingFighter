@@ -4,6 +4,7 @@ import {
   PILOTS,
   type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
 import { logoCanvas } from "./logo.ts";
+import { openRoadmap } from "./roadmap.ts";
 import { openMusicPanel } from "./main.ts";
 import { renderMapPreview } from "./map-preview.ts";
 import { clearLoadoutPick, moduleHexSvg, renderLoadout, svgEl } from "./loadout-ui.ts";
@@ -51,6 +52,7 @@ export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName:
   root.append(
     h("div", { class: `status ${m.connected ? "ok" : "bad"}` }, m.connected ? "ONLINE" : "OFFLINE..."),
     h("button", { class: "px music-btn", title: "Hudba a zvuk (vlastní skladby, hlasitost)", onclick: () => openMusicPanel() }, icon("log", "currentColor", 12), " ", label("Hudba")),
+    h("button", { class: "px music-btn roadmap-btn", title: "Roadmapa: na čem se pracuje a co se plánuje", onclick: () => openRoadmap() }, icon("target", "currentColor", 12), " ", label("Roadmapa")),
     screen,
   );
   screen.append(h("div", { class: "center" }, h("div", { class: "title" }, logoCanvas(5), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)));

@@ -213,19 +213,22 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       grp.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter", ...(shieldOff ? { "stroke-dasharray": "6 4" } : {}) }));
       grp.append(...hpFill(pts, box, col, selected ? 0.3 : broken ? 0.35 : shieldOff ? 0.08 : 0.18, broken ? 1 : hpFrac(m)));
       if (broken) grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h - 6, "font-family": "Jersey", "font-size": 10, fill: "#fca5a5", "text-anchor": "middle" }, "ZNIČEN"));
-      if (isShield(m) && !broken) {
-        // vypínač štítu: funguje vždy jen jeden; vypnout jde jen když je k dispozici jiný funkční štít
+      if (isShield(m) && !broken && loadout.modules.filter((x) => isShield(x)).length > 1) {
+        // vypínač štítu (pixel art, uprostřed horní části hexu): funguje vždy jen jeden; vypnout jde jen s jiným funkčním štítem
         const others = loadout.modules.filter((x) => x.id !== m.id && isShield(x) && moduleWorking(x));
         const canOff = others.length > 0;
-        const sw = svgEl("g", { class: `lo-switch ${m.off ? "off" : "on"} ${!ro && (m.off || canOff) ? "" : "fixed"}`, transform: `translate(${box.x + 24}, ${box.y + 14})` });
-        sw.append(svgEl("rect", { x: -16, y: -7, width: 32, height: 14, fill: m.off ? "#0b1020" : "#14532d", stroke: m.off ? "#64748b" : "#4ade80", "stroke-width": 1 }));
-        sw.append(svgEl("rect", { x: m.off ? -14 : 2, y: -5, width: 12, height: 10, fill: m.off ? "#475569" : "#4ade80" }));
-        sw.append(svgEl("text", { x: m.off ? 7 : -7, y: 3.5, "font-family": "Jersey", "font-size": 9, fill: m.off ? "#94a3b8" : "#bbf7d0", "text-anchor": "middle" }, m.off ? "VYP" : "ZAP"));
-        sw.append(svgEl("title", {}, m.off ? "Štít je vypnutý (záloha). Klik = zapnout (druhý štít se vypne)." : canOff ? "Štít je zapnutý. Klik = vypnout – zapne se druhý nainstalovaný štít." : "Štít je zapnutý. Jediný funkční štít nejde vypnout."));
-        if (!ro && (m.off || canOff))
+        const on = !m.off;
+        const sw = svgEl("g", { class: `lo-switch ${on ? "on" : "off"} ${!ro && (!on || canOff) ? "" : "fixed"}`, transform: `translate(${box.x + box.w / 2}, ${box.y + box.h / 2 - 28})`, "shape-rendering": "crispEdges" });
+        // dráha 24×10 s pixelovým rámečkem, knoflík 8×8 vlevo (VYP) / vpravo (ZAP)
+        sw.append(svgEl("rect", { x: -12, y: -5, width: 24, height: 10, fill: on ? "#166534" : "#1e293b", stroke: on ? "#4ade80" : "#64748b", "stroke-width": 1 }));
+        sw.append(svgEl("rect", { x: on ? 2 : -10, y: -3, width: 8, height: 6, fill: on ? "#bbf7d0" : "#64748b" }));
+        if (on) sw.append(svgEl("rect", { x: -8, y: -1, width: 4, height: 2, fill: "#4ade80" }));
+        sw.append(svgEl("rect", { x: -13, y: -6, width: 26, height: 12, fill: "transparent" }));
+        sw.append(svgEl("title", {}, on ? (canOff ? "Štít zapnutý. Klik = vypnout – zapne se druhý nainstalovaný štít." : "Štít zapnutý. Jediný funkční štít nejde vypnout.") : "Štít vypnutý (záloha). Klik = zapnout (druhý štít se vypne)."));
+        if (!ro && (!on || canOff))
           sw.addEventListener("click", (ev) => {
             ev.stopPropagation();
-            const target = m.off ? m.id : others[0].id;
+            const target = !on ? m.id : others[0].id;
             change(normalizeShields({ ...loadout, modules: loadout.modules.map((x) => (isShield(x) ? { ...x, off: x.id === target ? undefined : true } : x)) }));
           });
         grp.append(sw);
@@ -260,7 +263,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       if (!ro && !selectable && shop && !moduleBroken(m) && ammoRefillCost(m) > 0) {
         const price = ammoRefillCost(m);
         const can = price <= wallet;
-        const r = svgEl("g", { class: `lo-refill ${can ? "" : "dis"}`, transform: `translate(${box.x + 24}, ${box.y + box.h - 14})` });
+        const r = svgEl("g", { class: `lo-refill ${can ? "" : "dis"}`, transform: `translate(${box.x + box.w / 2 - 16}, ${box.y + box.h / 2 + 27})` });
         r.append(svgEl("rect", { x: -16, y: -7, width: 32, height: 14, fill: "#0b1020", stroke: can ? "#fbbf24" : "#64748b", "stroke-width": 1 }));
         r.append(svgEl("text", { x: 0, y: 4, "font-family": "Jersey", "font-size": 10, fill: can ? "#fbbf24" : "#64748b", "text-anchor": "middle" }, `+${price}`));
         r.append(svgEl("title", {}, `Doplnit munici (${def.ammo! - (m.ammo ?? 0)} ks) za ${price} kreditů${can ? "" : " – nedostatek kreditů"}`));
@@ -272,7 +275,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         grp.append(r);
       }
       if (!ro && !selectable) {
-        const x = svgEl("g", { class: "lo-remove", transform: `translate(${box.x + box.w - 24}, ${box.y + box.h - 14})` });
+        const x = svgEl("g", { class: "lo-remove", transform: `translate(${box.x + box.w / 2 + 16}, ${box.y + box.h / 2 + 27})` });
         x.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: "#0b1020", stroke: "#f87171", "stroke-width": 1 }));
         x.append(svgEl("path", { d: "M-4,-4 L4,4 M4,-4 L-4,4", stroke: "#f87171", "stroke-width": 2 }));
         x.append(svgEl("title", {}, shop ? m.gift ? `${def.name}: záchranná výbava – nejde prodat (odebrání = zahození)` : `Prodat ${def.name} za ${moduleSellPrice(m)} kreditů${moduleBroken(m) ? " (zničený)" : m.used ? " (použitý)" : ""}` : `Odebrat ${def.name} (vrátí ${def.price} kreditů)`));

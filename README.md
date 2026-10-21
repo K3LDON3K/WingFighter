@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.70 – V hlavním menu tlačítko **ROADMAPA** – textový přehled toho, na čem se pracuje, co se plánuje a nápady
+  (obsah v `packages/client/src/roadmap.ts`). Editor výbavy: vypínač štítu se zobrazí jen při **více než jednom**
+  štítu a je nakreslený jako pixel‑art páčka uprostřed horní části hexu; křížek pro odebrání a tlačítko dobití
+  munice jsou posunuté dovnitř hexagonu, aby nepřesahovaly.
 - v3.69 – Editor výbavy: pruh váhy přes celou šířku sloupce; **loď a pilot jako jedna dlaždice** – klik otevře
   okénko se všemi možnostmi (každá s vysvětlivkou). **Více štítů**: jde nainstalovat segmentový i celolodní (i víc
   kusů), funguje vždy jen **zapnutý** – v hexu je vypínač ZAP/VYP; vypnout jde jen když je k dispozici jiný funkční

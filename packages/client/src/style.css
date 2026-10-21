@@ -3881,3 +3881,49 @@ button.start-chip.on:hover:not(:disabled) {
   flex: 1;
   width: auto;
 }
+
+/* roadmapa */
+.roadmap-btn {
+  left: 110px;
+}
+.rm-card {
+  width: min(640px, calc(100vw - 24px));
+  gap: 10px;
+}
+.rm-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rm-sec-h {
+  font-size: 16px;
+  letter-spacing: 1px;
+  border-bottom: 1px solid #1e293b;
+  padding-bottom: 2px;
+}
+.rm-item {
+  display: grid;
+  grid-template-columns: 8px 150px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+.rm-dot {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  position: relative;
+  top: -1px;
+}
+.rm-title {
+  font-size: 15px;
+  color: #f8fafc;
+}
+.rm-text {
+  font-size: 14px;
+  color: #cbd5e1;
+}
+.rm-foot {
+  font-size: 12px;
+  margin-top: 4px;
+}
