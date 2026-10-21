@@ -251,16 +251,23 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     "div",
     { class: "gauges" },
     vgauge(10, hullBlocks, ship.hull <= ship.stats.hull * 0.3 ? "#ef4444" : "#4ade80", "#14341f", "trup", String(ship.hull), `Trup ${ship.hull}/${ship.stats.hull}`),
-    vgauge(
-      5,
-      ship.speed,
-      "#94a3b8",
-      "#1e293b",
-      "rychlost",
-      maxSp < 5 ? h("span", {}, `${ship.speed}/`, h("span", { class: "vmax-blocked" }, String(maxSp)), " ", icon("weight", "#f87171", 9)) : `${ship.speed}/${maxSp}`,
-      maxSp < 5 ? `Aktuální rychlost ${ship.speed}. Váha výbavy (${loadoutWeight(ship.loadout)}) blokuje rychlost ${maxSp + 1}–5: max. ${maxSp}. Lehčí výbava = vyšší rychlost.` : `Aktuální rychlost ${ship.speed}, max. ${maxSp} (váha ${loadoutWeight(ship.loadout)})`,
-      maxSp,
-    ),
+    (() => {
+      // plánovaná rychlost: hned podle nakresleného manévru (modře), po kole se ukáže nová aktuální
+      const planSp = man ? man.speed : ship.speed;
+      const changed = planSp !== ship.speed;
+      const col = changed ? "#7dd3fc" : "#94a3b8";
+      const num = h("span", {}, changed ? h("span", { class: "vplan" }, `${planSp}`) : `${ship.speed}`, "/", maxSp < 5 ? h("span", { class: "vmax-blocked" }, String(maxSp)) : String(maxSp), maxSp < 5 ? " " : "", maxSp < 5 ? icon("weight", "#f87171", 9) : "");
+      return vgauge(
+        5,
+        planSp,
+        col,
+        "#1e293b",
+        "rychlost",
+        num,
+        `${changed ? `Plán: rychlost ${planSp} (teď ${ship.speed}).` : `Aktuální rychlost ${ship.speed}.`} ${maxSp < 5 ? `Váha výbavy (${loadoutWeight(ship.loadout)}) blokuje rychlost ${maxSp + 1}–5: max. ${maxSp}. Lehčí výbava = vyšší rychlost.` : `Max. ${maxSp} (váha ${loadoutWeight(ship.loadout)}).`}`,
+        maxSp,
+      );
+    })(),
   );
   const right = h("div", { class: "bb-shipinfo" }, gauges);
   const shieldLine =

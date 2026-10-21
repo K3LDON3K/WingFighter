@@ -3702,3 +3702,6 @@ button.start-chip.on:hover:not(:disabled) {
   font-size: 13px;
   color: #f87171;
 }
+.vgauge .vplan {
+  color: #7dd3fc;
+}

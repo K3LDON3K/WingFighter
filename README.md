@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.63 – Ukazatel rychlosti v panelu lodi hned ukazuje **plánovanou rychlost** nakresleného manévru (modře; ve
+  vysvětlivce „Plán: rychlost X (teď Y)“); po vyhodnocení kola se zobrazí nová aktuální rychlost.
 - v3.62 – **Vysvětlivky akcí přehledně** (varianta B): název s ikonou vlevo, cena pilulkami vpravo (akce · stres ·
   technologie, aktuální i s overdrivem), efekty jako krátké štítky s ikonkou (zelený rámeček = výhoda, červený =
   postih), drobná poznámka dole, případný důvod „Nelze: …“ červeně. Platí pro všechna tlačítka lišty akcí včetně
