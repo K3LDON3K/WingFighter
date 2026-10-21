@@ -373,20 +373,174 @@ export function playDefeat(host: HTMLElement, teamColor: string, opts: { sound?:
   return stop;
 }
 
+/** Stíhač otočený o libovolný úhel (0 = doprava). */
+function drawShipAngle(x: CanvasRenderingContext2D, cx: number, cy: number, team: string, angle: number) {
+  const pal: Record<string, string> = { P: team, G: "#9aa3ad", D: "#4b5563", W: "#dbeafe", E: "#fb923c" };
+  x.save();
+  x.translate(cx, cy);
+  x.rotate(angle);
+  FIGHTER.forEach((row, yy) =>
+    [...row].forEach((ch, xx) => {
+      if (!pal[ch]) return;
+      x.fillStyle = pal[ch];
+      x.fillRect(xx - 8, yy - 7, 1, 1);
+    }),
+  );
+  x.restore();
+}
+
+/**
+ * Animace remízy: tři stíhače (barvy tří týmů) prolétnou každý z jiné strany, vystřelí po sobě, minou se,
+ * prolétnou kolem sebe a zmizí z obrazovky; pak se objeví bílý nápis REMÍZA.
+ */
+export function playDraw(host: HTMLElement, colors: string[], opts: { sound?: boolean; title?: string } = {}): () => void {
+  active?.stop();
+  const W = Math.ceil(host.clientWidth / PX) || 320;
+  const H = Math.ceil(host.clientHeight / PX) || 200;
+  const [c, x] = small(W, H);
+  c.className = "victory-canvas";
+  host.prepend(c);
+  host.classList.add("celebrate");
+  const title = opts.title ?? "REMÍZA";
+  const textW = Math.min(W, 320);
+  const text = bigText(title, textW, 72, "40px Jersey, ui-monospace, monospace", [[0, "#ffffff"], [0.5, "#e2e8f0"], [1, "#94a3b8"]], "#334155");
+  const cardTop = () => {
+    const card = host.querySelector<HTMLElement>(".card");
+    return card ? (card.getBoundingClientRect().top - host.getBoundingClientRect().top) / PX : H * 0.5;
+  };
+  const DURR = 5200;
+  const py = Math.max(34, cardTop() * 0.5);
+  const cx = W / 2;
+  /** Dráhy jako kvadratické křivky: zleva (oblouk nahoru), zprava (oblouk dolů), shora (zatáčka doleva a dolů).
+   *  Všechny procházejí těsně kolem bodu (cx, py) ve stejnou chvíli – těsné minutí. */
+  type Pt = { x: number; y: number };
+  const paths: { p0: Pt; p1: Pt; p2: Pt; t0: number; t1: number; col: string }[] = [
+    { p0: { x: -24, y: py + 46 }, p1: { x: cx - 10, y: py - 46 }, p2: { x: W + 24, y: py + 40 }, t0: 0.04, t1: 0.74, col: colors[0] ?? "#60a5fa" },
+    { p0: { x: W + 24, y: py - 44 }, p1: { x: cx + 14, y: py + 44 }, p2: { x: -24, y: py - 36 }, t0: 0.04, t1: 0.74, col: colors[1] ?? "#f87171" },
+    { p0: { x: cx + 56, y: -24 }, p1: { x: cx - 80, y: py + 4 }, p2: { x: cx - 6, y: H + 24 }, t0: 0.04, t1: 0.74, col: colors[2] ?? "#4ade80" },
+  ];
+  const bez = (p: (typeof paths)[number], k: number): Pt => ({
+    x: (1 - k) * (1 - k) * p.p0.x + 2 * (1 - k) * k * p.p1.x + k * k * p.p2.x,
+    y: (1 - k) * (1 - k) * p.p0.y + 2 * (1 - k) * k * p.p1.y + k * k * p.p2.y,
+  });
+  const dir = (p: (typeof paths)[number], k: number): number => {
+    const dx = 2 * (1 - k) * (p.p1.x - p.p0.x) + 2 * k * (p.p2.x - p.p1.x);
+    const dy = 2 * (1 - k) * (p.p1.y - p.p0.y) + 2 * k * (p.p2.y - p.p1.y);
+    return Math.atan2(dy, dx);
+  };
+  interface Shot { x: number; y: number; vx: number; vy: number; col: string; life: number }
+  const shots: Shot[] = [];
+  const fired = new Set<string>();
+  const ease = (t: number) => Math.min(1, Math.max(0, t));
+  let start = performance.now();
+  let last = start;
+  let raf = 0;
+  let stopped = false;
+  const draw = (now: number) => {
+    if (stopped) return;
+    const t = (now - start) / DURR;
+    const dt = Math.min(2, (now - last) / 16.7);
+    last = now;
+    x.clearRect(0, 0, W, H);
+    // střely: letí rovně, mimo cíl, zmizí za okrajem
+    for (const sh of shots) {
+      sh.life += dt;
+      sh.x += sh.vx * dt;
+      sh.y += sh.vy * dt;
+      if (sh.x < -10 || sh.x > W + 10 || sh.y < -10 || sh.y > H + 10) continue;
+      x.fillStyle = sh.col;
+      for (let k = 0; k < 4; k++) x.fillRect(Math.round(sh.x - sh.vx * 0.25 * k), Math.round(sh.y - sh.vy * 0.25 * k), 2, 2);
+      x.fillStyle = "#fff";
+      x.fillRect(Math.round(sh.x), Math.round(sh.y), 2, 2);
+    }
+    const pos: (Pt & { ang: number; col: string })[] = [];
+    paths.forEach((p, i) => {
+      const k = (t - p.t0) / (p.t1 - p.t0);
+      if (k < 0 || k > 1.02) return;
+      const kk = ease(k);
+      const { x: sx, y: sy } = bez(p, kk);
+      const ang = dir(p, kk);
+      pos.push({ x: sx, y: sy, ang, col: p.col });
+      // dvě salvy před minutím, mířené kousek vedle (netrefí)
+      for (const [id, at, off] of [["a", 0.26, -0.2], ["b", 0.38, 0.16]] as [string, number, number][]) {
+        const key = `${i}${id}`;
+        if (kk >= at && !fired.has(key)) {
+          fired.add(key);
+          const a2 = ang + off;
+          for (const d of [0, 6]) shots.push({ x: sx + Math.cos(a2) * (10 + d), y: sy + Math.sin(a2) * (10 + d), vx: Math.cos(a2) * 4, vy: Math.sin(a2) * 4, col: "#f87171", life: 0 });
+          if (opts.sound) sfx("laser");
+        }
+      }
+      // plamen za motorem
+      const flick = Math.floor(now / 60) % 2;
+      x.fillStyle = flick ? "#fde047" : "#fb923c";
+      x.fillRect(Math.round(sx - Math.cos(ang) * 9), Math.round(sy - Math.sin(ang) * 9), 2, 2);
+      drawShipAngle(x, sx, sy, p.col, ang);
+    });
+    // těsné minutí: když jsou dvě lodě blízko, bílé „švihnutí“ mezi nimi a jiskřičky
+    for (let i = 0; i < pos.length; i++)
+      for (let j = i + 1; j < pos.length; j++) {
+        const a = pos[i];
+        const b = pos[j];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d > 34) continue;
+        x.globalAlpha = Math.max(0, 1 - d / 34);
+        x.strokeStyle = "#fff";
+        x.lineWidth = 1;
+        x.beginPath();
+        x.moveTo(a.x, a.y);
+        x.lineTo(b.x, b.y);
+        x.stroke();
+        for (let k = 0; k < 3; k++) {
+          x.fillStyle = k ? "#fde68a" : "#fff";
+          x.fillRect(Math.round((a.x + b.x) / 2 + Math.sin(now / 30 + k) * 5), Math.round((a.y + b.y) / 2 + Math.cos(now / 40 + k * 2) * 5), 1, 1);
+        }
+        x.globalAlpha = 1;
+      }
+    // nápis: až když stíhače uvolní místo
+    const reveal = ease((t - 0.76) / 0.24);
+    if (reveal > 0) {
+      const top = cardTop();
+      const avail = top - 4;
+      const sc = avail >= 68 ? 1 : avail >= 38 ? 0.5 : 0;
+      if (sc > 0) {
+        const th = Math.round(72 * sc);
+        const tw = Math.round(textW * sc);
+        const ty = Math.max(2, Math.round(top - 6 - th));
+        x.globalAlpha = reveal;
+        x.drawImage(text, Math.round((W - tw) / 2), ty, tw, th);
+        x.globalAlpha = 1;
+      }
+    }
+    if (t < 1.05) raf = requestAnimationFrame(draw);
+  };
+  raf = requestAnimationFrame(draw);
+  const stop = () => {
+    stopped = true;
+    cancelAnimationFrame(raf);
+    c.remove();
+    host.classList.remove("celebrate");
+    if (active?.stop === stop) active = null;
+  };
+  active = { stop };
+  return stop;
+}
+
 /** Ladicí hák: náhled animace přes celou stránku (např. `__victory("#f87171")`). */
-(window as unknown as { __victory?: (color: string, defeat?: boolean) => () => void }).__victory = (color: string, defeat = false) => {
+(window as unknown as { __victory?: (color: string, mode?: string) => () => void }).__victory = (color: string, mode = "win") => {
   let host = document.querySelector<HTMLElement>(".victory-host");
   if (!host) {
     host = document.createElement("div");
     host.className = "victory-host";
-    host.style.cssText = "position:fixed;inset:0;z-index:999;background:#05070f;display:grid;place-items:center";
+    host.classList.add("overlay");
+    host.style.cssText = "position:fixed;inset:0;z-index:999;background:#05070f";
     const card = document.createElement("div");
     card.className = "card";
     card.style.cssText = "width:560px;height:220px";
     host.append(card);
     document.body.append(host);
   }
-  const stop = defeat ? playDefeat(host, color, { sound: false }) : playVictory(host, color, { sound: false });
+  const stop = mode === "lose" ? playDefeat(host, color, { sound: false }) : mode === "draw" ? playDraw(host, ["#60a5fa", "#f87171", "#4ade80"], { sound: false }) : playVictory(host, color, { sound: false });
   return () => {
     stop();
     host?.remove();

@@ -62,7 +62,7 @@ import { loadLibrary, playMode, renderSynth } from "./music.ts";
 (window as unknown as { __wfRender: typeof renderSynth }).__wfRender = renderSynth;
 import { renderMusicPanel } from "./music-ui.ts";
 import { logoCanvas, replayLogo } from "./logo.ts";
-import { playDefeat, playVictory } from "./victory.ts";
+import { playDefeat, playDraw, playVictory } from "./victory.ts";
 
 /** Vítězná animace už běžela pro tuto bitvu. */
 let victoryShown = false;
@@ -1060,14 +1060,15 @@ function renderHud() {
         victoryShown = true;
         const col = TEAM_COLORS[s.players.find((p) => p.id === playerId)?.team ?? 0];
         if (outcome === "win") playVictory(overlayEl.firstChild as HTMLElement, col);
-        else playDefeat(overlayEl.firstChild as HTMLElement, col, { sound: true });
+        else if (outcome === "lose") playDefeat(overlayEl.firstChild as HTMLElement, col, { sound: true });
+        else playDraw(overlayEl.firstChild as HTMLElement, [TEAM_COLORS[0], TEAM_COLORS[1], TEAM_COLORS[2]], { sound: true });
       }
     }
   }
 }
 
-/** Výsledek pro mě: výhra / prohra / null (remíza, nebo série ještě neskončila). V sérii až po poslední bitvě. */
-function myOutcome(s: GameState): "win" | "lose" | null {
+/** Výsledek pro mě: výhra / prohra / remíza; null = série ještě neskončila (animace až po poslední bitvě). */
+function myOutcome(s: GameState): "win" | "lose" | "draw" | null {
   const me = s.players.find((p) => p.id === playerId);
   if (!me) return null;
   const ss = room?.series;
@@ -1075,10 +1076,11 @@ function myOutcome(s: GameState): "win" | "lose" | null {
     if (!ss.finished) return null;
     const key = s.settings.mode === "dm" ? me.id : String(me.team);
     const w = seriesWinner(ss.results);
-    return w === null ? null : w === key ? "win" : "lose";
+    return w === null ? "draw" : w === key ? "win" : "lose";
   }
   const r = s.result;
-  if (!r || r.winnerTeam === null) return null;
+  if (!r) return null;
+  if (r.winnerTeam === null) return "draw";
   return r.winnerTeam === me.team ? "win" : "lose";
 }
 

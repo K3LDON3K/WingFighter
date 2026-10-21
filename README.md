@@ -147,6 +147,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.85 – **Animace remízy**: tři stíhače v barvách týmů 1–3 vletí zleva, zprava a shora po křivkách, vystřelí
+  po sobě mimo, těsně se minou (bílé švihnutí s jiskrami) a odletí z obrazovky; pak se nad tabulkou zjasní bílý
+  nápis REMÍZA. Hraje se všem při remíze bitvy i nerozhodné sérii (po poslední bitvě).
 - v3.84 – **Animace prohry** pro poraženou stranu: hořící stíhač v barvě týmu padá shora do výsledkové tabulky,
   při dopadu vybuchne (záblesk, jiskry, trosky), z místa dopadu se dál kouří a nad tabulku vystoupá nápis
   PROHRA v tmavší barvě týmu. Výhra / prohra se určuje stejně jako u vítězné animace (série až po konci).
