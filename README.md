@@ -147,6 +147,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.106 – Vzdálené pozadí utlumené na polovinu, aby nekonkurovalo lodím a dráhám.
 - v3.105 – Náhled mapy v místnosti ukazuje i zvolené vzdálené pozadí (motiv, rozložení galaxií a planet).
 - v3.104 – Vzdálené paralaxní pozadí: galaxie, mlhoviny a planety hluboko za mapou (pixel-art ze seedu mapy, posouvají
   se pomaleji než mapa, jen vizuální, kreslí se do statické mezipaměti – bez vlivu na výkon). Čtyři motivy

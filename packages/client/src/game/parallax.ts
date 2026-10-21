@@ -224,6 +224,9 @@ function sunSprite(rnd: () => number, n: number): HTMLCanvasElement {
   return c;
 }
 
+/** Celkové utlumení vrstvy – pozadí nesmí konkurovat lodím, asteroidům a dráhám. */
+const DIM = 0.5;
+
 const cache = new Map<string, Sky>();
 
 function buildSky(theme: SkyTheme, seed: number, w: number, h: number): Sky {
@@ -290,7 +293,7 @@ export function drawParallax(ctx: CanvasRenderingContext2D, theme: SkyTheme, see
     const sw = (s * o.sprite.width) / Math.max(o.sprite.width, o.sprite.height);
     const sh = (s * o.sprite.height) / Math.max(o.sprite.width, o.sprite.height);
     // pixelový krok ≈ 1 obrazový pixel × 2 (ať je vidět pixel-art) – kreslíme bez vyhlazení
-    ctx.globalAlpha = o.alpha;
+    ctx.globalAlpha = o.alpha * DIM;
     ctx.drawImage(o.sprite, Math.round(px - sw / 2), Math.round(py - sh / 2), Math.round(sw), Math.round(sh));
   }
   ctx.restore();
