@@ -705,7 +705,8 @@ function roomView(m: LobbyModel, net: Net) {
                     const on = map.size === k;
                     const sz = [10, 14, 18, 22][i] ?? 22;
                     const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
-                    s.append(svgEl("rect", { x: String(13 - sz / 2), y: String(13 - (sz * 2) / 3 / 2), width: String(sz), height: String((sz * 2) / 3), fill: on ? "#1e3a5f" : "none", stroke: on ? "#7dd3fc" : "#334155", "stroke-width": "2" }));
+                    // ovál podle velikosti mapy (poměr 3:2)
+                    s.append(svgEl("ellipse", { cx: "13", cy: "13", rx: String(sz / 2), ry: String(sz / 3), fill: on ? "#1e3a5f" : "none", stroke: on ? "#7dd3fc" : "#334155", "stroke-width": "2" }));
                     return h("button", { class: `pip size ${on ? "on" : ""}`, disabled: !isHost, title: `${MAP_SIZES[k].label} · ${MAP_SIZES[k].starts} startovních bodů`, onclick: () => setMap({ size: k }) }, s);
                   }),
                   h("span", { class: "txt muted pips-txt" }, MAP_SIZES[map.size]?.label ?? map.size),

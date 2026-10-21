@@ -118,7 +118,7 @@ export class Renderer {
     this.drawBackground(state, cam);
     this.drawGrid(state);
     this.stormsRef = state.storms ?? null;
-    if (state.border) drawBorderStorm(ctx, state.width, state.height, state.border, now, cam.zoom);
+    if (state.border) drawBorderStorm(ctx, state.width, state.height, state.border, cam.zoom);
     if (state.storms?.length) drawStorms(ctx, state.storms, now, cam.zoom);
     for (const a of view.asteroids) this.drawAsteroid(a);
     for (const m of view.mines) this.drawMine(m, now);

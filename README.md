@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.88 – Ikonky velikosti mapy jsou ovály (podle tvaru mapy). Okrajová bouře se kreslí staticky – bez blesků,
+  šumu a běžící animace tvrdého okraje (šetří výkon).
 - v3.87 – **Oválná mapa a okrajová bouře.** Hrací plocha je ovál vepsaný do rozměru mapy (asteroidy, bouře
   i startovní body se generují uvnitř, starty rovnoměrně po obvodu). Kolem oválu je **pás okrajové bouře**
   (ladění → Mapa → šířka pásu, výchozí 450; 0 = vypnuto a loď se od hrany odráží jako dřív): platí v něm vše
