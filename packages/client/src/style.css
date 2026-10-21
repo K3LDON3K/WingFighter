@@ -3821,3 +3821,63 @@ button.start-chip.on:hover:not(:disabled) {
 .lo-wbar .wtxt {
   font-size: 12px;
 }
+
+/* vypínač štítu v hexu */
+.lo-switch:not(.fixed) {
+  cursor: pointer;
+}
+.lo-switch:not(.fixed):hover rect:first-child {
+  stroke: #e2e8f0;
+}
+/* výběr lodi / pilota: jen vybraná dlaždice, okénko se všemi */
+.pk-holder {
+  position: relative;
+}
+.pk-tile.pk-current {
+  cursor: pointer;
+}
+.pk-pop {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  z-index: 20;
+  background: #0f172a;
+  border: 3px solid;
+  border-color: #475569 #0b1020 #0b1020 #475569;
+  box-shadow: 0 0 0 2px #05070f, 4px 4px 0 #05070f;
+  padding: 8px;
+  width: max-content;
+  max-width: 480px;
+}
+.pk-pop .pk-pop-h {
+  font-size: 13px;
+  color: #7dd3fc;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.pk-pop .pk-tile {
+  width: 104px;
+  min-height: 92px;
+  padding: 6px 4px 5px;
+}
+.pk-pop .pk-tile .pk-pic {
+  height: 40px;
+}
+.pk-pop .pk-tile .pk-pic svg {
+  width: 40px;
+  height: 40px;
+}
+.pk-pop .pk-tile .pk-name {
+  font-size: 12px;
+}
+/* pruh váhy: dílky vyplní šířku sloupce */
+.lo-wbar .wrow {
+  width: 100%;
+}
+.lo-wbar .wbar {
+  flex: 1;
+}
+.lo-wbar .wbar i.wseg {
+  flex: 1;
+  width: auto;
+}

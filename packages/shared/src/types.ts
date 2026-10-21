@@ -161,6 +161,8 @@ export interface ModuleInstance {
   gift?: boolean;
   /** Natočení zbraně (lasery: výseč, miny: strana odhozu, torpéda: směr výletu). Štíty směr nemají. */
   facing?: Facing;
+  /** Štít vypnutý (funguje vždy jen jeden štít; ostatní nainstalované jsou záloha). */
+  off?: boolean;
   /** Zastaralé (skener dřív míval náboje a cooldown; teď čerpá technologii lodi). */
   charges?: number;
   cooldown?: number;

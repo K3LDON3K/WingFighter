@@ -351,10 +351,35 @@ export function profileOf(loadout: ShipLoadout, ignoreWeight = false): ManeuverP
   return { ...p, maxSpeed, koiogranSpeeds: p.koiogranSpeeds.filter((s) => s <= maxSpeed) };
 }
 
+/** Je modul štít? */
+export function isShield(m: Pick<ModuleInstance, "type">): boolean {
+  return m.type === "shield-segment" || m.type === "shield-whole";
+}
+/**
+ * Štíty: nainstalovat jde víc, funguje vždy právě jeden (zapnutý). Vrátí sestavu, kde je mezi funkčními štíty
+ * zapnutý přesně jeden – ponechá první zapnutý, jinak zapne první funkční; zničené štíty se neřeší.
+ */
+export function normalizeShields(loadout: ShipLoadout): ShipLoadout {
+  const working = loadout.modules.filter((m) => isShield(m) && moduleWorking(m));
+  if (working.length === 0) return loadout;
+  const keep = working.find((m) => !m.off) ?? working[0];
+  let changed = false;
+  const modules = loadout.modules.map((m) => {
+    if (!isShield(m) || !moduleWorking(m)) return m;
+    const off = m !== keep;
+    if (!!m.off !== off) changed = true;
+    return off ? { ...m, off: true } : { ...m, off: undefined };
+  });
+  return changed ? { ...loadout, modules } : loadout;
+}
+/** Zapnutý funkční štít (po normalizaci nejvýš jeden). */
+export function activeShield(loadout: ShipLoadout): ModuleInstance | undefined {
+  const working = loadout.modules.filter((m) => isShield(m) && moduleWorking(m));
+  return working.find((m) => !m.off) ?? working[0];
+}
 export function shieldTypeOf(loadout: ShipLoadout): ShieldType {
-  if (loadout.modules.some((m) => m.type === "shield-whole" && moduleWorking(m))) return "whole";
-  if (loadout.modules.some((m) => m.type === "shield-segment" && moduleWorking(m))) return "segment";
-  return "none";
+  const a = activeShield(loadout);
+  return a ? (a.type === "shield-whole" ? "whole" : "segment") : "none";
 }
 
 /**
@@ -385,7 +410,6 @@ export function validateLoadout(loadout: ShipLoadout, limits?: { allowed?: Parti
     }
     perType[m.type] = (perType[m.type] ?? 0) + 1;
   }
-  if (perType["shield-segment"] && perType["shield-whole"]) return "segmentový a celolodní štít nejde kombinovat";
   if (limits?.allowed) {
     for (const t of MODULE_TYPES) {
       const max = limits.allowed[t];
@@ -451,9 +475,11 @@ export function computeStats(loadout: ShipLoadout): ShipStats {
     if (m.type === "laser") stats.attack = LASER_DICE.value;
     if (m.type === "torpedo") stats.torpedoes += m.ammo ?? 0;
     if (m.type === "mine") stats.mines += m.ammo ?? 0;
-    if (m.type === "shield-whole") stats.shields += def.shields ?? 0;
-    if (m.type === "shield-segment") stats.segmentModules++;
   }
+  // štít: funguje jen zapnutý (jeden)
+  const act = activeShield(loadout);
+  if (act?.type === "shield-whole") stats.shields += MODULES["shield-whole"].shields ?? 0;
+  if (act?.type === "shield-segment") stats.segmentModules = 1;
   // pilot
   const pm = PILOTS[loadout.pilotId]?.mods;
   if (pm) {
@@ -484,7 +510,7 @@ export function randomLoadout(rng: () => number, allowed: Partial<Record<ModuleT
       const def = MODULES[t];
       const count = lo.modules.filter((m) => m.type === t).length;
       if ((allowed[t] ?? 99) <= count || spent + def.price > budget) continue;
-      if ((t === "shield-whole" && lo.modules.some((m) => m.type === "shield-segment")) || (t === "shield-segment" && lo.modules.some((m) => m.type === "shield-whole"))) continue;
+      if (isShield({ type: t }) && lo.modules.some(isShield)) continue; // bot: jeden štít stačí
       if (rng() < 0.35) continue;
       const slot = freeSlots(lo).find((sl) => !(t === "mine" && sl === "front"));
       if (!slot) continue;

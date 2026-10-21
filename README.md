@@ -145,6 +145,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.69 – Editor výbavy: pruh váhy přes celou šířku sloupce; **loď a pilot jako jedna dlaždice** – klik otevře
+  okénko se všemi možnostmi (každá s vysvětlivkou). **Více štítů**: jde nainstalovat segmentový i celolodní (i víc
+  kusů), funguje vždy jen **zapnutý** – v hexu je vypínač ZAP/VYP; vypnout jde jen když je k dispozici jiný funkční
+  štít (ten se zapne), jediný štít vypnout nejde; vypnutý = „ZÁLOHA“. Zničí-li se v bitvě zapnutý štít, záloha se
+  automaticky zapne plná. Droid má v hexagonech fialovou barvu.
 - v3.68 – Editor výbavy kompaktně (rozvržení B): vlevo loď a piloti pod sebou (malé dlaždice, piloti 2×2), uprostřed
   nákres s pruhem váhy, vpravo souhrn a obchod v mřížce; stejně i editor bota. Dlouhý text o pravidlech nákupu je
   nahrazen jednořádkovou nápovědou (pravidla po najetí).

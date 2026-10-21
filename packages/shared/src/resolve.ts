@@ -32,7 +32,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, moduleHp, moduleMaxHp, moduleWorking, MODULES, occupiedSlots, profileOf } from "./ships.ts";
+import { cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 
 /** Je loď/bod v elektromagnetické bouři? */
@@ -149,7 +149,17 @@ let creditCtx: { state: GameState; events: TurnEvent[]; rng: Rng; turn: number }
 
 /** Po změně modulů srovná štíty s tím, co funkční moduly unesou. */
 function syncShields(ship: Ship): void {
+  // zničený zapnutý štít → automaticky se zapne další funkční (záloha startuje plná)
+  ship.loadout = normalizeShields(ship.loadout);
   refreshShip(ship);
+  const nowType = shieldTypeOf(ship.loadout);
+  if (nowType !== ship.shieldType) {
+    ship.shieldType = nowType;
+    ship.segments = nowType === "segment" ? ([1, 1, 1, 1].map(() => RULES.segmentHp * ship.stats.segmentModules) as Segments) : [0, 0, 0, 0];
+    ship.shields = nowType === "whole" ? ship.stats.shields : 0;
+    ship.shieldEff = 100;
+    return;
+  }
   if (ship.shieldType !== "none" && ship.stats.segmentModules === 0 && ship.stats.shields === 0) {
     ship.shieldType = "none";
     ship.segments = [0, 0, 0, 0];

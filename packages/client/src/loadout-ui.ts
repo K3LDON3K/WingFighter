@@ -24,6 +24,9 @@ import {
   PILOTS,
   validateLoadout,
   WEIGHT,
+  isShield,
+  moduleWorking,
+  normalizeShields,
   type Facing,
   type ModuleType,
   type ShipLoadout,
@@ -110,6 +113,7 @@ function hpFrac(m: ModuleInstance): number {
 
 /** Barva kategorie: zbraně červeně, speciální moduly modře. */
 export function moduleColor(type: ModuleType): string {
+  if (type === "droid") return "#c084fc";
   return type === "laser" || type === "torpedo" || type === "mine" || type === "mg" ? "#ef4444" : "#3b82f6";
 }
 
@@ -123,11 +127,14 @@ export function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Recor
 /** Výběr slotu / modulu v editoru: nejdřív slot a pak modul z obchodu, nebo naopak. Esc / klik vedle = zrušit. */
 let pickSlot: SlotId | null = null;
 let pickType: ModuleType | null = null;
+/** Otevřené okénko výběru lodi / pilota. */
+let pickerOpen: "hull" | "pilot" | null = null;
 /** Zruší rozpracovaný výběr (volá se po umístění, při Esc a při kliku mimo editor). */
 export function clearLoadoutPick(): boolean {
-  const had = !!(pickSlot || pickType);
+  const had = !!(pickSlot || pickType || pickerOpen);
   pickSlot = null;
   pickType = null;
+  pickerOpen = null;
   return had;
 }
 
@@ -142,7 +149,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   const err = validateLoadout(loadout, { allowed, budget: shop ? undefined : budget });
   const ro = !!opts.readonly;
 
-  const change = (lo: ShipLoadout) => opts.onChange?.(lo);
+  const change = (lo: ShipLoadout) => opts.onChange?.(normalizeShields(lo));
   /** Překreslení editoru na místě (změna výběru slotu/modulu bez změny výbavy). */
   const rerender = () => {
     const next = renderLoadout(opts);
@@ -174,7 +181,6 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     if (max !== undefined && have >= max) return `max. ${max} na hráče`;
     if (shop ? def.price > wallet : cost + def.price > budget) return shop ? "nedostatek kreditů" : "nestačí rozpočet";
     if (!firstFreeSlot()) return "všechny sloty obsazené";
-    if ((t === "shield-whole" && loadout.modules.some((m) => m.type === "shield-segment")) || (t === "shield-segment" && loadout.modules.some((m) => m.type === "shield-whole"))) return "nelze kombinovat typy štítů";
     return null;
   };
   if (pickType && (ro || buyWhy(pickType))) pickType = null;
@@ -202,10 +208,29 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     const pts = hexPoints(box);
     if (m && def) {
       const broken = moduleBroken(m);
-      const col = selected ? "#fb923c" : broken ? "#ef4444" : moduleColor(m.type);
-      grp.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
-      grp.append(...hpFill(pts, box, col, selected ? 0.3 : broken ? 0.35 : 0.18, broken ? 1 : hpFrac(m)));
+      const shieldOff = isShield(m) && !broken && !!m.off;
+      const col = selected ? "#fb923c" : broken ? "#ef4444" : shieldOff ? "#475569" : moduleColor(m.type);
+      grp.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter", ...(shieldOff ? { "stroke-dasharray": "6 4" } : {}) }));
+      grp.append(...hpFill(pts, box, col, selected ? 0.3 : broken ? 0.35 : shieldOff ? 0.08 : 0.18, broken ? 1 : hpFrac(m)));
       if (broken) grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h - 6, "font-family": "Jersey", "font-size": 10, fill: "#fca5a5", "text-anchor": "middle" }, "ZNIČEN"));
+      if (isShield(m) && !broken) {
+        // vypínač štítu: funguje vždy jen jeden; vypnout jde jen když je k dispozici jiný funkční štít
+        const others = loadout.modules.filter((x) => x.id !== m.id && isShield(x) && moduleWorking(x));
+        const canOff = others.length > 0;
+        const sw = svgEl("g", { class: `lo-switch ${m.off ? "off" : "on"} ${!ro && (m.off || canOff) ? "" : "fixed"}`, transform: `translate(${box.x + 24}, ${box.y + 14})` });
+        sw.append(svgEl("rect", { x: -16, y: -7, width: 32, height: 14, fill: m.off ? "#0b1020" : "#14532d", stroke: m.off ? "#64748b" : "#4ade80", "stroke-width": 1 }));
+        sw.append(svgEl("rect", { x: m.off ? -14 : 2, y: -5, width: 12, height: 10, fill: m.off ? "#475569" : "#4ade80" }));
+        sw.append(svgEl("text", { x: m.off ? 7 : -7, y: 3.5, "font-family": "Jersey", "font-size": 9, fill: m.off ? "#94a3b8" : "#bbf7d0", "text-anchor": "middle" }, m.off ? "VYP" : "ZAP"));
+        sw.append(svgEl("title", {}, m.off ? "Štít je vypnutý (záloha). Klik = zapnout (druhý štít se vypne)." : canOff ? "Štít je zapnutý. Klik = vypnout – zapne se druhý nainstalovaný štít." : "Štít je zapnutý. Jediný funkční štít nejde vypnout."));
+        if (!ro && (m.off || canOff))
+          sw.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            const target = m.off ? m.id : others[0].id;
+            change(normalizeShields({ ...loadout, modules: loadout.modules.map((x) => (isShield(x) ? { ...x, off: x.id === target ? undefined : true } : x)) }));
+          });
+        grp.append(sw);
+        if (shieldOff) grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h - 6, "font-family": "Jersey", "font-size": 10, fill: "#94a3b8", "text-anchor": "middle" }, "ZÁLOHA"));
+      }
       const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
       const words = def.name.toUpperCase().split(" ");
       const long = Math.max(...words.map((w) => w.length)) > 8;
@@ -363,7 +388,6 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       else if (max !== undefined && have >= max) why = `max. ${max} na hráče`;
       else if (shop ? def.price > wallet : cost + def.price > budget) why = shop ? "nedostatek kreditů" : "nestačí rozpočet";
       else if (!firstFreeSlot()) why = "všechny sloty obsazené";
-      else if ((t === "shield-whole" && loadout.modules.some((m) => m.type === "shield-segment")) || (t === "shield-segment" && loadout.modules.some((m) => m.type === "shield-whole"))) why = "nelze kombinovat typy štítů";
       const btn = hexBuyButton(t, have, why, () => {
         if (pickSlot) add(t, pickSlot);
         else if (pickType === t) {
@@ -409,7 +433,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const on = x.id === loadout.hullId;
       return h(
         "button",
-        { class: `pk-tile hull ${on ? "on" : ""}`, disabled: !canPick || !opts.hullChoices, title: `${x.name}\n${x.description}\nLodní body: ${x.points} · trup ${x.hull} · sloty: ${x.slots.map((sl) => sl.name).join(", ")} · náklad ${x.cargo}`, onclick: () => change({ ...loadout, hullId: x.id }) },
+        { class: `pk-tile hull ${on ? "on" : ""}`, disabled: !canPick || !opts.hullChoices, title: `${x.name}\n${x.description}\nLodní body: ${x.points} · trup ${x.hull} · sloty: ${x.slots.map((sl) => sl.name).join(", ")} · náklad ${x.cargo}`, onclick: () => ((pickerOpen = null), change({ ...loadout, hullId: x.id })) },
         h("span", { class: "pk-pic" }, icon("ship", on ? "#7dd3fc" : "#64748b", 28)),
         h("span", { class: "pk-name" }, label(x.name)),
         h("span", { class: "pk-sub" }, `${x.points} ${x.points === 1 ? "bod" : "body"}`),
@@ -422,18 +446,30 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const taken = x.unique && !on && (opts.pilotsTaken ?? []).includes(x.id);
       return h(
         "button",
-        { class: `pk-tile pilot ${on ? "on" : ""} ${taken ? "taken" : ""}`, disabled: !canPick || !opts.pilotChoices || taken, title: `${x.name}\n${x.description}${x.abilities.length ? `\n${x.abilities.join("\n")}` : "\nBez zvláštních schopností."}\n${x.unique ? "Unikátní – v letce jen jednou." : "Může se v letce opakovat."}${taken ? "\nNelze: už je v jiné lodi tvé letky." : ""}`, onclick: () => change({ ...loadout, pilotId: x.id }) },
+        { class: `pk-tile pilot ${on ? "on" : ""} ${taken ? "taken" : ""}`, disabled: !canPick || !opts.pilotChoices || taken, title: `${x.name}\n${x.description}${x.abilities.length ? `\n${x.abilities.join("\n")}` : "\nBez zvláštních schopností."}\n${x.unique ? "Unikátní – v letce jen jednou." : "Může se v letce opakovat."}${taken ? "\nNelze: už je v jiné lodi tvé letky." : ""}`, onclick: () => ((pickerOpen = null), change({ ...loadout, pilotId: x.id })) },
         h("span", { class: "pk-pic" }, pilotPortrait(x.id, 40)),
         h("span", { class: "pk-name" }, label(x.name)),
         modInfo(x),
       );
     });
-  const head = h(
-    "div",
-    { class: "lo-head pick" },
-    h("div", { class: "pk-group" }, h("span", { class: "pk-lbl" }, label("Loď")), h("div", { class: "pk-row" }, ...hullTiles)),
-    h("div", { class: "pk-group" }, h("span", { class: "pk-lbl" }, label("Pilot")), h("div", { class: "pk-row" }, ...pilotTiles)),
-  );
+  /** Jen vybraná dlaždice; klik = okénko se všemi možnostmi (každá s vysvětlivkou). */
+  const pickGroup = (kind: "hull" | "pilot", name: string, tiles: HTMLElement[]) => {
+    const selTile = tiles.find((t) => t.classList.contains("on")) ?? tiles[0];
+    const openable = canPick && (kind === "hull" ? !!opts.hullChoices : !!opts.pilotChoices) && tiles.length > 1;
+    const shown = selTile.cloneNode(true) as HTMLElement;
+    shown.classList.add("pk-current");
+    shown.removeAttribute("disabled");
+    shown.title = `${shown.title}${openable ? "\nKlik = vybrat jinou" : ""}`;
+    shown.onclick = (ev) => {
+      ev.stopPropagation();
+      if (!openable) return;
+      pickerOpen = pickerOpen === kind ? null : kind;
+      rerender();
+    };
+    const pop = pickerOpen === kind ? h("div", { class: "pk-pop", onclick: (ev: Event) => ev.stopPropagation() }, h("div", { class: "pk-pop-h" }, label(kind === "hull" ? "Vyber loď" : "Vyber pilota")), h("div", { class: "pk-row" }, ...tiles)) : null;
+    return h("div", { class: "pk-group" }, h("span", { class: "pk-lbl" }, label(name)), h("div", { class: "pk-holder" }, shown, pop));
+  };
+  const head = h("div", { class: "lo-head pick" }, pickGroup("hull", "Loď", hullTiles), pickGroup("pilot", "Pilot", pilotTiles));
 
   const summary = h(
     "div",

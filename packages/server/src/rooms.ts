@@ -34,6 +34,7 @@ import {
   randomLoadout,
   refillLoadout,
   validateLoadout,
+  normalizeShields,
   applyLoadoutTrade,
   moduleCost,
   settleLoadoutAfterBattle,
@@ -113,7 +114,7 @@ function cleanLoadout(raw: unknown): ShipLoadout | null {
     const def = MODULES[mm.type as ModuleType];
     const facing = typeof mm.facing === "string" ? (mm.facing as ShipLoadout["modules"][number]["facing"]) : undefined;
     const ammo = def.ammo === undefined ? undefined : typeof mm.ammo === "number" && Number.isFinite(mm.ammo) ? Math.max(0, Math.min(def.ammo, Math.round(mm.ammo))) : def.ammo;
-    modules.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: mm.slot as ShipLoadout["modules"][number]["slot"], ammo, facing });
+    modules.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: mm.slot as ShipLoadout["modules"][number]["slot"], ammo, facing, ...(mm.off === true ? { off: true } : {}) });
   }
   if (modules.length > 8) return null;
   let cargo: ShipLoadout["cargo"];
@@ -379,11 +380,11 @@ export class Hub {
           // bot: výbava zdarma (jen platnost a rozpočet)
           const err = validateLoadout(lo, { allowed: room.settings.allowedModules, budget: room.tuning.startBudget });
           if (err) return this.error(client, `Výbava: ${err}.`);
-          m.loadouts[idx] = lo;
+          m.loadouts[idx] = normalizeShields(lo);
           m.manualLoadout = true;
         } else {
           // hráč: změna je obchod – nákup, prodej, dokoupení munice z kreditů (jedna peněženka pro celou letku)
-          const trade = applyLoadoutTrade(m.loadouts[idx], lo);
+          const trade = applyLoadoutTrade(m.loadouts[idx], normalizeShields(lo));
           if (trade.error) return this.error(client, `Výbava: ${trade.error}.`);
           const err = validateLoadout(trade.loadout, { allowed: room.settings.allowedModules });
           if (err) return this.error(client, `Výbava: ${err}.`);

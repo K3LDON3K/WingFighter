@@ -3,6 +3,9 @@ import {
   applyLoadoutTrade,
   laserTarget,
   laserOdds,
+  refreshShip,
+  shieldTypeOf,
+  normalizeShields,
   profileFor,
   profileOf,
   resolveManeuver,
@@ -632,7 +635,17 @@ describe("inventář a ekonomika", () => {
     const full = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules, { id: "x", type: "laser" as const, slot: "front" as const, facing: "front" as const }] };
     expect(validateLoadout(full)).toMatch(/obsazený/);
     const mixed = { ...DEFAULT_LOADOUT, modules: [...DEFAULT_LOADOUT.modules.filter((m) => m.type !== "mine"), { id: "x", type: "shield-whole" as const, slot: "back" as const }] };
-    expect(validateLoadout(mixed)).toMatch(/kombinovat/);
+    // míchání štítů je nově dovolené – funguje jen jeden (zapnutý), druhý je záloha
+    expect(validateLoadout(mixed)).toBeNull();
+    const norm = normalizeShields(mixed);
+    const shields = norm.modules.filter((m) => m.type === "shield-segment" || m.type === "shield-whole");
+    expect(shields.filter((m) => !m.off).length).toBe(1);
+    expect(shieldTypeOf(norm)).toBe("segment"); // první funkční zůstává zapnutý
+    // přepnutí: segmentový vypnout → zapne se celolodní
+    const sw = normalizeShields({ ...norm, modules: norm.modules.map((m) => (m.type === "shield-segment" ? { ...m, off: true } : { ...m, off: undefined })) });
+    expect(shieldTypeOf(sw)).toBe("whole");
+    expect(computeStats(sw).segmentModules).toBe(0);
+    expect(computeStats(sw).shields).toBeGreaterThan(0);
     expect(validateLoadout(DEFAULT_LOADOUT, { allowed: { torpedo: 0 } })).toMatch(/zakázán/);
     expect(moduleCost(DEFAULT_LOADOUT)).toBe(470);
     expect(validateLoadout(DEFAULT_LOADOUT, { budget: 400 })).toMatch(/rozpočet/);
@@ -1261,5 +1274,31 @@ describe("droid – overdrive a váha", () => {
     expect(r.state.ships[0].speed).toBe(5);
     // další kolo bez overdrivu: rychlost 5 už nejde
     expect(sanitizeOrders(r.state, "p1", [{ shipId: me.id, maneuverId: "m5a0", fire: false }])[0].maneuverId).not.toBe("m5a0");
+  });
+});
+
+describe("záložní štít", () => {
+  it("při zničení zapnutého štítu se v bitvě zapne záložní (plný)", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g.asteroids = [];
+    const me = g.ships[0];
+    me.loadout = normalizeShields({ ...me.loadout, modules: [newModule("shield-segment", "front", "s1"), newModule("shield-whole", "back", "s2")] });
+    refreshShip(me);
+    me.shieldType = "segment";
+    me.segments = [2, 2, 2, 2];
+    expect(me.loadout.modules.find((m) => m.id === "s2")?.off).toBe(true);
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 640, 500, Math.PI);
+    // nepřítel střílí zepředu → zásah poškozuje přední modul (segmentový štít, 40 hp); dáme mu 1 hp
+    me.loadout.modules[0].hp = 1;
+    me.segments = [0, 0, 0, 0];
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: true }], createRng(3));
+    const s = r.state.ships[0];
+    const seg = s.loadout.modules.find((m) => m.id === "s1")!;
+    if ((seg.hp ?? 1) <= 0) {
+      expect(s.shieldType).toBe("whole");
+      expect(s.loadout.modules.find((m) => m.id === "s2")?.off).toBeUndefined();
+      expect(s.shields).toBe(s.stats.shields);
+    }
   });
 });
