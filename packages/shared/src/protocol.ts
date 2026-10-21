@@ -9,6 +9,8 @@ export interface RoomPlayer {
   team: number;
   isBot: boolean;
   ready: boolean;
+  /** V místnosti: hráč potvrdil, že je připravený (bitva jde spustit až když jsou všichni). Boti a host vždy true. */
+  lobbyReady: boolean;
   connected: boolean;
   /** První loď letky (kompatibilita); celá letka je v `loadouts`. */
   loadout: ShipLoadout;
@@ -59,6 +61,8 @@ export type ClientMessage =
   | { type: "balanceTeams"; shuffle?: boolean }
   /** Host otevře místnost pro ostatní (open=true) nebo se vrátí k nastavení (open=false). */
   | { type: "openRoom"; open: boolean }
+  /** Hráč v místnosti potvrdí (nebo vezme zpět), že je připravený. */
+  | { type: "setLobbyReady"; ready: boolean }
   /** Startovní bod (null = uvolnit); host může nastavit botovi. */
   | { type: "setStart"; index: number | null; botId?: string }
   /** Předat velení týmu jinému členovi (host komukoli, velitel ve svém týmu). */

@@ -77,6 +77,8 @@ interface RoomMember {
   team: number;
   isBot: boolean;
   ready: boolean;
+  /** Potvrzená připravenost v místnosti (false po každé vlastní změně, po změně nastavení a po návratu z bitvy). */
+  lobbyReady?: boolean;
   /** Letka: jedna výbava na loď (součet lodních bodů = settings.shipPoints). */
   loadouts: ShipLoadout[];
   /** Bot: výbavu nastavil host ručně (přepíše výchozí/náhodnou při startu). */
@@ -230,6 +232,7 @@ class Room {
         team: m.team,
         isBot: m.isBot,
         ready: m.ready,
+        lobbyReady: m.isBot || m.id === this.hostId || !!m.lobbyReady,
         loadout: m.loadouts[0],
         loadouts: m.loadouts,
         startIndex: m.startIndex,
@@ -384,6 +387,7 @@ export class Hub {
         const m = room.members.get(targetId);
         if (!m) return;
         m.team = clampInt(msg.team, 0, (room.settings.teams ?? 2) - 1);
+        m.lobbyReady = false;
         this.broadcastRoom(room);
         return;
       }
@@ -401,6 +405,7 @@ export class Hub {
           let best = 0;
           for (let t = 1; t < n; t++) if (sums[t] < sums[best]) best = t;
           m.team = best;
+          m.lobbyReady = false;
           sums[best] += fleetPoints(m.loadouts);
         }
         this.broadcastRoom(room);
@@ -426,6 +431,7 @@ export class Hub {
           if ([...room.members.values()].some((o) => o.id !== m.id && o.startIndex === i)) return this.error(client, "Tenhle startovní bod už někdo má.");
           m.startIndex = i;
         }
+        m.lobbyReady = false;
         this.broadcastRoom(room);
         return;
       }
@@ -469,6 +475,7 @@ export class Hub {
           if (trade.cost > room.walletOf(m)) return this.error(client, `Nedostatek kreditů (potřeba ${trade.cost}, máš ${room.walletOf(m)}).`);
           m.spent += trade.cost;
           m.loadouts[idx] = trade.loadout;
+          m.lobbyReady = false;
         }
         this.broadcastRoom(room);
         return;
@@ -546,6 +553,7 @@ export class Hub {
           }
           room.settings.allowedModules = out;
         }
+        for (const m of room.members.values()) m.lobbyReady = false;
         this.broadcastRoom(room);
         return;
       }
@@ -589,8 +597,21 @@ export class Hub {
       case "openRoom": {
         if (!room || room.game || room.hostId !== client.id) return;
         room.open = !!msg.open;
+        for (const m of room.members.values()) m.lobbyReady = false;
         this.broadcastRoom(room);
         this.broadcastRooms();
+        return;
+      }
+      case "setLobbyReady": {
+        if (!room || room.game || !room.open) return;
+        const m = room.members.get(client.id);
+        if (!m) return;
+        if (msg.ready) {
+          const err = validateFleet(m.loadouts, room.settings);
+          if (err) return this.error(client, `Letka: ${err}.`);
+        }
+        m.lobbyReady = !!msg.ready;
+        this.broadcastRoom(room);
         return;
       }
       case "startGame":
@@ -644,7 +665,10 @@ export class Hub {
         if (!room || room.hostId !== client.id) return;
         this.settleBattle(room);
         room.game = null;
-        for (const m of room.members.values()) m.ready = m.isBot;
+        for (const m of room.members.values()) {
+          m.ready = m.isBot;
+          m.lobbyReady = false;
+        }
         // odpojené hráče vyhodíme
         for (const m of [...room.members.values()]) {
           if (!m.isBot && !this.clients.get(m.id)?.ws) {
@@ -671,6 +695,8 @@ export class Hub {
     }
     room.syncBattle();
     if (members.length < 2) return this.error(host, "Potřebujete alespoň dva hráče (nebo bota).");
+    const notReady = members.filter((m) => !m.isBot && m.id !== host.id && !m.lobbyReady);
+    if (notReady.length) return this.error(host, `Ještě nejsou připraveni: ${notReady.map((m) => m.name).join(", ")}.`);
     if (room.settings.mode === "tdm" && new Set(members.map((m) => m.team)).size < 2) {
       return this.error(host, "V týmovém módu musí být obsazené alespoň dva týmy.");
     }

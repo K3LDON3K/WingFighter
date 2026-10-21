@@ -191,13 +191,15 @@ function roomView(m: LobbyModel, net: Net) {
       h("span", { class: "sc-mods" }, ...(l.modules.length ? l.modules.map((m) => icon(MODULES[m.type].icon, m.hp !== undefined && m.hp <= 0 ? "#f87171" : "#60a5fa", 10)) : [h("span", { class: "muted", style: "font-size:11px" }, "–")])),
     );
   };
+  /** Hráči (bez botů a hosta), kteří ještě nepotvrdili připravenost. */
+  const notReady = room.players.filter((p) => !p.isBot && p.id !== room.hostId && !p.lobbyReady);
   const fleetOf = (p: RoomPlayer) => (p.loadouts?.length ? p.loadouts : [p.loadout]);
   const canEditBot = (p: RoomPlayer) => p.isBot && isHost && room.settings.botLoadout === "manual";
   /** Řádek hráče v tabulce týmů. */
   const playerRow = (p: RoomPlayer, color: string) => {
     const fleet = fleetOf(p);
     const err = validateFleet(fleet, room.settings);
-    const status = !p.connected ? ["off", "odpojen"] : err ? ["warn", `⚠ ${err}`] : ["ok", "✓ připraven"];
+    const status = !p.connected ? ["off", "odpojen"] : err ? ["warn", `⚠ ${err}`] : p.id === room.hostId ? ["ok", "✓ host"] : p.lobbyReady ? ["ok", "✓ připraven"] : ["wait", "⌛ ještě upravuje"];
     const canMove = nTeams > 1 && (isHost || p.id === m.playerId);
     const open = botEdit === p.id;
     return h(
@@ -305,8 +307,13 @@ function roomView(m: LobbyModel, net: Net) {
         h("span", { class: "muted" }, "KOD "),
         h("span", { class: "code", style: "font-size:22px;font-weight:700;color:var(--accent);letter-spacing:3px" }, room.code),
         h("div", { class: "spacer" }),
+        !setup && !isHost && me
+          ? me.lobbyReady
+            ? h("button", { class: "on", title: "Jsi připraven. Klik = vzít zpět a ještě něco upravit (po každé vlastní změně se připravenost ruší sama).", onclick: () => net.send({ type: "setLobbyReady", ready: false }) }, icon("tick", "currentColor", 12), label("Připraven · upravit"))
+            : h("button", { class: "go", title: "Potvrdit, že máš hotovo – host může spustit bitvu, až budou připraveni všichni.", onclick: () => net.send({ type: "setLobbyReady", ready: true }) }, icon("tick", "currentColor", 12), label("Připraven"))
+          : null,
         !setup && isHost
-          ? h("button", { class: "go", title: room.series?.finished ? "Stejné nastavení, nové mapy (seedy), skóre od nuly" : "", onclick: () => net.send({ type: "startGame" }) }, icon("play", "currentColor", 12), label(room.series ? (room.series.finished ? "Nová série" : `Zahájit bitvu ${room.series.played + 1}/${room.series.total}`) : "Zahájit bitvu"))
+          ? h("button", { class: "go", disabled: notReady.length > 0, title: notReady.length ? `Čeká se na: ${notReady.map((p) => p.name).join(", ")}` : room.series?.finished ? "Stejné nastavení, nové mapy (seedy), skóre od nuly" : "", onclick: () => net.send({ type: "startGame" }) }, icon("play", "currentColor", 12), label(room.series ? (room.series.finished ? "Nová série" : `Zahájit bitvu ${room.series.played + 1}/${room.series.total}`) : "Zahájit bitvu"))
           : null,
         h("button", { onclick: () => net.send({ type: "leaveRoom" }) }, label("Opustit")),
       ),
@@ -894,7 +901,9 @@ function roomView(m: LobbyModel, net: Net) {
           ? h("button", { class: "primary", onclick: () => net.send({ type: "openRoom", open: true }) }, icon("tick", "currentColor", 12), label("Otevřít místnost"))
           : h("span", { class: "muted txt" }, "Čeká se, až zakladatel dokončí nastavení…")
         : isHost
-          ? null
+          ? notReady.length
+            ? h("span", { class: "muted txt" }, `Čeká se, až budou připraveni: ${notReady.map((p) => p.name).join(", ")}.`)
+            : null
           : h("span", { class: "muted txt" }, room.series ? (room.series.finished ? "Série skončila – host může spustit novou." : `Čeká se, až host zahájí bitvu ${room.series.played + 1} ze ${room.series.total}…`) : "Čeká se, až host zahájí bitvu…"),
     ),
   );

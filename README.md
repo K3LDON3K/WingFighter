@@ -147,6 +147,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.100 – Místnost: hráči potvrzují připravenost tlačítkem PŘIPRAVEN (jde vzít zpět a upravit výbavu; každá
+  vlastní změna výbavy, týmu nebo startu ji ruší, stejně jako změna nastavení hostem a návrat z bitvy). Host může
+  bitvu spustit, až jsou připraveni všichni; ve stavu hráče je „⌛ ještě upravuje“ / „✓ připraven“.
 - v3.99 – Oprava segmentového štítu: nové rozdělení segmentů se během přehrávání kola už nevrací na starý
   stav (přerozdělení platí od začátku kola, animace ho teď přebírá hned). Úprava štítu už se v animaci nehlásí
   chybně jako „úskok“.

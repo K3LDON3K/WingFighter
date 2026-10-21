@@ -3414,6 +3414,9 @@ button.mod-hex:hover:not(:disabled) {
 .trow .t-status.ok {
   color: #86efac;
 }
+.trow .t-status.wait {
+  color: var(--yellow);
+}
 .trow .t-status.warn {
   color: #fbbf24;
 }
