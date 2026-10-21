@@ -228,8 +228,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       h("div", { class: "spair bottom" }, btn(2, -1), btn(2, 1)),
       slots,
     );
-    shieldBox.append(h("span", { class: "bubble-tag" }, label("plán")));
-  } else if (planned) shieldBox.append(h("span", { class: "bubble-tag" }, label("plán")));
+  }
   const vgauge = (n: number, val: number, color: string, dark: string, name: string, num: string | Node, title: string, blockedFrom = n) => {
     const bar = h("div", { class: "vbar" });
     // dílky nad blockedFrom jsou blokované váhou (tmavě červené s rámečkem)

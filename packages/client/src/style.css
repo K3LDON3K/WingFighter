@@ -3586,3 +3586,9 @@ button.start-chip.on:hover:not(:disabled) {
 .seg.destroyed .dead-x {
   font-size: 18px;
 }
+/* štít v editaci: tlačítko pod okénkem si drží normální rozměr (flex-basis ve sloupci neprotahuje výšku) */
+.scan-holder.stack .bb-weapon {
+  flex: 0 0 auto;
+  width: 72px;
+  align-self: flex-start;
+}

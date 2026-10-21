@@ -503,6 +503,15 @@ function setAskConfirm(ask: boolean) {
   renderSide();
 }
 
+/** Zavře okénko štítu; beze změny rozložení se akce zruší (akce stojí jen skutečná úprava). */
+function closeShieldEdit(g: NonNullable<typeof game>, shipId: string | null) {
+  g.shieldEdit = false;
+  const ship = shipId ? g.state.ships.find((x) => x.id === shipId) : undefined;
+  const o = shipId ? g.orders.get(shipId) : undefined;
+  if (!ship || !o || !shipId || o.action?.type !== "shield") return;
+  if (o.action.segments.every((v, i) => v === ship.segments[i])) g.orders.set(shipId, { ...o, action: undefined });
+}
+
 function submitOrders(force = false) {
   if (!game || game.submitted) return;
   if (game.confirmOpen) force = true; // otevřené potvrzení: další SPUSTIT / Enter = potvrdit
@@ -530,7 +539,7 @@ function submitOrders(force = false) {
   }
   game.confirmOpen = false;
   game.aimingShipId = null;
-  game.shieldEdit = false;
+  closeShieldEdit(game, game.selectedShipId ?? null);
   sfx("launch");
   net.send({ type: "submitOrders", orders: [...game.orders.values()] });
   game.submitted = true;
@@ -1246,7 +1255,7 @@ function renderSide() {
         const o = g.orders.get(id);
         const ship = g.state.ships.find((x) => x.id === id);
         if (!o || !ship || shieldInHand(ship, o) > 0) return;
-        g.shieldEdit = false;
+        closeShieldEdit(g, id);
         renderSide();
       },
       centerOn: (id) => centerOnShip(id),
@@ -1727,7 +1736,7 @@ function bindInput(c: HTMLCanvasElement) {
       const so = sel && g.orders.get(sel.id);
       if (sel && so && shieldInHand(sel, so) > 0) showNotice("Nejdřív polož všechny body štítu (+).");
       else {
-        g.shieldEdit = false;
+        closeShieldEdit(g, sel?.id ?? null);
         closed = true;
       }
     }

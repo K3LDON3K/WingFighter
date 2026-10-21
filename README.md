@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.59 – Štít: tlačítko se při otevřeném okénku už neprotahuje; zavření okénka bez změny rozložení akci neutratí
+  (akce stojí jen skutečná úprava – platí i pro klik vedle a pro SPUSTIT KOLO); štítek „plán“ u lodi vlevo odstraněn.
 - v3.58 – **Zničená zbraň v liště akcí** (varianta B): když jsou všechny moduly dané zbraně zničené, je její tlačítko
   červeně šrafované s křížkem a nejde kliknout. U více modulů stejného typu je takto označené jen malé tlačítko
   zničeného modulu (1↑ / 2←) pod hlavním tlačítkem a nejde ho vybrat; hlavní tlačítko zůstává funkční.
