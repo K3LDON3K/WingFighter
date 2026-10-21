@@ -147,6 +147,13 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.76 – **Nákres lodi** v editoru výbavy ukazuje u modulu jen ikonu, název, jednu šipku zvoleného natočení,
+  výplň podle životů (zelená → žlutá → oranžová → červená, zničený tmavě červený) a munici jako ikonky (žlutá =
+  nabito; kulomet po dávkách 10 nábojů). **Klik na modul otevře okénko**: životy + OPRAVIT (zničený modul za
+  % ceny – ladění → Moduly → „Oprava zničeného modulu“, výchozí 50 %; po opravě plné životy, zůstává použitý),
+  munice + DOPLNIT (jen když není plná), natočení (jen povolené směry), váha a PRODAT / ODEBRAT. Zavře se
+  křížkem, klikem vedle nebo Esc. **Souhrn nastavení hry** je samostatný řádek čipů s ikonami (mapa modře, bitva
+  žlutě) s pevnou výškou – změna textu už neposouvá zbytek obrazovky.
 - v3.75 – Nastavení → Bitva: Herní mód, Umístění na mapě a Výbava botů jsou ikonková tlačítka (jako ostatní řádky)
   místo rozbalovacích seznamů; najetí ukáže popis, vedle je text zvolené volby.
 - v3.74 – Nastavení hry → Bitva → **Umístění na mapě**: *Náhodné* (každý náhodný startovní bod, mapa se před

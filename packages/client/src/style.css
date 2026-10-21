@@ -4030,3 +4030,160 @@ button.start-chip.on:hover:not(:disabled) {
   font-weight: 700;
   line-height: 1;
 }
+/* souhrn nastavení hry – pevná výška, nezalamuje se */
+.sum-strip {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  height: 30px;
+  overflow: hidden;
+  white-space: nowrap;
+  margin: 2px 0 8px;
+}
+.sum-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px;
+  background: #0a0e1c;
+  border: 1px solid #334155;
+  font-family: Pix, sans-serif;
+  font-size: 12px;
+  color: #cbd5e1;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.sum-chip b {
+  color: #f8fafc;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sum-sep {
+  width: 1px;
+  height: 18px;
+  background: #334155;
+  margin: 0 2px;
+  flex: none;
+}
+/* okénko modulu v nákresu lodi */
+.lo-diagram {
+  position: relative;
+}
+.lo-g.mod-click {
+  cursor: pointer;
+}
+.lo-g.mod-click:hover polygon:first-of-type {
+  filter: brightness(1.25);
+}
+.mod-pop {
+  position: absolute;
+  z-index: 25;
+  width: 300px;
+  background: #0f172a;
+  border: 3px solid;
+  border-color: #475569 #0b1020 #0b1020 #475569;
+  box-shadow: 0 0 0 2px #05070f, 4px 4px 0 #05070f;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.mp-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 2px solid;
+  padding-bottom: 4px;
+}
+.mp-name {
+  font-family: var(--ui);
+  font-size: 15px;
+  color: #f8fafc;
+  letter-spacing: 1px;
+}
+.mp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+.mp-k {
+  font-family: var(--ui);
+  font-size: 11px;
+  color: #94a3b8;
+  letter-spacing: 1px;
+  width: 64px;
+  flex: none;
+}
+.mp-bar {
+  flex: 1;
+  height: 10px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  position: relative;
+}
+.mp-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+}
+.mp-v {
+  font-family: Pix, sans-serif;
+  font-size: 13px;
+  color: #e2e8f0;
+  min-width: 40px;
+}
+.mp-v.bad {
+  color: #fca5a5;
+}
+.mp-ammo {
+  display: inline-flex;
+  gap: 3px;
+  flex: 1;
+  align-items: center;
+}
+.mp-ammo i {
+  width: 8px;
+  height: 6px;
+  border: 1px solid #64748b;
+}
+.mp-ammo i.on {
+  background: #fbbf24;
+  border-color: #fbbf24;
+}
+.mp-note {
+  font-size: 12px;
+}
+.mp-facing {
+  display: inline-flex;
+  gap: 4px;
+  flex: 1;
+}
+.mp-dir {
+  padding: 2px 5px;
+}
+.mp-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #fbbf24;
+}
+.mp-cost.no {
+  color: #64748b;
+}
+.mp-foot {
+  border-top: 1px solid #1e293b;
+  padding-top: 6px;
+}
+.mp-foot .px.tiny.danger {
+  border-color: #f87171;
+  color: #fca5a5;
+}
+.mod-pop .px.tiny {
+  font-size: 13px;
+  padding: 3px 7px;
+}

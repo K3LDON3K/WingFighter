@@ -163,6 +163,8 @@ export interface ModuleInstance {
   facing?: Facing;
   /** Štít vypnutý (funguje vždy jen jeden štít; ostatní nainstalované jsou záloha). */
   off?: boolean;
+  /** Požadavek na opravu zničeného modulu v obchodě (platí se % ceny; po zpracování se smaže). */
+  repair?: boolean;
   /** Zastaralé (skener dřív míval náboje a cooldown; teď čerpá technologii lodi). */
   charges?: number;
   cooldown?: number;

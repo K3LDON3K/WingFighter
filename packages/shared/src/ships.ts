@@ -187,6 +187,13 @@ export function moduleSellPrice(m: ModuleInstance): number {
 }
 
 /** Cena dokoupení chybějící munice (0 = plný zásobník nebo modul bez munice). */
+/** Cena opravy zničeného modulu v obchodě (% ceny; 0 = modul není zničený). */
+export function moduleRepairCost(m: ModuleInstance): number {
+  const def = MODULES[m.type];
+  if (!def || !moduleBroken(m)) return 0;
+  return Math.round((def.price * RULES.repairPct) / 100);
+}
+
 export function ammoRefillCost(m: ModuleInstance): number {
   const def = MODULES[m.type];
   if (!def?.ammo || def.ammoPrice === undefined) return 0;
@@ -213,12 +220,20 @@ export function applyLoadoutTrade(prev: ShipLoadout, next: ShipLoadout): { loado
       return { ...m, ammo: def.ammo, hp: undefined, used: undefined, gift: undefined };
     }
     if (old.type !== m.type) return "modul nelze změnit na jiný typ";
-    const out: ModuleInstance = { ...m, hp: old.hp, used: old.used, gift: old.gift };
+    const out: ModuleInstance = { ...m, hp: old.hp, used: old.used, gift: old.gift, repair: undefined };
+    let repaired = false;
+    if (m.repair && moduleBroken(old)) {
+      // oprava zničeného modulu: plné životy, zůstává „použitý“
+      cost += moduleRepairCost(old);
+      out.hp = undefined;
+      out.used = true;
+      repaired = true;
+    }
     if (def.ammo !== undefined) {
       const was = old.ammo ?? 0;
       const want = Math.max(0, Math.min(def.ammo, Math.round(m.ammo ?? was)));
       if (want > was) {
-        if (moduleBroken(old)) return `${def.name}: zničený modul nejde doplnit`;
+        if (moduleBroken(old) && !repaired) return `${def.name}: zničený modul nejde doplnit`;
         cost += Math.ceil((want - was) * (def.ammoPrice ?? 0));
       }
       out.ammo = Math.max(was, want); // munici nejde „odprodat“ – zůstává

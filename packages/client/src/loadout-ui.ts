@@ -1,3 +1,4 @@
+import { type ModuleDef } from "@wingfighter/shared";
 import {
   moduleBroken,
   moduleHp,
@@ -5,6 +6,8 @@ import {
   type PilotMods,
   moduleSellPrice,
   ammoRefillCost,
+  moduleRepairCost,
+  RULES,
   type ModuleInstance,
   cargoCapacity,
   moduleWeight,
@@ -81,6 +84,49 @@ function hexPoints(b: { x: number; y: number; w: number; h: number }): string {
   const cy = b.y + b.h / 2;
   return [0, 60, 120, 180, 240, 300].map((a) => `${(cx + HEX_R * Math.cos((a * Math.PI) / 180)).toFixed(1)},${(cy + HEX_R * Math.sin((a * Math.PI) / 180)).toFixed(1)}`).join(" ");
 }
+
+/**
+ * Stav munice v hexu modulu: nabité kusy = ikonka typu munice žlutě, chybějící = tmavý obrys.
+ * Kulomet (100 nábojů) se zobrazuje po dávkách (10 nábojů = 1 dílek).
+ */
+function ammoSlots(def: ModuleDef, ammo: number): { slots: number; loaded: number; unit: number } {
+  const max = def.ammo ?? 0;
+  const unit = max > 10 ? max / 10 : 1;
+  const slots = Math.round(max / unit);
+  return { slots, loaded: Math.min(slots, Math.ceil(ammo / unit)), unit };
+}
+function drawAmmo(grp: SVGElement, box: { x: number; y: number; w: number; h: number }, def: ModuleDef, ammo: number, nameLines: number): void {
+  const max = def.ammo ?? 0;
+  const { slots, loaded, unit } = ammoSlots(def, ammo);
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+  const g = svgEl("g", { class: "lo-ammo" });
+  g.append(svgEl("title", {}, `Munice ${ammo} / ${max}${unit > 1 ? ` (dílek = ${unit} nábojů)` : ""}`));
+  const size = max > 10 ? 6 : 10;
+  const gap = max > 10 ? 2 : 3;
+  const total = slots * size + (slots - 1) * gap;
+  const x0 = cx - total / 2;
+  const y = cy + 4 + (nameLines - 1) * 6 + 6;
+  for (let i = 0; i < slots; i++) {
+    const on = i < loaded;
+    const x = x0 + i * (size + gap);
+    if (max > 10) g.append(svgEl("rect", { x, y, width: size, height: size * 0.6, fill: on ? "#fbbf24" : "none", stroke: on ? "#fbbf24" : "#64748b", "stroke-width": 1 }));
+    else {
+      const ic = icon(def.icon, on ? "#fbbf24" : "#475569", size);
+      ic.setAttribute("x", String(x));
+      ic.setAttribute("y", String(y));
+      g.append(ic);
+    }
+  }
+  grp.append(g);
+}
+/** Barva životů modulu: zelená (plné) → žlutá → červená (skoro zničený). */
+function hpColor(frac: number): string {
+  if (frac >= 0.999) return "#22c55e";
+  if (frac > 0.5) return "#eab308";
+  if (frac > 0.25) return "#f97316";
+  return "#ef4444";
+}
 let hpClipSeq = 0;
 /**
  * Výplň hexu podle životů modulu (varianta A): barva ubývá odshora dolů, nad hladinou zůstává tmavý podklad
@@ -129,12 +175,15 @@ let pickSlot: SlotId | null = null;
 let pickType: ModuleType | null = null;
 /** Otevřené okénko výběru lodi / pilota. */
 let pickerOpen: "hull" | "pilot" | null = null;
+/** Otevřené okénko modulu v nákresu (id modulu). */
+let modPop: string | null = null;
 /** Zruší rozpracovaný výběr (volá se po umístění, při Esc a při kliku mimo editor). */
 export function clearLoadoutPick(): boolean {
-  const had = !!(pickSlot || pickType || pickerOpen);
+  const had = !!(pickSlot || pickType || pickerOpen || modPop);
   pickSlot = null;
   pickType = null;
   pickerOpen = null;
+  modPop = null;
   return had;
 }
 
@@ -210,10 +259,14 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const broken = moduleBroken(m);
       const shieldOff = isShield(m) && !broken && !!m.off;
       const col = selected ? "#fb923c" : broken ? "#ef4444" : shieldOff ? "#475569" : moduleColor(m.type);
-      grp.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter", ...(shieldOff ? { "stroke-dasharray": "6 4" } : {}) }));
-      grp.append(...hpFill(pts, box, col, selected ? 0.3 : broken ? 0.35 : shieldOff ? 0.08 : 0.18, broken ? 1 : hpFrac(m)));
+      const frac = hpFrac(m);
+      const open = modPop === m.id;
+      grp.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: open ? "#fbbf24" : col, "stroke-width": open ? 4 : 3, "stroke-linejoin": "miter", ...(shieldOff ? { "stroke-dasharray": "6 4" } : {}) }));
+      // výplň = životy: barva podle zbývajících životů (zelená → žlutá → červená), hladina klesá odshora
+      grp.append(...hpFill(pts, box, broken ? "#ef4444" : hpColor(frac), selected ? 0.3 : broken ? 0.35 : shieldOff ? 0.08 : 0.22, broken ? 1 : frac));
       if (broken) grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h - 6, "font-family": "Jersey", "font-size": 10, fill: "#fca5a5", "text-anchor": "middle" }, "ZNIČEN"));
-      if (isShield(m) && !broken && loadout.modules.filter((x) => isShield(x)).length > 1) {
+      const multiShield = isShield(m) && !broken && loadout.modules.filter((x) => isShield(x)).length > 1;
+      if (multiShield) {
         // vypínač štítu (pixel art, uprostřed horní části hexu): funguje vždy jen jeden; vypnout jde jen s jiným funkčním štítem
         const others = loadout.modules.filter((x) => x.id !== m.id && isShield(x) && moduleWorking(x));
         const canOff = others.length > 0;
@@ -233,6 +286,12 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
           });
         grp.append(sw);
         if (shieldOff) grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h - 6, "font-family": "Jersey", "font-size": 10, fill: "#94a3b8", "text-anchor": "middle" }, "ZÁLOHA"));
+      } else {
+        // ikona modulu nad názvem
+        const ic = icon(def.icon, broken ? "#fca5a5" : col, 14);
+        ic.setAttribute("x", String(box.x + box.w / 2 - 7));
+        ic.setAttribute("y", String(box.y + box.h / 2 - 34));
+        grp.append(ic);
       }
       const ammo = opts.ammoOf?.(m.id) ?? m.ammo;
       const words = def.name.toUpperCase().split(" ");
@@ -240,52 +299,29 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const fs = long ? 13 : 16;
       const base = box.y + box.h / 2 + 4 - (words.length - 1) * 6;
       words.forEach((w, i) => grp.append(svgEl("text", { x: box.x + box.w / 2, y: base + i * 12, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: "#f8fafc", "text-anchor": "middle" }, w)));
-      if (ammo !== undefined) grp.append(svgEl("text", { x: box.x + box.w / 2 + 20, y: box.y + 14, "font-family": "Jersey", "font-size": 12, fill: "#fbbf24", "text-anchor": "middle" }, String(ammo)));
+      if (ammo !== undefined && def.ammo) drawAmmo(grp, box, def, ammo, words.length);
       if (hasFacing(m.type)) {
-        // šipky natočení: všechny povolené směry (šedé = možnosti, žlutá = zvolený); boční v cípech, ↑↓ uprostřed hran
-        for (const f of allowedFacings(m.type, m.slot)) {
-          const sel = (m.facing ?? "front") === f;
-          const a = arrowAt(box, f);
-          const col2 = sel ? "#fbbf24" : "#64748b";
-          const arrow = svgEl("g", { class: `lo-arrow ${sel ? "sel" : "opt"} ${ro ? "ro" : ""}`, transform: `translate(${a.x}, ${a.y}) rotate(${a.rot})` });
-          arrow.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: sel ? "#0b1020" : "rgba(11,16,32,0.7)", stroke: col2, "stroke-width": 1, ...(sel ? {} : { "stroke-dasharray": "2 1" }) }));
-          arrow.append(svgEl("path", { d: "M0,-5 L5,2 L1.5,2 L1.5,5 L-1.5,5 L-1.5,2 L-5,2 Z", fill: col2 }));
-          arrow.append(svgEl("title", {}, `${FACING_NAMES[f]}${sel ? " (zvoleno)" : ro ? "" : " – klik = natočit"}`));
-          if (!ro && !sel) {
-            arrow.addEventListener("click", (ev) => {
-              ev.stopPropagation();
-              change({ ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? { ...x, facing: f } : x)) });
-            });
-          }
-          grp.append(arrow);
-        }
-      }
-      if (!ro && !selectable && shop && !moduleBroken(m) && ammoRefillCost(m) > 0) {
-        const price = ammoRefillCost(m);
-        const can = price <= wallet;
-        const r = svgEl("g", { class: `lo-refill ${can ? "" : "dis"}`, transform: `translate(${box.x + box.w / 2 - 16}, ${box.y + box.h / 2 + 27})` });
-        r.append(svgEl("rect", { x: -16, y: -7, width: 32, height: 14, fill: "#0b1020", stroke: can ? "#fbbf24" : "#64748b", "stroke-width": 1 }));
-        r.append(svgEl("text", { x: 0, y: 4, "font-family": "Jersey", "font-size": 10, fill: can ? "#fbbf24" : "#64748b", "text-anchor": "middle" }, `+${price}`));
-        r.append(svgEl("title", {}, `Doplnit munici (${def.ammo! - (m.ammo ?? 0)} ks) za ${price} kreditů${can ? "" : " – nedostatek kreditů"}`));
-        if (can)
-          r.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            refill(m.id);
-          });
-        grp.append(r);
+        // jen zvolené natočení (žlutá šipka na hraně hexu); změna se dělá v okénku modulu
+        const f = m.facing ?? "front";
+        const a = arrowAt(box, f);
+        const arrow = svgEl("g", { class: "lo-arrow sel", transform: `translate(${a.x}, ${a.y}) rotate(${a.rot})` });
+        arrow.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: "#0b1020", stroke: "#fbbf24", "stroke-width": 1 }));
+        arrow.append(svgEl("path", { d: "M0,-5 L5,2 L1.5,2 L1.5,5 L-1.5,5 L-1.5,2 L-5,2 Z", fill: "#fbbf24" }));
+        arrow.append(svgEl("title", {}, `Natočení: ${FACING_NAMES[f]}`));
+        grp.append(arrow);
       }
       if (!ro && !selectable) {
-        const x = svgEl("g", { class: "lo-remove", transform: `translate(${box.x + box.w / 2 + 16}, ${box.y + box.h / 2 + 27})` });
-        x.append(svgEl("rect", { x: -7, y: -7, width: 14, height: 14, fill: "#0b1020", stroke: "#f87171", "stroke-width": 1 }));
-        x.append(svgEl("path", { d: "M-4,-4 L4,4 M4,-4 L-4,4", stroke: "#f87171", "stroke-width": 2 }));
-        x.append(svgEl("title", {}, shop ? m.gift ? `${def.name}: záchranná výbava – nejde prodat (odebrání = zahození)` : `Prodat ${def.name} za ${moduleSellPrice(m)} kreditů${moduleBroken(m) ? " (zničený)" : m.used ? " (použitý)" : ""}` : `Odebrat ${def.name} (vrátí ${def.price} kreditů)`));
-        x.addEventListener("click", (ev) => {
+        grp.classList.add("mod-click");
+        grp.addEventListener("click", (ev) => {
           ev.stopPropagation();
-          remove(m.id);
+          modPop = open ? null : m.id;
+          pickSlot = null;
+          pickType = null;
+          pickerOpen = null;
+          rerender();
         });
-        grp.append(x);
       }
-      grp.append(svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}` : ""} · životy ${moduleHp(m)}/${def.hp} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${selectable ? "\nKlik = vybrat k vyhození" : ""}`));
+      grp.append(svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}/${def.ammo}` : ""} · životy ${moduleHp(m)}/${def.hp} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${selectable ? "\nKlik = vybrat k vyhození" : ro ? "" : "\nKlik = oprava, munice, natočení, prodej"}`));
       if (selectable) grp.addEventListener("click", () => opts.onSelect!(m.id));
     } else {
       const name = hull.slots.find((x) => x.id === slot)?.name ?? slot;
@@ -321,6 +357,107 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     }
     svg.append(grp);
   };
+  /** Okénko modulu: životy + oprava, munice + dokoupení, natočení, prodej / odebrání. */
+  const modulePopup = (m: ModuleInstance): HTMLElement => {
+    const def = MODULES[m.type];
+    const box = SLOT_BOX[def.size === "large" ? "front" : m.slot];
+    const broken = moduleBroken(m);
+    const col = moduleColor(m.type);
+    const hp = moduleHp(m);
+    const frac = hpFrac(m);
+    const rows: (HTMLElement | null)[] = [];
+    const costTag = (n: number, ok: boolean) => h("span", { class: `mp-cost ${ok ? "" : "no"}` }, icon("credits", ok ? "#fbbf24" : "#64748b", 10), ` ${n}`);
+    const pay = (n: number) => !shop || n <= wallet;
+    // životy
+    const repairCost = moduleRepairCost(m);
+    rows.push(
+      h(
+        "div",
+        { class: "mp-row" },
+        h("span", { class: "mp-k" }, label("Životy")),
+        h("span", { class: "mp-bar", title: `${hp} / ${def.hp}` }, h("i", { style: `width:${Math.round(frac * 100)}%;background:${broken ? "#ef4444" : hpColor(frac)}` })),
+        h("span", { class: `mp-v ${broken ? "bad" : ""}` }, broken ? "ZNIČEN" : `${hp}/${def.hp}`),
+        broken && shop
+          ? h("button", { class: `px tiny ${pay(repairCost) ? "on" : ""}`, disabled: !pay(repairCost), title: `Opravit zničený modul za ${repairCost} kreditů (${RULES.repairPct} % ceny)${pay(repairCost) ? "" : " – nedostatek kreditů"}`, onclick: () => {
+              modPop = null;
+              change({ ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? { ...x, repair: true } : x)) });
+            } }, label("Opravit"), " ", costTag(repairCost, pay(repairCost)))
+          : null,
+      ),
+    );
+    // munice
+    if (def.ammo) {
+      const ammo = m.ammo ?? 0;
+      const { slots, loaded, unit } = ammoSlots(def, ammo);
+      const refillCost = ammoRefillCost(m);
+      const full = ammo >= def.ammo;
+      const pips = h("span", { class: "mp-ammo", title: `Munice ${ammo} / ${def.ammo}${unit > 1 ? ` (dílek = ${unit} nábojů)` : ""}` });
+      for (let i = 0; i < slots; i++) pips.append(def.ammo > 10 ? h("i", { class: i < loaded ? "on" : "" }) : icon(def.icon, i < loaded ? "#fbbf24" : "#475569", 11));
+      rows.push(
+        h(
+          "div",
+          { class: "mp-row" },
+          h("span", { class: "mp-k" }, label("Munice")),
+          pips,
+          h("span", { class: "mp-v" }, `${ammo}/${def.ammo}`),
+          !full && !broken && shop
+            ? h("button", { class: `px tiny ${pay(refillCost) ? "on" : ""}`, disabled: !pay(refillCost), title: `Doplnit ${def.ammo - ammo} ks munice za ${refillCost} kreditů${pay(refillCost) ? "" : " – nedostatek kreditů"}`, onclick: () => {
+                modPop = null;
+                refill(m.id);
+              } }, label("Doplnit"), " ", costTag(refillCost, pay(refillCost)))
+            : full
+              ? h("span", { class: "muted txt mp-note" }, "plná")
+              : broken
+                ? h("span", { class: "muted txt mp-note" }, "nejdřív opravit")
+                : null,
+        ),
+      );
+    }
+    // natočení
+    if (hasFacing(m.type)) {
+      const cur = m.facing ?? "front";
+      const btns = h("span", { class: "mp-facing" });
+      for (const f of allowedFacings(m.type, m.slot)) {
+        const sel = f === cur;
+        const rot = f === "right" ? 90 : f === "back" ? 180 : f === "left" ? 270 : 0;
+        const b = h("button", { class: `px tiny mp-dir ${sel ? "on" : ""}`, title: `${FACING_NAMES[f]}${sel ? " (zvoleno)" : ""}`, onclick: () => {
+            if (sel) return;
+            change({ ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? { ...x, facing: f } : x)) });
+          } });
+        const sv = svgEl("svg", { viewBox: "-7 -7 14 14", width: 14, height: 14 });
+        sv.append(svgEl("path", { d: "M0,-5 L5,2 L1.5,2 L1.5,5 L-1.5,5 L-1.5,2 L-5,2 Z", fill: sel ? "#fbbf24" : "#94a3b8", transform: `rotate(${rot})` }));
+        b.append(sv);
+        btns.append(b);
+      }
+      rows.push(h("div", { class: "mp-row" }, h("span", { class: "mp-k" }, label("Natočení")), btns, h("span", { class: "mp-v" }, FACING_NAMES[cur])));
+    }
+    // prodej / odebrání
+    const sell = shop ? moduleSellPrice(m) : def.price;
+    const sellTitle = shop ? m.gift ? "Záchranná výbava – nejde prodat (odebrání = zahození)" : `Prodat za ${sell} kreditů${broken ? " (zničený)" : m.used ? " (použitý)" : " (nový – plná cena)"}` : `Odebrat (vrátí ${def.price} kreditů)`;
+    rows.push(
+      h(
+        "div",
+        { class: "mp-row mp-foot" },
+        h("span", { class: "muted txt", title: "Váha modulu včetně munice" }, icon("weight", "#94a3b8", 10), ` ${moduleWeight(m)}`),
+        h("span", { class: "spacer" }),
+        h("button", { class: "px tiny danger", title: sellTitle, onclick: () => {
+            modPop = null;
+            remove(m.id);
+          } }, "✕ ", label(shop ? (m.gift ? "Zahodit" : "Prodat") : "Odebrat"), shop && !m.gift ? h("span", { class: "mp-cost" }, " ", icon("credits", "#fbbf24", 10), ` ${sell}`) : null),
+      ),
+    );
+    const onRight = m.slot === "right";
+    const px = Math.round((onRight ? box.x - 8 : box.x + box.w + 8) * scale);
+    const py = Math.round(box.y * scale);
+    const pop = h(
+      "div",
+      { class: "mod-pop", style: `top:${py}px;${onRight ? `right:calc(100% - ${px}px)` : `left:${px}px`}` },
+      h("div", { class: "mp-head", style: `border-color:${col}` }, icon(def.icon, col, 14), h("span", { class: "mp-name" }, label(def.name)), h("span", { class: "spacer" }), h("button", { class: "px tiny", title: "Zavřít", onclick: () => ((modPop = null), rerender()) }, "✕")),
+      ...rows,
+    );
+    pop.addEventListener("click", (ev) => ev.stopPropagation());
+    return pop;
+  };
   if (LARGE_SLOTS.every((sl) => free.includes(sl))) {
     const f = SLOT_BOX.front;
     const b = SLOT_BOX.back;
@@ -336,7 +473,18 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     occ.forEach((sl) => drawn.add(sl));
   }
   for (const sl of hull.slots) if (!drawn.has(sl.id)) slotBox(sl.id, SLOT_BOX[sl.id]);
+  // klik do nákresu mimo modul zavře okénko modulu
+  svg.addEventListener("click", () => {
+    if (modPop) {
+      modPop = null;
+      rerender();
+    }
+  });
   const diagram = h("div", { class: "lo-diagram" }, svg);
+  const popMod = modPop ? loadout.modules.find((x) => x.id === modPop) : undefined;
+  if (popMod && !ro && !opts.onSelect) diagram.append(modulePopup(popMod));
+  else modPop = null;
+
 
   /* --- náklad: zvednuté moduly (nefungují, jen váží) --- */
   if (opts.showCargo) {
@@ -576,3 +724,6 @@ export function loadoutTag(loadout: ShipLoadout): HTMLElement {
   el.append(h("span", { class: "muted" }, ` ${label(PILOTS[loadout.pilotId]?.name ?? "")} · `), icon("speed", "#94a3b8", 10), ` ${maxSpeedFor(loadout)}`);
   return el;
 }
+
+/** Ladicí hák pro náhledy (e2e): vykreslení editoru s libovolnou výbavou. */
+(window as unknown as { __renderLoadout?: typeof renderLoadout }).__renderLoadout = renderLoadout;

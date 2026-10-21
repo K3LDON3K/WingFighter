@@ -51,6 +51,8 @@ export const RULES = {
   moduleDamagePct: 50,
   moduleDropChance: 45,
   brokenSellPct: 10,
+  /** Oprava zničeného modulu v obchodě (% ceny). */
+  repairPct: 50,
   /** Prodej použitého (po bitvě) funkčního modulu – % ceny. */
   usedSellPct: 60,
 };

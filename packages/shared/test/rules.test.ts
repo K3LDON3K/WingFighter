@@ -35,6 +35,7 @@ import {
   carveCrater,
   circleHitsAsteroid,
   createGame,
+  type ShipLoadout,
   type MapSettings,
   commanderOf,
   effectivePlacement,
@@ -1354,5 +1355,26 @@ describe("umístění na mapě", () => {
     expect(effectivePlacement({ mode: "dm", placement: "teamRandom" })).toBe("random");
     expect(effectivePlacement({ mode: "tdm", placement: "teamRandom" })).toBe("teamRandom");
     expect(effectivePlacement({ mode: "tdm" })).toBe("manual");
+  });
+});
+
+describe("oprava zničeného modulu", () => {
+  it("obchod: repair=true u zničeného modulu stojí % ceny a vrátí plné životy; bez repair nejde doplnit munici", () => {
+    const prev: ShipLoadout = { hullId: "fighter", pilotId: "kadet", modules: [{ id: "t", type: "torpedo", slot: "front", ammo: 1, hp: 0, used: true, facing: "front" }] };
+    const bad = applyLoadoutTrade(prev, { ...prev, modules: [{ ...prev.modules[0], ammo: 3 }] });
+    expect(bad.error).toBeTruthy();
+    const ok = applyLoadoutTrade(prev, { ...prev, modules: [{ ...prev.modules[0], repair: true }] });
+    expect(ok.error).toBeUndefined();
+    expect(ok.cost).toBe(Math.round((MODULES.torpedo.price * RULES.repairPct) / 100));
+    expect(ok.loadout.modules[0].hp).toBeUndefined();
+    expect(ok.loadout.modules[0].repair).toBeUndefined();
+    expect(ok.loadout.modules[0].used).toBe(true);
+    // oprava + munice najednou
+    const both = applyLoadoutTrade(prev, { ...prev, modules: [{ ...prev.modules[0], repair: true, ammo: 3 }] });
+    expect(both.error).toBeUndefined();
+    expect(both.cost).toBe(ok.cost + Math.ceil(2 * MODULES.torpedo.ammoPrice!));
+    // repair u nezničeného modulu nic nestojí
+    const fine = applyLoadoutTrade({ ...prev, modules: [{ ...prev.modules[0], hp: undefined }] }, { ...prev, modules: [{ ...prev.modules[0], hp: undefined, repair: true }] });
+    expect(fine.cost).toBe(0);
   });
 });

@@ -438,7 +438,26 @@ function roomView(m: LobbyModel, net: Net) {
           );
         }),
       );
-      const summary = `${MAP_SIZES[map.size]?.label ?? map.size} · asteroidy ${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids} · ${map.storms === 0 ? "bez bouří" : `${map.storms} bouře`} · komety ${{ none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"]} · seed ${map.seed} · ${settings.mode === "tdm" ? "týmový deathmatch" : "deathmatch"} · ${PLACEMENT_LABEL[placement].toLowerCase()} · startovní kredity ${budget}`;
+      /** Souhrn nastavení: řádek čipů (ikona + hodnota) s pevnou výškou – změna textu neposune zbytek UI. */
+      const sumChip = (ic: string, color: string, value: string, title: string) => h("span", { class: "sum-chip", title }, icon(ic, color, 11), h("b", {}, value));
+      const B = "#7dd3fc";
+      const Y = "#fbbf24";
+      const summaryStrip = () =>
+        h(
+          "div",
+          { class: "sum-strip" },
+          sumChip("map", B, MAP_SIZES[map.size]?.label ?? map.size, "Velikost mapy"),
+          sumChip("rock", B, `${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids}${map.clusters ? " · shluky" : ""}`, "Asteroidy"),
+          sumChip("storm", B, map.storms === 0 ? "bez bouří" : `${map.storms} ${map.storms === 1 ? "bouře" : map.storms < 5 ? "bouře" : "bouří"}`, "Bouře"),
+          sumChip("comet", B, { none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"] ?? "žádné", "Komety"),
+          sumChip("seed", B, String(map.seed), "Seed mapy"),
+          h("span", { class: "sum-sep" }),
+          sumChip("people", Y, settings.mode === "tdm" ? `týmový DM · ${settings.teams ?? 2} týmy` : "všichni proti všem", "Herní mód"),
+          sumChip("place", Y, PLACEMENT_LABEL[placement].replace(" umístění", "").toLowerCase(), `Umístění na mapě: ${PLACEMENT_LABEL[placement]}`),
+          sumChip("credits", Y, String(budget), "Startovní kredity"),
+          sumChip("ship", Y, `${settings.shipPoints} ${settings.shipPoints === 1 ? "bod" : "body"}`, "Lodní body na hráče"),
+          settings.turnLimit ? sumChip("clock", Y, `${settings.turnLimit} kol`, "Limit kol") : null,
+        );
       /** Pixelové pictogramy pro řádky Herní mód / Umístění / Výbava botů (26×26). */
       const dot = (s: SVGElement, x: number, y: number, c: string, r = 2.2) => s.append(svgEl("circle", { cx: String(x), cy: String(y), r: String(r), fill: c }));
       const ring = (s: SVGElement, x: number, y: number, c: string, r = 3) => s.append(svgEl("circle", { cx: String(x), cy: String(y), r: String(r), fill: "none", stroke: c, "stroke-width": "1.5", "stroke-dasharray": "2 1.5" }));
@@ -527,7 +546,7 @@ function roomView(m: LobbyModel, net: Net) {
           "div",
           { class: "card gamecard open" },
           h("h3", { style: "display:flex;align-items:center;gap:8px" }, icon("target", "#7dd3fc", 12), " ", label("Nastavení hry"), h("span", { class: "txt muted", style: "font-size:13px" }, "hotovo, místnost otevřená"), h("span", { class: "spacer" }), isHost ? h("button", { class: "px tiny", title: "Místnost se zavře pro nové hráče, dokud nastavení znovu nedokončíš", onclick: () => ((gamePage = 0), net.send({ type: "openRoom", open: false })) }, icon("pen", "currentColor", 10), " ", label("upravit")) : null),
-          h("div", { class: "txt muted", style: "margin-bottom:8px;font-size:13px" }, summary),
+          summaryStrip(),
           randomPlacement
             ? h("div", { class: "game-side" }, h("div", { class: "fsec-h" }, label("Mapa · umístění")), h("div", { class: "muted txt place-note" }, icon("target", "#94a3b8", 12), " ", startHelp))
             : h(
@@ -542,7 +561,8 @@ function roomView(m: LobbyModel, net: Net) {
       return h(
         "div",
         { class: "card gamecard" },
-        h("h3", {}, icon("target", "#7dd3fc", 12), " ", label("Nastavení hry"), isHost ? "" : h("span", { class: "muted" }, label(" (mění host)")), h("span", { class: "spacer" }), h("span", { class: "txt muted wiz-sum" }, summary)),
+        h("h3", {}, icon("target", "#7dd3fc", 12), " ", label("Nastavení hry"), isHost ? "" : h("span", { class: "muted" }, label(" (mění host)"))),
+        summaryStrip(),
         pageBar,
         h(
           "div",
