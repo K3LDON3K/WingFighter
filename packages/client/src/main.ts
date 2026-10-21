@@ -683,6 +683,8 @@ function unmountGame() {
 }
 
 let lastFrameAt = 0;
+/** Poslední vstup myší/kolečkem (po něm chvíli kreslíme plnou rychlostí). */
+let lastInputAt = 0;
 function frame(now: number) {
   if (!game || !renderer || !cam || !canvas) return;
   if (sideDirty) {
@@ -691,8 +693,9 @@ function frame(now: number) {
     const light = game.aimingShipId && barEl && updateManeuverPanel(barEl, { state: game.state, myId: playerId, orders: game.orders, selectedShipId: game.selectedShipId } as Parameters<typeof updateManeuverPanel>[1]);
     if (!light) renderSide();
   }
-  // bez běžící animace stačí ~30 snímků/s (tahová hra) – šetří procesor
-  if (!game.anim && now - lastFrameAt < 30) return;
+  // v klidu stačí ~30 snímků/s (tahová hra) – šetří procesor; při animaci, kreslení dráhy a pohybu myši plných 60
+  const busy = !!game.anim || !!game.aimingShipId || now - lastInputAt < 250;
+  if (!busy && now - lastFrameAt < 30) return;
   lastFrameAt = now;
   if (game.anim) {
     game.anim.update(now);
@@ -1735,6 +1738,7 @@ function bindInput(c: HTMLCanvasElement) {
   });
 
   c.addEventListener("pointermove", (e) => {
+    lastInputAt = performance.now();
     if (e.pointerType === "mouse" && !isTouchMode()) return; // myš řeší window.mousemove
     e.preventDefault();
     touchMove(e);

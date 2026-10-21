@@ -7,6 +7,7 @@ export const RENDER_SCALES: [number, string][] = [
   [1, "100 %"],
   [0.75, "75 %"],
   [0.5, "50 %"],
+  [0.25, "25 %"],
 ];
 let scale = 0.5;
 try {

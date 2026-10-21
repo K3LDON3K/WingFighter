@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.94 – Rozlišení mapy i 25 %. Při kreslení dráhy, při animaci kola a chvíli po každém pohybu myši běží
+  vykreslování plnou rychlostí (60 snímků/s), úsporných 30 jen v klidu – kreslení manévru je plynulejší.
 - v3.93 – Výchozí rozlišení mapy je 50 % (jde přepnout v menu / ladění, volba se pamatuje); log událostí je ve
   výchozím stavu sbalený.
 - v3.92 – Oprava grafických glitchů po v3.91 (mezipaměť statické vrstvy si držela ořez z minulého překreslení –
