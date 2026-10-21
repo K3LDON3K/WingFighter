@@ -266,7 +266,7 @@ function buildSky(theme: SkyTheme, seed: number, w: number, h: number): Sky {
 }
 
 /** Vykreslí vrstvu do kontextu, který už má světovou transformaci (scale zoom, translate -cam). */
-export function drawParallax(ctx: CanvasRenderingContext2D, theme: SkyTheme, seed: number, w: number, h: number, cam: Camera): void {
+export function drawParallax(ctx: CanvasRenderingContext2D, theme: SkyTheme, seed: number, w: number, h: number, cam: Pick<Camera, "x" | "y" | "zoom" | "viewW" | "viewH">, sizeMul = 1, flat = false): void {
   const key = `${theme}|${seed}|${w}x${h}`;
   let sky = cache.get(key);
   if (!sky) {
@@ -281,11 +281,12 @@ export function drawParallax(ctx: CanvasRenderingContext2D, theme: SkyTheme, see
   ctx.imageSmoothingEnabled = false;
   for (const o of sky.objects) {
     // paralaxa: objekt se vůči středu obrazu posouvá jen zlomkem (depth) pohybu kamery
-    const px = ccx + (o.x - ccx) * o.depth;
-    const py = ccy + (o.y - ccy) * o.depth;
+    // náhled mapy (flat): objekty na svých místech bez paralaxy, ať je vidět rozložení celé vrstvy
+    const px = flat ? o.x : ccx + (o.x - ccx) * o.depth;
+    const py = flat ? o.y : ccy + (o.y - ccy) * o.depth;
     // zoom na vzdálené objekty působí míň (depth 0 = nemění velikost)
     const zoomEff = 1 + (cam.zoom - 1) * o.depth;
-    const s = (o.size * zoomEff) / cam.zoom; // velikost ve světových jednotkách při aktuálním zoomu
+    const s = ((o.size * zoomEff) / cam.zoom) * sizeMul; // velikost ve světových jednotkách při aktuálním zoomu (sizeMul: náhled mapy)
     const sw = (s * o.sprite.width) / Math.max(o.sprite.width, o.sprite.height);
     const sh = (s * o.sprite.height) / Math.max(o.sprite.width, o.sprite.height);
     // pixelový krok ≈ 1 obrazový pixel × 2 (ať je vidět pixel-art) – kreslíme bez vyhlazení

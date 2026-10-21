@@ -1,5 +1,6 @@
-import { generateMap, TEAM_COLORS, type MapSettings, type RoomPlayer } from "@wingfighter/shared";
+import { generateMap, skyThemeOf, TEAM_COLORS, type MapSettings, type RoomPlayer } from "@wingfighter/shared";
 import { h } from "./dom.ts";
+import { drawParallax } from "./game/parallax.ts";
 
 /**
  * Náhled generované mapy v místnosti: asteroidy, bouře, startovní body (obsazené barvou týmu + jméno).
@@ -26,6 +27,17 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
   const cy = (gen.height / 2) * scale;
   const ra = (gen.width / 2) * scale;
   const rb = (gen.height / 2) * scale;
+  // vzdálené pozadí (zvolený motiv) – stejné kreslení jako ve hře, oříznuté na hrací plochu (s okrajovou bouří)
+  {
+    const Bs = border * scale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, ra + Bs, rb + Bs, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.setTransform(scale, 0, 0, scale, pad * scale, pad * scale);
+    drawParallax(ctx, skyThemeOf(settings), settings.seed, gen.width, gen.height, { x: -pad, y: -pad, zoom: scale, viewW: width, viewH: height }, scale, true);
+    ctx.restore();
+  }
   if (border > 0) {
     // okrajová bouře: tenká fialová hrana (za ní zraňuje) a červený tvrdý okraj
     const Bs = border * scale;
