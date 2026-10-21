@@ -26,6 +26,8 @@ import {
   laserReach,
   parseManeuverId,
   resolveManeuver,
+  type Maneuver,
+  type Ship,
   STRESS,
   maneuverStress,
   effStressCost,
@@ -167,6 +169,43 @@ function costPipsAll(c: { actions?: number; stress?: number; tech?: number }, sp
 let openPops = new Set<string>();
 const popsNow = new Set<string>();
 const popClass = (key: string) => (popsNow.add(key), openPops.has(key) ? "noanim" : "");
+
+/** Panel „Manévr“ (náhled nakreslené dráhy: směr, rychlost, úhel, náročnost). */
+function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLElement {
+  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
+  const dcolor = man ? (o.droid?.overdrive && maneuverStress(man) > 0 ? DIFFICULTY_COLOR.white : DIFFICULTY_COLOR[man.difficulty]) : "#f87171";
+  return h(
+    "div",
+    { class: "pnl bb-maneuver" },
+    h("div", { class: "ttl" }, label("Manévr")),
+    h(
+      "div",
+      { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] : "Neplatný manévr" },
+      h("span", { class: "man-glyph", style: `color:${dcolor}` }, angleGlyph(cur.angle, false), cur.koiogran ? h("span", { class: "man-koi", title: "Otočka 180° na konci" }, "⟲") : null),
+      h("span", { class: "man-speed" }, String(cur.speed)),
+    ),
+    h("div", { class: "man-angle" }, `${Math.abs(cur.angle)}°${cur.koiogran ? " +180°" : ""}`),
+    h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && maneuverStress(man) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
+    h("div", { class: "spacer" }),
+    h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
+  );
+}
+
+/**
+ * Lehká aktualizace při kreslení dráhy: vymění jen panel Manévr (celá lišta se překreslí až po potvrzení).
+ * Vrací false, když panel v liště není (pak je potřeba plné překreslení).
+ */
+export function updateManeuverPanel(root: HTMLElement, m: PlanningModel): boolean {
+  const old = root.querySelector(".bb-maneuver");
+  if (!old) return false;
+  const my = m.state.ships.filter((s) => s.alive && s.ownerId === m.myId);
+  const ship = my.find((s) => s.id === m.selectedShipId) ?? my[0];
+  if (!ship) return false;
+  const o = m.orders.get(ship.id) ?? defaultOrders(ship);
+  const man = resolveManeuver(profileFor(ship, o), o.maneuverId, ship.speed);
+  old.replaceWith(maneuverPanel(ship, o, man));
+  return true;
+}
 
 export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks) {
   clear(root);
@@ -345,22 +384,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   }
 
   /* ---- 2. manévr (svislý sloupec) ---- */
-  const dcolor = man ? (o.droid?.overdrive && maneuverStress(man) > 0 ? DIFFICULTY_COLOR.white : DIFFICULTY_COLOR[man.difficulty]) : "#f87171";
-  const maneuver = h(
-    "div",
-    { class: "pnl bb-maneuver" },
-    h("div", { class: "ttl" }, label("Manévr")),
-    h(
-      "div",
-      { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] : "Neplatný manévr" },
-      h("span", { class: "man-glyph", style: `color:${dcolor}` }, angleGlyph(cur.angle, false), cur.koiogran ? h("span", { class: "man-koi", title: "Otočka 180° na konci" }, "⟲") : null),
-      h("span", { class: "man-speed" }, String(cur.speed)),
-    ),
-    h("div", { class: "man-angle" }, `${Math.abs(cur.angle)}°${cur.koiogran ? " +180°" : ""}`),
-    h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && maneuverStress(man) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
-    h("div", { class: "spacer" }),
-    h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
-  );
+  const maneuver = maneuverPanel(ship, o, man);
 
   /* ---- 3. akce ---- */
   const apips = h("div", { class: "apip" });

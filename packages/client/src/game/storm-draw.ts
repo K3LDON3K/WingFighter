@@ -120,63 +120,26 @@ export function drawStormSparks(ctx: CanvasRenderingContext2D, x: number, y: num
 }
 
 /**
- * Okrajová bouře kolem oválné mapy: prstenec šířky `border` (u hrany řídký, směrem ven hustší, kreslený jako
- * soustředné elipsy), za ním tvrdý okraj (elipsa zvětšená o `border`, červeně) a bouře pokračuje dál i za něj.
- * Bez šumu, blesků a animace – kreslí se každý snímek, musí být levná.
+ * Okrajová bouře kolem oválné mapy – jen dvě tenké čáry (šetří výkon): fialová na hraně hrací plochy
+ * (za ní bouře zraňuje) a červená na tvrdém okraji (elipsa o `border` větší; dotyk = zničení).
  */
 export function drawBorderStorm(ctx: CanvasRenderingContext2D, w: number, h: number, border: number, zoom: number) {
-  const B = border;
   const cx = w / 2;
   const cy = h / 2;
   const a = w / 2;
   const b = h / 2;
-  const ellipse = (ra: number, rb: number) => {
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, Math.max(1, ra), Math.max(1, rb), 0, 0, Math.PI * 2);
-  };
-  const col = (t: number) => {
-    // 0 = hrana mapy (řídká) … 1 = tvrdý okraj (hustá)
-    const al = t < 0.5 ? 0.12 + (0.38 - 0.12) * (t / 0.5) : 0.38 + (0.72 - 0.38) * ((t - 0.5) / 0.5);
-    const rr = Math.round(168 + (120 - 168) * t);
-    const gg = Math.round(85 + (30 - 85) * t);
-    const bb = Math.round(247 + (150 - 247) * t);
-    return `rgba(${rr},${gg},${bb},${al})`;
-  };
-  ctx.save();
-  // jen prstenec mezi hranou mapy a tvrdým okrajem (za ním je plná barva z pozadí)
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, a + B, b + B, 0, 0, Math.PI * 2);
-  ctx.ellipse(cx, cy, a, b, 0, 0, Math.PI * 2);
-  ctx.clip("evenodd");
-  // prstenec: soustředné elipsy od tvrdého okraje dovnitř (každá překryje vnitřek – vrstvení dá přechod)
-  const N = 18;
-  for (let i = N; i >= 1; i--) {
-    const t = i / N;
-    ellipse(a + B * t, b + B * t);
-    ctx.fillStyle = col(t);
-    // každá vrstva jen tenký mezikruh: vyříznout menší elipsu
-    ctx.ellipse(cx, cy, a + (B * (i - 1)) / N, b + (B * (i - 1)) / N, 0, 0, Math.PI * 2);
-    ctx.fill("evenodd");
-  }
-  ctx.restore();
   const k = 1 / Math.min(1, zoom); // tloušťka čar nezávislá na oddálení
-  // vnitřní hranice pásu: jemná tečkovaná fialová (začátek bouře)
   ctx.save();
-  ctx.strokeStyle = "rgba(216,180,254,0.45)";
-  ctx.lineWidth = 1.5 * k;
-  ctx.setLineDash([4 * k, 6 * k]);
-  ellipse(a, b);
+  ctx.strokeStyle = "rgba(192,132,252,0.8)";
+  ctx.lineWidth = 2 * k;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, a, b, 0, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.restore();
-  // tvrdý okraj: elipsa, červená přerušovaná čára s běžícími čárkami + matný lem
-  ctx.save();
-  ellipse(a + B, b + B);
-  ctx.strokeStyle = "rgba(239,68,68,0.35)";
-  ctx.lineWidth = 10 * k;
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(239,68,68,0.95)";
-  ctx.lineWidth = 3 * k;
-  ctx.setLineDash([14 * k, 10 * k]);
+  ctx.strokeStyle = "rgba(239,68,68,0.9)";
+  ctx.lineWidth = 2 * k;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, a + border, b + border, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }

@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.90 – Výkon: okrajová bouře je jen tenká fialová hrana (za ní zraňuje) a tenká červená čára tvrdého okraje,
+  bez výplně; při kreslení dráhy se místo celé lišty vyměňuje jen panel Manévr; ocas komety a jádro bez animace.
 - v3.89 – **Výkon**: statické vrstvy mapy (hvězdy, mřížka, okrajová bouře, mraky bouří) se kreslí do mezipaměti
   a překreslují jen při pohybu kamery; mlha dohledu se přepočítává jen při změně kamery nebo dohledu; mimo
   animaci kola běží hra na ~30 snímků/s; postranní panel se při kreslení manévru překresluje nejvýš jednou za

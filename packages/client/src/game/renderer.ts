@@ -480,7 +480,7 @@ export class Renderer {
     for (let i = 0; i < cnt; i++) {
       const x = -c.radius - i * step;
       const k = i / cnt;
-      const flick = Math.sin(now / 90 + i * 1.3) > 0.2;
+      const flick = i % 2 === 0; // statické krystaly (bez animace – šetří výkon)
       ctx.fillStyle = k < 0.3 ? "#f0f9ff" : k < 0.6 ? "#a5f3fc" : "#0e7490";
       ctx.globalAlpha = (used ? 0.4 : 1) * (1 - k * 0.6);
       ctx.fillRect(x, -2, step, 4);
@@ -504,7 +504,7 @@ export class Renderer {
     const px = (c.radius * 2) / 9;
     ctx.save();
     ctx.translate(c.x, c.y);
-    ctx.rotate(now / 900 + c.x);
+    ctx.rotate(c.x); // jádro bez otáčení
     ROCK.forEach((row, yy) =>
       [...row].forEach((ch, xx) => {
         const col = pal[ch];

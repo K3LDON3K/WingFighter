@@ -90,7 +90,7 @@ import { renderLoadout } from "./loadout-ui.ts";
 import { actionById } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
-import { DIFFICULTY_COLOR, renderBottomBar, shieldInHand } from "./game/planning.ts";
+import { DIFFICULTY_COLOR, renderBottomBar, shieldInHand, updateManeuverPanel } from "./game/planning.ts";
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
@@ -683,7 +683,9 @@ function frame(now: number) {
   if (!game || !renderer || !cam || !canvas) return;
   if (sideDirty) {
     sideDirty = false;
-    renderSide();
+    // při kreslení dráhy stačí vyměnit panel Manévr; celá lišta se překreslí po potvrzení
+    const light = game.aimingShipId && barEl && updateManeuverPanel(barEl, { state: game.state, myId: playerId, orders: game.orders, selectedShipId: game.selectedShipId } as Parameters<typeof updateManeuverPanel>[1]);
+    if (!light) renderSide();
   }
   // bez běžící animace stačí ~30 snímků/s (tahová hra) – šetří procesor
   if (!game.anim && now - lastFrameAt < 30) return;

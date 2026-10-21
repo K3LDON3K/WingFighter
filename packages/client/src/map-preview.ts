@@ -27,29 +27,11 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
   const ra = (gen.width / 2) * scale;
   const rb = (gen.height / 2) * scale;
   if (border > 0) {
-    // okrajová bouře: fialový prstenec (zevnitř řídký, ven hustý) + červený tvrdý okraj
+    // okrajová bouře: tenká fialová hrana (za ní zraňuje) a červený tvrdý okraj
     const Bs = border * scale;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-pad * scale, -pad * scale, width, height);
-    ctx.ellipse(cx, cy, ra, rb, 0, 0, Math.PI * 2);
-    ctx.clip("evenodd");
-    ctx.fillStyle = "rgba(120,30,150,0.55)";
-    ctx.fillRect(-pad * scale, -pad * scale, width, height);
-    const N = 12;
-    for (let i = N; i >= 1; i--) {
-      const t = i / N;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, ra + Bs * t, rb + Bs * t, 0, 0, Math.PI * 2);
-      ctx.ellipse(cx, cy, ra + (Bs * (i - 1)) / N, rb + (Bs * (i - 1)) / N, 0, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${Math.round(168 - 48 * t)},${Math.round(85 - 55 * t)},${Math.round(247 - 97 * t)},${0.12 + 0.5 * t})`;
-      ctx.fill("evenodd");
-    }
-    ctx.restore();
     ctx.save();
     ctx.strokeStyle = "rgba(239,68,68,0.9)";
     ctx.lineWidth = 1.5 * k;
-    ctx.setLineDash([4 * k, 3 * k]);
     ctx.beginPath();
     ctx.ellipse(cx, cy, ra + Bs, rb + Bs, 0, 0, Math.PI * 2);
     ctx.stroke();
@@ -122,7 +104,8 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
       ctx.setLineDash([]);
     }
   });
-  ctx.strokeStyle = "rgba(148,163,184,0.5)";
+  ctx.strokeStyle = border > 0 ? "rgba(192,132,252,0.85)" : "rgba(148,163,184,0.5)";
+  ctx.lineWidth = 1.5 * k;
   ctx.beginPath();
   ctx.ellipse(cx, cy, ra, rb, 0, 0, Math.PI * 2);
   ctx.stroke();
