@@ -50,6 +50,13 @@ import {
   sanitizePilots,
   PLACEMENTS,
   effectivePlacement,
+  battleResult,
+  currentBattle,
+  isSeries,
+  newBattle,
+  sanitizeBattles,
+  type SeriesBattleResult,
+  type SeriesState,
 } from "@wingfighter/shared";
 import { savePilots } from "./pilot-store.ts";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -147,6 +154,8 @@ class Room {
   hostId: string;
   settings: GameSettings = { mode: "tdm", turnLimit: 0, shipPoints: 1, teams: 2, allowedModules: {}, allowedHulls: {}, allowedPilots: {}, botLoadout: "default", map: { ...DEFAULT_MAP, seed: Math.floor(Math.random() * 100000) } };
   tuning: Tuning = initialTuning();
+  /** Odehrané bitvy série (prázdné = série nezačala / jedna bitva). */
+  seriesResults: SeriesBattleResult[] = [];
   members = new Map<string, RoomMember>();
   game: RunningGame | null = null;
   /** Host dokončil nastavení → ostatní se mohou připojit. */
@@ -160,6 +169,21 @@ class Room {
 
   humans(): RoomMember[] {
     return [...this.members.values()].filter((m) => !m.isBot);
+  }
+
+  seriesState(): SeriesState | undefined {
+    if (!isSeries(this.settings)) return undefined;
+    const total = this.settings.battles!.length;
+    const played = Math.min(this.seriesResults.length, total);
+    return { total, played, results: this.seriesResults.slice(0, total), finished: played >= total };
+  }
+
+  /** Mapa / limit kol / umístění v nastavení = bitva, která se bude hrát (série: podle odehraných). */
+  syncBattle(): void {
+    const b = currentBattle(this.settings, this.seriesResults.length);
+    this.settings.map = b.map;
+    this.settings.turnLimit = b.turnLimit;
+    this.settings.placement = b.placement;
   }
 
   /** Každý tým má právě jednoho velitele: stávající, pokud je pořád v týmu (a není bot, když je v týmu člověk), jinak první člověk, jinak první bot. */
@@ -199,6 +223,7 @@ class Room {
       inGame: !!this.game,
       open: this.open,
       pilots: pilotList(),
+      series: this.seriesState(),
       players: [...this.members.values()].map((m) => ({
         id: m.id,
         name: m.name,
@@ -471,7 +496,17 @@ export class Hub {
         if (!room || room.game || room.hostId !== client.id) return;
         const s = msg.settings;
         if (s.mode === "tdm" || s.mode === "dm") room.settings.mode = s.mode;
-        if (typeof s.turnLimit === "number") room.settings.turnLimit = clampInt(s.turnLimit, 0, 99);
+        if ("battles" in s) {
+          const fallback = currentBattle(room.settings, 0);
+          const list = sanitizeBattles(s.battles, room.settings.battles, fallback);
+          const prevCount = room.settings.battles?.length ?? 0;
+          if (list) room.settings.battles = list;
+          else delete room.settings.battles;
+          // změna počtu bitev = nová série
+          if ((room.settings.battles?.length ?? 0) !== prevCount) room.seriesResults = [];
+        }
+        const series = isSeries(room.settings);
+        if (typeof s.turnLimit === "number" && !series) room.settings.turnLimit = clampInt(s.turnLimit, 0, 99);
         if (typeof s.teams === "number") {
           room.settings.teams = clampInt(s.teams, 2, MAX_TEAMS_TDM);
           for (const m of room.members.values()) if (m.team >= room.settings.teams) m.team = 0;
@@ -481,7 +516,7 @@ export class Hub {
           room.resizeFleets();
           for (const m of room.members.values()) if (m.isBot && !m.manualLoadout) m.loadouts = this.botFleet(room);
         }
-        if (s.placement && PLACEMENTS.includes(s.placement)) room.settings.placement = s.placement;
+        if (s.placement && PLACEMENTS.includes(s.placement) && !series) room.settings.placement = s.placement;
         if (s.botLoadout === "default" || s.botLoadout === "random" || s.botLoadout === "manual") {
           room.settings.botLoadout = s.botLoadout;
           for (const m of room.members.values()) if (m.isBot && !m.manualLoadout) m.loadouts = this.botFleet(room);
@@ -497,7 +532,7 @@ export class Hub {
           for (const id of Object.keys(PILOTS)) if ((s.allowedPilots as Record<string, unknown>)[id] === 0 && id !== "kadet") out[id] = 0; // Kadet vždy
           room.settings.allowedPilots = out;
         }
-        if (s.map && typeof s.map === "object") {
+        if (s.map && typeof s.map === "object" && !series) {
           room.settings.map = sanitizeMapSettings(s.map, room.settings.map ?? DEFAULT_MAP);
           // startovní body se po změně mapy přepočítají – neplatné volby zrušit
           const n = generateMap(room.settings.map).starts.length;
@@ -628,6 +663,13 @@ export class Hub {
 
   private startGame(room: Room, host: Client) {
     const members = [...room.members.values()];
+    const ss = room.seriesState();
+    if (ss?.finished) {
+      // nová série: stejné nastavení, nové seedy map
+      room.seriesResults = [];
+      room.settings.battles = room.settings.battles!.map((b) => newBattle(b));
+    }
+    room.syncBattle();
     if (members.length < 2) return this.error(host, "Potřebujete alespoň dva hráče (nebo bota).");
     if (room.settings.mode === "tdm" && new Set(members.map((m) => m.team)).size < 2) {
       return this.error(host, "V týmovém módu musí být obsazené alespoň dva týmy.");
@@ -743,7 +785,10 @@ export class Hub {
       if (!r) perTeam.set(team, (r = resultForTeam(result, prev, team, memoryFor(g, team))));
       this.send(c, { type: "turnResult", result: r });
     }
-    if (g.state.status === "finished") this.settleBattle(room);
+    if (g.state.status === "finished") {
+      this.settleBattle(room);
+      this.broadcastRoom(room); // stav série (výsledek bitvy) pro přehled v závěrečném okně
+    }
     if (g.state.status !== "finished") {
       this.planBots(room);
       // pokud už nikdo nemusí nic poslat (např. všichni lidé odpojeni), pokračujeme automaticky
@@ -763,6 +808,7 @@ export class Hub {
     const g = room.game;
     if (!g || g.settled) return;
     g.settled = true;
+    if (isSeries(room.settings) && room.seriesResults.length < room.settings.battles!.length) room.seriesResults.push(battleResult(g.state, room.seriesResults.length));
     for (const m of room.members.values()) {
       if (m.isBot) continue;
       const mine = g.state.ships.filter((s) => s.ownerId === m.id);
@@ -845,6 +891,7 @@ export class Hub {
   }
 
   private broadcastRoom(room: Room) {
+    room.syncBattle();
     room.refreshCommanders();
     this.broadcast(room, { type: "room", room: room.toState(this.clients) });
   }

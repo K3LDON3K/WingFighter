@@ -35,6 +35,14 @@ import {
   carveCrater,
   circleHitsAsteroid,
   createGame,
+  sanitizeBattles,
+  currentBattle,
+  isSeries,
+  battleResult,
+  seriesStandings,
+  seriesWinner,
+  SERIES_MAX,
+  type SeriesBattleResult,
   type ShipLoadout,
   type MapSettings,
   commanderOf,
@@ -1376,5 +1384,48 @@ describe("oprava zničeného modulu", () => {
     // repair u nezničeného modulu nic nestojí
     const fine = applyLoadoutTrade({ ...prev, modules: [{ ...prev.modules[0], hp: undefined }] }, { ...prev, modules: [{ ...prev.modules[0], hp: undefined, repair: true }] });
     expect(fine.cost).toBe(0);
+  });
+});
+
+describe("série bitev", () => {
+  const map: MapSettings = { size: "small", asteroids: "few", storms: 0, stormSize: "small", seed: 7, symmetric: false, comets: "none", clusters: false, cometsHitAsteroids: false };
+  it("sanitizeBattles: 2–5 bitev, méně = jedna bitva; currentBattle podle odehraných", () => {
+    const fb = { map, turnLimit: 0 };
+    expect(sanitizeBattles([{}], undefined, fb)).toBeNull();
+    const list = sanitizeBattles([{ map: { ...map, seed: 1 }, turnLimit: 20 }, { turnLimit: 150 }, {}, {}, {}, {}, {}], undefined, fb)!;
+    expect(list.length).toBe(SERIES_MAX);
+    expect(list[0].map.seed).toBe(1);
+    expect(list[0].turnLimit).toBe(20);
+    expect(list[1].turnLimit).toBe(99);
+    const settings = { mode: "tdm" as const, turnLimit: 5, shipPoints: 1, allowedModules: {}, botLoadout: "default" as const, map, battles: list };
+    expect(isSeries(settings)).toBe(true);
+    expect(currentBattle(settings, 1).turnLimit).toBe(99);
+    expect(currentBattle(settings, 99)).toBe(list[4]);
+    expect(currentBattle({ ...settings, battles: undefined }, 3).turnLimit).toBe(5);
+  });
+  it("battleResult + standings: body 3/1/0, pořadí podle bodů, sestřelů, zranění", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default", map } });
+    g.status = "finished";
+    g.result = { winnerTeam: 1, winnerPlayerId: null, reason: "elimination" };
+    g.stats!["p2"].kills = 1;
+    g.stats!["p2"].damageDealt = 30;
+    const r1 = battleResult(g, 0);
+    expect(r1.winner).toBe("1");
+    expect(r1.sides.sort()).toEqual(["0", "1"]);
+    expect(r1.kills["1"]).toBe(1);
+    const r2: SeriesBattleResult = { index: 1, winner: null, sides: ["0", "1"], kills: { "0": 2, "1": 0 }, damage: { "0": 50, "1": 10 }, reason: "turnLimit" };
+    const st = seriesStandings([r1, r2]);
+    expect(st[0].key).toBe("1");
+    expect(st[0].points).toBe(4);
+    expect(st[1].points).toBe(1);
+    expect(seriesWinner([r1, r2])).toBe("1");
+    // rovnost bodů: rozhodují sestřely
+    const r3: SeriesBattleResult = { index: 2, winner: "0", sides: ["0", "1"], kills: { "0": 1, "1": 0 }, damage: { "0": 10, "1": 0 }, reason: "elimination" };
+    expect(seriesWinner([r1, r2, r3])).toBe("0");
+    // DM: klíč = id hráče
+    const dm = createGame({ players, settings: { mode: "dm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default", map } });
+    dm.status = "finished";
+    dm.result = { winnerTeam: dm.players[0].team, winnerPlayerId: "p1", reason: "elimination" };
+    expect(battleResult(dm, 0).winner).toBe("p1");
   });
 });

@@ -53,6 +53,8 @@ import {
   type Segments,
   type ShipOrders,
   type TurnResult,
+  seriesStandings,
+  seriesWinner,
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
 import { audioReady, isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
@@ -1035,6 +1037,7 @@ function renderHud() {
             h("h2", { style: `color:${color}` }, title.toUpperCase()),
             h("div", { class: "muted txt" }, r.reason === "turnLimit" ? "Dosažen limit kol." : "Soupeři zničeni."),
             renderLeaderboard(s),
+            seriesSummary(s),
             h("div", { style: "margin-top:16px" }, isHost ? h("button", { class: "primary", onclick: () => net.send({ type: "backToLobby" }) }, "Zpět do místnosti") : h("span", { class: "muted" }, "Host může vrátit všechny do místnosti.")),
           ),
         ),
@@ -1043,6 +1046,23 @@ function renderHud() {
       clear(overlayEl);
     }
   }
+}
+
+/** Stav série bitev v závěrečném okně (jen když místnost hraje sérii). */
+function seriesSummary(s: GameState): HTMLElement | null {
+  const ss = room?.series;
+  if (!ss) return null;
+  const tdm = s.settings.mode === "tdm";
+  const sideName = (k: string) => (tdm ? TEAM_NAMES[Number(k)] : (s.players.find((p) => p.id === k)?.name ?? "?"));
+  const sideColor = (k: string) => (tdm ? TEAM_COLORS[Number(k)] : TEAM_COLORS[s.players.findIndex((p) => p.id === k) % TEAM_COLORS.length] ?? "#e2e8f0");
+  const st = seriesStandings(ss.results);
+  const win = ss.finished ? seriesWinner(ss.results) : null;
+  return h(
+    "div",
+    { class: "series-end" },
+    h("div", { class: "ttl", style: "margin:10px 0 4px" }, label(ss.finished ? `Série skončila · ${win === null ? "remíza" : `vítěz ${sideName(win)}`}` : `Série · odehráno ${ss.played} ze ${ss.total}`)),
+    ...st.map((x, i) => h("div", { class: "se-row" }, h("span", { class: "muted" }, `${i + 1}. `), h("b", { style: `color:${sideColor(x.key)}` }, sideName(x.key)), ` ${x.points} b. `, h("span", { class: "muted" }, `(${x.wins}V ${x.draws}R ${x.losses}P · ${x.kills} sestřelů · ${x.damage} zranění)`))),
+  );
 }
 
 function renderTooltip() {

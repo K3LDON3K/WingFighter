@@ -1,4 +1,5 @@
 import type { Tuning } from "./tuning.ts";
+import type { SeriesState } from "./series.ts";
 import type { GameSettings, GameState, PilotDef, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
 
 /** Stav místnosti v lobby. */
@@ -33,6 +34,8 @@ export interface RoomState {
   open: boolean;
   /** Piloti platní na serveru (editovatelní v ladění). */
   pilots: PilotDef[];
+  /** Série bitev (chybí = jedna bitva). */
+  series?: SeriesState;
 }
 
 export interface RoomSummary {

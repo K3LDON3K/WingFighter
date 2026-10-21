@@ -147,6 +147,14 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.77 – **Série bitev.** Nastavení hry má první záložku **Bitvy**: počet bitev 1 (jedna bitva) nebo 2–5 (série).
+  V sérii má každá bitva vlastní **mapu, limit kol a umístění na mapě** (dlaždice Bitva 1…N, klik = její
+  nastavení s náhledem; 🎲 u seedu i „🎲 všechny“); mód, kredity, lodní body, lodě a moduly jsou společné
+  (záložka *Pravidla*). Mezi bitvami se všichni vrátí do místnosti (nákupy, opravy, startovní body na další mapě),
+  v hlavičce je panel série (příští bitva, pořadí, výsledky) a host dá ZAHÁJIT BITVU 2/3. **Vítěz série podle
+  bodů**: výhra 3, remíza 1, prohra 0 (za tým; v deathmatchi za hráče), při rovnosti sestřely, pak zranění.
+  Po poslední bitvě tabulka série a tlačítko NOVÁ SÉRIE (stejné nastavení, nové seedy, skóre od nuly). Změna
+  počtu bitev začne sérii znovu. Závěrečné okno bitvy ukazuje i průběžné pořadí série.
 - v3.76 – **Nákres lodi** v editoru výbavy ukazuje u modulu jen ikonu, název, jednu šipku zvoleného natočení,
   výplň podle životů (zelená → žlutá → oranžová → červená, zničený tmavě červený) a munici jako ikonky (žlutá =
   nabito; kulomet po dávkách 10 nábojů). **Klik na modul otevře okénko**: životy + OPRAVIT (zničený modul za

@@ -365,6 +365,8 @@ export interface GameSettings {
   map?: MapSettings;
   /** Umístění na mapě při startu (chybí = ruční). */
   placement?: Placement;
+  /** Série 2–5 bitev (každá vlastní mapa, limit kol, umístění). Chybí = jedna bitva podle map/turnLimit/placement. */
+  battles?: import("./series.ts").BattleSettings[];
 }
 
 /**
