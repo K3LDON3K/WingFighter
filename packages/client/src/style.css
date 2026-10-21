@@ -4431,3 +4431,24 @@ button.start-chip.on:hover:not(:disabled) {
 .cargo-pop .lo-cargo {
   margin-top: 4px;
 }
+/* rozlišení mapy (zobrazení jen pro tento počítač) */
+.rs-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+.rs-row .rs-lbl {
+  font-size: 12px;
+  margin-right: 6px;
+}
+.menu-card .rs-row {
+  padding: 4px 10px;
+}
+.tp-local {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}

@@ -71,6 +71,8 @@ export interface Overlay {
   mineField?: { x: number; y: number; timer?: number };
   /** Plánovaná úprava štítu vlastních lodí (platí od začátku kola) – kreslí se hned. */
   plannedSegments?: Record<string, Segments>;
+  /** Některá vlastní loď je v bouři → kreslí se blesky (jinak ne, šetří výkon). */
+  stormActive?: boolean;
   /** Zvolený cíl (loď / torpédo) a bod pro torpédo. */
   targetId?: string;
   targetPoint?: { x: number; y: number };
@@ -100,6 +102,7 @@ export class Renderer {
   /** Mezipaměť statické vrstvy (hvězdy, mřížka, okrajová bouře, mraky bouří) v obrazovkových pixelech. */
   private staticCanvas: HTMLCanvasElement | null = null;
   private staticKey = "";
+  private onScreen: (x: number, y: number, r: number) => boolean = () => true;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -133,6 +136,11 @@ export class Renderer {
       sx.translate(-cam.x, -cam.y);
       const saved = this.ctx;
       this.ctx = sx;
+      if (state.border) {
+        sx.beginPath();
+        sx.ellipse(state.width / 2, state.height / 2, state.width / 2 + state.border, state.height / 2 + state.border, 0, 0, Math.PI * 2);
+        sx.clip();
+      }
       this.drawBackground(state, cam);
       this.drawGrid(state);
       if (state.border) drawBorderStorm(sx, state.width, state.height, state.border, cam.zoom);
@@ -147,12 +155,25 @@ export class Renderer {
     ctx.save();
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
-    if (state.storms?.length) drawStormBolts(ctx, state.storms, now);
-    for (const a of view.asteroids) this.drawAsteroid(a);
-    for (const m of view.mines) this.drawMine(m, now);
+    // za tvrdým okrajem se nekreslí vůbec nic
+    if (state.border) {
+      ctx.beginPath();
+      ctx.ellipse(state.width / 2, state.height / 2, state.width / 2 + state.border, state.height / 2 + state.border, 0, 0, Math.PI * 2);
+      ctx.clip();
+    }
+    // ořez na viditelný výřez: objekty mimo obraz se nekreslí (velké mapy, hodně hráčů)
+    const vx0 = cam.x;
+    const vy0 = cam.y;
+    const vx1 = cam.x + cam.viewW / cam.zoom;
+    const vy1 = cam.y + cam.viewH / cam.zoom;
+    const onScreen = (x: number, y: number, r: number) => x + r >= vx0 && x - r <= vx1 && y + r >= vy0 && y - r <= vy1;
+    this.onScreen = onScreen;
+    if (state.storms?.length && overlay.stormActive) drawStormBolts(ctx, state.storms, now);
+    for (const a of view.asteroids) if (onScreen(a.x, a.y, a.radius + 4)) this.drawAsteroid(a);
+    for (const m of view.mines) if (onScreen(m.x, m.y, m.radius + 20)) this.drawMine(m, now);
     this.marks = [];
-    for (const d of view.debris) this.drawDebris(d, overlay, now);
-    for (const c of view.comets) this.drawComet(c, overlay, now);
+    for (const d of view.debris) if (onScreen(d.x, d.y, 60)) this.drawDebris(d, overlay, now);
+    for (const c of view.comets) if (onScreen(c.x, c.y, c.radius + COMET.tailLength + 40)) this.drawComet(c, overlay, now);
 
     const sel = overlay.selectedShipId ? view.ships.find((x) => x.id === overlay.selectedShipId) : undefined;
     if (sel && overlay.rangeCircle2) this.drawRange(sel, overlay.rangeCircle2.radius, "rgba(251,191,36,0.35)", "");
@@ -207,7 +228,7 @@ export class Renderer {
         ctx.restore();
       }
     }
-    for (const s of view.ships) this.drawShip(s, overlay, now);
+    for (const s of view.ships) if (this.onScreen(s.x, s.y, s.radius + 120)) this.drawShip(s, overlay, now);
     if (overlay.targetPoint) this.drawPointMarker(overlay.targetPoint, "#fbbf24", 1, now);
     if (overlay.actionGhost && sel) {
       drawSprite(ctx, this.sprites.fighter(TEAM_COLORS[sel.team]), overlay.actionGhost.x, overlay.actionGhost.y, overlay.actionGhost.heading, 0.3);
@@ -318,14 +339,6 @@ export class Renderer {
     ctx.save();
     const vw = cam.viewW / cam.zoom;
     const vh = cam.viewH / cam.zoom;
-    if (state.border) {
-      // za tvrdým okrajem se vesmír nekreslí – jen plná barva husté bouře; hvězdy jen uvnitř
-      ctx.fillStyle = "#1a0a24";
-      ctx.fillRect(cam.x, cam.y, vw, vh);
-      ctx.beginPath();
-      ctx.ellipse(state.width / 2, state.height / 2, state.width / 2 + state.border, state.height / 2 + state.border, 0, 0, Math.PI * 2);
-      ctx.clip();
-    }
     ctx.fillStyle = this.starPattern!;
     ctx.fillRect(cam.x, cam.y, vw, vh);
     ctx.restore();

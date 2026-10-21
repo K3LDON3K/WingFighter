@@ -63,6 +63,8 @@ import { loadLibrary, playMode, renderSynth } from "./music.ts";
 import { renderMusicPanel } from "./music-ui.ts";
 import { logoCanvas, replayLogo } from "./logo.ts";
 import { playDefeat, playDraw, playVictory } from "./victory.ts";
+import { onRenderScaleChange, renderScale, renderScaleRow } from "./display.ts";
+let unsubScale: (() => void) | null = null;
 
 /** Vítězná animace už běžela pro tuto bitvu. */
 let victoryShown = false;
@@ -647,7 +649,7 @@ function mountGame() {
   cam = new Camera(mapEl.clientWidth, mapEl.clientHeight);
   const resize = () => {
     if (!canvas || !mapEl || !cam) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = (window.devicePixelRatio || 1) * renderScale();
     const w = mapEl.clientWidth;
     const hgt = mapEl.clientHeight;
     canvas.width = Math.round(w * dpr);
@@ -658,6 +660,8 @@ function mountGame() {
   resizeObs = new ResizeObserver(resize);
   resizeObs.observe(mapEl);
   resize();
+  unsubScale?.();
+  unsubScale = onRenderScaleChange(resize);
   cam.fit(game!.state.width, game!.state.height);
   const mine = game!.state.ships.find((s) => s.ownerId === playerId && s.alive);
   if (mine) centerOnShip(mine.id, true);
@@ -701,7 +705,7 @@ function frame(now: number) {
   updateCenterBtn();
   const overlay = buildOverlay(view);
   if (game.hoverIcon && !game.icons.some((i) => `${i.shipId}:${i.id}` === game!.hoverIcon)) game.hoverIcon = undefined;
-  renderer.draw(game.state, view, cam, overlay, now, window.devicePixelRatio || 1);
+  renderer.draw(game.state, view, cam, overlay, now, (window.devicePixelRatio || 1) * renderScale());
   renderHud();
   renderTooltip();
 }
@@ -741,6 +745,7 @@ function buildOverlay(view: ViewModel): Overlay {
   overlay.picking = g.picking ?? undefined;
   overlay.previews = [];
   overlay.plannedSegments = {};
+  overlay.stormActive = g.state.ships.some((s) => s.alive && s.ownerId === playerId && inStorm(g.state, s));
 
   const my = g.state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const ship of my) {
@@ -1013,6 +1018,7 @@ function renderMenu() {
       h("div", { class: "menu-sep" }, label("Přehled")),
       mbtn("log", "Tabulka skóre", "TAB", () => showStats()),
       mbtn("wait", "Hudba a zvuk", "M", () => openMusicPanel(), "", "M = ztlumit vše"),
+      renderScaleRow(),
       h("div", { class: "menu-sep" }, label("Odchod")),
       mbtn("people", "Ukončit bitvu pro všechny", isHost ? "" : "jen host", () => net.send({ type: "backToLobby" }), "", "Vrátí všechny hráče do místnosti; výbava a nastavení zůstanou.", !isHost),
       mbtn("wait", "Opustit hru", "", () => askLeave(), "danger", "Odejdeš do hlavního menu; bitva ostatních pokračuje bez tebe."),

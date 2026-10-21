@@ -36,6 +36,9 @@ export function seenBy(eyes: Eye[], p: Vec, radius = 0): boolean {
   return false;
 }
 
+/** O kolik za hranici dohledu se ještě posílají lodě a komety (plynulé vplutí do dohledu; na mapě jsou ztlumené mlhou). */
+export const VISION_MARGIN = 160;
+
 /** Stav tak, jak ho vidí daný tým. Aktualizuje paměť asteroidů. */
 /** Tým bez živé lodi je pozorovatel – vidí celou mapu. */
 export function isSpectator(state: GameState, team: number): boolean {
@@ -53,11 +56,12 @@ export function stateForTeam(state: GameState, team: number, memory: AsteroidMem
   for (const [id, a] of memory) if (!live.has(id) && seenBy(eyes, a, a.radius)) memory.delete(id);
   return {
     ...state,
-    ships: state.ships.filter((s) => s.team === team || !s.alive || seenBy(eyes, s, s.stats.radius)),
+    // lodě a komety posíláme už kousek za hranicí dohledu, aby do něj „vplouvaly“ a neobjevily se naráz
+    ships: state.ships.filter((s) => s.team === team || !s.alive || seenBy(eyes, s, s.stats.radius + VISION_MARGIN)),
     torpedoes: state.torpedoes.filter((t) => t.team === team || seenBy(eyes, t, TORPEDO.radius)),
     mines: state.mines.filter((m) => m.team === team || seenBy(eyes, m, m.radius)),
     debris: (state.debris ?? []).filter((d) => seenBy(eyes, d, 12)),
-    comets: (state.comets ?? []).filter((c) => seenBy(eyes, c, c.radius + COMET.tailLength / 2)),
+    comets: (state.comets ?? []).filter((c) => seenBy(eyes, c, c.radius + COMET.tailLength / 2 + VISION_MARGIN)),
     asteroids: [...memory.values()].map((a) => structuredClone(a)),
   };
 }
@@ -87,8 +91,8 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
     const own = p.kind === "ship" ? shipTeam(p.id) === team : torpTeam(p.id) === team;
     if (own || pathVisible(p)) (p.kind === "ship" ? visibleShip : visibleTorp).add(p.id);
   }
-  for (const c of result.state.comets ?? []) if (seenBy(eyes, c, c.radius)) visibleComet.add(c.id);
-  for (const s of result.state.ships) if (s.team === team || seenBy(eyes, s, s.stats.radius)) visibleShip.add(s.id);
+  for (const c of result.state.comets ?? []) if (seenBy(eyes, c, c.radius + VISION_MARGIN)) visibleComet.add(c.id);
+  for (const s of result.state.ships) if (s.team === team || seenBy(eyes, s, s.stats.radius + VISION_MARGIN)) visibleShip.add(s.id);
   for (const t of result.state.torpedoes) if (t.team === team || seenBy(eyes, t, TORPEDO.radius)) visibleTorp.add(t.id);
 
   const events: TurnEvent[] = [];

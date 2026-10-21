@@ -147,6 +147,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.91 – Výkon pro velké mapy a hodně hráčů: za tvrdým okrajem se nekreslí nic (ořez), objekty mimo obraz se
+  přeskakují, blesky bouří se kreslí jen hráči, jehož loď v bouři je. Lodě a komety se posílají už 160 jednotek
+  za hranicí dohledu (v mlze ztlumené), takže do dohledu vplouvají a neobjeví se naráz. **Rozlišení mapy**
+  (100 / 75 / 50 %) v menu hry i v ladění – jen pro tento počítač, ukládá se v prohlížeči.
 - v3.90 – Výkon: okrajová bouře je jen tenká fialová hrana (za ní zraňuje) a tenká červená čára tvrdého okraje,
   bez výplně; při kreslení dráhy se místo celé lišty vyměňuje jen panel Manévr; ocas komety a jádro bez animace.
 - v3.89 – **Výkon**: statické vrstvy mapy (hvězdy, mřížka, okrajová bouře, mraky bouří) se kreslí do mezipaměti
