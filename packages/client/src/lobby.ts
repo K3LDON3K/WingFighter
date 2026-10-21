@@ -55,7 +55,7 @@ export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName:
     h("button", { class: "px music-btn roadmap-btn", title: "Roadmapa: na čem se pracuje a co se plánuje", onclick: () => openRoadmap() }, icon("target", "currentColor", 12), " ", label("Roadmapa")),
     screen,
   );
-  screen.append(h("div", { class: "center" }, h("div", { class: "title" }, logoCanvas(5), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)));
+  screen.append(h("div", { class: `center ${m.room ? "room" : ""}` }, h("div", { class: "title" }, logoCanvas(5), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)));
   screen.scrollTop = scrollTop;
   // obnova fokusu nesmí stránku odrolovat
   if (activeId) {
@@ -473,13 +473,13 @@ function roomView(m: LobbyModel, net: Net) {
         h(
           "div",
           { class: "sum-strip" },
-          sumChip("map", B, MAP_SIZES[map.size]?.label ?? map.size, "Velikost mapy"),
+          sumChip("map", B, MAP_SIZES[map.size]?.label.split(" ")[0] ?? map.size, `Velikost mapy: ${MAP_SIZES[map.size]?.label ?? map.size}`),
           sumChip("rock", B, `${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids}${map.clusters ? " · shluky" : ""}`, "Asteroidy"),
           sumChip("storm", B, map.storms === 0 ? "bez bouří" : `${map.storms} ${map.storms === 1 ? "bouře" : map.storms < 5 ? "bouře" : "bouří"}`, "Bouře"),
           sumChip("comet", B, { none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"] ?? "žádné", "Komety"),
           sumChip("seed", B, String(map.seed), "Seed mapy"),
           h("span", { class: "sum-sep" }),
-          sumChip("people", Y, settings.mode === "tdm" ? `týmový DM · ${settings.teams ?? 2} týmy` : "všichni proti všem", "Herní mód"),
+          sumChip("people", Y, settings.mode === "tdm" ? `${settings.teams ?? 2} týmy` : "každý sám", settings.mode === "tdm" ? `Týmový deathmatch · ${settings.teams ?? 2} týmy` : "Deathmatch · všichni proti všem"),
           sumChip("place", Y, PLACEMENT_LABEL[placement].replace(" umístění", "").toLowerCase(), `Umístění na mapě: ${PLACEMENT_LABEL[placement]}`),
           sumChip("credits", Y, String(budget), "Startovní kredity"),
           sumChip("ship", Y, `${settings.shipPoints} ${settings.shipPoints === 1 ? "bod" : "body"}`, "Lodní body na hráče"),
@@ -624,7 +624,7 @@ function roomView(m: LobbyModel, net: Net) {
                   } else setMap({ seed });
                 } }, "🎲")
               : null;
-            const sub = done ? `✓ ${resTxt}` : next ? "příští" : `${MAP_SIZES[b.map.size]?.label.split(" ")[0] ?? b.map.size} · #${b.map.seed}`;
+            const sub = done ? `✓ ${resTxt}` : next ? "příští" : `#${b.map.seed}`;
             return h(
               "button",
               { class: `bt-tab ${!series || i === battleSel ? "on" : ""} ${done ? "done" : ""} ${next ? "next" : ""}`, title: series ? `Bitva ${i + 1}: ${MAP_SIZES[b.map.size]?.label ?? b.map.size} · seed ${b.map.seed}${b.turnLimit ? ` · limit ${b.turnLimit} kol` : ""}${done ? ` · odehraná (${resTxt})` : next ? " · příští" : ""}` : "Jediná bitva", onclick: () => ((battleSel = i), rerender()) },
@@ -634,7 +634,7 @@ function roomView(m: LobbyModel, net: Net) {
             );
           }),
           h("span", { class: "spacer" }),
-          series && isHost ? h("button", { class: "px tiny bt-all", title: "Nové náhodné mapy pro všechny neodehrané bitvy", onclick: () => set({ battles: battles.map((b, i) => (i < played ? b : { ...b, map: { ...b.map, seed: Math.floor(Math.random() * 100000) } })) }) }, "🎲 ", label("všechny")) : null,
+          series && isHost ? h("button", { class: "px tiny bt-all", title: "Nové náhodné mapy pro všechny neodehrané bitvy", onclick: () => set({ battles: battles.map((b, i) => (i < played ? b : { ...b, map: { ...b.map, seed: Math.floor(Math.random() * 100000) } })) }) }, "🎲 ", label("vše")) : null,
         );
       };
       const pageBar = h(

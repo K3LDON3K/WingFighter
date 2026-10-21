@@ -147,6 +147,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.80 – Šířka místnosti je pevná (1140 px, na menších obrazovkách 94 % šířky) a obsah ji už nikdy neroztáhne:
+  5 bitev má stejnou šířku jako 2; záložky bitev se v úzkém sloupci zúží (bez podtextu), souhrn má kratší čipy
+  (velikost mapy, „2 týmy“) a neořezává je.
 - v3.79 – Záložka Bitvy má stálé rozměry: řádek záložek je vždy (u jedné bitvy záložka „Bitva · jediná“ s 🎲),
   text u počtu bitev je jednořádkový (pravidla bodování v nápovědě) – změna počtu bitev nic neposouvá.
 - v3.78 – Záložka Bitvy: počet bitev jako ikonková tlačítka (tolik křížků, kolik bitev); bitvy série jako

@@ -229,6 +229,18 @@ h3,
   gap: 14px;
   padding: 16px 0;
 }
+/* místnost (nastavení hry, týmy, výbava) potřebuje víc místa než menu */
+.center.room {
+  width: min(1140px, 94vw);
+}
+/* karty nikdy neroztáhne obsah (dlouhý text, řádek záložek…) – šířka je daná, obsah se přizpůsobí */
+.center > *,
+.center > * > .card,
+.center .gamecard {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 .card {
   background: var(--panel-2);
   border: 3px solid;
@@ -2760,7 +2772,7 @@ body.touch .lo-refill {
 /* ---------- místnost: sjednocený panel Nastavení hry ---------- */
 .game-grid {
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: minmax(0, 1fr) 400px;
   gap: 24px;
   align-items: start;
 }
@@ -2768,6 +2780,7 @@ body.touch .lo-refill {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
 }
 .fsec-h {
   color: #7dd3fc;
@@ -2983,6 +2996,7 @@ button.fleet-tab.on:hover:not(:disabled) {
   display: flex;
   gap: 4px;
   align-items: center;
+  min-width: 0;
 }
 .pip {
   width: 34px;
@@ -3023,6 +3037,10 @@ button.fleet-tab.on:hover:not(:disabled) {
   background: #111a33;
 }
 .pips-txt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
   font-size: 13px;
   margin-left: 8px;
 }
@@ -4051,14 +4069,11 @@ button.start-chip.on:hover:not(:disabled) {
   font-family: Pix, sans-serif;
   font-size: 12px;
   color: #cbd5e1;
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: none;
 }
 .sum-chip b {
   color: #f8fafc;
   font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .sum-sep {
   width: 1px;
@@ -4190,6 +4205,9 @@ button.start-chip.on:hover:not(:disabled) {
 /* série bitev */
 .bt-tabs {
   min-height: 52px;
+  /* šířka řádku záložek nikdy neroztáhne sloupec formuláře (záložky se zúží; v úzkém sloupci bez podtextu) */
+  container-type: inline-size;
+  overflow: hidden;
   display: flex;
   gap: 4px;
   align-items: flex-end;
@@ -4201,8 +4219,11 @@ button.start-chip.on:hover:not(:disabled) {
   background: #0a0e1c;
   border: 2px solid #334155;
   border-bottom: 0;
-  padding: 6px 26px 8px 12px;
-  min-width: 112px;
+  padding: 6px 24px 8px 10px;
+  min-width: 0;
+  flex: 1 1 0;
+  max-width: 132px;
+  overflow: hidden;
   cursor: pointer;
   color: #94a3b8;
   display: flex;
@@ -4221,6 +4242,13 @@ button.start-chip.on:hover:not(:disabled) {
 .bt-tab .bt-sub {
   font-size: 11px;
   color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.bt-tab .bt-n {
+  white-space: nowrap;
 }
 .bt-tab.on {
   background: #101b33;
@@ -4251,6 +4279,27 @@ button.start-chip.on:hover:not(:disabled) {
 }
 .bt-tabs .bt-all {
   margin-bottom: 6px;
+  flex: none;
+}
+.bt-tab.done .bt-n {
+  color: #4ade80;
+}
+.bt-tab.next .bt-n {
+  color: #fbbf24;
+}
+.bt-tab.on .bt-n {
+  color: #7dd3fc;
+}
+@container (max-width: 560px) {
+  .bt-tab .bt-sub {
+    display: none;
+  }
+  .bt-tab {
+    padding: 8px 22px 8px 8px;
+  }
+  .bt-tab.on {
+    padding-bottom: 12px;
+  }
 }
 /* panel mapy pod záložkami: splývá s aktivní záložkou */
 .bt-tabs + .fsec {
