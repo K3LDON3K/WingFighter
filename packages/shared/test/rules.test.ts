@@ -35,6 +35,9 @@ import {
   carveCrater,
   circleHitsAsteroid,
   createGame,
+  insideMap,
+  ellipseNorm,
+  inStorm,
   parseManeuverId,
   effStressCost,
   maneuverStress,
@@ -202,14 +205,40 @@ describe("vyhodnocení kola", () => {
     expect(Math.hypot(last.x - prev.x, last.y - prev.y)).toBeGreaterThan(1);
   });
 
-  it("okraj mapy odmrští loď zpět do mapy", () => {
+  it("bez okrajové bouře: hrana oválu odmrští loď zpět do mapy", () => {
     const g = game();
-    place(g, "ship-p1-0", 60, 500, Math.PI);
+    g.border = undefined;
+    place(g, "ship-p1-0", 60, g.height / 2, Math.PI);
     place(g, "ship-p2-0", 1500, 900, 0);
     const r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m3a0", fire: false }], createRng(1));
-    expect(r.state.ships[0].x).toBeGreaterThanOrEqual(16);
+    expect(insideMap(g, r.state.ships[0])).toBe(true);
     expect(r.events.some((e) => e.type === "collision" && e.with === "edge")).toBe(true);
     expect(Math.abs(r.state.ships[0].heading)).toBeLessThan(Math.PI / 2 + 0.8);
+  });
+
+  it("okrajová bouře: loď letí ven bez odrazu, bouře zraňuje podle části dráhy, tvrdý okraj loď zničí", () => {
+    const g = game();
+    g.border = 450;
+    g.asteroids = [];
+    place(g, "ship-p1-0", 100, g.height / 2, Math.PI); // 100 od středu levé hrany, letí ven
+    place(g, "ship-p2-0", 1500, 900, 0);
+    const hull = g.ships[0].hull;
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m3a0", fire: false }], createRng(1));
+    const s = r.state.ships[0];
+    expect(s.alive).toBe(true);
+    expect(insideMap(g, s)).toBe(false); // je v pásu
+    expect(r.events.some((e) => e.type === "collision")).toBe(false); // žádný odraz
+    const bs = r.events.find((e) => e.type === "borderStorm");
+    expect(bs && bs.type === "borderStorm" && bs.damage > 0 && bs.damage <= RULES.borderDamage).toBe(true);
+    expect(s.hull).toBe(hull - (bs as { damage: number }).damage);
+    expect(inStorm(r.state, s)).toBe(true); // v pásu platí pravidla bouře
+    // dál ven: za tvrdý okraj (450 za hranou) = zničení
+    const g2 = r.state;
+    g2.ships[0].x = -400;
+    g2.ships[0].speed = 3;
+    r = resolveTurn(g2, [{ shipId: "ship-p1-0", maneuverId: "m3a0", fire: false }], createRng(2));
+    expect(r.state.ships[0].alive).toBe(false);
+    expect(r.events.some((e) => e.type === "destroyed" && e.shipId === "ship-p1-0")).toBe(true);
   });
 
   it("laser zasáhne cíl ve výseči a v dostřelu, cíl mimo výseč ne", () => {
@@ -893,8 +922,8 @@ describe("komety", () => {
     expect(cometOnMap(g, c)).toBe(false);
     const f = { x: Math.cos(c.heading), y: Math.sin(c.heading) };
     const edgePt = { x: c.x + f.x * COMET.speed * COMET.approachTurns, y: c.y + f.y * COMET.speed * COMET.approachTurns };
-    const onEdge = Math.abs(edgePt.x - c.radius) < 1e-6 || Math.abs(edgePt.y - c.radius) < 1e-6 || Math.abs(edgePt.x - (g.width - c.radius)) < 1e-6 || Math.abs(edgePt.y - (g.height - c.radius)) < 1e-6;
-    expect(onEdge).toBe(true);
+    // bod vstupu leží na hraně oválu (zmenšeného o poloměr komety)
+    expect(Math.abs(ellipseNorm(g, edgePt, c.radius) - 1)).toBeLessThan(1e-6);
     // za okrajem na ni nejde střílet ani ji netrefí loď
     const gc = structuredClone(g);
     gc.comets = [c];

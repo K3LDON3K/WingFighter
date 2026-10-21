@@ -34,10 +34,16 @@ import {
 import { makeManeuver, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
 import { cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
+import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
 
 /** Je loď/bod v elektromagnetické bouři? */
 export function inStorm(state: GameState, p: Vec): boolean {
+  if (inBorderStorm(state, p)) return true;
   return pointInStorm(state.storms ?? [], p);
+}
+/** Je bod v okrajové bouři (mimo ovál hrací plochy; pás i vše za ním)? */
+export function inBorderStorm(state: Pick<GameState, "width" | "height" | "border">, p: Vec): boolean {
+  return !!state.border && !insideMap(state, p);
 }
 /** Laserová čára: nesmí začínat ani končit v bouři a nesmí ji protínat. */
 function laserBlockedByStorm(state: GameState, a: Vec, b: Vec): boolean {
@@ -110,7 +116,7 @@ function torpedoById(state: GameState, id: string | undefined): Torpedo | undefi
 }
 
 function isInsideMap(state: GameState, p: Vec, r: number): boolean {
-  return p.x >= r && p.y >= r && p.x <= state.width - r && p.y <= state.height - r;
+  return insideMap(state, p, r);
 }
 
 function hitsAsteroid(state: GameState, p: Vec, r: number): Asteroid | undefined {
@@ -306,26 +312,22 @@ export function inCometTail(c: Pose, p: Vec, length = COMET.tailLength, width = 
   return along >= radius && along <= radius + length && across <= width / 2;
 }
 
-/** Nová kometa: z náhodného bodu jednoho okraje na náhodný bod protějšího okraje. */
+/** Nová kometa: z náhodného bodu hrany oválu na náhodný bod protější části hrany. */
 export function spawnComet(state: GameState, rng: Rng, id: string): Comet {
-  const side = Math.floor(rng.next() * 4); // 0 = zleva, 1 = zprava, 2 = shora, 3 = zdola
   const r = COMET.radius;
-  const fx = rng.next();
-  const tx = rng.next();
-  let x: number, y: number, ex: number, ey: number;
-  if (side === 0) [x, y, ex, ey] = [r, r + fx * (state.height - 2 * r), state.width - r, r + tx * (state.height - 2 * r)];
-  else if (side === 1) [x, y, ex, ey] = [state.width - r, r + fx * (state.height - 2 * r), r, r + tx * (state.height - 2 * r)];
-  else if (side === 2) [x, y, ex, ey] = [r + fx * (state.width - 2 * r), r, r + tx * (state.width - 2 * r), state.height - r];
-  else [x, y, ex, ey] = [r + fx * (state.width - 2 * r), state.height - r, r + tx * (state.width - 2 * r), r];
-  const heading = Math.atan2(ey - y, ex - x);
+  const a0 = rng.next() * Math.PI * 2;
+  const a1 = a0 + Math.PI + (rng.next() - 0.5) * (Math.PI * 0.7);
+  const from = pointOnEdge(state, a0, r);
+  const to = pointOnEdge(state, a1, r);
+  const heading = Math.atan2(to.y - from.y, to.x - from.x);
   // objeví se COMET.approachTurns kol letu za okrajem a na mapu teprve přiletí (do té doby je jen vidět)
   const back = COMET.speed * COMET.approachTurns;
-  return { id, x: x - Math.cos(heading) * back, y: y - Math.sin(heading) * back, heading, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: r, tailUsed: [], entered: false };
+  return { id, x: from.x - Math.cos(heading) * back, y: from.y - Math.sin(heading) * back, heading, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: r, tailUsed: [], entered: false };
 }
 
 /** Je kometa na mapě (střed uvnitř)? Za okrajem je jen vidět – nejde zasáhnout ani do ničeho narazit. */
 export function cometOnMap(state: Pick<GameState, "width" | "height">, c: Vec): boolean {
-  return c.x >= 0 && c.y >= 0 && c.x <= state.width && c.y <= state.height;
+  return insideMap(state, c);
 }
 
 /** Kam se mina odhodí vůči startovní pozici lodi. */
@@ -1194,12 +1196,19 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
         let hit: { with: "edge" | "asteroid" | "ship"; otherId?: string; heading: number } | null = null;
 
         const outside = !shipInsideMap(state.width, state.height, p, cols);
-        if (outside && !stillTouching(ship.id, "edge", true)) {
-          // která hrana: podle opsané kružnice modelu (kolizní kruhy mohou vyčnívat dřív než střed)
-          let h = p.heading;
-          if (p.x < br || p.x > state.width - br) h = Math.PI - h;
-          if (p.y < br || p.y > state.height - br) h = -h;
-          hit = { with: "edge", heading: normalizeAngle(h + scatter()) };
+        if (state.border) {
+          // okrajová bouře: loď letí dál (bouře zraňuje průběžně); dotyk tvrdého okraje = zničení
+          if (beyondHardEdge(state, p, state.border, br)) {
+            events.push({ type: "collision", shipId: ship.id, with: "edge", t, newHeading: p.heading });
+            applyDamage(ship, ship.hull, events);
+            m.frozenAt = k;
+            changed = true;
+            continue;
+          }
+        }
+        if (outside && !state.border && !stillTouching(ship.id, "edge", true)) {
+          // odraz od hrany oválu (jen bez okrajové bouře)
+          hit = { with: "edge", heading: normalizeAngle(reflectAtEdge(state, p, p.heading) + scatter()) };
         } else {
           if (!outside) stillTouching(ship.id, "edge", false);
           for (const a of state.asteroids) {
@@ -1269,7 +1278,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               ? posAt(shipMovers.get(hit.otherId!)!, k)
               : hit.with === "asteroid"
                 ? state.asteroids.find((a) => a.id === hit!.otherId)!
-                : { x: p.x < br ? p.x - 10 : p.x > state.width - br ? p.x + 10 : p.x, y: p.y < br ? p.y - 10 : p.y > state.height - br ? p.y + 10 : p.y };
+                : { x: p.x + Math.cos(edgeNormal(state, p)) * 10, y: p.y + Math.sin(edgeNormal(state, p)) * 10 };
           const dbl = hit.with === "asteroid" && evading.has(ship.id) ? 2 : 1; // úhyb skončil v asteroidu
           applyDamage(ship, hit.with === "ship" ? RULES.collisionShip : hit.with === "asteroid" ? RULES.collisionAsteroid * dbl : RULES.collisionEdge, events, src);
           if (!ship.alive) m.frozenAt = k - 1;
@@ -1286,7 +1295,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       const cp = cm.samples[k];
       if (!cometOnMap(state, cp)) {
         // za okrajem: jen přilétá (nebo odlétá) – žádné srážky; odlet z mapy = konec
-        if (c.entered && (cp.x < -c.radius || cp.y < -c.radius || cp.x > state.width + c.radius || cp.y > state.height + c.radius)) endComet(c, k, "edge");
+        if (c.entered && !insideMap(state, cp, -c.radius)) endComet(c, k, "edge");
         continue;
       }
       c.entered = true;
@@ -1467,6 +1476,21 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     ship.stressPoints = clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
     if (man.difficulty === "danger" && !od?.droid?.overdrive) applyDamage(ship, Math.max(1, Math.round((ship.stats.hull * STRESS.dangerHullPercent) / 100)), events);
+  }
+
+  // okrajová bouře: zranění trupu podle části dráhy strávené mimo ovál (štíty tam nefungují)
+  if (state.border && RULES.borderDamage > 0) {
+    for (const ship of state.ships) {
+      if (!ship.alive) continue;
+      const m = shipMovers.get(ship.id)!;
+      const last = m.frozenAt ?? MOVE_STEPS;
+      let n = 0;
+      for (let k = 1; k <= MOVE_STEPS; k++) if (!insideMap(state, posAt(m, Math.min(k, last)))) n++;
+      if (!n) continue;
+      const dmg = Math.ceil((RULES.borderDamage * n) / MOVE_STEPS);
+      events.push({ type: "borderStorm", shipId: ship.id, damage: dmg, fraction: n / MOVE_STEPS });
+      applyDamage(ship, dmg, events);
+    }
   }
 
   /* ---------- 2. Akce ---------- */

@@ -53,6 +53,9 @@ export const RULES = {
   brokenSellPct: 10,
   /** Oprava zničeného modulu v obchodě (% ceny). */
   repairPct: 50,
+  /** Okrajová bouře kolem mapy: šířka pásu (0 = vypnuto, loď se odráží od hrany) a zranění trupu za celé kolo v pásu. */
+  borderWidth: 450,
+  borderDamage: 10,
   /** Prodej použitého (po bitvě) funkčního modulu – % ceny. */
   usedSellPct: 60,
 };

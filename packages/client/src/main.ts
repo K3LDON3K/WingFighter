@@ -372,7 +372,7 @@ const ZOOM_STEP = 1.1;
 function zoomBy(factor: number) {
   if (!game || !cam) return;
   cam.zoomAt(cam.viewW / 2, cam.viewH / 2, factor);
-  cam.clampTo(game.state.width, game.state.height);
+  cam.clampTo(game.state.width, game.state.height, game.state.border ?? 0);
 }
 
 /** Režimy centrování (C): blízko na loď → celý dohled lodi → celá mapa → znovu blízko. */
@@ -399,7 +399,7 @@ function centerOnShip(shipId: string | undefined, force = false) {
   if (mode === 2) cam.fit(game.state.width, game.state.height);
   else {
     cam.centerOn(s.x, s.y, cam.zoomForRadius(mode === 0 ? r / 2 : r));
-    cam.clampTo(game.state.width, game.state.height);
+    cam.clampTo(game.state.width, game.state.height, game.state.border ?? 0);
   }
   lastCenter = { x: cam.x, y: cam.y, zoom: cam.zoom, mode };
   updateCenterBtn();
@@ -425,7 +425,7 @@ function lookAtShip(shipId: string | undefined) {
   const s = game.state.ships.find((x) => x.id === shipId);
   if (!s) return;
   cam.centerOn(s.x, s.y);
-  cam.clampTo(game.state.width, game.state.height);
+  cam.clampTo(game.state.width, game.state.height, game.state.border ?? 0);
 }
 
 /** Když je loď mimo záběr, vycentruje na ni kameru. */
@@ -438,7 +438,7 @@ function ensureVisible(shipId: string | undefined) {
   if (sp.x < m || sp.y < m || sp.x > cam.viewW - m || sp.y > cam.viewH - m) {
     // jen přesun na loď, zoom zůstává
     cam.centerOn(s.x, s.y);
-    cam.clampTo(game.state.width, game.state.height);
+    cam.clampTo(game.state.width, game.state.height, game.state.border ?? 0);
   }
 }
 
@@ -1676,7 +1676,7 @@ function bindInput(c: HTMLCanvasElement) {
       const rect = c.getBoundingClientRect();
       if (pinch.dist > 0) cam.zoomAt(mx - rect.left, my - rect.top, dist / pinch.dist);
       cam.panBy(mx - pinch.mx, my - pinch.my);
-      cam.clampTo(game.state.width, game.state.height);
+      cam.clampTo(game.state.width, game.state.height, game.state.border ?? 0);
       pinch = { dist, mx, my };
       moved = true;
       return;
@@ -1698,7 +1698,7 @@ function bindInput(c: HTMLCanvasElement) {
       return;
     }
     cam.panBy(dx, dy);
-    cam.clampTo(game.state.width, game.state.height);
+    cam.clampTo(game.state.width, game.state.height, game.state.border ?? 0);
     lastX = e.clientX;
     lastY = e.clientY;
   };
@@ -1767,7 +1767,7 @@ function bindInput(c: HTMLCanvasElement) {
       if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
       if (moved) {
         cam.panBy(dx, dy);
-        cam.clampTo(game.state.width, game.state.height);
+        cam.clampTo(game.state.width, game.state.height, game.state.border ?? 0);
       }
       lastX = e.clientX;
       lastY = e.clientY;
@@ -1912,7 +1912,7 @@ function bindInput(c: HTMLCanvasElement) {
         return;
       }
       cam.zoomAt(sx, sy, e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
-      cam.clampTo(game.state.width, game.state.height);
+      cam.clampTo(game.state.width, game.state.height, game.state.border ?? 0);
     },
     { passive: false },
   );

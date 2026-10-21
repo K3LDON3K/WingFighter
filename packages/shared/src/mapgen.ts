@@ -1,3 +1,4 @@
+import { insideMap, pointOnEdge } from "./mapshape.ts";
 import { generateProfile } from "./asteroids.ts";
 import type { Vec } from "./geometry.ts";
 import { createRng } from "./rng.ts";
@@ -80,7 +81,9 @@ export function generateMap(settings: MapSettings): GeneratedMap {
     const seed = Math.floor(rng.next() * 100000);
     asteroids.push({ id: `a${aid++}`, x: Math.round(x), y: Math.round(y), radius, vx: 0, vy: 0, seed, profile: generateProfile(radius, seed), version: 0 });
   };
-  const fits = (x: number, y: number, r: number) => asteroids.every((a) => Math.hypot(a.x - x, a.y - y) > a.radius + r + 50);
+  const box = { width, height };
+  // ovál: asteroid musí ležet celý uvnitř (s odstupem od hrany)
+  const fits = (x: number, y: number, r: number) => insideMap(box, { x, y }, r + START_MARGIN) && asteroids.every((a) => Math.hypot(a.x - x, a.y - y) > a.radius + r + 50);
   const target = settings.symmetric ? Math.ceil(asteroidCount / 2) : asteroidCount;
   let guard = 0;
   if (settings.clusters) {
@@ -124,6 +127,7 @@ export function generateMap(settings: MapSettings): GeneratedMap {
     guard++;
     const cx = inner.x0 + stormR + rng.next() * Math.max(1, genW - inner.x0 - 2 * stormR);
     const cy = inner.y0 + stormR + rng.next() * Math.max(1, inner.y1 - inner.y0 - 2 * stormR);
+    if (!insideMap(box, { x: cx, y: cy }, stormR * 0.6 + START_MARGIN)) continue;
     if (storms.some((s) => s.blobs.some((b) => Math.hypot(b.x - cx, b.y - cy) < stormR * 2.6))) continue;
     const blobs: Storm["blobs"][number][] = [{ x: Math.round(cx), y: Math.round(cy), r: stormR }];
     const n = 1 + Math.floor(rng.next() * 3);
@@ -140,31 +144,13 @@ export function generateMap(settings: MapSettings): GeneratedMap {
   // asteroidy uvnitř bouře odstraníme (bouře je "prázdná" překážka)
   const cleaned = asteroids.filter((a) => !pointInStorm(storms, a, a.radius));
 
-  // startovní body po obvodu, rovnoměrně; vynechat ty v asteroidu / bouři
+  // startovní body po obvodu oválu, rovnoměrně po úhlu; vynechat ty v asteroidu / bouři
   const starts: GeneratedMap["starts"] = [];
-  const perim = 2 * (width - 2 * START_MARGIN) + 2 * (height - 2 * START_MARGIN);
   const count = size.starts;
   for (let i = 0; i < count; i++) {
-    let d = (i / count) * perim + perim / (2 * count);
-    let x: number;
-    let y: number;
-    const w = width - 2 * START_MARGIN;
-    const hh = height - 2 * START_MARGIN;
-    if (d < w) {
-      x = START_MARGIN + d;
-      y = START_MARGIN;
-    } else if ((d -= w) < hh) {
-      x = width - START_MARGIN;
-      y = START_MARGIN + d;
-    } else if ((d -= hh) < w) {
-      x = width - START_MARGIN - d;
-      y = height - START_MARGIN;
-    } else {
-      d -= w;
-      x = START_MARGIN;
-      y = height - START_MARGIN - d;
-    }
-    const p = { x: Math.round(x), y: Math.round(y) };
+    const ang = -Math.PI + ((i + 0.5) / count) * Math.PI * 2;
+    const e = pointOnEdge(box, ang, START_MARGIN);
+    const p = { x: Math.round(e.x), y: Math.round(e.y) };
     if (pointInStorm(storms, p, 40)) continue;
     if (cleaned.some((a) => Math.hypot(a.x - p.x, a.y - p.y) < a.radius + 60)) continue;
     starts.push({ ...p, heading: Math.atan2(height / 2 - p.y, width / 2 - p.x) });

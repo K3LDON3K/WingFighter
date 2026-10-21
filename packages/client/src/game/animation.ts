@@ -47,6 +47,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
                 : `${name(e.shipId)} narazil do okraje mapy.`,
         );
         break;
+      case "borderStorm":
+        lines.push(`⚡ ${name(e.shipId)} letěl okrajovou bouří (${Math.round(e.fraction * 100)} % kola): trup −${e.damage}.`);
+        break;
       case "asteroidHit":
         lines.push(e.destroyed ? `Asteroid se rozpadl!` : `Výbuch vykousl kus asteroidu.`);
         break;
@@ -238,6 +241,9 @@ export class TurnAnimation {
           }
           break;
         case "torpedoExpire":
+          time = moveStart + MOVE_DURATION;
+          break;
+        case "borderStorm":
           time = moveStart + MOVE_DURATION;
           break;
         case "stress":
@@ -593,6 +599,14 @@ export class TurnAnimation {
         v.effects.push({ kind: "explosion", x: e.x, y: e.y, size: e.reason === "ship" ? 36 : 24, start: now, duration: 600, color: "#a5f3fc" });
         if (e.reason === "ship") v.effects.push({ kind: "ring", x: e.x, y: e.y, radius: 40, color: "#67e8f9", start: now, duration: 500 });
         break;
+      case "borderStorm": {
+        const s = v.ships.find((x) => x.id === e.shipId);
+        if (s) {
+          v.effects.push({ kind: "ring", x: s.x, y: s.y, radius: 26, color: "#c084fc", start: now, duration: 500 });
+          v.effects.push({ kind: "text", x: s.x, y: s.y - 6, text: `⚡ BOUŘE −${e.damage}`, color: "#e879f9", start: now + 80, duration: 1100 });
+        }
+        break;
+      }
       case "cometTail": {
         const s = v.ships.find((x) => x.id === e.shipId);
         const com = v.comets.find((x) => x.id === e.cometId);

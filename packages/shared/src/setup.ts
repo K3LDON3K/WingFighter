@@ -5,6 +5,7 @@ import { computeStats, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf,
 import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
 import { effectivePlacement, type Asteroid, type GameSettings, type GameState, type PlayerInfo, type Ship, type ShipLoadout, type Storm } from "./types.ts";
 import { generateMap, START_MARGIN } from "./mapgen.ts";
+import { insideMap } from "./mapshape.ts";
 
 /** Mapa 1 – statické asteroidy (vx, vy = 0; v budoucnu mohou létat). Tvar se generuje ze seedu. */
 const MAP_1: Omit<Asteroid, "profile" | "version">[] = [
@@ -217,8 +218,9 @@ export function createGame(opts: CreateGameOptions): GameState {
     tuning,
     width,
     height,
-    asteroids,
+    asteroids: asteroids.filter((a) => insideMap({ width, height }, a, a.radius)),
     storms,
+    border: RULES.borderWidth > 0 ? RULES.borderWidth : undefined,
     ships,
     torpedoes: [],
     mines: [],

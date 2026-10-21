@@ -21,7 +21,7 @@ import {
 } from "@wingfighter/shared";
 import type { Camera } from "./camera.ts";
 import { segmentColor, strengthColor } from "./shield-ui.ts";
-import { drawStorms, drawStormSparks } from "./storm-draw.ts";
+import { drawBorderStorm, drawStorms, drawStormSparks } from "./storm-draw.ts";
 import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
 import type { ViewComet, ViewDebris, ViewModel, ViewShip } from "./view.ts";
@@ -118,6 +118,7 @@ export class Renderer {
     this.drawBackground(state, cam);
     this.drawGrid(state);
     this.stormsRef = state.storms ?? null;
+    if (state.border) drawBorderStorm(ctx, state.width, state.height, state.border, now, cam.zoom);
     if (state.storms?.length) drawStorms(ctx, state.storms, now, cam.zoom);
     for (const a of view.asteroids) this.drawAsteroid(a);
     for (const m of view.mines) this.drawMine(m, now);
@@ -286,13 +287,20 @@ export class Renderer {
     const vh = cam.viewH / cam.zoom;
     ctx.fillRect(cam.x, cam.y, vw, vh);
     ctx.restore();
+    // hrací plocha je ovál
     ctx.strokeStyle = "rgba(148,163,184,0.35)";
     ctx.lineWidth = 2;
-    ctx.strokeRect(0, 0, state.width, state.height);
+    ctx.beginPath();
+    ctx.ellipse(state.width / 2, state.height / 2, state.width / 2, state.height / 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   private drawGrid(state: GameState) {
     const ctx = this.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(state.width / 2, state.height / 2, state.width / 2, state.height / 2, 0, 0, Math.PI * 2);
+    ctx.clip();
     ctx.strokeStyle = "rgba(148,163,184,0.07)";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -305,6 +313,7 @@ export class Renderer {
       ctx.lineTo(state.width, y);
     }
     ctx.stroke();
+    ctx.restore();
   }
 
   private drawAsteroid(a: Asteroid) {

@@ -1,3 +1,4 @@
+import { insideMap } from "./mapshape.ts";
 import { LASER, RULES, TORPEDO } from "./constants.ts";
 import { actionCost } from "./resolve.ts";
 import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from "./geometry.ts";
@@ -25,7 +26,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
       // dráha nesmí vést skrz asteroid ani ven z mapy
       for (const p of samplePath(maneuverPath(ship, man), 8)) {
         const r = ship.stats.radius + 4;
-        if (p.x < r || p.y < r || p.x > state.width - r || p.y > state.height - r) score -= 15;
+        if (!insideMap(state, p, r)) score -= 15;
         for (const a of state.asteroids) if (circleHitsAsteroid(a, p, r)) score -= 15;
       }
       if (isRed(man.difficulty)) score -= 3;
@@ -58,7 +59,9 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
 function scorePose(state: GameState, ship: Ship, end: Pose, enemies: Ship[]): number {
   let score = 0;
   const r = ship.stats.radius;
-  if (end.x < r + 30 || end.y < r + 30 || end.x > state.width - r - 30 || end.y > state.height - r - 30) score -= 50;
+  if (!insideMap(state, end, r + 30)) score -= 50;
+  // okrajová bouře: do pásu vůbec, za tvrdý okraj nikdy
+  if (state.border && !insideMap(state, end, r)) score -= 200;
   for (const a of state.asteroids) if (circleHitsAsteroid(a, end, r + 10)) score -= 40;
   for (const o of state.ships) if (o !== ship && o.alive && circlesOverlap(end, r + 12, o, o.stats.radius)) score -= 25;
   for (const e of enemies) {

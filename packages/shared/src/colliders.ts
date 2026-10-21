@@ -2,6 +2,7 @@
  * Kolizní model lodi: místo jednoho kruhu sada kruhů v souřadnicích lodi (+x = příď, +y = pravobok).
  * Každý trup si definuje vlastní rozmístění; výpočty zůstávají kruh × kruh.
  */
+import { insideMap } from "./mapshape.ts";
 import type { Asteroid } from "./types.ts";
 import { circleHitsAsteroid } from "./asteroids.ts";
 import { circlesOverlap, type Pose, type Vec } from "./geometry.ts";
@@ -38,7 +39,8 @@ export function shipHitsAsteroid(a: Asteroid, p: Pose, cols: Collider[]): boolea
 
 /** Celá loď (všechny kruhy) je uvnitř mapy. */
 export function shipInsideMap(width: number, height: number, p: Pose, cols: Collider[]): boolean {
-  return shipCircles(p, cols).every((k) => k.x >= k.r && k.y >= k.r && k.x <= width - k.r && k.y <= height - k.r);
+  const m = { width, height };
+  return shipCircles(p, cols).every((k) => insideMap(m, k, k.r));
 }
 
 /** Poloměr opsané kružnice (pro hrubé testy a kreslení). */

@@ -661,7 +661,7 @@ function roomView(m: LobbyModel, net: Net) {
                 "div",
                 { class: "game-side" },
                 h("div", { class: "fsec-h" }, label(teamManual ? "Mapa · start týmu" : "Mapa · startovní bod"), h("span", { class: "spacer" }), startChips),
-                renderMapPreview(map, previewPlayers, pickerId, pickStart, 1200, !!pickerId),
+                renderMapPreview(map, previewPlayers, pickerId, pickStart, 1200, !!pickerId, room.tuning.borderWidth),
                 h("div", { class: "muted txt" }, startHelp),
               ),
         );

@@ -50,12 +50,12 @@ export class Camera {
   }
 
   /** Udrží mapu alespoň částečně v záběru. */
-  clampTo(worldW: number, worldH: number) {
+  clampTo(worldW: number, worldH: number, border = 0) {
     const vw = this.viewW / this.zoom;
     const vh = this.viewH / this.zoom;
-    // vůle až půl okna, aby šla vycentrovat i loď u okraje mapy
-    const slackX = Math.max(200, vw / 2);
-    const slackY = Math.max(200, vh / 2);
+    // vůle až půl okna (+ okrajová bouře), aby šla vycentrovat i loď u okraje mapy
+    const slackX = Math.max(200, vw / 2) + border;
+    const slackY = Math.max(200, vh / 2) + border;
     this.x = Math.max(-slackX, Math.min(worldW - vw + slackX, this.x));
     this.y = Math.max(-slackY, Math.min(worldH - vh + slackY, this.y));
   }

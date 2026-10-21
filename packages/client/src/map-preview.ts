@@ -9,30 +9,71 @@ import { h } from "./dom.ts";
  * Náhled generované mapy se startovními body. `myId` = kdo právě vybírá (zvýrazněný bod, klik ho mění);
  * `interactive=false` = jen prohlížení (náhodné umístění, nebo start týmu vybírá velitel).
  */
-export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], myId: string, onPick: (index: number | null) => void, width = 520, interactive = true): HTMLElement {
+export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], myId: string, onPick: (index: number | null) => void, width = 520, interactive = true, border = 0): HTMLElement {
   const gen = generateMap(settings);
-  const scale = width / gen.width;
+  // kolem oválu je pás okrajové bouře; do náhledu se vejde i s ním
+  const pad = border > 0 ? border * 0.6 : 0;
+  const scale = width / (gen.width + 2 * pad);
   /** Měřítko značek a písma vůči základní šířce 520 px. */
   const k = Math.max(1, width / 520);
-  const height = Math.round(gen.height * scale);
+  const height = Math.round((gen.height + 2 * pad) * scale);
   const canvas = h("canvas", { width, height, class: "map-preview" });
   const ctx = canvas.getContext("2d")!;
   ctx.fillStyle = "#04060d";
   ctx.fillRect(0, 0, width, height);
-  // mřížka
+  ctx.translate(pad * scale, pad * scale);
+  const cx = (gen.width / 2) * scale;
+  const cy = (gen.height / 2) * scale;
+  const ra = (gen.width / 2) * scale;
+  const rb = (gen.height / 2) * scale;
+  if (border > 0) {
+    // okrajová bouře: fialový prstenec (zevnitř řídký, ven hustý) + červený tvrdý okraj
+    const Bs = border * scale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-pad * scale, -pad * scale, width, height);
+    ctx.ellipse(cx, cy, ra, rb, 0, 0, Math.PI * 2);
+    ctx.clip("evenodd");
+    ctx.fillStyle = "rgba(120,30,150,0.55)";
+    ctx.fillRect(-pad * scale, -pad * scale, width, height);
+    const N = 12;
+    for (let i = N; i >= 1; i--) {
+      const t = i / N;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, ra + Bs * t, rb + Bs * t, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy, ra + (Bs * (i - 1)) / N, rb + (Bs * (i - 1)) / N, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${Math.round(168 - 48 * t)},${Math.round(85 - 55 * t)},${Math.round(247 - 97 * t)},${0.12 + 0.5 * t})`;
+      ctx.fill("evenodd");
+    }
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = "rgba(239,68,68,0.9)";
+    ctx.lineWidth = 1.5 * k;
+    ctx.setLineDash([4 * k, 3 * k]);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, ra + Bs, rb + Bs, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // mřížka jen uvnitř oválu
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, ra, rb, 0, 0, Math.PI * 2);
+  ctx.clip();
   ctx.strokeStyle = "rgba(148,163,184,0.08)";
   for (let x = 0; x < gen.width; x += 400) {
     ctx.beginPath();
     ctx.moveTo(x * scale, 0);
-    ctx.lineTo(x * scale, height);
+    ctx.lineTo(x * scale, gen.height * scale);
     ctx.stroke();
   }
   for (let y = 0; y < gen.height; y += 400) {
     ctx.beginPath();
     ctx.moveTo(0, y * scale);
-    ctx.lineTo(width, y * scale);
+    ctx.lineTo(gen.width * scale, y * scale);
     ctx.stroke();
   }
+  ctx.restore();
   // bouře
   for (const s of gen.storms) {
     for (const b of s.blobs) {
@@ -82,7 +123,9 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
     }
   });
   ctx.strokeStyle = "rgba(148,163,184,0.5)";
-  ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, ra, rb, 0, 0, Math.PI * 2);
+  ctx.stroke();
 
   if (!interactive) {
     canvas.title = "Náhled mapy";

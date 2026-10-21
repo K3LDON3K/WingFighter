@@ -147,6 +147,14 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.87 – **Oválná mapa a okrajová bouře.** Hrací plocha je ovál vepsaný do rozměru mapy (asteroidy, bouře
+  i startovní body se generují uvnitř, starty rovnoměrně po obvodu). Kolem oválu je **pás okrajové bouře**
+  (ladění → Mapa → šířka pásu, výchozí 450; 0 = vypnuto a loď se od hrany odráží jako dřív): platí v něm vše
+  jako v bouři (bez štítů, laserů, skeneru, droida; torpédo ohluchne; loď není vidět) a navíc **zraňuje trup
+  podle části kola strávené v pásu** (ladění → Mapa → zranění za celé kolo, výchozí 10; v logu „letěl okrajovou
+  bouří“). Loď se už od hrany neodráží – letí dál do pásu; za ním je **tvrdý okraj** (červená čára, ovál
+  o pás větší) a jeho dotyk loď okamžitě zničí. Bouře pokračuje i za tvrdý okraj. Komety přilétají přes pás
+  z hrany oválu. Boti do pásu nelétají. Náhled mapy v místnosti ukazuje ovál, pás i tvrdý okraj.
 - v3.86 – **Otočka 180° na konci křivky.** Otočka už nenutí rovný let: jde na konci jakéhokoli nakresleného
   manévru (rychlost 2–5, úhel podle profilu). Tlačítko OTOČKA je přepínač – zapni ho před kreslením (pak
   kreslíš s nejnižší rychlostí 2) nebo až po něm; duch lodi v cíli je otočený o 180° se žlutým odznakem ⟲.

@@ -442,6 +442,8 @@ export interface GameState {
   height: number;
   asteroids: Asteroid[];
   storms: Storm[];
+  /** Šířka okrajové bouře kolem mapy (0 / chybí = bez ní). Za ní je tvrdý okraj – dotyk = zničení lodi. */
+  border?: number;
   ships: Ship[];
   torpedoes: Torpedo[];
   mines: Mine[];
@@ -516,6 +518,8 @@ export type TurnEvent =
       effAfter?: number;
     }
   | { type: "destroyed"; shipId: string; x: number; y: number }
+  /** Okrajová bouře zranila loď (část kola strávená mimo ovál). */
+  | { type: "borderStorm"; shipId: string; damage: number; fraction: number }
   | { type: "stress"; shipId: string; stressPoints: number; delta: number }
   /** Úhybný manévr: loď proletěla skrz nepřátelskou loď (t = podíl dráhy, x/y = místo průletu). */
   | { type: "evadePass"; shipId: string; victimId: string; t: number; x: number; y: number }

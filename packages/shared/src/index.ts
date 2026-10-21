@@ -16,3 +16,4 @@ export * from "./protocol.ts";
 export * from "./mapgen.ts";
 export * from "./roadmap.ts";
 export * from "./series.ts";
+export * from "./mapshape.ts";
