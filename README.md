@@ -147,6 +147,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.102 – Výchozí umístění na mapě je náhodné a výchozí výbava botů náhodná (obojí jde v nastavení změnit).
 - v3.101 – Balanc celolodního štítu (varianta C): zásoba 50 → 80, dobíjení +5 za kolo (dřív 0), účinnost už
   neklesá (pokles 0 %; v ladění jde vrátit – pak se opět ukazuje prstenec účinnosti). Cena a váha beze změny.
 - v3.100 – Místnost: hráči potvrzují připravenost tlačítkem PŘIPRAVEN (jde vzít zpět a upravit výbavu; každá

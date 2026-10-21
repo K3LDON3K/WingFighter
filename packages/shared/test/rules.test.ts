@@ -844,7 +844,7 @@ describe("generovaná mapa a bouře", () => {
     for (const x of left) expect(a.asteroids.some((y) => Math.abs(y.x - (a.width - x.x)) < 1 && y.y === x.y)).toBe(true);
   });
   it("hra na generované mapě: startovní body hráčů, v bouři nefungují štíty ani lasery, torpédo ohluchne, loď v bouři není vidět", () => {
-    const g = createGame({ players: [{ ...players[0], startIndex: 0 }, { ...players[1], startIndex: 5 }], settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default", map }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    const g = createGame({ players: [{ ...players[0], startIndex: 0 }, { ...players[1], startIndex: 5 }], settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default", placement: "manual", map }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
     const gen = generateMap(map);
     expect(g.ships[0].x).toBe(gen.starts[0].x);
     expect(g.ships[1].x).toBe(gen.starts[5].x);
@@ -1412,7 +1412,7 @@ describe("umístění na mapě", () => {
     expect(effectivePlacement({ mode: "dm", placement: "teamManual" })).toBe("manual");
     expect(effectivePlacement({ mode: "dm", placement: "teamRandom" })).toBe("random");
     expect(effectivePlacement({ mode: "tdm", placement: "teamRandom" })).toBe("teamRandom");
-    expect(effectivePlacement({ mode: "tdm" })).toBe("manual");
+    expect(effectivePlacement({ mode: "tdm" })).toBe("random"); // výchozí = náhodné
   });
 });
 

@@ -154,7 +154,7 @@ class Room {
   code: string;
   name: string;
   hostId: string;
-  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipPoints: 1, teams: 2, allowedModules: {}, allowedHulls: {}, allowedPilots: {}, botLoadout: "default", map: { ...DEFAULT_MAP, seed: Math.floor(Math.random() * 100000) } };
+  settings: GameSettings = { mode: "tdm", turnLimit: 0, shipPoints: 1, teams: 2, allowedModules: {}, allowedHulls: {}, allowedPilots: {}, botLoadout: "random", map: { ...DEFAULT_MAP, seed: Math.floor(Math.random() * 100000) } };
   tuning: Tuning = initialTuning();
   /** Odehrané bitvy série (prázdné = série nezačala / jedna bitva). */
   seriesResults: SeriesBattleResult[] = [];

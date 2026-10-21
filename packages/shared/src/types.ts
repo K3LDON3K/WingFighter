@@ -399,7 +399,7 @@ export const PLACEMENT_HINT: Record<Placement, string> = {
 
 /** Efektivní umístění: v deathmatchi nejsou týmy, týmové varianty se chovají jako ne-týmové. */
 export function effectivePlacement(settings: { mode: GameMode; placement?: Placement }): Placement {
-  const p = settings.placement ?? "manual";
+  const p = settings.placement ?? "random";
   if (settings.mode !== "tdm") return p === "teamRandom" ? "random" : p === "teamManual" ? "manual" : p;
   return p;
 }
