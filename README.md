@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.72 – Roadmapa se **upravuje přímo ve hře**: tlačítko UPRAVIT → přidat položku, upravit (oblast, název, popis,
+  horizont), označit jako hotovou (✓, přesune se do sbalené sekce *Hotovo* s datem) nebo smazat (✕, druhý klik
+  potvrdí). Data jsou na serveru v souboru `roadmap.json` v kořeni projektu (HTTP API `GET/PUT /api/roadmap`), takže
+  jdou upravovat i ručně v souboru; při prvním spuštění se soubor vytvoří s výchozím obsahem.
 - v3.71 – Roadmapa naplněná skutečným plánem: sekce *Stále probíhá / Budeme vypracovávat / Střednědobý vývoj /
   Pozdější vývoj*, každá položka má štítek oblasti (nový droid, nový modul, nová loď, herní mód, prvky na mapě, UI).
 - v3.70 – V hlavním menu tlačítko **ROADMAPA** – textový přehled toho, na čem se pracuje, co se plánuje a nápady

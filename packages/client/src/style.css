@@ -3935,3 +3935,72 @@ button.start-chip.on:hover:not(:disabled) {
   font-size: 12px;
   margin-top: 4px;
 }
+.rm-foot.err {
+  color: #f87171;
+}
+.rm-item.edit {
+  grid-template-columns: 8px 120px 230px 1fr auto;
+}
+.rm-item.done .rm-title,
+.rm-item.done .rm-text {
+  color: #64748b;
+  text-decoration: line-through;
+}
+.rm-item.done .rm-text {
+  text-decoration: none;
+}
+.rm-btns {
+  display: inline-flex;
+  gap: 4px;
+  justify-self: end;
+}
+.rm-btns .px.tiny {
+  padding: 2px 6px;
+  min-width: 26px;
+}
+.rm-btns .px.tiny.danger {
+  border-color: #f87171;
+  color: #f87171;
+}
+.rm-sec-btn {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid #1e293b;
+  cursor: pointer;
+  text-align: left;
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 0 2px;
+  font: inherit;
+}
+.rm-empty {
+  font-size: 13px;
+  padding-left: 16px;
+}
+.rm-tools {
+  display: flex;
+  gap: 6px;
+}
+.rm-form {
+  display: grid;
+  grid-template-columns: 130px 1fr 190px;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px dashed #334155;
+  background: #0b1220;
+}
+.rm-form .rm-in {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 13px;
+  padding: 4px 6px;
+}
+.rm-form .rm-in:nth-child(5) {
+  grid-column: 1 / -1;
+}
+.rm-form-btns {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}

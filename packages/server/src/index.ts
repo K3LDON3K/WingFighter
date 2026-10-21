@@ -8,9 +8,12 @@ import type { ClientMessage } from "@wingfighter/shared";
 import { Hub } from "./rooms.ts";
 import { loadSavedTuning, TUNING_FILE } from "./tuning-store.ts";
 import { loadPilots } from "./pilot-store.ts";
+import { loadRoadmap, ROADMAP_FILE, saveRoadmap } from "./roadmap-store.ts";
+import { sanitizeRoadmap } from "@wingfighter/shared";
 
 if (loadSavedTuning()) console.log(`  Načteny uložené parametry: ${TUNING_FILE}`);
 loadPilots();
+console.log(`  Roadmapa: ${ROADMAP_FILE}`);
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -29,7 +32,49 @@ const MIME: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
+/** GET /api/roadmap → seznam položek; PUT /api/roadmap (JSON pole) → uloží do roadmap.json a vrátí očištěný seznam. */
+function handleRoadmapApi(req: import("node:http").IncomingMessage, res: import("node:http").ServerResponse): void {
+  const json = (code: number, body: unknown) => {
+    res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(JSON.stringify(body));
+  };
+  if (req.method === "GET") {
+    json(200, loadRoadmap());
+    return;
+  }
+  if (req.method === "PUT" || req.method === "POST") {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on("data", (c: Buffer) => {
+      size += c.length;
+      if (size > 256 * 1024) req.destroy();
+      else chunks.push(c);
+    });
+    req.on("end", () => {
+      try {
+        const list = sanitizeRoadmap(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+        if (!list) {
+          json(400, { error: "Očekávám pole položek." });
+          return;
+        }
+        saveRoadmap(list);
+        json(200, list);
+      } catch (e) {
+        console.error("Uložení roadmap.json selhalo", e);
+        json(500, { error: "Uložení se nezdařilo." });
+      }
+    });
+    return;
+  }
+  json(405, { error: "Nepodporovaná metoda." });
+}
+
 const http = createServer((req, res) => {
+  const path = new URL(req.url ?? "/", "http://localhost").pathname;
+  if (path === "/api/roadmap") {
+    handleRoadmapApi(req, res);
+    return;
+  }
   if (!existsSync(CLIENT_DIST)) {
     res.writeHead(503, { "content-type": "text/plain; charset=utf-8" });
     res.end("Klient není sestaven. Spusťte `npm run build` (nebo `npm start`).");
