@@ -1038,6 +1038,19 @@ h3,
   padding: 8px 12px;
   border-bottom: 3px solid var(--bevel-d);
 }
+/* tlačítka v hlavičce ladění a v řádcích zobrazení: stejná výška, bez zalamování */
+.tune-head button,
+.rs-row button {
+  white-space: nowrap;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+  line-height: 1;
+}
+.tune-head .rs-row .rs-lbl {
+  font-size: 11px;
+  margin-right: 4px;
+}
 .tune-body {
   overflow: auto;
   padding: 10px 12px;
@@ -3944,6 +3957,23 @@ button.start-chip.on:hover:not(:disabled) {
   background: #7dd3fc;
   border-color: #7dd3fc;
   color: #05070f;
+}
+.tune-btn {
+  left: 420px;
+}
+.tune-overlay {
+  align-items: start;
+  padding-top: 44px;
+}
+.tune-ovbody {
+  width: min(1400px, calc(100vw - 32px));
+}
+.tune-float {
+  max-height: calc(100vh - 60px);
+  overflow: auto;
+}
+.tune-float .tune-card {
+  width: 100%;
 }
 .gfx-btn {
   left: 222px;

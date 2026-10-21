@@ -75,7 +75,7 @@ export function parallaxRow(): HTMLElement {
       setParallaxEnabled(v);
       for (const b of row.querySelectorAll("button")) b.classList.toggle("on", b.dataset.v === String(v));
     }, dataset: { v: String(v) } }, txt);
-  row.append(mk(true, "zapnuto"), mk(false, "vypnuto"));
+  row.append(mk(true, "ZAPNUTO"), mk(false, "VYPNUTO"));
   return row;
 }
 

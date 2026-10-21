@@ -57,6 +57,7 @@ export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName:
     h("button", { class: "px music-btn", title: "Hudba a zvuk (vlastní skladby, hlasitost)", onclick: () => openMusicPanel() }, icon("log", "currentColor", 12), " ", label("Hudba")),
     h("button", { class: "px music-btn roadmap-btn", title: "Roadmapa: na čem se pracuje a co se plánuje", onclick: () => openRoadmap() }, icon("target", "currentColor", 12), " ", label("Roadmapa")),
     h("button", { class: "px music-btn gfx-btn", title: "Nastavení grafiky: rozlišení mapy, vzdálené pozadí", onclick: () => openGraphicsPanel() }, icon("eye", "currentColor", 12), " ", label("Nastavení grafiky")),
+    ...(m.room ? [h("button", { class: `px music-btn tune-btn ${tuningOpen ? "on" : ""}`, title: "Ladění parametrů hry (jen pro správce – heslo)", onclick: () => (tuningOpen ? ((tuningOpen = false), rerender()) : withTuneAccess(() => ((tuningOpen = true), rerender()))) }, icon("target", "currentColor", 12), " ", label("Ladění"))] : []),
     screen,
   );
   screen.append(h("div", { class: `center ${m.room ? "room" : ""}` }, h("div", { class: "title" }, logoCanvas(5), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)));
@@ -153,7 +154,7 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
 
 let rerender: () => void = () => {};
 /** Trvalý prvek ladicího panelu – při překreslení lobby se nestaví znovu (neztrácí rozepsané hodnoty). */
-const lobbyTunePanel = h("div", { style: "margin-top:10px" });
+const lobbyTunePanel = h("div", { class: "tune-float" });
 /** Bot, kterému host právě kliká výbavu. */
 let botEdit: string | null = null;
 /** Vybraná loď (záložka) v „Tvoje výbava“ a v editoru bota. */
@@ -957,22 +958,23 @@ function roomView(m: LobbyModel, net: Net) {
       );
     })(),
     (() => {
-      const wrap = h("div");
-      const toggle = h("button", { onclick: () => (tuningOpen ? ((tuningOpen = false), rerender()) : withTuneAccess(() => ((tuningOpen = true), rerender()))) }, icon("target", "currentColor", 12), label(tuningOpen ? "Skrýt ladění" : "Ladění parametrů"));
-      wrap.append(toggle);
-      if (tuningOpen) {
-        const panel = lobbyTunePanel;
-        renderTuningPanel(panel, room.tuning, room.savedTuning, isHost, {
-          onChange: (patch) => net.send({ type: "setTuning", tuning: patch }),
-          onReset: () => net.send({ type: "resetTuning" }),
-          onSave: () => net.send({ type: "saveTuning" }),
-          onLoad: () => net.send({ type: "loadTuning" }),
-          onSavePilots: (pilots) => net.send({ type: "setPilots", pilots }),
-          onClose: () => ((tuningOpen = false), rerender()),
-        });
-        wrap.append(panel);
-      }
-      return wrap;
+      if (!tuningOpen) return null;
+      // ladění jako překryvné okno (tlačítko LADĚNÍ vlevo nahoře)
+      const panel = lobbyTunePanel;
+      renderTuningPanel(panel, room.tuning, room.savedTuning, isHost, {
+        onChange: (patch) => net.send({ type: "setTuning", tuning: patch }),
+        onReset: () => net.send({ type: "resetTuning" }),
+        onSave: () => net.send({ type: "saveTuning" }),
+        onLoad: () => net.send({ type: "loadTuning" }),
+        onSavePilots: (pilots) => net.send({ type: "setPilots", pilots }),
+        onClose: () => ((tuningOpen = false), rerender()),
+      });
+      return h("div", { class: "mu-overlay tune-overlay", onclick: (e: Event) => {
+          if ((e.target as HTMLElement).classList.contains("tune-overlay")) {
+            tuningOpen = false;
+            rerender();
+          }
+        } }, h("div", { class: "mu-body tune-ovbody" }, panel));
     })(),
     h(
       "div",
