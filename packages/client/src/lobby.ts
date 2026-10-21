@@ -592,23 +592,44 @@ function roomView(m: LobbyModel, net: Net) {
         );
       const PAGES = ["Bitvy", "Pravidla", "Lodě a piloti", "Moduly"];
       /** Dlaždice bitev série: číslo, stav (odehraná / příští / další), zkrácený popis mapy. */
-      const battleTiles = () =>
+      /** Ikona bitvy: zkřížené střely; k malých křížků = počet bitev (volba počtu). */
+      const crossAt = (sv: SVGElement, x: number, y: number, r: number, on: boolean) => {
+        sv.append(svgEl("path", { d: `M${x - r} ${y - r} L${x + r} ${y + r}`, stroke: on ? "#f87171" : "#475569", "stroke-width": r > 3 ? "3" : "2", "stroke-linecap": "square" }));
+        sv.append(svgEl("path", { d: `M${x + r} ${y - r} L${x - r} ${y + r}`, stroke: on ? "#7dd3fc" : "#475569", "stroke-width": r > 3 ? "3" : "2", "stroke-linecap": "square" }));
+      };
+      const battleCountSvg = (k: number, on: boolean) => {
+        const sv = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+        const pts: [number, number][] = k === 1 ? [[13, 13]] : k === 2 ? [[8, 13], [18, 13]] : k === 3 ? [[7, 8], [19, 8], [13, 18]] : k === 4 ? [[8, 8], [18, 8], [8, 18], [18, 18]] : [[13, 13], [7, 7], [19, 7], [7, 19], [19, 19]];
+        for (const [x, y] of pts) crossAt(sv, x, y, k === 1 ? 5 : 3, on);
+        return sv;
+      };
+      /** Záložky bitev série (T1): aktivní splývá s panelem mapy pod ní; stav pod názvem; 🎲 = nový seed té bitvy. */
+      const battleTabs = () =>
         h(
           "div",
-          { class: "bt-row" },
+          { class: "bt-tabs" },
           ...battles.map((b, i) => {
             const done = i < played;
-            const next = i === played && !(room.series?.finished);
+            const next = i === played && !room.series?.finished;
             const res = room.series?.results[i];
             const resTxt = res ? (res.winner === null ? "remíza" : tdm ? TEAM_NAMES[Number(res.winner)] : (room.players.find((p) => p.id === res.winner)?.name ?? "?")) : "";
+            const dice = isHost && !done
+              ? h("span", { class: "bt-dice", title: `Nová náhodná mapa pro bitvu ${i + 1}`, onclick: (ev: MouseEvent) => {
+                  ev.stopPropagation();
+                  battleSel = i;
+                  set({ battles: battles.map((x, j) => (j === i ? { ...x, map: { ...x.map, seed: Math.floor(Math.random() * 100000) } } : x)) });
+                } }, "🎲")
+              : null;
             return h(
               "button",
-              { class: `bt-tile ${i === battleSel ? "on" : ""} ${done ? "done" : ""} ${next ? "next" : ""}`, title: `Bitva ${i + 1}: ${MAP_SIZES[b.map.size]?.label ?? b.map.size} · seed ${b.map.seed}${b.turnLimit ? ` · limit ${b.turnLimit} kol` : ""}${done ? ` · odehraná (${resTxt})` : next ? " · příští" : ""}`, onclick: () => ((battleSel = i), rerender()) },
+              { class: `bt-tab ${i === battleSel ? "on" : ""} ${done ? "done" : ""} ${next ? "next" : ""}`, title: `Bitva ${i + 1}: ${MAP_SIZES[b.map.size]?.label ?? b.map.size} · seed ${b.map.seed}${b.turnLimit ? ` · limit ${b.turnLimit} kol` : ""}${done ? ` · odehraná (${resTxt})` : next ? " · příští" : ""}`, onclick: () => ((battleSel = i), rerender()) },
               h("span", { class: "bt-n" }, label(`Bitva ${i + 1}`)),
               h("span", { class: "bt-sub txt" }, done ? `✓ ${resTxt}` : next ? "příští" : `${MAP_SIZES[b.map.size]?.label.split(" ")[0] ?? b.map.size} · #${b.map.seed}`),
+              dice,
             );
           }),
-          isHost ? h("button", { class: "px tiny", title: "Nové náhodné mapy pro všechny bitvy", onclick: () => set({ battles: battles.map((b) => ({ ...b, map: { ...b.map, seed: Math.floor(Math.random() * 100000) } })) }) }, "🎲 ", label("všechny")) : null,
+          h("span", { class: "spacer" }),
+          isHost ? h("button", { class: "px tiny bt-all", title: "Nové náhodné mapy pro všechny neodehrané bitvy", onclick: () => set({ battles: battles.map((b, i) => (i < played ? b : { ...b, map: { ...b.map, seed: Math.floor(Math.random() * 100000) } })) }) }, "🎲 ", label("všechny")) : null,
         );
       const pageBar = h(
         "div",
@@ -660,13 +681,13 @@ function roomView(m: LobbyModel, net: Net) {
                 h(
                   "div",
                   { class: "pips-row" },
-                  ...[1, 2, 3, 4, 5].map((n) => h("button", { class: `pip size ${(series ? battles.length : 1) === n ? "on" : ""}`, disabled: !isHost, title: n === 1 ? "Jedna bitva" : `Série ${n} bitev – každá má vlastní mapu, limit kol a umístění`, onclick: () => setBattleCount(n) }, h("span", { class: "pip-num" }, String(n)))),
+                  ...[1, 2, 3, 4, 5].map((n) => h("button", { class: `pip size ${(series ? battles.length : 1) === n ? "on" : ""}`, disabled: !isHost, title: n === 1 ? "Jedna bitva" : `Série ${n} bitev – každá má vlastní mapu, limit kol a umístění`, onclick: () => setBattleCount(n) }, battleCountSvg(n, (series ? battles.length : 1) === n))),
                   h("span", { class: "txt muted pips-txt" }, series ? `série ${battles.length} bitev · vítěz podle bodů (výhra 3, remíza 1)` : "jedna bitva"),
                 ),
                 `Jedna bitva, nebo série ${SERIES_MIN}–${SERIES_MAX} bitev za sebou. V sérii má každá bitva vlastní mapu, limit kol a umístění; mód, kredity, lodní body a moduly jsou společné. Mezi bitvami se hraje v místnosti (nákupy, opravy), host zahájí další. Vítěz série: body (výhra 3, remíza 1, prohra 0), při rovnosti sestřely, pak zranění.`,
               ),
             ),
-            series ? battleTiles() : null,
+            series ? battleTabs() : null,
             section(
               series ? `Bitva ${battleSel + 1} · mapa` : "Mapa",
               frow(

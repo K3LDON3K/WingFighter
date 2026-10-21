@@ -147,6 +147,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.78 – Záložka Bitvy: počet bitev jako ikonková tlačítka (tolik křížků, kolik bitev); bitvy série jako
+  skutečné záložky nad panelem mapy (aktivní splývá s panelem, pod názvem stav ✓ výsledek / příští / velikost
+  · seed, 🎲 v rohu = nová mapa té bitvy, „🎲 VŠECHNY“ pro neodehrané).
 - v3.77 – **Série bitev.** Nastavení hry má první záložku **Bitvy**: počet bitev 1 (jedna bitva) nebo 2–5 (série).
   V sérii má každá bitva vlastní **mapu, limit kol a umístění na mapě** (dlaždice Bitva 1…N, klik = její
   nastavení s náhledem; 🎲 u seedu i „🎲 všechny“); mód, kredity, lodní body, lodě a moduly jsou společné

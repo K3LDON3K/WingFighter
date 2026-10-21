@@ -4188,56 +4188,75 @@ button.start-chip.on:hover:not(:disabled) {
   padding: 3px 7px;
 }
 /* série bitev */
-.pip .pip-num {
-  font-family: var(--ui);
-  font-size: 14px;
-  color: inherit;
-}
-.pip.size.on .pip-num {
-  color: #7dd3fc;
-}
-.bt-row {
-  margin: -4px 0 10px;
+.bt-tabs {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
+  gap: 4px;
+  align-items: flex-end;
+  padding-left: 6px;
+  margin: 2px 0 0;
 }
-.bt-tile {
+.bt-tab {
+  position: relative;
+  background: #0a0e1c;
+  border: 2px solid #334155;
+  border-bottom: 0;
+  padding: 6px 26px 8px 12px;
+  min-width: 112px;
+  cursor: pointer;
+  color: #94a3b8;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  padding: 5px 9px;
-  min-width: 96px;
-  background: #0a0e1c;
-  border: 2px solid #334155;
-  color: #cbd5e1;
-  cursor: pointer;
   text-align: left;
+  clip-path: polygon(0 100%, 0 8px, 8px 0, calc(100% - 8px) 0, 100% 8px, 100% 100%);
 }
-.bt-tile .bt-n {
+.bt-tab .bt-n {
   font-family: var(--ui);
   font-size: 12px;
   letter-spacing: 1px;
+  color: #cbd5e1;
 }
-.bt-tile .bt-sub {
+.bt-tab .bt-sub {
   font-size: 11px;
   color: #94a3b8;
 }
-.bt-tile.on {
+.bt-tab.on {
+  background: #101b33;
   border-color: #7dd3fc;
-  background: #0f2a4a;
   color: #f8fafc;
+  padding-bottom: 12px;
+  margin-bottom: -2px;
+  z-index: 2;
 }
-.bt-tile.done {
-  opacity: 0.75;
+.bt-tab.on .bt-n {
+  color: #7dd3fc;
 }
-.bt-tile.done .bt-sub {
+.bt-tab.done .bt-sub {
   color: #4ade80;
 }
-.bt-tile.next .bt-sub {
+.bt-tab.next .bt-sub {
   color: #fbbf24;
+}
+.bt-tab .bt-dice {
+  position: absolute;
+  right: 6px;
+  top: 5px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+.bt-tab .bt-dice:hover {
+  opacity: 1;
+}
+.bt-tabs .bt-all {
+  margin-bottom: 6px;
+}
+/* panel mapy pod záložkami: splývá s aktivní záložkou */
+.bt-tabs + .fsec {
+  border: 2px solid #7dd3fc;
+  background: #101b33;
+  padding: 10px 12px;
+  margin-top: 0;
 }
 .series-bar {
   border: 1px solid #334155;
