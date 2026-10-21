@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.101 – Balanc celolodního štítu (varianta C): zásoba 50 → 80, dobíjení +5 za kolo (dřív 0), účinnost už
+  neklesá (pokles 0 %; v ladění jde vrátit – pak se opět ukazuje prstenec účinnosti). Cena a váha beze změny.
 - v3.100 – Místnost: hráči potvrzují připravenost tlačítkem PŘIPRAVEN (jde vzít zpět a upravit výbavu; každá
   vlastní změna výbavy, týmu nebo startu ji ruší, stejně jako změna nastavení hostem a návrat z bitvy). Host může
   bitvu spustit, až jsou připraveni všichni; ve stavu hráče je „⌛ ještě upravuje“ / „✓ připraven“.

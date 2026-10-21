@@ -30,7 +30,7 @@ export const RULES = {
   collisionShip: 15,
   collisionAsteroid: 15,
   collisionEdge: 15,
-  shieldRecharge: 0,
+  shieldRecharge: 5,
   /** Počet akcí na kolo. */
   actionPoints: 2,
   /** O kolik klesne rychlost po otočce o 180°. */
@@ -40,7 +40,7 @@ export const RULES = {
   evadePassStress: 1,
   evadeDamageReduction: 50,
   /** Štíty: pokles účinnosti celolodního štítu za zásah (%), výchozí a max. životy segmentu. */
-  wholeEffDrop: 10,
+  wholeEffDrop: 0,
   segmentHp: 2,
   segmentMax: 3,
   /** Ekonomika: odměna za sestřel, za přežité kolo, za sestřelený vyhozený modul (% ceny). */

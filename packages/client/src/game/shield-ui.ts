@@ -1,4 +1,4 @@
-import type { Segments, ShieldType } from "@wingfighter/shared";
+import { RULES, type Segments, type ShieldType } from "@wingfighter/shared";
 
 /** Barvy štítů: podle síly (celolodní) a podle bodů segmentu. */
 export const SHIELD_BLUE = "#3b82f6";
@@ -86,7 +86,8 @@ export function shieldBubble(ship: BubbleShip, teamColor: string, planned?: Segm
       const on = i < Math.round(frac * n);
       svg.append(rect(cx + 40 * Math.cos(a * D) - 3, cy + 40 * Math.sin(a * D) - 3, 6, 6, on ? col : SHIELD_DARK));
     }
-    for (let i = 0; i < n; i++) {
+    // vnější prstenec účinnosti jen pokud účinnost vůbec klesá (ladění)
+    for (let i = 0; i < (RULES.wholeEffDrop > 0 ? n : 0); i++) {
       const a = (i * 360) / n - 90 + 6;
       const on = i < Math.round((ship.shieldEff / 100) * n);
       svg.append(rect(cx + 51 * Math.cos(a * D) - 2, cy + 51 * Math.sin(a * D) - 2, 4, 4, on ? "#9aa3ad" : SHIELD_DARK));

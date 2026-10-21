@@ -900,6 +900,14 @@ describe("kulomet", () => {
     g2.ships[1].shields = 50;
     g2.ships[1].stats.shields = 50;
     r = resolveTurn(g2, [{ shipId: me.id, maneuverId: "m1a0", fire: false, fireMg: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    // výchozí balanc: účinnost neklesá (wholeEffDrop 0) → dávka 10 × 3 = 30 pohltí zásoba, trup celý; pak dobití +5 (strop = max)
+    expect(r.state.ships[1].shieldEff).toBe(100);
+    expect(r.state.ships[1].hull).toBe(100);
+    expect(r.state.ships[1].shields).toBe(Math.min(50, 50 - 30 + RULES.shieldRecharge));
+    // s poklesem účinnosti (ladění) klesá po každém projektilu zvlášť
+    const g3 = structuredClone(g2);
+    g3.tuning = { ...g3.tuning, wholeEffDrop: 10 };
+    r = resolveTurn(g3, [{ shipId: me.id, maneuverId: "m1a0", fire: false, fireMg: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
     expect(r.state.ships[1].shieldEff).toBe(0); // 10 zásahů × −10 %
     expect(r.state.ships[1].hull).toBeLessThan(100);
     // kulomet není akce zdarma: s laserem a torpédem (2 akce) se neschválí
