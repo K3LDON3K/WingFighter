@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.79 – Záložka Bitvy má stálé rozměry: řádek záložek je vždy (u jedné bitvy záložka „Bitva · jediná“ s 🎲),
+  text u počtu bitev je jednořádkový (pravidla bodování v nápovědě) – změna počtu bitev nic neposouvá.
 - v3.78 – Záložka Bitvy: počet bitev jako ikonková tlačítka (tolik křížků, kolik bitev); bitvy série jako
   skutečné záložky nad panelem mapy (aktivní splývá s panelem, pod názvem stav ✓ výsledek / příští / velikost
   · seed, 🎲 v rohu = nová mapa té bitvy, „🎲 VŠECHNY“ pro neodehrané).

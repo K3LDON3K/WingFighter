@@ -4189,6 +4189,7 @@ button.start-chip.on:hover:not(:disabled) {
 }
 /* série bitev */
 .bt-tabs {
+  min-height: 52px;
   display: flex;
   gap: 4px;
   align-items: flex-end;
