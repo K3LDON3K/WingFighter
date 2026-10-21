@@ -140,6 +140,18 @@ function costPips(n: number, color: "red" | "yellow" | "spent", title: string): 
   for (let i = 0; i < n; i++) el.append(h("i", {}, color === "spent" ? icon("tick", "#86efac", 9) : null));
   return el;
 }
+/**
+ * Cena akce ve všech surovinách: červené = akce, růžové = stres, žluté = technologie.
+ * `spent` = akce už je zaplacená (čtverečky tmavé s fajfkou). Zelený manévr stres vrací – růžový čtvereček s „+“.
+ */
+function costPipsAll(c: { actions?: number; stress?: number; tech?: number }, spent: boolean, title: string): HTMLElement {
+  const el = h("span", { class: `cost-pips multi ${spent ? "spent" : ""}`, title });
+  for (let i = 0; i < (c.actions ?? 0); i++) el.append(h("i", { class: "red" }, spent ? icon("tick", "#86efac", 9) : null));
+  if ((c.stress ?? 0) < 0) el.append(h("i", { class: "pink plus" }, "+"));
+  for (let i = 0; i < (c.stress ?? 0); i++) el.append(h("i", { class: "pink" }, spent ? icon("tick", "#86efac", 9) : null));
+  for (let i = 0; i < (c.tech ?? 0); i++) el.append(h("i", { class: "yellow" }, spent ? icon("tick", "#86efac", 9) : null));
+  return el;
+}
 
 /** Okénka otevřená při minulém vykreslení – při překreslení (klik na +/−) se znovu neanimují. */
 let openPops = new Set<string>();
@@ -402,7 +414,15 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
                   : `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`,
             onclick: () => (moveDone ? cb.cancelManeuver(ship.id) : shieldDone ? cb.cancelAction(ship.id) : a.id === "shield" && editing ? cb.shieldConfirm(ship.id) : isMove ? cb.aim(ship.id) : cb.chooseAction(ship.id, a.id)),
           },
-          costPips(a.id === "koiogran" ? 2 : 1, dots > 0 ? "spent" : "red", a.id === "koiogran" ? "stojí 2 akce" : a.id === "move" ? "stojí 1 akci (rovně stejnou rychlostí zdarma)" : "stojí 1 akci"),
+          (() => {
+            // cena ve všech surovinách: otočka 2 akce + stres červeného manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
+            const manStress = a.id === "koiogran" ? stressCost("red") : a.id === "move" && man ? stressCost(man.difficulty) : 0;
+            const c = { actions: a.id === "koiogran" ? 2 : 1, stress: a.id === "evade" ? RULES.evadeStressCost : manStress };
+            const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];
+            if (c.stress > 0) parts.push(`${c.stress} stres`);
+            if (c.stress < 0) parts.push(`vrací ${-c.stress} stres`);
+            return costPipsAll(c, dots > 0, `stojí ${parts.join(" + ")}${a.id === "move" ? " (rovně stejnou rychlostí zdarma)" : ""}`);
+          })(),
           icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
           done ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
@@ -492,7 +512,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         );
         if (m.scanOpen && !stormed) {
           // dvě tlačítka vyjedou nad tlačítko skeneru (přes okraj lišty), stejně velká jako ono
-          const cost = (n: number) => costPips(n, "yellow", `${n} ${n === 1 ? "bod" : "body"} technologie (nebere akci)`);
+          const cost = (n: number) => costPipsAll({ tech: n }, false, `${n} ${n === 1 ? "bod" : "body"} technologie (nebere akci)`);
           holder.append(
             h(
               "div",

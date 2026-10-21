@@ -3461,3 +3461,31 @@ button.start-chip.on:hover:not(:disabled) {
 .res-grp.storm .res-lbl {
   color: #f87171;
 }
+/* cena akce ve více surovinách (akce červeně, stres růžově, technologie žlutě) */
+.cost-pips.multi i.red {
+  background: #ef4444;
+  border-color: #7f1d1d;
+}
+.cost-pips.multi i.pink {
+  background: #f472b6;
+  border-color: #831843;
+}
+.cost-pips.multi i.pink.plus {
+  background: #0b1020;
+  color: #f472b6;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.cost-pips.multi i.yellow {
+  background: #fbbf24;
+  border-color: #92400e;
+}
+.cost-pips.multi.spent i.red {
+  background: #0b1020;
+  border-color: #166534;
+}
+.cost-pips.multi.spent i.pink {
+  background: #0b1020;
+  border-color: #831843;
+}

@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.54 – Cena akce na tlačítku ve **všech surovinách**: červené čtverečky = akce, růžové = stres, žluté = technologie.
+  Otočka 2 červené + 1 růžový, úhyb 1 + 1, manévr 1 + stres podle nakreslené dráhy (zelený manévr ukáže růžové „+“ –
+  stres vrací), sken lodi / vesmíru žluté. Zaplacené čtverečky ztmavnou s fajfkou.
 - v3.53 – **Suroviny v hlavičce panelu Akce** (varianta C): vedle sebe Akce (červené), Stres (růžové) a nová
   **Technologie** (žluté) – popisek nad pilulkami, text „2/2 volné“ a svislý ukazatel stresu zmizely. **Technologie**:
   6 bodů na loď na celou bitvu, nedobíjí se; čerpá je **skener** – sken lodi 1 bod, hluboký sken 2 body (náboje a
