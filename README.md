@@ -11,7 +11,9 @@ skryté simultánní plánování, kostky) a Space Rangers (vzhled, později inv
 2. Poklepej na **`Spustit server.command`** (poprvé se stáhnou knihovny a sestaví klient, chvíli to trvá).
 3. V okně Terminálu se objeví adresy. Otevři v prohlížeči `http://localhost:3000`.
 4. Ostatní hráči na stejné síti otevřou adresu **„V síti“** (např. `http://192.168.1.23:3000`).
-5. Ukončení serveru: v Terminálu `Ctrl+C` nebo zavřít okno.
+5. Okno Terminálu pak přijímá příkazy: **`r`** = restart (znovu sestaví klienta a spustí server – po stažení nové
+   verze z GitHubu), `i` = `npm install` + restart, `p` = `git pull` + restart, `s` = stav, `h` = nápověda,
+   **`q`** = ukončit (jde i `Ctrl+C` nebo zavřít okno).
 
 Stejný příkaz funguje jako **dedikovaný server** na jakémkoli stroji s Node.js
 (`npm install && npm start`). Port lze změnit proměnnou `PORT=4000 npm start`.
@@ -145,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.73 – `Spustit server.command` po spuštění přijímá příkazy: `r` restartuje server (včetně nového sestavení
+  klienta) bez zavírání okna, `i` přeinstaluje závislosti, `p` stáhne změny z gitu, `s` stav, `q` konec.
 - v3.72 – Roadmapa se **upravuje přímo ve hře**: tlačítko UPRAVIT → přidat položku, upravit (oblast, název, popis,
   horizont), označit jako hotovou (✓, přesune se do sbalené sekce *Hotovo* s datem) nebo smazat (✕, druhý klik
   potvrdí). Data jsou na serveru v souboru `roadmap.json` v kořeni projektu (HTTP API `GET/PUT /api/roadmap`), takže
