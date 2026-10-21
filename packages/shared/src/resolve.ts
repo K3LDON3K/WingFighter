@@ -43,7 +43,7 @@ export function inStorm(state: GameState, p: Vec): boolean {
 function laserBlockedByStorm(state: GameState, a: Vec, b: Vec): boolean {
   return (state.storms?.length ?? 0) > 0 && (inStorm(state, a) || inStorm(state, b) || lineCrossesStorm(state.storms, a, b));
 }
-import type { Difficulty, DroidOrder, ModuleInstance } from "./types.ts";
+import type { Difficulty, DroidOrder, ManeuverProfile, ModuleInstance } from "./types.ts";
 
 /** Pozice lodi natočená podle směru modulu (výseč laserů, výlet torpéda). */
 function aimPose(ship: Pose, mod: ModuleInstance | undefined): Pose {
@@ -355,6 +355,10 @@ export function effStressCost(d: Difficulty, o?: Pick<ShipOrders, "droid">): num
   if (d === "green" && o?.droid?.autopilot) return -DROID.autopilotRegen;
   return base;
 }
+/** Manévrovací profil lodi pro dané rozkazy: s overdrivem droida rychlost v tomto kole ignoruje váhu. */
+export function profileFor(ship: Ship, o?: Pick<ShipOrders, "droid">): ManeuverProfile {
+  return profileOf(ship.loadout, !!o?.droid?.overdrive);
+}
 /** Stres za úhyb (overdrive = zdarma). */
 export function effEvadeCost(o?: Pick<ShipOrders, "droid">): number {
   return o?.droid?.overdrive ? 0 : RULES.evadeStressCost;
@@ -459,10 +463,10 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       out.push(def);
       continue;
     }
-    const profile = profileOf(ship.loadout);
     // droid: jen s funkčním modulem, mimo bouři a s dostatkem technologie
     let droid: DroidOrder | undefined = raw.droid && (raw.droid.overdrive || raw.droid.autopilot) ? { overdrive: !!raw.droid.overdrive, autopilot: !!raw.droid.autopilot } : undefined;
     if (droid && (!droidModule(ship) || inStorm(state, ship) || droidCost({ droid }) > ship.techPoints)) droid = undefined;
+    const profile = profileFor(ship, { droid });
     let man = resolveManeuver(profile, raw.maneuverId, ship.speed);
     if (!man || !canAfford(ship, man, { droid })) man = resolveManeuver(profile, def.maneuverId, ship.speed)!;
 
@@ -903,7 +907,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   for (const ship of state.ships) {
     if (!ship.alive) continue;
     const o = orders.get(ship.id)!;
-    const profile = profileOf(ship.loadout);
+    const profile = profileFor(ship, o);
     let man = resolveManeuver(profile, o.maneuverId, ship.speed);
     if (!man || !canAfford(ship, man, o)) man = resolveManeuver(profile, defaultOrders(ship).maneuverId, ship.speed)!;
     maneuverOf.set(ship.id, man);

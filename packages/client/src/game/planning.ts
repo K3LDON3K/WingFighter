@@ -29,6 +29,7 @@ import {
   STRESS,
   stressCost,
   effStressCost,
+  profileFor,
   effEvadeCost,
   droidModule,
   droidCost,
@@ -200,7 +201,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const o = m.orders.get(ship.id) ?? defaultOrders(ship);
   // po odeslání i během vyhodnocování kola zůstává lišta vidět, jen jsou všechna tlačítka vypnutá
   const locked = m.submitted || m.animating;
-  const man = resolveManeuver(profileOf(ship.loadout), o.maneuverId, ship.speed);
+  const man = resolveManeuver(profileFor(ship, o), o.maneuverId, ship.speed);
   const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
   const acts = actionList(ship, o);
   const aiming = m.aimingShipId === ship.id;
@@ -243,7 +244,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     return h("div", { class: "vgauge", title }, bar, h("span", { class: "vname" }, label(name)), h("span", { class: "vnum", style: `color:${color}` }, num));
   };
   const hullBlocks = Math.max(ship.hull > 0 ? 1 : 0, Math.round((10 * ship.hull) / ship.stats.hull));
-  const maxSp = profileOf(ship.loadout).maxSpeed;
+  const maxSp = profileFor(ship, o).maxSpeed;
   const gauges = h(
     "div",
     { class: "gauges" },
@@ -556,7 +557,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             h(
               "div",
               { class: `scan-pop ${popClass(`droid:${ship.id}`)}` },
-              h("button", { class: `px bb-weapon sm ${od.overdrive ? "on" : ""}`, disabled: locked || !canOver, title: `Overdrive (${DROID.overdriveCost} technologie): v tomto kole manévry nestojí stres – červený i nebezpečný jsou „bílé“ (nebezpečný bez ztráty trupu), úhyb bez stresu, otočka za 1 akci. Nebere akci; zrušit jde zdarma do odeslání kola.`, onclick: () => cb.setOrders(ship.id, { droid: { ...od, overdrive: !od.overdrive } }) }, icon("speed", "currentColor", 22), h("span", { class: "lbl" }, label("Overdrive")), cost(DROID.overdriveCost, !!od.overdrive)),
+              h("button", { class: `px bb-weapon sm ${od.overdrive ? "on" : ""}`, disabled: locked || !canOver, title: `Overdrive (${DROID.overdriveCost} technologie): v tomto kole manévry nestojí stres – červený i nebezpečný jsou „bílé“ (nebezpečný bez ztráty trupu), úhyb bez stresu, otočka za 1 akci, rychlost ignoruje váhu. Nebere akci; zrušit jde zdarma do odeslání kola.`, onclick: () => cb.setOrders(ship.id, { droid: { ...od, overdrive: !od.overdrive } }) }, icon("speed", "currentColor", 22), h("span", { class: "lbl" }, label("Overdrive")), cost(DROID.overdriveCost, !!od.overdrive)),
               h("button", { class: `px bb-weapon sm ${od.autopilot ? "on" : ""}`, disabled: locked || !canAuto, title: `Autopilot (${DROID.autopilotCost} technologie): zelený manévr v tomto kole vrátí +${DROID.autopilotRegen} stresové body místo +1. Nebere akci.`, onclick: () => cb.setOrders(ship.id, { droid: { ...od, autopilot: !od.autopilot } }) }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Autopilot")), cost(DROID.autopilotCost, !!od.autopilot)),
             ),
           );

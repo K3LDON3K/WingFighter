@@ -3,6 +3,7 @@ import {
   applyLoadoutTrade,
   laserTarget,
   laserOdds,
+  profileFor,
   profileOf,
   resolveManeuver,
   canAfford,
@@ -1239,5 +1240,26 @@ describe("droid – pilot", () => {
     r = resolveTurn(g3, [{ shipId: me.id, maneuverId: "m2a0", fire: false, droid: { autopilot: true } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
     expect(r.state.ships[0].stressPoints).toBe(DROID.autopilotRegen);
     expect(r.state.ships[0].techPoints).toBe(6 - DROID.autopilotCost);
+  });
+});
+
+describe("droid – overdrive a váha", () => {
+  it("s overdrivem rychlost v kole ignoruje váhu, příští kolo limit zase platí", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 2 } });
+    g.asteroids = [];
+    const me = g.ships[0];
+    me.loadout.modules = [newModule("droid", "left", "dr"), newModule("laser", "front", "l1"), newModule("laser", "right", "l2")];
+    place(g, "ship-p1-0", 500, 1000, 0);
+    place(g, "ship-p2-0", 3000, 1800, Math.PI);
+    const limited = profileOf(me.loadout).maxSpeed;
+    expect(limited).toBeLessThan(5);
+    expect(profileFor(me, { droid: { overdrive: true } }).maxSpeed).toBe(5);
+    const o = { shipId: me.id, maneuverId: "m5a0", fire: false, droid: { overdrive: true } };
+    expect(sanitizeOrders(g, "p1", [o])[0].maneuverId).toBe("m5a0");
+    expect(sanitizeOrders(g, "p1", [{ ...o, droid: undefined }])[0].maneuverId).not.toBe("m5a0");
+    const r = resolveTurn(g, [o, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.state.ships[0].speed).toBe(5);
+    // další kolo bez overdrivu: rychlost 5 už nejde
+    expect(sanitizeOrders(r.state, "p1", [{ shipId: me.id, maneuverId: "m5a0", fire: false }])[0].maneuverId).not.toBe("m5a0");
   });
 });

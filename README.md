@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.61 – Overdrive droida navíc: rychlost v tomto kole **ignoruje váhu** (plná max. rychlost trupu, blokované
+  dílky ukazatele rychlosti zmizí); příští kolo limit zase platí.
 - v3.60 – **Nový modul Droid – pilot** (kategorie Speciální, malý, váha 0,5, cena 140; Ladění → Droid). Čerpá
   technologii, nebere akci, zapíná se pro kolo a platí se až při SPUSTIT KOLO (rezervované body jsou v hlavičce
   obrysově, zrušit jde zdarma). **Overdrive** (3): v tomto kole manévry nestojí stres – červený i nebezpečný jsou

@@ -1,4 +1,4 @@
-import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
+import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, profileFor, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -117,7 +117,7 @@ export const ACTIONS: ActionOption[] = [
     disabled: (ship, _s, o) => {
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.koiogran) return null;
-      const profile = profileOf(ship.loadout);
+      const profile = profileFor(ship, o);
       const sp = profile.koiogranSpeeds.includes(ship.speed) ? ship.speed : profile.koiogranSpeeds[0];
       const man = makeManeuver(profile, sp, 0, true, ship.speed);
       if (!man) return "loď otočku nezvládne";
@@ -127,7 +127,7 @@ export const ACTIONS: ActionOption[] = [
     },
     active: (o) => !!parseManeuverId(o.maneuverId)?.koiogran,
     apply: (o, ship) => {
-      const profile = profileOf(ship.loadout);
+      const profile = profileFor(ship, o);
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.koiogran) return { maneuverId: makeManeuver(profile, ship.speed, 0, false, ship.speed)?.id ?? o.maneuverId };
       const sp = profile.koiogranSpeeds.includes(ship.speed) ? ship.speed : profile.koiogranSpeeds[0];

@@ -21,6 +21,7 @@ import {
   maneuverPath,
   rightOf,
   effStressCost,
+  profileFor,
   TEAM_COLORS,
   TEAM_NAMES,
   TORPEDO,
@@ -436,7 +437,7 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
   const ship = game.state.ships.find((s) => s.id === shipId);
   const o = game.orders.get(shipId);
   if (!ship || !o) return false;
-  const profile = profileOf(ship.loadout);
+  const profile = profileFor(ship, o);
   speed = Math.max(1, Math.min(profile.maxSpeed, Math.round(speed)));
   let man = makeManeuver(profile, speed, angle, koiogran, ship.speed);
   if (!man && !koiogran) {
@@ -713,7 +714,7 @@ function buildOverlay(view: ViewModel): Overlay {
     const vs = view.ships.find((s) => s.id === ship.id);
     const o = g.orders.get(ship.id);
     if (!vs || !o) continue;
-    const profile = profileOf(ship.loadout);
+    const profile = profileFor(ship, o);
     const man = resolveManeuver(profile, o.maneuverId, ship.speed);
     if (!man) continue;
     const aiming = g.aimingShipId === ship.id && !g.submitted;
@@ -1453,7 +1454,7 @@ function confirmManeuver(id: string): boolean {
   const ship = g.state.ships.find((s) => s.id === id);
   const o = g.orders.get(id);
   if (!ship || !o) return false;
-  const man = resolveManeuver(profileOf(ship.loadout), o.maneuverId, ship.speed);
+  const man = resolveManeuver(profileFor(ship, o), o.maneuverId, ship.speed);
   if (!man || effStressCost(man.difficulty, o) > ship.stressPoints) {
     showError("Na tento manévr nemáš dost stresových bodů.");
     return false;
