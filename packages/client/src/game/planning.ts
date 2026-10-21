@@ -270,14 +270,12 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     })(),
   );
   const right = h("div", { class: "bb-shipinfo" }, gauges);
+  // štít vypnutý bouří je vidět přímo v nákresu lodi (štítek „štít vypnut“) – samostatný popisek vpravo dole už není
   const shieldLine =
-    ship.shieldType === "whole"
-      ? h("div", { class: `bb-row ${stormed ? "dim" : ""}` }, icon("shield", stormed ? "#64748b" : strengthColor(ship.shields / Math.max(1, ship.stats.shields))), h("span", { class: "num" }, `${Math.round((100 * ship.shields) / Math.max(1, ship.stats.shields))} %`), h("span", { class: "muted", title: "Účinnost: kolik % zranění štít pohltí" }, label(stormed ? "vypnuto" : `úč. ${ship.shieldEff} %`)))
-      : ship.shieldType === "segment" && stormed
-        ? h("div", { class: "bb-row dim" }, icon("shield", "#64748b"), h("span", { class: "pv" }, label("štít vypnut")))
-        : null;
+    ship.shieldType === "whole" && !stormed
+      ? h("div", { class: "bb-row" }, icon("shield", strengthColor(ship.shields / Math.max(1, ship.stats.shields))), h("span", { class: "num" }, `${Math.round((100 * ship.shields) / Math.max(1, ship.stats.shields))} %`), h("span", { class: "muted", title: "Účinnost: kolik % zranění štít pohltí" }, label(`úč. ${ship.shieldEff} %`)))
+      : null;
   if (shieldLine) right.append(shieldLine);
-  if (stormed) right.append(h("div", { class: "storm-warn", title: "Elektromagnetická bouře: štíty a lasery mimo provoz, torpéda neřiditelná, skener nefunguje" }, "⚡ ", label("bouře")));
   // jméno hráče / lodi je na záložce nad panelem (na horní hraně lišty)
   const status = h(
     "div",

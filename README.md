@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.64 – V panelu lodi zmizel popisek „štít vypnut / ⚡ bouře“ vpravo dole (byl oříznutý) – stav je vidět přímo
+  v nákresu lodi; řádek celolodního štítu (% a účinnost) zůstává jen mimo bouři.
 - v3.63 – Ukazatel rychlosti v panelu lodi hned ukazuje **plánovanou rychlost** nakresleného manévru (modře; ve
   vysvětlivce „Plán: rychlost X (teď Y)“); po vyhodnocení kola se zobrazí nová aktuální rychlost.
 - v3.62 – **Vysvětlivky akcí přehledně** (varianta B): název s ikonou vlevo, cena pilulkami vpravo (akce · stres ·
