@@ -162,6 +162,7 @@ export function createGame(opts: CreateGameOptions): GameState {
           shieldEff: 100,
           segments: [RULES.segmentHp * stats.segmentModules, RULES.segmentHp * stats.segmentModules, RULES.segmentHp * stats.segmentModules, RULES.segmentHp * stats.segmentModules],
           stressPoints: stats.stressMax,
+          techPoints: stats.techMax,
           speed: 2,
           tokens: { focus: 0, evade: 0 },
           ammo: { torpedoes: stats.torpedoes, mines: stats.mines },

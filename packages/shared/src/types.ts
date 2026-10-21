@@ -153,7 +153,7 @@ export interface ModuleInstance {
   gift?: boolean;
   /** Natočení zbraně (lasery: výseč, miny: strana odhozu, torpéda: směr výletu). Štíty směr nemají. */
   facing?: Facing;
-  /** Skener: náboje a zbývající kola cooldownu (po něm plné náboje). */
+  /** Zastaralé (skener dřív míval náboje a cooldown; teď čerpá technologii lodi). */
   charges?: number;
   cooldown?: number;
 }
@@ -181,6 +181,8 @@ export interface ShipStats {
   vision: number;
   /** Maximum stresových bodů (ladění + pilot). */
   stressMax: number;
+  /** Body technologie na celou bitvu (ladění); utrácí je skener. */
+  techMax: number;
   /** Počet segmentových štítových modulů (životy segmentu = počet × segmentHp). */
   segmentModules: number;
 }
@@ -202,6 +204,8 @@ export interface Ship extends Pose {
   segments: Segments;
   /** Zásoba stresových bodů (červený manévr −1, nebezpečný −2, zelený +1). */
   stressPoints: number;
+  /** Body technologie (nedobíjí se; sken lodi 1, hluboký sken 2). */
+  techPoints: number;
   /** Rychlost posledního manévru (prudká změna o 2+ = červený manévr). */
   speed: number;
   tokens: { focus: number; evade: number };
@@ -410,7 +414,7 @@ export type TurnEvent =
   | { type: "cometShot"; cometId: string; shooterId: string; x: number; y: number; damage: number; hullAfter: number; destroyed: boolean; reward: number }
   | { type: "cometGone"; cometId: string; x: number; y: number; t: number; reason: "ship" | "asteroid" | "torpedo" | "mine" | "edge" | "comet"; shipId?: string; damage?: number }
   /** Průlet ocasem komety: co loď dostala. */
-  | { type: "cometTail"; cometId: string; shipId: string; t: number; x: number; y: number; effect: "shield" | "segment" | "hull" | "credits" | "stress"; amount: number; segment?: number }
+  | { type: "cometTail"; cometId: string; shipId: string; t: number; x: number; y: number; effect: "shield" | "segment" | "hull" | "credits" | "stress" | "tech"; amount: number; segment?: number }
   | { type: "mineBlast"; mineId: string; x: number; y: number; t: number; hits: { shipId: string; damage: number }[] }
   | { type: "torpedoHit"; torpedoId: string; shipId?: string; x: number; y: number; t: number; damage: number; blast: boolean }
   | { type: "asteroidHit"; asteroidId: string; x: number; y: number; t: number; profile: number[]; destroyed: boolean }

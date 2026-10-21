@@ -822,7 +822,7 @@ function showScanResult(ship: Ship) {
   if (!mapEl || !game) return;
   mapEl.querySelector(".scan-wrap")?.remove();
   const lo = ship.loadout;
-  const lines = lo.modules.map((m) => `${MODULES[m.type].name}${m.facing ? ` (${FACING_NAMES[m.facing]})` : ""}${m.ammo !== undefined ? ` · ${m.ammo} ks` : ""}${m.type === "scanner" ? ` · ${m.charges ?? 0} nábojů` : ""}`);
+  const lines = lo.modules.map((m) => `${MODULES[m.type].name}${m.facing ? ` (${FACING_NAMES[m.facing]})` : ""}${m.ammo !== undefined ? ` · ${m.ammo} ks` : ""}`);
   const entry = game.log.find((l) => l.turn === game!.state.turn) ?? (game.log.push({ turn: game.state.turn, lines: [] }), game.log[game.log.length - 1]);
   entry.lines.push(`Sken ${ship.name}: ${HULLS[lo.hullId]?.name ?? lo.hullId}, pilot ${PILOTS[lo.pilotId]?.name ?? lo.pilotId}; ${lines.length ? lines.join(", ") : "bez modulů"}.`);
   const wrap = h(

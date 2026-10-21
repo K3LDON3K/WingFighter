@@ -230,7 +230,6 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     "div",
     { class: "gauges" },
     vgauge(10, hullBlocks, ship.hull <= ship.stats.hull * 0.3 ? "#ef4444" : "#4ade80", "#14341f", "trup", String(ship.hull), `Trup ${ship.hull}/${ship.stats.hull}`),
-    vgauge(STRESS.max, ship.stressPoints, "#f472b6", "#3b1a2e", "stres", `${ship.stressPoints}/${STRESS.max}`, "Stresové body: červený manévr −1, nebezpečný −2, zelený +1"),
     vgauge(
       5,
       ship.speed,
@@ -314,7 +313,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       continue;
     }
     if (md.ammo === undefined) {
-      weapons.append(h("div", { class: "ammo-row", title: `${def.name}: funkční` }, h("span", { class: "ammo-name" }, label(name)), hpBar(md), h("span", { class: "ammo-num muted" }, md.type === "scanner" ? `${md.charges ?? 0}⚡` : "")));
+      weapons.append(h("div", { class: "ammo-row", title: `${def.name}: funkční` }, h("span", { class: "ammo-name" }, label(name)), hpBar(md), h("span", { class: "ammo-num muted" }, "")));
       continue;
     }
     if (md.type === "mg") {
@@ -355,6 +354,20 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   /* ---- 3. akce ---- */
   const apips = h("div", { class: "apip" });
   for (let i = 0; i < RULES.actionPoints; i++) apips.append(h("i", { class: i < RULES.actionPoints - acts.length ? "on" : "" }));
+  /** Skupina suroviny v hlavičce (varianta C): popisek nad pilulkami. */
+  const resGroup = (name: string, pips: HTMLElement, title: string, cls = "") => h("div", { class: `res-grp ${cls}`, title }, h("span", { class: "res-lbl" }, label(name)), pips);
+  const spips = h("div", { class: "apip pink" });
+  for (let i = 0; i < ship.stats.stressMax; i++) spips.append(h("i", { class: i < ship.stressPoints ? "on" : "" }));
+  const inStormNow = inStorm(m.state, ship);
+  const tpips = h("div", { class: `apip yellow ${inStormNow ? "storm" : ""}` });
+  for (let i = 0; i < ship.stats.techMax; i++) tpips.append(h("i", { class: i < ship.techPoints ? "on" : "" }));
+  const resources = h(
+    "div",
+    { class: "res-row" },
+    resGroup("Akce", apips, `Akce: ${RULES.actionPoints - acts.length}/${RULES.actionPoints} volné. Dobíjí se každé kolo.`),
+    resGroup("Stres", spips, `Stresové body ${ship.stressPoints}/${ship.stats.stressMax}: červený manévr −1, nebezpečný −2, zelený +1.`),
+    resGroup(inStormNow ? "Technologie ⚡ bouře" : "Technologie", tpips, `Technologie ${ship.techPoints}/${ship.stats.techMax}: body na celou bitvu, nedobíjí se (průlet ocasem komety +${COMET.tailTech}). Sken lodi ${SCANNER.shipCost}, hluboký sken ${SCANNER.deepCost}.${inStormNow ? "\nV bouři je technologie deaktivovaná – skener nefunguje." : ""}`, inStormNow ? "storm" : ""),
+  );
   /** Kolik akcí tlačítko právě stojí (tečky): otočka 2, manévr 1 (jen když se liší od rovně stejnou rychlostí), ostatní 1. */
   const dotsFor = (id: string) => (id === "koiogran" ? (acts.some((a) => a.id === "koiogran") ? 2 : 0) : id === "move" ? (acts.some((a) => a.id === "move") && !acts.some((a) => a.id === "koiogran") ? 1 : 0) : acts.some((a) => a.id === id) ? 1 : 0);
   const buttons = h("div", { class: "bb-weapons" });
@@ -461,39 +474,31 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       row.append(holder);
       const sc = scannerModule(ship.loadout);
       if (sc) {
-        const charges = sc.charges ?? 0;
-        const cd = sc.cooldown ?? 0;
-        const pips = h("span", { class: "scan-pips" });
-        // bez cooldownu: políčka = náboje; při cooldownu: políčka = délka cooldownu (červeně zbývající kola)
-        const slots = cd > 0 ? SCANNER.cooldown : SCANNER.charges;
-        for (let i = 0; i < slots; i++) pips.append(h("i", { class: cd > 0 ? (i < cd ? "red" : "") : i < charges ? "on" : "" }));
+        const tech = ship.techPoints;
         const holder = h("div", { class: "scan-holder" });
         holder.append(
           h(
             "button",
             {
-              class: `px bb-weapon scan-btn ${m.scanOpen && !stormed ? "on" : ""} ${cd > 0 ? "cool" : ""} ${stormed ? "stormed" : ""}`,
-              disabled: locked || stormed,
-              title: `${MODULES.scanner.name}\n${MODULES.scanner.description}\n${cd > 0 ? `Cooldown: ${cd} kol (pak plné náboje).` : `Náboje: ${charges}/${SCANNER.charges}.`}`,
+              class: `px bb-weapon scan-btn ${m.scanOpen && !stormed ? "on" : ""} ${stormed ? "stormed" : ""} ${tech < SCANNER.shipCost ? "cool" : ""}`,
+              disabled: locked || stormed || tech < Math.min(SCANNER.shipCost, SCANNER.deepCost),
+              title: `${MODULES.scanner.name}\n${MODULES.scanner.description}\nTechnologie: ${tech}/${ship.stats.techMax}.`,
               onclick: () => cb.scanToggle(ship.id),
             },
             icon("scan", "currentColor", 22),
             h("span", { class: "lbl" }, label("Skener")),
-            pips,
             stormed ? h("span", { class: "sb" }, "⚡") : null,
           ),
         );
-        if (m.scanOpen && cd === 0 && !stormed) {
-          // tři tlačítka vyjedou nad tlačítko skeneru (přes okraj lišty), stejně velká jako ono
-          const forceLen = Math.max(1, SCANNER.cooldown - charges);
-          const cost = (n: number) => costPips(n, "yellow", `${n} ${n === 1 ? "náboj" : "náboje"} skeneru (nebere akci)`);
+        if (m.scanOpen && !stormed) {
+          // dvě tlačítka vyjedou nad tlačítko skeneru (přes okraj lišty), stejně velká jako ono
+          const cost = (n: number) => costPips(n, "yellow", `${n} ${n === 1 ? "bod" : "body"} technologie (nebere akci)`);
           holder.append(
             h(
               "div",
               { class: `scan-pop ${popClass(`scan:${ship.id}`)}` },
-              h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || charges < 1, title: `Sken lodi (1 náboj): klikni na cizí loď v dohledu do ${SCANNER.range}. Proběhne hned, nebere akci.`, onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(1)),
-              h("button", { class: "px bb-weapon sm", disabled: locked || charges < 2, title: `Hluboký sken (2 náboje): hned odkryje mapu do ${SCANNER.deepRange} celému týmu do konce kola, pak cooldown ${SCANNER.cooldown} kola.`, onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(2)),
-              h("button", { class: "px bb-weapon sm force", disabled: locked || charges >= SCANNER.charges, title: charges >= SCANNER.charges ? "Jde jen bez plné zásoby nábojů" : `Vynutit cooldown: ${SCANNER.cooldown} − ${charges} = ${forceLen} kola, pak plné náboje`, onclick: () => cb.scan(ship.id, "cooldown") }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Cooldown")), h("span", { class: "c" }, `${forceLen}K`)),
+              h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || tech < SCANNER.shipCost, title: `Sken lodi (${SCANNER.shipCost} technologie): klikni na cizí loď v dohledu do ${SCANNER.range}. Proběhne hned, nebere akci.`, onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(SCANNER.shipCost)),
+              h("button", { class: "px bb-weapon sm", disabled: locked || tech < SCANNER.deepCost, title: `Hluboký sken (${SCANNER.deepCost} technologie): hned odkryje mapu do ${SCANNER.deepRange} celému týmu do konce kola.`, onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(SCANNER.deepCost)),
             ),
           );
         }
@@ -516,12 +521,9 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     );
   };
   if (m.scanOpen && scannerModule(ship.loadout)) {
-    const sc = scannerModule(ship.loadout)!;
-    const cd = sc.cooldown ?? 0;
     details.append(icon("scan", "#7dd3fc"));
-    if (cd > 0) details.append(h("span", { class: "muted" }, label(`cooldown ${cd} kol · pak plné náboje`)));
-    else if (m.scanPick) details.append(h("span", { class: "warn" }, label(`klikni na cizí loď v dohledu (dosah ${SCANNER.range}) – sken proběhne hned`)), h("span", { class: "muted" }, label(`· ${sc.charges ?? 0} nábojů · nebere akci`)));
-    else details.append(h("span", { class: "muted" }, label(`${sc.charges ?? 0} nábojů · nebere akci · +1 za zelený manévr`)));
+    if (m.scanPick) details.append(h("span", { class: "warn" }, label(`klikni na cizí loď v dohledu (dosah ${SCANNER.range}) – sken proběhne hned`)), h("span", { class: "muted" }, label(`· technologie ${ship.techPoints}/${ship.stats.techMax} · nebere akci`)));
+    else details.append(h("span", { class: "muted" }, label(`technologie ${ship.techPoints}/${ship.stats.techMax} · nedobíjí se · nebere akci`)));
   } else if (o.fireMg && o.special?.type !== "torpedo" && o.special?.type !== "mine") {
     const picker = modulePicker("mg", o.mgModuleId, (id) => cb.setOrders(ship.id, { mgModuleId: id }));
     if (picker) details.append(picker);
@@ -622,7 +624,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const actions = h(
     "div",
     { class: "pnl bb-actions" },
-    h("div", { class: "bb-head" }, h("span", { class: "ttl" }, label("Akce")), apips, h("span", { class: "muted bb-acts" }, label(`${RULES.actionPoints - acts.length}/${RULES.actionPoints} volné`))),
+    h("div", { class: "bb-head res-head" }, resources),
     buttons,
     details,
   );

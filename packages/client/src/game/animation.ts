@@ -161,7 +161,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
                 ? `  ${name(e.shipId)} proletěl ocasem komety: trup +${e.amount}.`
                 : e.effect === "stress"
                   ? `  ${name(e.shipId)} proletěl ocasem komety: stres obnoven, +${e.amount} kreditů.`
-                  : `  ${name(e.shipId)} proletěl ocasem komety: +${e.amount} kreditů.`,
+                  : e.effect === "tech"
+                    ? `  ${name(e.shipId)} proletěl ocasem komety: technologie +${e.amount}.`
+                    : `  ${name(e.shipId)} proletěl ocasem komety: +${e.amount} kreditů.`,
         );
         break;
     }
@@ -596,8 +598,8 @@ export class TurnAnimation {
         if (com && !com.tailUsed.includes(e.shipId)) com.tailUsed.push(e.shipId);
         v.effects.push({ kind: "ripple", x: e.x, y: e.y, color: "#67e8f9", start: now, duration: 700 });
         const segName = ["PŘEDEK", "PRAVOBOK", "ZÁĎ", "LEVOBOK"];
-        const txt = e.effect === "shield" ? `+${e.amount} ŠTÍT` : e.effect === "segment" ? `+1 ŠTÍT ${segName[e.segment ?? 0]}` : e.effect === "hull" ? `+${e.amount} TRUP` : e.effect === "stress" ? `STRES OBNOVEN · +${e.amount} CR` : `+${e.amount} CR`;
-        v.effects.push({ kind: "text", x: e.x, y: (s?.y ?? e.y) - 4, text: txt, color: e.effect === "credits" || e.effect === "stress" ? "#fbbf24" : "#67e8f9", start: now + 100, duration: 1100 });
+        const txt = e.effect === "shield" ? `+${e.amount} ŠTÍT` : e.effect === "segment" ? `+1 ŠTÍT ${segName[e.segment ?? 0]}` : e.effect === "hull" ? `+${e.amount} TRUP` : e.effect === "stress" ? `STRES OBNOVEN · +${e.amount} CR` : e.effect === "tech" ? `+${e.amount} TECHNOLOGIE` : `+${e.amount} CR`;
+        v.effects.push({ kind: "text", x: e.x, y: (s?.y ?? e.y) - (e.effect === "tech" ? 18 : 4), text: txt, color: e.effect === "credits" || e.effect === "stress" || e.effect === "tech" ? "#fbbf24" : "#67e8f9", start: now + (e.effect === "tech" ? 400 : 100), duration: 1100 });
         if (s) {
           if (e.effect === "shield") s.shields = Math.min(s.maxShields, s.shields + e.amount);
           if (e.effect === "segment" && e.segment !== undefined) s.segments[e.segment] = s.segments[e.segment] + 1;

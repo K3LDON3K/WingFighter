@@ -963,8 +963,14 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const p = posAt(shipMovers.get(ship.id)!, k);
     const st = statsOf(state, ship.ownerId);
     if (st) st.cometTails = (st.cometTails ?? 0) + 1;
-    const push = (effect: "shield" | "segment" | "hull" | "credits" | "stress", amount: number, segment?: number) =>
+    const push = (effect: "shield" | "segment" | "hull" | "credits" | "stress" | "tech", amount: number, segment?: number) =>
       events.push({ type: "cometTail", cometId: c.id, shipId: ship.id, t: k / MOVE_STEPS, x: p.x, y: p.y, effect, amount, segment });
+    // technologie: průlet ocasem přidá body (do stropu)
+    const techAdd = Math.min(COMET.tailTech, Math.max(0, ship.stats.techMax - ship.techPoints));
+    if (techAdd > 0) {
+      ship.techPoints += techAdd;
+      push("tech", techAdd);
+    }
     const hullHeal = () => {
       if (ship.hull < ship.stats.hull) {
         const add = Math.min(ship.stats.hull - ship.hull, Math.max(1, Math.round((ship.stats.hull * COMET.hullPct) / 100)));
@@ -1399,17 +1405,6 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     ship.stressPoints = clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
     if (man.difficulty === "danger") applyDamage(ship, Math.max(1, Math.round((ship.stats.hull * STRESS.dangerHullPercent) / 100)), events);
-    // skener: cooldown odpočítává; po jeho konci plné náboje; jinak zelený manévr dobije +1
-    for (const mod of ship.loadout.modules) {
-      if (mod.type !== "scanner") continue;
-      if ((mod.cooldown ?? 0) > 0) {
-        mod.cooldown = (mod.cooldown ?? 0) - 1;
-        if (mod.cooldown <= 0) {
-          mod.cooldown = 0;
-          mod.charges = SCANNER.charges;
-        }
-      } else if (man.difficulty === "green") mod.charges = Math.min(SCANNER.charges, (mod.charges ?? 0) + 1);
-    }
   }
 
   /* ---------- 2. Akce ---------- */
@@ -1587,41 +1582,32 @@ export function laserOdds(ship: Ship, target: Ship, laserModuleId?: string): { h
 }
 
 /**
- * Skener – okamžitá akce při plánování (nebere akci). Vrací chybu, nebo provede:
- * ship = 1 náboj, cíl musí být nepřátelská loď v dosahu (viditelnost ověřuje server);
- * deep = všechny náboje (min. 2), odkryje mapu týmu do konce kola a spustí cooldown;
- * cooldown = vynucený cooldown (jen bez plné zásoby): délka = cooldown − zbývající náboje, náboje 0.
+ * Skener – okamžitá akce při plánování (nebere akci, čerpá body technologie lodi). Vrací chybu, nebo provede:
+ * ship = SCANNER.shipCost bodů, cíl musí být nepřátelská loď v dosahu (viditelnost ověřuje server);
+ * deep = SCANNER.deepCost bodů, odkryje mapu týmu do konce kola.
  */
 export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: "ship" | "deep" | "cooldown", targetId?: string): { error?: string; target?: Ship } {
   const mod = ship.loadout.modules.find((m) => m.id === moduleId && m.type === "scanner");
   if (!mod) return { error: "loď nemá skener" };
   if (!moduleWorking(mod)) return { error: "skener je zničený" };
-  if ((mod.cooldown ?? 0) > 0) return { error: `skener je v cooldownu (${mod.cooldown} kol)` };
-  const charges = mod.charges ?? 0;
+  if (mode === "cooldown") return { error: "cooldown skeneru už ve hře není" };
+  const cost = mode === "ship" ? SCANNER.shipCost : SCANNER.deepCost;
+  if (ship.techPoints < cost) return { error: `nedostatek technologie (${ship.techPoints}/${cost})` };
   if (mode === "ship") {
-    if (charges < 1) return { error: "skener nemá náboj" };
     const target = state.ships.find((s) => s.id === targetId && s.alive && s.team !== ship.team);
     if (!target) return { error: "cíl skenu není cizí živá loď" };
     if (dist(ship, target) > SCANNER.range) return { error: `cíl je mimo dosah skeneru (${SCANNER.range})` };
     if (inStorm(state, ship) || inStorm(state, target)) return { error: "bouře ruší skener" };
-    mod.charges = charges - 1;
+    ship.techPoints -= cost;
     const st = statsOf(state, ship.ownerId);
     if (st) st.scans++;
     return { target };
   }
-  if (mode === "deep") {
-    if (charges < 2) return { error: "hluboký sken potřebuje 2 náboje" };
-    if (inStorm(state, ship)) return { error: "bouře ruší skener" };
-    mod.charges = 0;
-    mod.cooldown = SCANNER.cooldown;
-    const st = statsOf(state, ship.ownerId);
-    if (st) st.scans++;
-    state.revealTeams = [...new Set([...(state.revealTeams ?? []), ship.team])];
-    return {};
-  }
-  if (charges >= SCANNER.charges) return { error: "cooldown jde vynutit jen bez plné zásoby nábojů" };
-  mod.cooldown = Math.max(1, SCANNER.cooldown - charges);
-  mod.charges = 0;
+  if (inStorm(state, ship)) return { error: "bouře ruší skener" };
+  ship.techPoints -= cost;
+  const st = statsOf(state, ship.ownerId);
+  if (st) st.scans++;
+  state.revealTeams = [...new Set([...(state.revealTeams ?? []), ship.team])];
   return {};
 }
 

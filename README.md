@@ -145,6 +145,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.53 – **Suroviny v hlavičce panelu Akce** (varianta C): vedle sebe Akce (červené), Stres (růžové) a nová
+  **Technologie** (žluté) – popisek nad pilulkami, text „2/2 volné“ a svislý ukazatel stresu zmizely. **Technologie**:
+  6 bodů na loď na celou bitvu, nedobíjí se; čerpá je **skener** – sken lodi 1 bod, hluboký sken 2 body (náboje a
+  cooldown skeneru zrušeny, tlačítko Cooldown pryč). Průlet ocasem komety přidá +2 technologie (do stropu). V bouři je
+  technologie deaktivovaná (pilulky přeškrtnuté, popisek „⚡ bouře“, skener nefunguje). Ladění → Skener: body
+  technologie na bitvu, ceny skenů; Komety: body za průlet ocasem.
 - v3.52 – Značky cílů (závorky + ikonky zbraní) se kreslí až nad vším ostatním – nepřekrývá je loď ani štít.
 - v3.51 – **Boti:** ze zničeného bota vypadne vždy právě jeden náhodný funkční modul (u hráčů dál platí šance na každý
   modul). **Fog of war:** cizí loď (i torpédo), která vletí do dohledu během kola, se teď animuje po celé své dráze

@@ -3419,3 +3419,45 @@ button.start-chip.on:hover:not(:disabled) {
   display: inline-flex;
   margin-left: 2px;
 }
+
+/* hlavička Akce: suroviny vedle sebe – popisek nad pilulkami (varianta C) */
+.bb-head.res-head {
+  height: auto;
+  min-height: 26px;
+}
+.res-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.res-grp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.res-grp .res-lbl {
+  font-size: 13px;
+  color: #94a3b8;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.apip.pink i.on {
+  background: #f472b6;
+  border-color: #831843;
+}
+.apip.yellow i.on {
+  background: #fbbf24;
+  border-color: #78350f;
+}
+/* technologie v bouři: deaktivovaná – ztlumené pilulky s přeškrtnutím */
+.apip.yellow.storm i.on {
+  background: repeating-linear-gradient(135deg, #78350f 0 3px, #3b2a0a 3px 6px);
+  border-color: #3b2a0a;
+}
+.apip.yellow.storm {
+  opacity: 0.8;
+}
+.res-grp.storm .res-lbl {
+  color: #f87171;
+}

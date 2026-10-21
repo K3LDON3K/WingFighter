@@ -2,7 +2,7 @@
  * Ladicí parametry hry (balanc). Host je může měnit v lobby i během bitvy;
  * server je aplikuje před každým vyhodnocením, klient před vykreslením.
  */
-import { CARGO, COMET, CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO } from "./constants.ts";
+import { CARGO, COMET, CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TECH, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
 import { HULLS, LASER_DICE, MODULE_HP_PCT, MODULES, STRESS_MAX_REF, WEIGHT } from "./ships.ts";
 
@@ -86,10 +86,11 @@ export interface Tuning {
   weightMg: number;
   weightPerMgRound: number;
   // skener
-  scannerCharges: number;
+  techMax: number;
+  scannerShipCost: number;
+  scannerDeepCost: number;
   scannerRange: number;
   scannerDeepRange: number;
-  scannerCooldown: number;
   priceScanner: number;
   weightScanner: number;
   // komety
@@ -104,6 +105,7 @@ export interface Tuning {
   cometHullPct: number;
   cometBonusCredits: number;
   cometNoShieldCredits: number;
+  cometTailTech: number;
   cometChanceFew: number;
   cometChanceMedium: number;
   cometChanceMany: number;
@@ -200,10 +202,11 @@ export const DEFAULT_TUNING: Tuning = {
   priceMg: 120,
   weightMg: 1,
   weightPerMgRound: 0.02,
-  scannerCharges: 2,
+  techMax: 6,
+  scannerShipCost: 1,
+  scannerDeepCost: 2,
   scannerRange: 600,
   scannerDeepRange: 2000,
-  scannerCooldown: 3,
   priceScanner: 130,
   weightScanner: 1,
   cometSpeed: 300,
@@ -217,6 +220,7 @@ export const DEFAULT_TUNING: Tuning = {
   cometHullPct: 10,
   cometBonusCredits: 50,
   cometNoShieldCredits: 100,
+  cometTailTech: 2,
   cometChanceFew: 25,
   cometChanceMedium: 50,
   cometChanceMany: 100,
@@ -330,10 +334,11 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "weightMg", label: "Modul – váha (prázdný)", group: "Kulomet", min: 0, max: 20, step: 0.5 },
   { key: "weightPerMgRound", label: "Váha jednoho náboje", group: "Kulomet", min: 0, max: 1, step: 0.01 },
   // --- skener ---
-  { key: "scannerCharges", label: "Náboje (max)", group: "Skener", min: 1, max: 6, step: 1, hint: "start plné; +1 za zelený manévr; po cooldownu plné" },
+  { key: "techMax", label: "Technologie – body na bitvu", group: "Skener", min: 0, max: 12, step: 1, hint: "nedobíjí se; utrácí je skener" },
+  { key: "scannerShipCost", label: "Sken lodi – cena (technologie)", group: "Skener", min: 0, max: 6, step: 1 },
+  { key: "scannerDeepCost", label: "Hluboký sken – cena (technologie)", group: "Skener", min: 0, max: 6, step: 1 },
   { key: "scannerRange", label: "Sken lodi – dosah", group: "Skener", min: 50, max: 4000, step: 50, hint: "cíl musí být navíc v dohledu" },
   { key: "scannerDeepRange", label: "Hluboký sken – dosah", group: "Skener", min: 100, max: 6000, step: 100, hint: "odkryje mapu týmu do konce kola" },
-  { key: "scannerCooldown", label: "Cooldown po hlubokém skenu (kola)", group: "Skener", min: 1, max: 10, step: 1, hint: "vynucený cooldown = tato hodnota − zbývající náboje" },
   { key: "priceScanner", label: "Modul – cena", group: "Skener", min: 0, max: 2000, step: 10 },
   { key: "weightScanner", label: "Modul – váha", group: "Skener", min: 0, max: 20, step: 0.5 },
   // --- komety ---
@@ -348,6 +353,7 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "cometHullPct", label: "Průlet – % trupu (když je štít plný)", group: "Komety", min: 0, max: 100, step: 5 },
   { key: "cometBonusCredits", label: "Průlet – kredity (když není co doplnit)", group: "Komety", min: 0, max: 1000, step: 10 },
   { key: "cometNoShieldCredits", label: "Průlet bez štítového modulu – kredity", group: "Komety", min: 0, max: 1000, step: 10, hint: "loď bez štítu dostane navíc plný stres" },
+  { key: "cometTailTech", label: "Průlet ocasem – body technologie", group: "Komety", min: 0, max: 6, step: 1, hint: "přičte se vždy (max. do stropu technologie)" },
   { key: "cometCollide", label: "Naráží do asteroidů i do sebe", group: "Komety", min: 0, max: 1, step: 1, bool: true, hint: "zapnuto: kometa se roztříští o asteroid (vykousne kráter) a dvě komety se při srážce zničí navzájem; doplňuje volbu v nastavení mapy" },
   { key: "cometChanceFew", label: "Málo – šance za kolo %", group: "Komety", min: 0, max: 100, step: 5 },
   { key: "cometMaxFew", label: "Málo – max. na mapě", group: "Komety", min: 1, max: 20, step: 1 },
@@ -464,10 +470,11 @@ export function applyTuning(t: Tuning): void {
   MODULES.mg.price = t.priceMg;
   MODULES.mg.weight = t.weightMg;
   MODULES.mg.ammoWeight = t.weightPerMgRound;
-  SCANNER.charges = t.scannerCharges;
+  TECH.max = t.techMax;
+  SCANNER.shipCost = t.scannerShipCost;
+  SCANNER.deepCost = t.scannerDeepCost;
   SCANNER.range = t.scannerRange;
   SCANNER.deepRange = t.scannerDeepRange;
-  SCANNER.cooldown = t.scannerCooldown;
   MODULES.scanner.price = t.priceScanner;
   MODULES.scanner.weight = t.weightScanner;
   COMET.speed = t.cometSpeed;
@@ -481,6 +488,7 @@ export function applyTuning(t: Tuning): void {
   COMET.hullPct = t.cometHullPct;
   COMET.bonusCredits = t.cometBonusCredits;
   COMET.noShieldCredits = t.cometNoShieldCredits;
+  COMET.tailTech = t.cometTailTech;
   COMET.chance = { few: t.cometChanceFew, medium: t.cometChanceMedium, many: t.cometChanceMany };
   COMET.max = { few: t.cometMaxFew, medium: t.cometMaxMedium, many: t.cometMaxMany };
   COMET.collide = t.cometCollide > 0;

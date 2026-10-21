@@ -178,7 +178,6 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const base = box.y + box.h / 2 + 4 - (words.length - 1) * 6;
       words.forEach((w, i) => grp.append(svgEl("text", { x: box.x + box.w / 2, y: base + i * 12, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: "#f8fafc", "text-anchor": "middle" }, w)));
       if (ammo !== undefined) grp.append(svgEl("text", { x: box.x + box.w / 2 + 20, y: box.y + 14, "font-family": "Jersey", "font-size": 12, fill: "#fbbf24", "text-anchor": "middle" }, String(ammo)));
-      if (m.type === "scanner") grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + 14, "font-family": "Jersey", "font-size": 10, fill: (m.cooldown ?? 0) > 0 ? "#f87171" : "#fbbf24", "text-anchor": "middle" }, (m.cooldown ?? 0) > 0 ? `CD ${m.cooldown}` : `${m.charges ?? 0}×`));
       if (hasFacing(m.type)) {
         // šipky natočení: všechny povolené směry (šedé = možnosti, žlutá = zvolený); boční v cípech, ↑↓ uprostřed hran
         for (const f of allowedFacings(m.type, m.slot)) {

@@ -1,6 +1,6 @@
 import { VISION_REF } from "./fog.ts";
 import { FIGHTER_PROFILE } from "./maneuvers.ts";
-import { CARGO, LASER, RULES, SCANNER } from "./constants.ts";
+import { CARGO, LASER, RULES, TECH } from "./constants.ts";
 import type { Facing, GameSettings, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, PilotMods, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
 
 /**
@@ -90,7 +90,7 @@ export const MODULES: Record<ModuleType, ModuleDef> = {
   mine: { id: "mine", name: "Miny", short: "MINA", icon: "mine", size: "small", weight: 1, price: 100, hp: 20, ammo: 2, ammoWeight: 0.5, ammoPrice: 12, description: "Miny, 2 kusy na modul. Odhazují se za loď nebo do stran." },
   "shield-segment": { id: "shield-segment", name: "Segmentový štít", short: "SEG", icon: "segments", size: "small", weight: 2, price: 120, hp: 40, shieldType: "segment", description: "Čtyři segmenty po 2 bodech; každý zásah ubere 1 bod a je pohlcen celý. Akce Úprava štítu body přesouvá. Nelze kombinovat s celolodním." },
   mg: { id: "mg", name: "Kulomet", short: "KUL", icon: "mg", size: "small", weight: 1, price: 120, hp: 25, ammo: 100, ammoWeight: 0.02, ammoPrice: 0.3, description: "Krátký dosah (150), široká výseč ±45°. Dávka 10 projektilů s rozptylem, každý 3 zranění; šance zásahu klesá se vzdáleností. Střílí na začátku kola na cokoliv (loď, torpédo, trosky). Funguje i v bouři. 100 nábojů = 10 dávek." },
-  scanner: { id: "scanner", name: "Skener", short: "SKEN", icon: "scan", size: "small", weight: 1, price: 130, hp: 15, description: "2 náboje (dobíjí zelený manévr). Sken lodi (1 náboj): hned ukáže výbavu, natočení modulů, munici a pilota cizí lodi v dohledu. Hluboký sken (2 náboje): hned odkryje mapu celému týmu do konce kola, pak cooldown 3 kola. Nebere akci." },
+  scanner: { id: "scanner", name: "Skener", short: "SKEN", icon: "scan", size: "small", weight: 1, price: 130, hp: 15, description: "Čerpá technologii lodi (6 bodů na celou bitvu, nedobíjí se). Sken lodi (1 bod): hned ukáže výbavu, natočení modulů, munici a pilota cizí lodi v dohledu. Hluboký sken (2 body): hned odkryje mapu celému týmu do konce kola. Nebere akci." },
   "shield-whole": { id: "shield-whole", name: "Celolodní štít", short: "CEL", icon: "shield", size: "small", weight: 2, price: 120, hp: 40, shieldType: "whole", shields: 50, description: "Zásoba 50 kolem celé lodi, pohltí účinnost % zranění; účinnost po každém zásahu klesá o 10 %. Nelze kombinovat se segmentovým." },
 };
 export const MODULE_TYPES = Object.keys(MODULES) as ModuleType[];
@@ -152,7 +152,7 @@ export function mineSideOf(f: Facing | undefined): MineSide {
 
 export function newModule(type: ModuleType, slot: SlotId, id?: string): ModuleInstance {
   const def = MODULES[type];
-  return { id: id ?? `${type}-${Math.random().toString(36).slice(2, 8)}`, type, slot, ammo: def.ammo, facing: defaultFacing(type, slot), ...(type === "scanner" ? { charges: SCANNER.charges, cooldown: 0 } : {}) };
+  return { id: id ?? `${type}-${Math.random().toString(36).slice(2, 8)}`, type, slot, ammo: def.ammo, facing: defaultFacing(type, slot), };
 }
 
 /** Skenerový modul lodi (první). */
@@ -403,7 +403,8 @@ export function refillLoadout(loadout: ShipLoadout): ShipLoadout {
       ...m,
       ammo: MODULES[m.type]?.ammo === undefined ? undefined : Math.max(0, Math.min(MODULES[m.type].ammo!, m.ammo ?? MODULES[m.type].ammo!)),
       facing: hasFacing(m.type) ? (m.facing ?? defaultFacing(m.type, m.slot)) : undefined,
-      ...(m.type === "scanner" ? { charges: SCANNER.charges, cooldown: 0 } : { charges: undefined, cooldown: undefined }),
+      charges: undefined,
+      cooldown: undefined,
     })),
   };
 }
@@ -439,6 +440,7 @@ export function computeStats(loadout: ShipLoadout): ShipStats {
     colliders: hull.colliders ?? [{ x: 0, y: 0, r: hull.radius }],
     vision: VISION_REF.value,
     stressMax: STRESS_MAX_REF.value,
+    techMax: TECH.max,
     segmentModules: 0,
   };
   for (const m of loadout.modules) {

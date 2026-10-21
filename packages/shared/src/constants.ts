@@ -108,6 +108,8 @@ export const COMET = {
   bonusCredits: 50,
   /** Loď bez štítového modulu: reset stresu + kredity. */
   noShieldCredits: 100,
+  /** Průlet ocasem přidá body technologie (ladění). */
+  tailTech: 2,
   /** Šance (%) na novou kometu za kolo a max. počet komet na mapě podle nastavení mapy. */
   chance: { few: 25, medium: 50, many: 100 } as Record<"few" | "medium" | "many", number>,
   max: { few: 2, medium: 4, many: 6 } as Record<"few" | "medium" | "many", number>,
@@ -146,13 +148,15 @@ export const MG = {
   hitFar: 35,
 };
 
-/** Skener (mutovatelné kvůli ladění): náboje, dosah skenu lodi, dosah hlubokého skenu, cooldown v kolech. */
+/** Skener (mutovatelné kvůli ladění): cena skenů v bodech technologie, dosah skenu lodi, dosah hlubokého skenu. */
 export const SCANNER = {
-  charges: 2,
+  shipCost: 1,
+  deepCost: 2,
   range: 600,
   deepRange: 2000,
-  cooldown: 3,
 };
+/** Technologie: body na celou bitvu (nedobíjí se); utrácí je skener. Mutovatelné kvůli ladění. */
+export const TECH = { max: 6 };
 
 /** Kráter, který výbuch torpéda/miny vykousne z asteroidu (mutovatelné kvůli ladění). */
 export const CRATER_RADIUS_REF = { value: 45 };
