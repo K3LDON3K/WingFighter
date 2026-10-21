@@ -1069,14 +1069,24 @@ h3,
 }
 .tune-tabs .tab {
   font-size: 14px;
-  padding: 6px 8px;
+  padding: 6px 10px;
   border-bottom: 0;
-  opacity: 0.7;
+  color: #94a3b8;
+  background: #0a0e1c;
+  border-color: #1e293b #0a0e1c #0a0e1c #1e293b;
 }
-.tune-tabs .tab.on {
-  opacity: 1;
-  color: var(--accent);
-  border-color: var(--accent) var(--bevel-d) var(--bevel-d) var(--accent);
+.tune-tabs .tab:hover:not(:disabled) {
+  color: #e2e8f0;
+  background: #121a30;
+}
+.tune-tabs .tab.on,
+.tune-tabs .tab.on:hover:not(:disabled) {
+  background: #0f2a4a;
+  color: #e0f2fe;
+  border-color: #7dd3fc #0c4a6e #0c4a6e #7dd3fc;
+}
+.tune-tabs .tab.on .tab-dot {
+  color: #fde047;
 }
 .tab-dot {
   margin-left: 5px;

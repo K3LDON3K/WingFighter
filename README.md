@@ -147,6 +147,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.110 – Záložky v ladění čitelnější: vybraná je tmavě modrá se světlým textem a světlým rámem, ostatní šedé.
 - v3.109 – Tlačítko LADĚNÍ je vlevo nahoře u ostatních tlačítek (jen v místnosti); ladění se otevírá jako překryvné
   okno přes celou šířku. Tlačítka v hlavičce ladění sjednocená (stejná výška, bez zalamování, velká písmena).
 - v3.108 – Tlačítko OTEVŘÍT MÍSTNOST je zelené v hlavičce místnosti vedle OPUSTIT; vedle něj čtyři kroky nastavení
