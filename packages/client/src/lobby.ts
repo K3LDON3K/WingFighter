@@ -308,7 +308,7 @@ function roomView(m: LobbyModel, net: Net) {
           "div",
           { class: "card" },
           h("h3", {}, icon("inventory", "#7dd3fc", 12), " ", label("Tvoje výbava"), h("span", { class: "spacer" }), h("span", { class: "lo-wallet", title: "Kredity: rozpočet místnosti + výdělky z bitev − utracené za výbavu. Výbava, munice i zničené moduly ti mezi bitvami zůstávají." }, icon("credits", "#fbbf24", 12), ` ${me.credits ?? budget}`)),
-          h("div", { class: "muted txt" }, `Nové moduly kupuješ za plnou cenu (nový jde před bitvou vrátit za plnou cenu, použitý se prodá za ${RULES.usedSellPct} %, zničený za ${RULES.brokenSellPct} %). Munice se mezi bitvami nedoplňuje sama – dokoupíš ji tlačítkem +cena u modulu (levnější než nový modul). Co neutratíš, máš ve hře jako kredity; další získáš za sestřely a přežitá kola. Váha modulů snižuje max. rychlost lodi.`),
+          h("div", { class: "muted txt", style: "font-size:13px", title: `Nové moduly kupuješ za plnou cenu (nový jde před bitvou vrátit za plnou cenu, použitý se prodá za ${RULES.usedSellPct} %, zničený za ${RULES.brokenSellPct} %). Munice se mezi bitvami nedoplňuje sama – dokoupíš ji tlačítkem +cena u modulu. Co neutratíš, máš ve hře jako kredity; další získáš za sestřely a přežitá kola. Váha modulů snižuje max. rychlost lodi.` }, "Klik na volný slot a pak na modul (nebo naopak) = modul do zvoleného slotu · ✕ = prodat · +cena = dokoupit munici · najetí sem = pravidla nákupu"),
           (() => {
             const fleet = me.loadouts?.length ? me.loadouts : [me.loadout];
             const t = Math.min(fleetTab, fleet.length - 1);

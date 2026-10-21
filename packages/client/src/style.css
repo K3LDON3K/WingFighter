@@ -1659,18 +1659,66 @@ button.px.tiny {
 /* ---- výbava (lobby + inventář) ---- */
 .loadout {
   display: grid;
-  grid-template-columns: 480px 1fr;
+  grid-template-columns: auto 1fr;
   gap: 10px 16px;
   align-items: start;
   margin-top: 8px;
 }
-.loadout.compact {
+.loadout:not(.compact):not(.nohead) {
+  grid-template-columns: 150px 480px minmax(380px, 1fr);
+}
+.loadout:not(.compact).nohead {
+  grid-template-columns: 480px minmax(380px, 1fr);
+}
+.loadout.compact:not(.nohead) {
+  grid-template-columns: 150px auto minmax(300px, 1fr);
+}
+.loadout.compact.nohead {
   grid-template-columns: 1fr;
 }
-.lo-head {
-  grid-column: 1 / -1;
+.lo-mid-col,
+.lo-right-col {
   display: flex;
-  gap: 16px;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.loadout:not(.nohead) .lo-mid-col {
+  border-left: 2px solid var(--bevel-d);
+  border-right: 2px solid var(--bevel-d);
+  padding: 0 12px;
+}
+.loadout:not(.compact).nohead .lo-mid-col {
+  border-right: 2px solid var(--bevel-d);
+  padding-right: 12px;
+}
+.lo-head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* dlaždice lodi a pilota vlevo: menší, piloti 2×2 */
+.loadout .lo-head .pk-row {
+  width: 150px;
+}
+.loadout .lo-head .pk-tile {
+  width: 70px;
+  min-height: 72px;
+  padding: 4px 2px 3px;
+}
+.loadout .lo-head .pk-tile .pk-pic {
+  height: 32px;
+}
+.loadout .lo-head .pk-tile .pk-pic svg {
+  width: 30px;
+  height: 30px;
+}
+.loadout .lo-head .pk-tile .pk-name {
+  font-size: 11px;
+}
+.loadout .lo-head .pk-tile .pk-sub,
+.loadout .lo-head .pk-mod {
+  font-size: 10px;
 }
 .lo-head label {
   display: flex;
@@ -1679,7 +1727,6 @@ button.px.tiny {
   font-size: 17px;
 }
 .lo-diagram {
-  grid-row: 2 / 4;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1757,14 +1804,6 @@ button.px.tiny {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  grid-column: 2;
-}
-.loadout.compact .lo-shop,
-.loadout.compact .lo-summary {
-  grid-column: 1;
-}
-.loadout.compact .lo-diagram {
-  grid-row: auto;
 }
 .lo-buy {
   display: inline-flex;

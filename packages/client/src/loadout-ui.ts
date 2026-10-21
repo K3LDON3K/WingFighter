@@ -465,8 +465,10 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     );
   })();
   const hint = !ro && (pickSlot || pickType) ? h("div", { class: "lo-pickhint txt" }, pickSlot ? `Slot „${hull.slots.find((x) => x.id === pickSlot)?.name ?? pickSlot}“ vybraný – klikni na modul v obchodě (Esc = zrušit).` : `${MODULES[pickType!].name}: klikni na volný slot v nákresu, kam ho dát (nebo znovu na modul = zrušit).`) : null;
-  const root = h("div", { class: `loadout ${opts.compact ? "compact" : ""}` }, opts.hideHead ? null : head, diagram, weightBar, hint, summary);
-  if (!ro) root.append(shopEl);
+  // rozvržení B: vlevo loď + piloti pod sebou, uprostřed nákres s pruhem váhy, vpravo souhrn a obchod
+  const mid = h("div", { class: "lo-mid-col" }, diagram, weightBar, hint);
+  const right = h("div", { class: "lo-right-col" }, summary, ro ? null : shopEl);
+  const root = h("div", { class: `loadout ${opts.compact ? "compact" : ""} ${opts.hideHead ? "nohead" : ""}` }, opts.hideHead ? null : head, mid, right);
   rootRef = root;
   if (err) root.append(h("div", { class: "error" }, err));
   return root;

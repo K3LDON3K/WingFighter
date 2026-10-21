@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.68 – Editor výbavy kompaktně (rozvržení B): vlevo loď a piloti pod sebou (malé dlaždice, piloti 2×2), uprostřed
+  nákres s pruhem váhy, vpravo souhrn a obchod v mřížce; stejně i editor bota. Dlouhý text o pravidlech nákupu je
+  nahrazen jednořádkovou nápovědou (pravidla po najetí).
 - v3.67 – Editor výbavy: **váha modulů jako počet závaží** v hexagonech obchodu (půl závaží = 0,5); **pruh váhy a
   rychlosti** pod nákresem lodi (dílky podle výsledné max. rychlosti, žluté značky = prahy, text „váha X → max.
   rychlost Y“); **výběr slotu přímo v nákresu**: klik na volný slot (svítí „SEM ◆“) a pak na modul v obchodě, nebo
