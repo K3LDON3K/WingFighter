@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.71 – Roadmapa naplněná skutečným plánem: sekce *Stále probíhá / Budeme vypracovávat / Střednědobý vývoj /
+  Pozdější vývoj*, každá položka má štítek oblasti (nový droid, nový modul, nová loď, herní mód, prvky na mapě, UI).
 - v3.70 – V hlavním menu tlačítko **ROADMAPA** – textový přehled toho, na čem se pracuje, co se plánuje a nápady
   (obsah v `packages/client/src/roadmap.ts`). Editor výbavy: vypínač štítu se zobrazí jen při **více než jednom**
   štítu a je nakreslený jako pixel‑art páčka uprostřed horní části hexu; křížek pro odebrání a tlačítko dobití

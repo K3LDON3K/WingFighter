@@ -6,30 +6,39 @@ import { h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 
 export interface RoadmapItem {
+  /** oblast (droid, modul, loď, herní mód, mapa, UI…) – zobrazí se jako štítek před názvem */
+  group: string;
   title: string;
   text: string;
-  status: "doing" | "planned" | "idea";
+  status: "doing" | "next" | "mid" | "later";
 }
 
 export const ROADMAP: RoadmapItem[] = [
-  // --- pracuje se ---
-  { status: "doing", title: "Droidi", text: "Další druhy droidů (navigační, bojový, technický) s vlastními funkcemi za technologii." },
-  { status: "doing", title: "Štíty", text: "Záložní štít se zapíná automaticky; ladění chování více štítů v bitvě." },
-  { status: "doing", title: "Editor výbavy", text: "Přehlednější rozvržení, výběr slotu, váha a rychlost – doladění detailů." },
-  // --- plánuje se ---
-  { status: "planned", title: "Další trupy", text: "Těžší loď za 2 lodní body s více sloty a velkým modulem." },
-  { status: "planned", title: "Velké moduly", text: "Moduly přes dva sloty (příď + záď): těžké dělo, velký štít, hangár." },
-  { status: "planned", title: "Kampaň / série bitev", text: "Více bitev za sebou s přenosem výbavy, kreditů a pilotů." },
-  { status: "planned", title: "Statistiky", text: "Historie bitev a žebříček hráčů na serveru." },
-  // --- nápady ---
-  { status: "idea", title: "Mlhoviny a jiné překážky", text: "Oblasti, které mění dohled, rychlost nebo účinnost zbraní." },
-  { status: "idea", title: "Mise s cílem", text: "Jiné módy než deathmatch: dobýt bod, doprovodit loď, přežít vlny." },
+  // --- stále probíhá ---
+  { status: "doing", group: "UI", title: "Úprava UI", text: "Průběžné zpřehledňování a zkompaktnění obrazovek." },
+  // --- budeme vypracovávat ---
+  { status: "next", group: "Nový droid", title: "Droid Střelec", text: "" },
+  { status: "next", group: "Nový modul", title: "Velký modul – Hyperpohon", text: "" },
+  { status: "next", group: "Nový modul", title: "Velký modul – Atomová bomba", text: "" },
+  { status: "next", group: "Prvky na mapě", title: "Vizuální prvky bez efektů", text: "" },
+  { status: "next", group: "Zpětná vazba", title: "Zpětná vazba po zápase", text: "Po dokončení zápasu může hráč napsat zpětnou vazbu; admin ji uvidí v roadmapě jako seznam zpráv." },
+  // --- střednědobý vývoj ---
+  { status: "mid", group: "Nový droid", title: "Droid Hacker", text: "" },
+  { status: "mid", group: "Nová loď", title: "Střední loď", text: "" },
+  { status: "mid", group: "Prvky na mapě", title: "Budovy, vesmírné stanice", text: "" },
+  { status: "mid", group: "Prvky na mapě", title: "Nové druhy hazardu", text: "Slunce, planety." },
+  { status: "mid", group: "Prvky na mapě", title: "Skryté suroviny či moduly v asteroidech", text: "" },
+  // --- pozdější vývoj ---
+  { status: "later", group: "Nová loď", title: "Velká loď", text: "" },
+  { status: "later", group: "Herní mód", title: "Obrana Velké lodi", text: "" },
+  { status: "later", group: "Herní mód", title: "Útok na Velkou loď", text: "" },
 ];
 
 const SECTIONS: { status: RoadmapItem["status"]; title: string; color: string; hint: string }[] = [
-  { status: "doing", title: "Pracuje se", color: "#4ade80", hint: "Rozpracované – objeví se v dalších verzích." },
-  { status: "planned", title: "Plánuje se", color: "#fbbf24", hint: "Domluvené, zatím nezačaté." },
-  { status: "idea", title: "Nápady", color: "#94a3b8", hint: "Zatím jen úvahy – pořadí se může měnit." },
+  { status: "doing", title: "Stále probíhá", color: "#4ade80", hint: "Průběžná práce, která nikdy úplně nekončí." },
+  { status: "next", title: "Budeme vypracovávat", color: "#7dd3fc", hint: "Nejbližší věci na řadě." },
+  { status: "mid", title: "Střednědobý vývoj", color: "#fbbf24", hint: "Domluvené, přijde po nejbližších věcech." },
+  { status: "later", title: "Pozdější vývoj", color: "#94a3b8", hint: "Vzdálenější plány – pořadí se může měnit." },
 ];
 
 let overlay: HTMLElement | null = null;
@@ -56,7 +65,16 @@ export function openRoadmap(): void {
         "div",
         { class: "rm-sec" },
         h("div", { class: "rm-sec-h", style: `color:${sec.color}`, title: sec.hint }, label(sec.title), h("span", { class: "muted" }, ` · ${items.length}`)),
-        ...items.map((it) => h("div", { class: "rm-item" }, h("span", { class: "rm-dot", style: `background:${sec.color}` }), h("span", { class: "rm-title" }, it.title), h("span", { class: "rm-text txt" }, it.text))),
+        ...items.map((it) =>
+          h(
+            "div",
+            { class: "rm-item" },
+            h("span", { class: "rm-dot", style: `background:${sec.color}` }),
+            h("span", { class: "rm-group txt" }, it.group),
+            h("span", { class: "rm-title" }, it.title),
+            h("span", { class: "rm-text txt" }, it.text),
+          ),
+        ),
       );
     }),
     h("div", { class: "muted txt rm-foot" }, "Historie změn je v README (Historie změn). Roadmapa se upravuje v souboru roadmap.ts."),
