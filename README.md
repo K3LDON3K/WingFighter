@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.62 – **Vysvětlivky akcí přehledně** (varianta B): název s ikonou vlevo, cena pilulkami vpravo (akce · stres ·
+  technologie, aktuální i s overdrivem), efekty jako krátké štítky s ikonkou (zelený rámeček = výhoda, červený =
+  postih), drobná poznámka dole, případný důvod „Nelze: …“ červeně. Platí pro všechna tlačítka lišty akcí včetně
+  okének (náklad, skener, droid). Pixel-art bubliny umí i strukturovaný obsah (`tipAttr` / `tipHtml`).
 - v3.61 – Overdrive droida navíc: rychlost v tomto kole **ignoruje váhu** (plná max. rychlost trupu, blokované
   dílky ukazatele rychlosti zmizí); příští kolo limit zase platí.
 - v3.60 – **Nový modul Droid – pilot** (kategorie Speciální, malý, váha 0,5, cena 140; Ladění → Droid). Čerpá

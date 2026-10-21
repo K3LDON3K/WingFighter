@@ -18,10 +18,11 @@ function ensureEl(): HTMLElement {
 }
 
 /** Najde nejbližší prvek s vysvětlivkou a vrátí její text (title se přesune do data-tip, aby nativní bublina nevyskočila). */
-function tipFor(target: Element | null): { el: Element; text: string } | null {
+function tipFor(target: Element | null): { el: Element; text: string; html?: string } | null {
   let el: Element | null = target;
   while (el && el !== document.body) {
     const ds = (el as HTMLElement).dataset;
+    if (ds?.tiphtml) return { el, text: "", html: ds.tiphtml };
     if (ds?.tip) return { el, text: ds.tip };
     const t = el.getAttribute("title");
     if (t) {
@@ -43,10 +44,16 @@ function tipFor(target: Element | null): { el: Element; text: string } | null {
   return null;
 }
 
-function show(el: Element, text: string, x: number, y: number) {
+function show(el: Element, text: string, x: number, y: number, html?: string) {
   const t = ensureEl();
   current = el;
   t.textContent = "";
+  if (html) {
+    t.innerHTML = html;
+    t.style.display = "block";
+    place(x, y);
+    return;
+  }
   const lines = text.split("\n");
   lines.forEach((ln, i) => {
     const d = document.createElement("div");
@@ -84,7 +91,7 @@ export function initTooltips() {
       if (current) hideTip();
       return;
     }
-    if (hit.el !== current) show(hit.el, hit.text, e.clientX, e.clientY);
+    if (hit.el !== current) show(hit.el, hit.text, e.clientX, e.clientY, hit.html);
   });
   document.addEventListener("mousemove", (e) => {
     if (current && tipEl?.style.display === "block") place(e.clientX, e.clientY);
@@ -103,7 +110,7 @@ export function initTooltips() {
       const hit = tipFor(e.target as Element);
       if (!hit) return;
       const { clientX, clientY } = e;
-      pressTimer = window.setTimeout(() => show(hit.el, hit.text, clientX, clientY), 450);
+      pressTimer = window.setTimeout(() => show(hit.el, hit.text, clientX, clientY, hit.html), 450);
     },
     true,
   );
@@ -113,4 +120,48 @@ export function initTooltips() {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") hideTip();
   });
+}
+
+/* ---------- strukturovaná vysvětlivka akce (varianta B): název + cena vpravo, štítky efektů, poznámka ---------- */
+import { ICONS } from "./icons.ts";
+
+export interface TipSpec {
+  icon: string;
+  iconColor?: string;
+  title: string;
+  cost?: { actions?: number; stress?: number; tech?: number };
+  /** Štítky: ikona, text, ladění (good = zelený rámeček, bad = červený). */
+  fx: { icon: string; text: string; tone?: "good" | "bad" }[];
+  note?: string;
+  /** Důvod, proč akce nejde (červeně). */
+  warn?: string;
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function iconSvg(name: string, color: string, size: number): string {
+  const rows = ICONS[name] ?? ICONS.target;
+  const rects = rows.map((r, y) => [...r].map((c, x) => (c === "#" ? `<rect x="${x}" y="${y}" width="1" height="1"/>` : "")).join("")).join("");
+  return `<svg width="${size}" height="${size}" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="${color}">${rects}</svg>`;
+}
+function pips(n: number, cls: string): string {
+  return n > 0 ? `<span class="tp-pips ${cls}">${"<i></i>".repeat(n)}</span>` : "";
+}
+
+/** HTML vysvětlivky pro `data-tiphtml`. */
+export function tipHtml(t: TipSpec): string {
+  const c = t.cost ?? {};
+  const costHtml = `${pips(c.actions ?? 0, "r")}${(c.stress ?? 0) > 0 ? pips(c.stress!, "p") : (c.stress ?? 0) < 0 ? `<span class="tp-pips p plus"><i>+</i></span>` : ""}${pips(c.tech ?? 0, "y")}`;
+  const free = !(c.actions || c.stress || c.tech);
+  const head = `<div class="tp-h"><span class="tp-name">${iconSvg(t.icon, t.iconColor ?? "#fbbf24", 14)}${esc(t.title)}</span><span class="tp-cost">${free && t.cost ? '<span class="tp-free">zdarma</span>' : costHtml}</span></div>`;
+  const chips = t.fx.length ? `<div class="tp-chips">${t.fx.map((f) => `<span class="tp-chip ${f.tone ?? ""}">${iconSvg(f.icon, f.tone === "good" ? "#86efac" : f.tone === "bad" ? "#fca5a5" : "#cbd5e1", 12)}${esc(f.text)}</span>`).join("")}</div>` : "";
+  const note = t.note ? `<div class="tp-note">${esc(t.note)}</div>` : "";
+  const warn = t.warn ? `<div class="tp-warn">${esc(t.warn)}</div>` : "";
+  return head + chips + note + warn;
+}
+
+/** Atributy pro h(): data-tiphtml s hotovým HTML. */
+export function tipAttr(t: TipSpec): { dataset: { tiphtml: string } } {
+  return { dataset: { tiphtml: tipHtml(t) } };
 }

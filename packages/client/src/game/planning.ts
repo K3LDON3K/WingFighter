@@ -43,6 +43,8 @@ import {
   defaultOrders,
 } from "@wingfighter/shared";
 import { clear, h } from "../dom.ts";
+import { actionTip } from "./tips.ts";
+import { tipAttr } from "../tooltip.ts";
 import { icon, label, segBar } from "../icons.ts";
 import { ACTIONS, actionAvailable } from "./actions.ts";
 import { SEGMENT_NAMES, shieldBubble, strengthColor } from "./shield-ui.ts";
@@ -400,13 +402,11 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           {
             class: `px bb-weapon ${active && !stormOff && !done ? "on" : ""} ${done ? "done" : ""} ${stormOff ? "stormed" : ""} ${dots > 0 ? "spent" : ""} ${destroyed ? "destroyed" : ""}`,
             disabled: locked || stormOff || destroyed || (!!why && !active && !done && dots === 0),
-            title: moveDone
-              ? `Manévr je nakreslený a platí. Stisk = reset: loď poletí rovně stejnou rychlostí (zdarma).\nNovou dráhu nakreslíš tažením z lodi.`
-              : shieldDone
-                ? "Úprava štítu platí. Stisk = reset (štít zůstane, jak je teď)."
-                : a.id === "shield" && editing
-                  ? "Rozmísti body −/+ a klikni kamkoliv vedle (nebo sem) – úprava se potvrdí."
-                  : `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`,
+            ...tipAttr({
+              ...actionTip(a.id, ship, o, man, destroyed ? null : why),
+              ...(moveDone ? { note: "nakresleno a platí · stisk = reset (rovně stejnou rychlostí, zdarma)" } : shieldDone ? { note: "úprava platí · stisk = reset" } : a.id === "shield" && editing ? { note: "rozmísti body −/+ a klikni vedle – úprava se potvrdí" } : {}),
+              ...(destroyed ? { warn: "ZNIČENO – modul nefunguje" } : {}),
+            }),
             onclick: () => (moveDone ? cb.cancelManeuver(ship.id) : shieldDone ? cb.cancelAction(ship.id) : a.id === "shield" && editing ? cb.shieldConfirm(ship.id) : isMove ? cb.aim(ship.id) : cb.chooseAction(ship.id, a.id)),
           },
           (() => {
@@ -441,7 +441,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       const sub = (a: typeof jet, on: boolean, why: string | null, lbl: string) =>
         h(
           "button",
-          { class: `px bb-weapon sm ${on ? "on" : ""}`, disabled: locked || (!!why && !on), title: `${a.label}\n${a.description}${why ? `\nNelze: ${why}.` : ""}`, onclick: () => cb.chooseAction(ship.id, a.id) },
+          { class: `px bb-weapon sm ${on ? "on" : ""}`, disabled: locked || (!!why && !on), ...tipAttr(actionTip(a.id, ship, o, man, on ? null : why)), onclick: () => cb.chooseAction(ship.id, a.id) },
           costPips(1, on ? "spent" : "red", "stojí 1 akci"),
           icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
           h("span", { class: "lbl" }, label(lbl)),
@@ -454,7 +454,17 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           {
             class: `px bb-weapon ${cargoActive && !cargoDone ? "on" : ""} ${cargoDone ? "done" : ""} ${cargoSpent > 0 ? "spent" : ""} ${m.cargoOpen ? "open" : ""}`,
             disabled: locked,
-            title: cargoDone ? `${jetOn ? "Vyhození modulu" : "Zvednutí nákladu"} platí. Stisk = reset (akce se zruší).` : "Náklad: vyhodit modul z lodi nebo z nákladu (1 akce) / zvednout trosky do nákladového prostoru (1 akce). Klik vedle okénko zavře a volba platí.",
+            ...tipAttr({
+              icon: "cargo",
+              iconColor: "#94a3b8",
+              title: "Náklad",
+              cost: { actions: 1 },
+              fx: [
+                { icon: "debris", text: "vyhodit modul z lodi / nákladu" },
+                { icon: "cargo", text: `zvednout trosky do ${CARGO.range}` },
+              ],
+              note: cargoDone ? `${jetOn ? "vyhození" : "zvednutí"} platí · stisk = reset` : "klik vedle okénko zavře a volba platí",
+            }),
             onclick: () => (cargoDone ? cb.cancelAction(ship.id) : cb.cargoToggle(ship.id)),
           },
           costPips(1, cargoSpent > 0 ? "spent" : "red", "stojí 1 akci"),
@@ -499,7 +509,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             {
               class: `px bb-weapon scan-btn ${m.scanOpen && !stormed ? "on" : ""} ${stormed ? "stormed" : ""} ${tech < SCANNER.shipCost ? "cool" : ""}`,
               disabled: locked || stormed || tech < Math.min(SCANNER.shipCost, SCANNER.deepCost),
-              title: `${MODULES.scanner.name}\n${MODULES.scanner.description}\nTechnologie: ${tech}/${ship.stats.techMax}.`,
+              ...tipAttr({ ...actionTip("scanner", ship, o, man), note: `technologie ${tech}/${ship.stats.techMax} · nebere akci · v bouři nefunguje`, ...(tech < Math.min(SCANNER.shipCost, SCANNER.deepCost) ? { warn: "Nelze: nedostatek technologie." } : {}) }),
               onclick: () => cb.scanToggle(ship.id),
             },
             icon("scan", "currentColor", 22),
@@ -514,8 +524,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             h(
               "div",
               { class: `scan-pop ${popClass(`scan:${ship.id}`)}` },
-              h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || tech < SCANNER.shipCost, title: `Sken lodi (${SCANNER.shipCost} technologie): klikni na cizí loď v dohledu do ${SCANNER.range}. Proběhne hned, nebere akci.`, onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(SCANNER.shipCost)),
-              h("button", { class: "px bb-weapon sm", disabled: locked || tech < SCANNER.deepCost, title: `Hluboký sken (${SCANNER.deepCost} technologie): hned odkryje mapu do ${SCANNER.deepRange} celému týmu do konce kola.`, onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(SCANNER.deepCost)),
+              h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || tech < SCANNER.shipCost, ...tipAttr({ ...actionTip("scan-ship", ship, o, man), ...(tech < SCANNER.shipCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(SCANNER.shipCost)),
+              h("button", { class: "px bb-weapon sm", disabled: locked || tech < SCANNER.deepCost, ...tipAttr({ ...actionTip("scan-deep", ship, o, man), ...(tech < SCANNER.deepCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(SCANNER.deepCost)),
             ),
           );
         }
@@ -531,14 +541,14 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         const planned = droidCost(o);
         const anyOn = !!od.overdrive || !!od.autopilot;
         const holder = h("div", { class: "scan-holder" });
-        const title = `${MODULES.droid.name}\n${MODULES.droid.description}\nTechnologie: ${tech}/${ship.stats.techMax}${planned ? ` (v plánu −${planned})` : ""}${dDestroyed ? "\nZNIČENO – modul nefunguje" : stormed ? "\nV bouři nefunguje." : ""}`;
+        const dtip = tipAttr({ ...actionTip("droid", ship, o, man), note: `technologie ${tech}/${ship.stats.techMax}${planned ? ` (v plánu −${planned})` : ""} · nebere akci · v bouři nefunguje`, ...(dDestroyed ? { warn: "ZNIČENO – modul nefunguje" } : stormed ? { warn: "Nelze: v bouři droid nefunguje." } : {}) });
         holder.append(
           h(
             "button",
             {
               class: `px bb-weapon droid-btn ${m.droidOpen && !stormed && !dDestroyed ? "on" : ""} ${anyOn && !m.droidOpen ? "done" : ""} ${stormed ? "stormed" : ""} ${dDestroyed ? "destroyed" : ""}`,
               disabled: locked || stormed || dDestroyed,
-              title,
+              ...dtip,
               onclick: () => cb.droidToggle(ship.id),
             },
             icon("bot", "currentColor", 22),
@@ -557,8 +567,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             h(
               "div",
               { class: `scan-pop ${popClass(`droid:${ship.id}`)}` },
-              h("button", { class: `px bb-weapon sm ${od.overdrive ? "on" : ""}`, disabled: locked || !canOver, title: `Overdrive (${DROID.overdriveCost} technologie): v tomto kole manévry nestojí stres – červený i nebezpečný jsou „bílé“ (nebezpečný bez ztráty trupu), úhyb bez stresu, otočka za 1 akci, rychlost ignoruje váhu. Nebere akci; zrušit jde zdarma do odeslání kola.`, onclick: () => cb.setOrders(ship.id, { droid: { ...od, overdrive: !od.overdrive } }) }, icon("speed", "currentColor", 22), h("span", { class: "lbl" }, label("Overdrive")), cost(DROID.overdriveCost, !!od.overdrive)),
-              h("button", { class: `px bb-weapon sm ${od.autopilot ? "on" : ""}`, disabled: locked || !canAuto, title: `Autopilot (${DROID.autopilotCost} technologie): zelený manévr v tomto kole vrátí +${DROID.autopilotRegen} stresové body místo +1. Nebere akci.`, onclick: () => cb.setOrders(ship.id, { droid: { ...od, autopilot: !od.autopilot } }) }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Autopilot")), cost(DROID.autopilotCost, !!od.autopilot)),
+              h("button", { class: `px bb-weapon sm ${od.overdrive ? "on" : ""}`, disabled: locked || !canOver, ...tipAttr({ ...actionTip("overdrive", ship, o, man), ...(!canOver ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.setOrders(ship.id, { droid: { ...od, overdrive: !od.overdrive } }) }, icon("speed", "currentColor", 22), h("span", { class: "lbl" }, label("Overdrive")), cost(DROID.overdriveCost, !!od.overdrive)),
+              h("button", { class: `px bb-weapon sm ${od.autopilot ? "on" : ""}`, disabled: locked || !canAuto, ...tipAttr({ ...actionTip("autopilot", ship, o, man), ...(!canAuto ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.setOrders(ship.id, { droid: { ...od, autopilot: !od.autopilot } }) }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Autopilot")), cost(DROID.autopilotCost, !!od.autopilot)),
             ),
           );
         }
