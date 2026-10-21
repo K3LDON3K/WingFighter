@@ -145,6 +145,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.57 – **Výzbroj kompaktně** (varianta E, panel 136 px): bez názvů a čísel – svislá „baterie“ životů modulu
+  (5 segmentů po 20 %, zelená/žlutá/červená, zničený = tmavě červená), políčko s ikonkou zbraně (šipka = natočení,
+  zničený = červené políčko) a munice ikonkami (plná = k dispozici, šedá = spotřebovaná; kulomet proužky, lasery ∞).
+  Název, životy a munice slovy jsou ve vysvětlivce po najetí.
 - v3.56 – Spodní lišta: panel lodi užší (trup a rychlost blíž k sobě), Výzbroj o něco užší, tlačítka akcí se při
   nedostatku místa mírně zúží – víc prostoru pro akce, na 1280 px se vejde všech 8 tlačítek.
 - v3.55 – Při kreslení manévru ukazuje tlačítko Potvrdit cenu surovin bez fajfek (barevné čtverečky se mění podle

@@ -501,7 +501,7 @@ h3,
 /* ---- spodní lišta (pevné rozměry) ---- */
 .bottombar {
   display: grid;
-  grid-template-columns: 196px 160px 1fr 84px 84px 96px;
+  grid-template-columns: 196px 136px 1fr 84px 84px 96px;
   gap: 6px;
   height: 172px;
   padding: 6px;
@@ -1436,9 +1436,62 @@ h3,
 .ammo-row {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
   height: 20px;
   white-space: nowrap;
+}
+/* Výzbroj (varianta E): svislá baterie životů · políčko s ikonkou zbraně · munice ikonkami */
+.mod-hpv {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1px;
+  width: 4px;
+  height: 20px;
+  flex: none;
+}
+.mod-hpv i {
+  display: block;
+  flex: 1;
+  background: #1e293b;
+}
+.mod-hpv i.g {
+  background: #4ade80;
+}
+.mod-hpv i.y {
+  background: #fbbf24;
+}
+.mod-hpv i.r {
+  background: #f87171;
+}
+.mod-hpv.dead i {
+  background: #450a0a;
+}
+.wtile {
+  position: relative;
+  width: 22px;
+  height: 20px;
+  flex: none;
+  background: #0b1020;
+  border: 1px solid #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.wtile.dead {
+  border-color: #7f1d1d;
+  background: #2a0a0a;
+}
+.wtile .wfac {
+  position: absolute;
+  right: -1px;
+  top: -6px;
+  font-size: 9px;
+  line-height: 1;
+  color: #94a3b8;
+}
+.ammo-icons .inf {
+  color: #f87171;
+  font-size: 14px;
 }
 .ammo-name {
   width: 56px;
@@ -1485,7 +1538,7 @@ h3,
   display: block;
 }
 .mgpip.on {
-  background: #f87171;
+  background: #fde047;
 }
 .bubble {
   display: block;

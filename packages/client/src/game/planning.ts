@@ -296,53 +296,38 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const counters: Record<string, number> = {};
   const typeCount: Record<string, number> = {};
   for (const md of ammoMods) typeCount[md.type] = (typeCount[md.type] ?? 0) + 1;
-  const hpBar = (md: ModuleInstance) => {
+  /** Životy modulu: svislá „baterie“ – 5 segmentů po 20 % (zelená > 60 %, žlutá > 30 %, jinak červená). */
+  const hpGauge = (md: ModuleInstance) => {
     const hp = moduleHp(md);
     const max = moduleMaxHp(md.type);
     const pct = hp / max;
-    const bar = h("span", { class: `mod-hp ${hp === 0 ? "dead" : ""}`, title: hp === 0 ? "Modul je zničený – nefunguje (prodá se jen za zlomek ceny)" : `Životy modulu ${hp}/${max} – zranění trupu modul poškozuje` });
-    bar.append(h("i", { style: `width:${Math.round(pct * 100)}%;background:${pct > 0.6 ? "#4ade80" : pct > 0.3 ? "#fbbf24" : "#f87171"}` }));
-    return bar;
+    const lit = Math.ceil(pct * 5 - 1e-9);
+    const col = pct > 0.6 ? "g" : pct > 0.3 ? "y" : "r";
+    const g = h("span", { class: `mod-hpv ${hp === 0 ? "dead" : ""}` });
+    for (let i = 0; i < 5; i++) g.append(h("i", { class: i < lit ? col : "" }));
+    return g;
   };
+  const WEAPON_COL: Record<string, string> = { laser: "#f87171", torpedo: "#f87171", mine: "#f87171", mg: "#fde047", scanner: "#a78bfa", "shield-segment": "#60a5fa", "shield-whole": "#60a5fa" };
   for (const md of ammoMods) {
     const def = MODULES[md.type];
     counters[md.type] = (counters[md.type] ?? 0) + 1;
     const max = def.ammo ?? 0;
     const left = md.ammo ?? 0;
     const broken = !moduleWorking(md);
-    const base = md.type === "torpedo" ? "TORP" : md.type === "mine" ? "MINY" : md.type === "mg" ? "KULOMET" : md.type === "laser" ? "LASER" : md.type === "scanner" ? "SKENER" : md.type === "shield-segment" || md.type === "shield-whole" ? "ŠTÍT" : def.short;
-    const name = `${base}${typeCount[md.type] > 1 ? ` ${counters[md.type]}` : ""}`;
+    const nameFull = `${def.name}${typeCount[md.type] > 1 ? ` ${counters[md.type]}` : ""}${md.facing ? ` – ${FACING_NAMES[md.facing]}` : ""}`;
+    const hp = moduleHp(md);
+    const hpTxt = broken ? "ZNIČENÝ – nefunguje" : `životy ${hp}/${moduleMaxHp(md.type)}`;
+    const ammoTxt = md.type === "laser" ? "bez munice (střílí každé kolo)" : md.ammo !== undefined ? `munice ${left}/${max}` : "";
+    const tile = h("span", { class: `wtile ${broken ? "dead" : ""}` }, icon(def.icon, broken ? "#f87171" : (WEAPON_COL[md.type] ?? "#e2e8f0"), 12), md.facing ? h("span", { class: "wfac" }, FACING_GLYPH[md.facing]) : null);
     const icons = h("span", { class: "ammo-icons" });
-    const facingTxt = md.facing ? ` ${FACING_GLYPH[md.facing]}` : "";
-    if (broken) {
-      weapons.append(h("div", { class: "ammo-row broken", title: `${def.name}: ZNIČENÝ – nefunguje. Dá se vyhodit nebo po bitvě prodat za ${RULES.brokenSellPct} % ceny.` }, h("span", { class: "ammo-name" }, label(name), h("span", { class: "muted" }, facingTxt)), hpBar(md), h("span", { class: "ammo-num" }, label("zničen"))));
-      continue;
+    if (!broken) {
+      if (md.type === "laser") icons.append(h("span", { class: "inf" }, "∞"));
+      else if (md.type === "mg") {
+        const lit = Math.round((left / Math.max(1, max)) * 10);
+        for (let i = 0; i < 10; i++) icons.append(h("i", { class: `mgpip ${i < lit ? "on" : ""}` }));
+      } else if (md.ammo !== undefined) for (let i = 0; i < max; i++) icons.append(icon(def.icon, i < left ? "#f87171" : "#334155", 10));
     }
-    if (md.type === "laser") {
-      // bez munice: nekonečno
-      icons.append(h("span", { class: "inf", title: "Lasery nemají munici – střílí každé kolo" }, "∞"));
-      weapons.append(h("div", { class: "ammo-row", title: `${def.name} – ${FACING_NAMES[md.facing ?? "front"]}: bez munice` }, h("span", { class: "ammo-name" }, label(name), h("span", { class: "muted" }, facingTxt)), hpBar(md), icons));
-      continue;
-    }
-    if (md.ammo === undefined) {
-      weapons.append(h("div", { class: "ammo-row", title: `${def.name}: funkční` }, h("span", { class: "ammo-name" }, label(name)), hpBar(md), h("span", { class: "ammo-num muted" }, "")));
-      continue;
-    }
-    if (md.type === "mg") {
-      const n = 10;
-      const lit = Math.round((left / Math.max(1, max)) * n);
-      for (let i = 0; i < n; i++) icons.append(h("i", { class: `mgpip ${i < lit ? "on" : ""}` }));
-    } else for (let i = 0; i < max; i++) icons.append(icon(def.icon, i < left ? "#f87171" : "#334155", 10));
-    weapons.append(
-      h(
-        "div",
-        { class: "ammo-row", title: `${def.name} ${typeCount[md.type] > 1 ? counters[md.type] : ""} – ${FACING_NAMES[md.facing ?? "front"]}: munice ${left}/${max}` },
-        h("span", { class: "ammo-name" }, label(name), h("span", { class: "muted" }, facingTxt)),
-        hpBar(md),
-        icons,
-        h("span", { class: "ammo-num muted" }, md.type === "mg" ? String(left) : `${left}/${max}`),
-      ),
-    );
+    weapons.append(h("div", { class: `ammo-row ${broken ? "broken" : ""}`, title: `${nameFull}\n${hpTxt}${ammoTxt ? `\n${ammoTxt}` : ""}` }, hpGauge(md), tile, icons));
   }
 
   /* ---- 2. manévr (svislý sloupec) ---- */
