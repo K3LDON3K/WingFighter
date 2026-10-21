@@ -1,4 +1,4 @@
-/** Nastavení zobrazení (jen tento počítač): rozlišení herní mapy. 1 = nativní, 0.75 / 0.5 = méně pixelů (rychlejší). */
+/** Nastavení zobrazení (jen tento počítač): rozlišení herní mapy. Výchozí 0.5 (čtvrtina pixelů, plynulé); 1 = nativní. */
 import { h } from "./dom.ts";
 import { label } from "./icons.ts";
 
@@ -8,7 +8,7 @@ export const RENDER_SCALES: [number, string][] = [
   [0.75, "75 %"],
   [0.5, "50 %"],
 ];
-let scale = 1;
+let scale = 0.5;
 try {
   const v = Number(localStorage.getItem(KEY));
   if (RENDER_SCALES.some(([s]) => s === v)) scale = v;

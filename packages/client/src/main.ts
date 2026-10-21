@@ -1469,7 +1469,7 @@ function renderSide() {
   if (open) sideEl.append(log);
   if (open) log.scrollTop = log.scrollHeight;
 }
-let logOpen = true;
+let logOpen = false;
 
 /* ------------------------------------------------------------------ */
 /* Vstup na mapě                                                        */
