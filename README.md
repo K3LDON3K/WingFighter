@@ -147,6 +147,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.84 – **Animace prohry** pro poraženou stranu: hořící stíhač v barvě týmu padá shora do výsledkové tabulky,
+  při dopadu vybuchne (záblesk, jiskry, trosky), z místa dopadu se dál kouří a nad tabulku vystoupá nápis
+  PROHRA v tmavší barvě týmu. Výhra / prohra se určuje stejně jako u vítězné animace (série až po konci).
 - v3.83 – **Vítězná animace**: po výhře (jedna bitva hned, série až po celkové výhře) vyletí zpoza výsledkové
   tabulky tři stíhače v barvě vítězného týmu s barevnými pruhy, nad tabulkou se odkryje pixelový nápis
   VÍTĚZSTVÍ (písmo UI, styl loga) a spustí se ohňostroj v týmových barvách. Hraje se jen hráčům vítězné

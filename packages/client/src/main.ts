@@ -62,7 +62,7 @@ import { loadLibrary, playMode, renderSynth } from "./music.ts";
 (window as unknown as { __wfRender: typeof renderSynth }).__wfRender = renderSynth;
 import { renderMusicPanel } from "./music-ui.ts";
 import { logoCanvas, replayLogo } from "./logo.ts";
-import { playVictory } from "./victory.ts";
+import { playDefeat, playVictory } from "./victory.ts";
 
 /** Vítězná animace už běžela pro tuto bitvu. */
 let victoryShown = false;
@@ -1054,25 +1054,32 @@ function renderHud() {
       victoryShown = false;
     }
     // vítězná animace: jedna bitva hned po výhře, série až po celkové výhře; jen pro vítěze
-    if (finished && overlayEl.firstChild && !victoryShown && iWon(s)) {
-      victoryShown = true;
-      playVictory(overlayEl.firstChild as HTMLElement, TEAM_COLORS[s.players.find((p) => p.id === playerId)?.team ?? 0]);
+    if (finished && overlayEl.firstChild && !victoryShown) {
+      const outcome = myOutcome(s);
+      if (outcome) {
+        victoryShown = true;
+        const col = TEAM_COLORS[s.players.find((p) => p.id === playerId)?.team ?? 0];
+        if (outcome === "win") playVictory(overlayEl.firstChild as HTMLElement, col);
+        else playDefeat(overlayEl.firstChild as HTMLElement, col, { sound: true });
+      }
     }
   }
 }
 
-/** Vyhrál můj tým / já? V sérii až po poslední bitvě podle celkového pořadí (stav série přijde z místnosti). */
-function iWon(s: GameState): boolean {
+/** Výsledek pro mě: výhra / prohra / null (remíza, nebo série ještě neskončila). V sérii až po poslední bitvě. */
+function myOutcome(s: GameState): "win" | "lose" | null {
   const me = s.players.find((p) => p.id === playerId);
-  if (!me) return false;
+  if (!me) return null;
   const ss = room?.series;
   if (ss) {
-    if (!ss.finished) return false;
+    if (!ss.finished) return null;
     const key = s.settings.mode === "dm" ? me.id : String(me.team);
-    return seriesWinner(ss.results) === key;
+    const w = seriesWinner(ss.results);
+    return w === null ? null : w === key ? "win" : "lose";
   }
   const r = s.result;
-  return !!r && r.winnerTeam !== null && r.winnerTeam === me.team;
+  if (!r || r.winnerTeam === null) return null;
+  return r.winnerTeam === me.team ? "win" : "lose";
 }
 
 /** Stav série bitev v závěrečném okně (jen když místnost hraje sérii). */
