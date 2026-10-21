@@ -2,10 +2,11 @@ import {
   RULES,
   HULLS,
   PILOTS,
-  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner, LOADOUT_PRESETS, applyPreset, unarmedShips, hasWeapon } from "@wingfighter/shared";
+  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner, LOADOUT_PRESETS, applyPreset, unarmedShips, hasWeapon, SKY_THEMES, SKY_LABEL, type SkyTheme } from "@wingfighter/shared";
 import { confirmDialog } from "./dialog.ts";
 import { logoCanvas } from "./logo.ts";
 import { openRoadmap } from "./roadmap.ts";
+import { openGraphicsPanel } from "./display.ts";
 import { openMusicPanel } from "./main.ts";
 import { renderMapPreview } from "./map-preview.ts";
 import { clearLoadoutPick, moduleHexSvg, renderLoadout, svgEl } from "./loadout-ui.ts";
@@ -55,6 +56,7 @@ export function renderLobby(root: HTMLElement, m: LobbyModel, net: Net, setName:
     h("div", { class: `status ${m.connected ? "ok" : "bad"}` }, m.connected ? "ONLINE" : "OFFLINE..."),
     h("button", { class: "px music-btn", title: "Hudba a zvuk (vlastní skladby, hlasitost)", onclick: () => openMusicPanel() }, icon("log", "currentColor", 12), " ", label("Hudba")),
     h("button", { class: "px music-btn roadmap-btn", title: "Roadmapa: na čem se pracuje a co se plánuje", onclick: () => openRoadmap() }, icon("target", "currentColor", 12), " ", label("Roadmapa")),
+    h("button", { class: "px music-btn gfx-btn", title: "Nastavení grafiky: rozlišení mapy, vzdálené pozadí", onclick: () => openGraphicsPanel() }, icon("eye", "currentColor", 12), " ", label("Nastavení grafiky")),
     screen,
   );
   screen.append(h("div", { class: `center ${m.room ? "room" : ""}` }, h("div", { class: "title" }, logoCanvas(5), h("div", { class: "sub" }, label("tahová vesmírná střílečka · prototyp"))), m.room ? roomView(m, net) : lobbyView(m, net, setName)));
@@ -582,6 +584,34 @@ function roomView(m: LobbyModel, net: Net) {
         }
         return s;
       };
+      /** Ikona motivu pozadí. */
+      const skySvg = (k: SkyTheme | "random", on: boolean) => {
+        const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+        const c = (col: string) => (on ? col : "#475569");
+        if (k === "random") {
+          dot(s, 6, 7, c("#c4b5fd"), 1.5);
+          dot(s, 20, 6, c("#7dd3fc"), 1.2);
+          dot(s, 19, 20, c("#fdba74"), 2.2);
+          dot(s, 7, 19, c("#86efac"), 1.6);
+          txt(s, 13, 17, "?", c("#fbbf24"), 13);
+        } else if (k === "spirala") {
+          s.append(svgEl("path", { d: "M13 13 m-9 0 a9 5 0 1 0 18 0 a9 5 0 1 0 -18 0", fill: "none", stroke: c("#818cf8"), "stroke-width": "1.5", transform: "rotate(-25 13 13)" }));
+          s.append(svgEl("path", { d: "M13 13 m-4 0 a4 2.2 0 1 0 8 0 a4 2.2 0 1 0 -8 0", fill: c("#c4b5fd"), stroke: "none", transform: "rotate(-25 13 13)" }));
+          dot(s, 21, 6, c("#86efac"), 2);
+        } else if (k === "mlhovina") {
+          for (const [x, y, r, col] of [[9, 11, 6, "#7e22ce"], [16, 14, 6, "#0891b2"], [12, 17, 4, "#be185d"]] as [number, number, number, string][]) s.append(svgEl("circle", { cx: String(x), cy: String(y), r: String(r), fill: c(col), opacity: "0.75" }));
+          dot(s, 20, 6, c("#fde68a"), 1.5);
+          dot(s, 5, 20, c("#ffffff"), 1);
+        } else if (k === "soustava") {
+          dot(s, 6, 6, c("#fde047"), 4);
+          dot(s, 16, 15, c("#fb923c"), 4.5);
+          s.append(svgEl("ellipse", { cx: "16", cy: "15", rx: "8", ry: "2.2", fill: "none", stroke: c("#fdba74"), "stroke-width": "1.2", transform: "rotate(-15 16 15)" }));
+          dot(s, 22, 22, c("#94a3b8"), 1.5);
+        } else {
+          for (const [x, y, rx, ry, col] of [[7, 8, 4, 2, "#93c5fd"], [18, 7, 3, 1.6, "#fda4af"], [10, 19, 3.5, 1.8, "#99f6e4"], [20, 18, 4, 2.2, "#c4b5fd"]] as [number, number, number, number, string][]) s.append(svgEl("ellipse", { cx: String(x), cy: String(y), rx: String(rx), ry: String(ry), fill: c(col), opacity: "0.8", transform: `rotate(${(x * 7) % 60 - 30} ${x} ${y})` }));
+        }
+        return s;
+      };
       const placeSvg = (pl: Placement, on: boolean) => {
         const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
         const c = (k: string) => (on ? k : "#475569");
@@ -792,6 +822,11 @@ function roomView(m: LobbyModel, net: Net) {
                 "Komety přilétají na okraj mapy a letí přes ni rychleji než torpéda: náraz zraní loď, sestřel dává kredity, průlet ocasem doplní štít.",
               ),
               frow("", h("div", { class: "fpair" }, h("span", { class: "txt muted fsub" }, "komety naráží do asteroidů"), toggle(!!map.cometsHitAsteroids, (v) => setMap({ cometsHitAsteroids: v }))), "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím."),
+              frow(
+                "Pozadí",
+                pipRow("size", (map.sky ?? "random") as SkyTheme | "random", (["random", ...SKY_THEMES] as (SkyTheme | "random")[]).map((k) => [k, SKY_LABEL[k] + (k === "random" ? " – motiv podle seedu (u série může mít každá bitva jiný)" : ""), (on: boolean) => skySvg(k, on)] as [SkyTheme | "random", string, (on: boolean) => Node]), (v) => setMap({ sky: v }), SKY_LABEL[(map.sky ?? "random") as SkyTheme | "random"].toLowerCase()),
+                "Vzdálená paralaxní vrstva (galaxie, mlhoviny, planety) – jen vizuální, na hru nemá vliv. Hráč si ji může vypnout v Nastavení grafiky.",
+              ),
               frow(
                 "Seed",
                 h("div", { class: "fpair" }, h("input", { class: "fsel", type: "number", value: String(map.seed), min: "0", max: "999999", disabled: !isHost, style: "width:118px", onchange: (e) => setMap({ seed: Number((e.target as HTMLInputElement).value) || 0 }) }), isHost ? h("button", { class: "fdice", title: "Nová náhodná mapa", onclick: () => setMap({ seed: Math.floor(Math.random() * 100000) }) }, "🎲") : null),

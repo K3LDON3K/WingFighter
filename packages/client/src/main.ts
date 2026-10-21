@@ -64,7 +64,7 @@ import { loadLibrary, playMode, renderSynth } from "./music.ts";
 import { renderMusicPanel } from "./music-ui.ts";
 import { logoCanvas, replayLogo } from "./logo.ts";
 import { playDefeat, playDraw, playVictory } from "./victory.ts";
-import { onRenderScaleChange, renderScale, renderScaleRow } from "./display.ts";
+import { onRenderScaleChange, parallaxRow, renderScale, renderScaleRow } from "./display.ts";
 let unsubScale: (() => void) | null = null;
 
 /** Vítězná animace už běžela pro tuto bitvu. */
@@ -1024,6 +1024,7 @@ function renderMenu() {
       mbtn("log", "Tabulka skóre", "TAB", () => showStats()),
       mbtn("wait", "Hudba a zvuk", "M", () => openMusicPanel(), "", "M = ztlumit vše"),
       renderScaleRow(),
+      parallaxRow(),
       h("div", { class: "menu-sep" }, label("Odchod")),
       mbtn("people", "Ukončit bitvu pro všechny", isHost ? "" : "jen host", () => net.send({ type: "backToLobby" }), "", "Vrátí všechny hráče do místnosti; výbava a nastavení zůstanou.", !isHost),
       mbtn("wait", "Opustit hru", "", () => askLeave(), "danger", "Odejdeš do hlavního menu; bitva ostatních pokračuje bez tebe."),

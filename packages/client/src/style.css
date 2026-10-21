@@ -3915,6 +3915,12 @@ button.start-chip.on:hover:not(:disabled) {
 .roadmap-btn {
   left: 110px;
 }
+.gfx-btn {
+  left: 222px;
+}
+.gfx-card {
+  gap: 8px;
+}
 .rm-card {
   width: min(760px, calc(100vw - 24px));
   max-height: calc(100vh - 40px);

@@ -18,6 +18,7 @@ import {
   RULES,
   MODULES,
   pointInStorm,
+  skyThemeOf,
 } from "@wingfighter/shared";
 import type { Camera } from "./camera.ts";
 import { segmentColor, strengthColor } from "./shield-ui.ts";
@@ -25,6 +26,8 @@ import { drawBorderStorm, drawStormBolts, drawStormClouds, drawStormSparks } fro
 import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
 import type { ViewComet, ViewDebris, ViewModel, ViewShip } from "./view.ts";
+import { drawParallax } from "./parallax.ts";
+import { parallaxEnabled } from "../display.ts";
 
 export interface IconSpot {
   id: string;
@@ -134,7 +137,7 @@ export class Renderer {
 
     // statická vrstva: překreslí se jen při změně kamery / velikosti / mapy, jinak jen jeden drawImage
     this.stormsRef = state.storms ?? null;
-    const key = `${width}x${height}|${cam.x.toFixed(2)},${cam.y.toFixed(2)},${cam.zoom.toFixed(4)}|${state.width}x${state.height}|${state.border ?? 0}|${(state.storms ?? []).map((st) => st.id).join(",")}`;
+    const key = `${width}x${height}|${cam.x.toFixed(2)},${cam.y.toFixed(2)},${cam.zoom.toFixed(4)}|${state.width}x${state.height}|${state.border ?? 0}|${(state.storms ?? []).map((st) => st.id).join(",")}|${parallaxEnabled() ? (state.settings.map ? skyThemeOf(state.settings.map) + state.settings.map.seed : "") : "-"}`;
     if (!this.staticCanvas || this.staticKey !== key) {
       if (!this.staticCanvas) this.staticCanvas = document.createElement("canvas");
       const sc = this.staticCanvas;
@@ -161,6 +164,7 @@ export class Renderer {
         sx.clip();
       }
       this.drawBackground(state, cam);
+      if (parallaxEnabled() && state.settings.map) drawParallax(sx, skyThemeOf(state.settings.map), state.settings.map.seed, state.width, state.height, cam);
       this.drawGrid(state);
       if (state.border) drawBorderStorm(sx, state.width, state.height, state.border, cam.zoom);
       if (state.storms?.length) drawStormClouds(sx, state.storms, cam.zoom);

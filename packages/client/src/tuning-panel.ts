@@ -1,6 +1,6 @@
 import { BUILTIN_PILOTS, DEFAULT_TUNING, pilotAbilities, pilotList, TUNING_FIELDS, type PilotDef, type PilotMods, type Tuning } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
-import { renderScaleRow } from "./display.ts";
+import { parallaxRow, renderScaleRow } from "./display.ts";
 import { icon, label } from "./icons.ts";
 import { setTouchSetting, touchSetting, deviceIsTouch, type TouchSetting } from "./touch.ts";
 
@@ -80,7 +80,7 @@ export function renderTuningPanel(root: HTMLElement, tuning: Tuning, savedTuning
     canEdit ? h("button", { title: "Tovární hodnoty", onclick: a.onReset }, label("Výchozí")) : null,
     h("button", { onclick: a.onClose }, "✕"),
     ].filter((x): x is HTMLElement | SVGSVGElement => !!x)),
-    h("div", { class: "tp-local" }, h("span", { class: "muted", style: "font-size:8px" }, label("Zobrazení (jen tento počítač)")), renderScaleRow()),
+    h("div", { class: "tp-local" }, h("span", { class: "muted", style: "font-size:8px" }, label("Zobrazení (jen tento počítač)")), renderScaleRow(), parallaxRow()),
   );
   // záložky
   clear(b.tabs);

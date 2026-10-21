@@ -147,6 +147,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.104 – Vzdálené paralaxní pozadí: galaxie, mlhoviny a planety hluboko za mapou (pixel-art ze seedu mapy, posouvají
+  se pomaleji než mapa, jen vizuální, kreslí se do statické mezipaměti – bez vlivu na výkon). Čtyři motivy
+  (Spirální galaxie · Mlhovina · Planetární soustava · Hluboký vesmír) volí zakladatel v nastavení mapy, výchozí
+  „náhodné“ podle seedu. Nové tlačítko NASTAVENÍ GRAFIKY v hlavním menu (rozlišení mapy, vzdálené pozadí
+  zapnout/vypnout); stejné přepínače v herním menu a v hlavičce ladění.
 - v3.103 – Sady výbavy: nad výbavou lodi tlačítka Prázdný · Útočník · Obránce · Taktik (rychlý start, pak jde vše
   upravit). Sada se plní v pořadí priorit podle kreditů – co se nevejde nebo je zakázané, vynechá; moduly stejného
   typu ponechá, ostatní prodá; nápověda ukáže, co koupí/prodá a kolik zůstane. Rozpočet na výbavu má minimum 100

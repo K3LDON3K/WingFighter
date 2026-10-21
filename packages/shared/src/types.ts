@@ -339,6 +339,16 @@ export interface MapSettings {
   comets: "none" | "few" | "medium" | "many";
   /** Komety naráží do asteroidů (zmizí a vykousnou kráter); jinak jimi proletí. */
   cometsHitAsteroids: boolean;
+  /** Vzdálené pozadí (paralaxní vrstva, jen vizuální): motiv, nebo náhodný podle seedu. */
+  sky?: SkyTheme | "random";
+}
+
+export type SkyTheme = "spirala" | "mlhovina" | "soustava" | "hluboko";
+export const SKY_THEMES: SkyTheme[] = ["spirala", "mlhovina", "soustava", "hluboko"];
+export const SKY_LABEL: Record<SkyTheme | "random", string> = { random: "Náhodné", spirala: "Spirální galaxie", mlhovina: "Mlhovina", soustava: "Planetární soustava", hluboko: "Hluboký vesmír" };
+/** Motiv pozadí pro mapu (náhodný = podle seedu). */
+export function skyThemeOf(map: { sky?: SkyTheme | "random"; seed: number }): SkyTheme {
+  return map.sky && map.sky !== "random" ? map.sky : SKY_THEMES[Math.abs(Math.floor(map.seed / 7)) % SKY_THEMES.length];
 }
 
 /** Elektromagnetická bouře: shluk kruhů. Uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener a dohled nepronikne. */

@@ -1,6 +1,6 @@
 /** Nastavení zobrazení (jen tento počítač): rozlišení herní mapy. Výchozí 0.5 (čtvrtina pixelů, plynulé); 1 = nativní. */
 import { h } from "./dom.ts";
-import { label } from "./icons.ts";
+import { icon, label } from "./icons.ts";
 
 const KEY = "wingfighter.renderScale";
 export const RENDER_SCALES: [number, string][] = [
@@ -46,4 +46,66 @@ export function renderScaleRow(): HTMLElement {
         }, dataset: { v: String(v) } }, txt),
     );
   return row;
+}
+
+/** Vzdálená paralaxní vrstva (galaxie, planety) – jen vizuální; jde vypnout (slabší počítač / rozptyluje). */
+const PKEY = "wingfighter.parallax";
+let parallax = true;
+try {
+  parallax = localStorage.getItem(PKEY) !== "0";
+} catch {
+  /* bez úložiště */
+}
+export function parallaxEnabled(): boolean {
+  return parallax;
+}
+export function setParallaxEnabled(v: boolean): void {
+  parallax = v;
+  try {
+    localStorage.setItem(PKEY, v ? "1" : "0");
+  } catch {
+    /* ignorovat */
+  }
+  for (const l of listeners) l();
+}
+/** Řádek s přepínačem paralaxní vrstvy. */
+export function parallaxRow(): HTMLElement {
+  const row = h("div", { class: "rs-row" }, h("span", { class: "txt muted rs-lbl", title: "Galaxie a planety hluboko za mapou, posouvají se pomaleji než mapa. Jen vizuální; vypnutí trochu ušetří výkon. Platí jen pro tento prohlížeč." }, "Vzdálené pozadí"));
+  const mk = (v: boolean, txt: string) => h("button", { class: `px tiny ${parallax === v ? "on" : ""}`, onclick: () => {
+      setParallaxEnabled(v);
+      for (const b of row.querySelectorAll("button")) b.classList.toggle("on", b.dataset.v === String(v));
+    }, dataset: { v: String(v) } }, txt);
+  row.append(mk(true, "zapnuto"), mk(false, "vypnuto"));
+  return row;
+}
+
+/** Okno „Nastavení grafiky“ (hlavní menu): rozlišení mapy + vzdálené pozadí. */
+export function openGraphicsPanel(): void {
+  if (document.querySelector(".gfx-overlay")) return;
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === "Escape") close();
+  };
+  const overlay = h("div", { class: "mu-overlay gfx-overlay", onclick: (e: Event) => {
+      if (e.target === overlay) close();
+    } },
+    h(
+      "div",
+      { class: "mu-body" },
+      h(
+        "div",
+        { class: "pnl mu-card gfx-card" },
+        h("div", { class: "bb-head" }, icon("eye", "#7dd3fc", 14), h("span", { class: "ttl" }, label("Nastavení grafiky")), h("span", { class: "muted txt", style: "font-size:13px;margin-left:8px" }, "platí jen pro tento prohlížeč"), h("span", { class: "spacer" }), h("button", { class: "px tiny", onclick: close }, "✕")),
+        renderScaleRow(),
+        h("div", { class: "muted txt", style: "font-size:13px" }, "Nižší rozlišení = méně vykreslovaných pixelů a plynulejší hra na slabším počítači (obraz je o něco hrubší)."),
+        parallaxRow(),
+        h("div", { class: "muted txt", style: "font-size:13px" }, "Galaxie, mlhoviny a planety hluboko za mapou (posouvají se pomaleji než mapa). Jen vizuální – na hru nemá vliv; motiv pozadí volí zakladatel v nastavení mapy."),
+      ),
+    ),
+  );
+  document.body.append(overlay);
+  document.addEventListener("keydown", onKey);
 }
