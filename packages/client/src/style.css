@@ -501,7 +501,7 @@ h3,
 /* ---- spodní lišta (pevné rozměry) ---- */
 .bottombar {
   display: grid;
-  grid-template-columns: 250px 170px 1fr 84px 84px 96px;
+  grid-template-columns: 196px 160px 1fr 84px 84px 96px;
   gap: 6px;
   height: 172px;
   padding: 6px;
@@ -670,6 +670,7 @@ h3,
 .act-group {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: 3px;
   padding: 0 6px 0 0;
   border-right: 2px solid var(--bevel-d);
@@ -689,6 +690,8 @@ h3,
 .bb-weapon {
   flex-direction: column;
   width: 72px;
+  flex: 0 1 72px;
+  min-width: 58px;
   height: 62px;
   gap: 5px;
   padding: 4px 0 2px;
@@ -1358,9 +1361,9 @@ h3,
 /* svislé ukazatele trupu a stresu */
 .gauges {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-end;
-  justify-content: space-between;
+  justify-content: flex-end;
   height: 100%;
   flex: 1;
 }

@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.56 – Spodní lišta: panel lodi užší (trup a rychlost blíž k sobě), Výzbroj o něco užší, tlačítka akcí se při
+  nedostatku místa mírně zúží – víc prostoru pro akce, na 1280 px se vejde všech 8 tlačítek.
 - v3.55 – Při kreslení manévru ukazuje tlačítko Potvrdit cenu surovin bez fajfek (barevné čtverečky se mění podle
   dráhy); fajfky se objeví až po potvrzení manévru.
 - v3.54 – Cena akce na tlačítku ve **všech surovinách**: červené čtverečky = akce, růžové = stres, žluté = technologie.
