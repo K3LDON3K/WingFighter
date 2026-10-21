@@ -62,6 +62,10 @@ import { loadLibrary, playMode, renderSynth } from "./music.ts";
 (window as unknown as { __wfRender: typeof renderSynth }).__wfRender = renderSynth;
 import { renderMusicPanel } from "./music-ui.ts";
 import { logoCanvas, replayLogo } from "./logo.ts";
+import { playVictory } from "./victory.ts";
+
+/** Vítězná animace už běžela pro tuto bitvu. */
+let victoryShown = false;
 
 /** Překryvný panel Hudba a zvuk (z lobby i z herního menu). */
 let musicOverlay: HTMLElement | null = null;
@@ -241,6 +245,7 @@ net.on((msg) => {
       break;
     case "gameStart":
       adoptTuning(msg.state);
+      victoryShown = false;
       startGame(msg.state);
       break;
     case "gameState":
@@ -1046,8 +1051,28 @@ function renderHud() {
       );
     } else if (!finished && overlayEl.firstChild) {
       clear(overlayEl);
+      victoryShown = false;
+    }
+    // vítězná animace: jedna bitva hned po výhře, série až po celkové výhře; jen pro vítěze
+    if (finished && overlayEl.firstChild && !victoryShown && iWon(s)) {
+      victoryShown = true;
+      playVictory(overlayEl.firstChild as HTMLElement, TEAM_COLORS[s.players.find((p) => p.id === playerId)?.team ?? 0]);
     }
   }
+}
+
+/** Vyhrál můj tým / já? V sérii až po poslední bitvě podle celkového pořadí (stav série přijde z místnosti). */
+function iWon(s: GameState): boolean {
+  const me = s.players.find((p) => p.id === playerId);
+  if (!me) return false;
+  const ss = room?.series;
+  if (ss) {
+    if (!ss.finished) return false;
+    const key = s.settings.mode === "dm" ? me.id : String(me.team);
+    return seriesWinner(ss.results) === key;
+  }
+  const r = s.result;
+  return !!r && r.winnerTeam !== null && r.winnerTeam === me.team;
 }
 
 /** Stav série bitev v závěrečném okně (jen když místnost hraje sérii). */

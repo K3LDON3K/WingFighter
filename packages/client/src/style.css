@@ -4389,3 +4389,16 @@ button.start-chip.on:hover:not(:disabled) {
 .se-row {
   padding: 1px 0;
 }
+/* vítězná animace (pod výsledkovou tabulkou) */
+.victory-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+/* během vítězné animace je tabulka níž, aby nad ní byl nápis v plné velikosti */
+.overlay.celebrate .card {
+  margin-top: min(260px, 30vh);
+}

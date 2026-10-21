@@ -147,6 +147,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.83 – **Vítězná animace**: po výhře (jedna bitva hned, série až po celkové výhře) vyletí zpoza výsledkové
+  tabulky tři stíhače v barvě vítězného týmu s barevnými pruhy, nad tabulkou se odkryje pixelový nápis
+  VÍTĚZSTVÍ (písmo UI, styl loga) a spustí se ohňostroj v týmových barvách. Hraje se jen hráčům vítězné
+  strany; remíza bez animace. Tabulka je při animaci posunutá níž, aby se nápis vešel.
 - v3.82 – Plánovaná úprava štítu se na mapě (prstenec segmentů kolem lodi) zobrazí hned po potvrzení, ne až po
   odehrání kola; v bitvě platí od začátku kola (před střelbou) jako dosud.
 - v3.81 – Okénko modulu je širší (380 px), tlačítka DOPLNIT / OPRAVIT / PRODAT se vždy vejdou (kulomet 60/100).
