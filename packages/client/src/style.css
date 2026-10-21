@@ -166,6 +166,14 @@ button.on:hover:not(:disabled),
 button.primary:hover:not(:disabled) {
   background: var(--accent);
 }
+button.go {
+  background: #15803d;
+  color: #f0fdf4;
+  border-color: #86efac #14532d #14532d #86efac;
+}
+button.go:hover:not(:disabled) {
+  background: #16a34a;
+}
 button.danger {
   background: #7f1d1d;
   border-color: #fca5a5 #450a0a #450a0a #fca5a5;

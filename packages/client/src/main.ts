@@ -57,6 +57,7 @@ import {
   seriesWinner,
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
+import { withTuneAccess } from "./tune-lock.ts";
 import { audioReady, isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
 import { loadLibrary, playMode, renderSynth } from "./music.ts";
 (window as unknown as { __wfRender: typeof renderSynth }).__wfRender = renderSynth;
@@ -631,7 +632,7 @@ function mountGame() {
       h("button", { class: "gear", id: "inv-btn", title: "Inventář lodi (připravuje se)", onclick: () => ((game!.inventoryOpen = !game!.inventoryOpen), renderSide()) }, icon("inventory", "currentColor", 12), label("inventář")),
       h("button", { class: "gear touch-only", title: "Menu", onclick: () => toggleMenu(!game?.menuOpen) }, "☰ ", label("menu")),
       h("button", { class: "gear", title: "Tabulka skóre (Tab)", onclick: () => toggleStats() }, icon("log", "currentColor", 12), label("skóre")),
-      h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => ((tuningOpen = !tuningOpen), renderSide()) }, icon("target", "currentColor", 12), label("ladění")),
+      h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => (tuningOpen ? ((tuningOpen = false), renderSide()) : withTuneAccess(() => ((tuningOpen = true), renderSide()))) }, icon("target", "currentColor", 12), label("ladění")),
       h("button", { class: "gear", title: "Herní menu (Esc)", onclick: () => toggleMenu() }, icon("log", "currentColor", 12), label("menu")),
     ),
     pstatEl,

@@ -12,6 +12,7 @@ import { pilotPortrait } from "./pilot-ui.ts";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
 import { renderTuningPanel } from "./tuning-panel.ts";
+import { withTuneAccess } from "./tune-lock.ts";
 
 let tuningOpen = false;
 import type { Net } from "./net.ts";
@@ -304,6 +305,9 @@ function roomView(m: LobbyModel, net: Net) {
         h("span", { class: "muted" }, "KOD "),
         h("span", { class: "code", style: "font-size:22px;font-weight:700;color:var(--accent);letter-spacing:3px" }, room.code),
         h("div", { class: "spacer" }),
+        !setup && isHost
+          ? h("button", { class: "go", title: room.series?.finished ? "Stejné nastavení, nové mapy (seedy), skóre od nuly" : "", onclick: () => net.send({ type: "startGame" }) }, icon("play", "currentColor", 12), label(room.series ? (room.series.finished ? "Nová série" : `Zahájit bitvu ${room.series.played + 1}/${room.series.total}`) : "Zahájit bitvu"))
+          : null,
         h("button", { onclick: () => net.send({ type: "leaveRoom" }) }, label("Opustit")),
       ),
       setup
@@ -864,7 +868,7 @@ function roomView(m: LobbyModel, net: Net) {
     })(),
     (() => {
       const wrap = h("div");
-      const toggle = h("button", { onclick: () => ((tuningOpen = !tuningOpen), rerender()) }, icon("target", "currentColor", 12), label(tuningOpen ? "Skrýt ladění" : "Ladění parametrů"));
+      const toggle = h("button", { onclick: () => (tuningOpen ? ((tuningOpen = false), rerender()) : withTuneAccess(() => ((tuningOpen = true), rerender()))) }, icon("target", "currentColor", 12), label(tuningOpen ? "Skrýt ladění" : "Ladění parametrů"));
       wrap.append(toggle);
       if (tuningOpen) {
         const panel = lobbyTunePanel;
@@ -890,7 +894,7 @@ function roomView(m: LobbyModel, net: Net) {
           ? h("button", { class: "primary", onclick: () => net.send({ type: "openRoom", open: true }) }, icon("tick", "currentColor", 12), label("Otevřít místnost"))
           : h("span", { class: "muted txt" }, "Čeká se, až zakladatel dokončí nastavení…")
         : isHost
-          ? h("button", { class: "primary", title: room.series?.finished ? "Stejné nastavení, nové mapy (seedy), skóre od nuly" : "", onclick: () => net.send({ type: "startGame" }) }, icon("play", "currentColor", 12), label(room.series ? (room.series.finished ? "Nová série" : `Zahájit bitvu ${room.series.played + 1}/${room.series.total}`) : "Zahájit bitvu"))
+          ? null
           : h("span", { class: "muted txt" }, room.series ? (room.series.finished ? "Série skončila – host může spustit novou." : `Čeká se, až host zahájí bitvu ${room.series.played + 1} ze ${room.series.total}…`) : "Čeká se, až host zahájí bitvu…"),
     ),
   );

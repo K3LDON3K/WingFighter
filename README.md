@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.97 – Ladění parametrů (v místnosti i ve hře) je schované pod heslem – po odemknutí si ho prohlížeč pamatuje.
+  Tlačítko ZAHÁJIT BITVU je zelené a přesunuté nahoru do hlavičky místnosti vedle OPUSTIT.
 - v3.96 – Ocas komety: hladký obrys s malou sinusoidou (osa i krystaly sledují vlnu, fáze pro každou kometu jiná).
 - v3.95 – Oprava zpomalování po delším hraní v jedné záložce: každá spuštěná bitva přidávala další posluchače myši
   a klávesnice na okno (a držela staré plátno v paměti); teď se s koncem bitvy odebírají. Kometa: nepravidelný
