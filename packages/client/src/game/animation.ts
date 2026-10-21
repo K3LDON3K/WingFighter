@@ -356,15 +356,12 @@ export class TurnAnimation {
         ent.x = pose.x;
         ent.y = pose.y;
         ent.heading = pose.heading;
-        // kývání při úhybném manévru: zatočení ±14° a vlnění do stran, utlumí se ke konci dráhy
+        // úhybný manévr: loď přesně sleduje nakreslenou dráhu i rychlost, navíc jen sudový překrut (bez vlnění do stran)
         if (tw.kind === "ship") {
           const es = ent as { evading?: boolean; roll?: number };
           if (es.evading && p < 1) {
-            // sudový překrut: fáze otáčení kolem podélné osy (renderer podle ní zužuje sprite) + lehké vlnění do stran
+            // fáze otáčení kolem podélné osy (renderer podle ní zužuje sprite)
             es.roll = (p * 3 * Math.PI * 2) % (Math.PI * 2);
-            const w = Math.sin(p * Math.PI * 6);
-            ent.x += -Math.sin(pose.heading) * w * 6;
-            ent.y += Math.cos(pose.heading) * w * 6;
           } else if (es.evading && p >= 1) {
             es.evading = false;
             es.roll = undefined;
