@@ -147,6 +147,10 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.95 – Oprava zpomalování po delším hraní v jedné záložce: každá spuštěná bitva přidávala další posluchače myši
+  a klávesnice na okno (a držela staré plátno v paměti); teď se s koncem bitvy odebírají. Kometa: nepravidelný
+  ocas místo obdélníku (tvar je pro každou kometu jiný, bez animace), jádro se neotáčí, a při odletu z mapy letí
+  dál přes okrajovou bouři – zmizí až za tvrdým okrajem.
 - v3.94 – Rozlišení mapy i 25 %. Při kreslení dráhy, při animaci kola a chvíli po každém pohybu myši běží
   vykreslování plnou rychlostí (60 snímků/s), úsporných 30 jen v klidu – kreslení manévru je plynulejší.
 - v3.93 – Výchozí rozlišení mapy je 50 % (jde přepnout v menu / ladění, volba se pamatuje); log událostí je ve

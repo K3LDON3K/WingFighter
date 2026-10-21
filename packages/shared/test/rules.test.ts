@@ -934,13 +934,20 @@ describe("komety", () => {
     expect(r.state.comets!.length).toBe(1);
     const moved = r.events.find((e) => e.type === "move");
     expect(moved && moved.type === "move" && moved.paths.some((p) => p.kind === "comet")).toBe(true);
-    // kometa mířící ven zmizí
+    // kometa mířící ven letí dál přes okrajovou bouři a zmizí až za tvrdým okrajem
     const g2 = createGame({ players, settings: settingsWith("none"), tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
     g2.asteroids = [];
     g2.comets = [{ ...cometAt(g2.width - 20, 500, 0), entered: true }];
     r = resolveTurn(g2, noOrders(g2), createRng(1));
+    expect(r.state.comets!.length).toBe(1);
+    expect(ellipseNorm(g2, r.state.comets![0])).toBeGreaterThan(1);
+    let gone = false;
+    for (let i = 0; i < 4 && !gone; i++) {
+      r = resolveTurn(r.state, noOrders(r.state), createRng(1));
+      gone = r.events.some((e) => e.type === "cometGone" && e.reason === "edge");
+    }
+    expect(gone).toBe(true);
     expect(r.state.comets!.length).toBe(0);
-    expect(r.events.some((e) => e.type === "cometGone" && e.reason === "edge")).toBe(true);
   });
 
   it("náraz do lodi: zranění, odmrštění, kometa zmizí; sestřelení laserem dává kredity", () => {

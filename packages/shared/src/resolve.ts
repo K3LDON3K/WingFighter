@@ -1294,8 +1294,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       const cm = cometMovers.get(c.id)!;
       const cp = cm.samples[k];
       if (!cometOnMap(state, cp)) {
-        // za okrajem: jen přilétá (nebo odlétá) – žádné srážky; odlet z mapy = konec
-        if (c.entered && !insideMap(state, cp, -c.radius)) endComet(c, k, "edge");
+        // za okrajem: jen přilétá (nebo odlétá) – žádné srážky; odlétá dál přes okrajovou bouři a zmizí až za tvrdým okrajem
+        if (c.entered && !insideMap(state, cp, -(c.radius + (state.border ?? 0) + COMET.tailLength))) endComet(c, k, "edge");
         continue;
       }
       c.entered = true;

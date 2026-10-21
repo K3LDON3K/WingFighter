@@ -95,6 +95,19 @@ export const ICON_RADIUS = 13;
 /** Odstup štítu od trupu lodi na mapě (herní jednotky). */
 export const SHIELD_GAP = 14;
 
+/** Deterministický generátor 0..1 z textu (tvar ocasu komety je pevný, ale pro každou jiný). */
+function seeded(key: string): () => number {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  let s = h >>> 0 || 1;
+  return () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return ((s >>> 0) % 10000) / 10000;
+  };
+}
+
 export class Renderer {
   readonly sprites = new SpriteCache();
   private stormsRef: import("@wingfighter/shared").Storm[] | null = null;
@@ -481,37 +494,58 @@ export class Renderer {
     const L = COMET.tailLength;
     const W = COMET.tailWidth;
     const used = overlay.myShipIds?.length ? overlay.myShipIds.every((id) => c.tailUsed.includes(id)) : false;
-    // zóna ocasu (obdélník za jádrem)
+    // ocas: nepravidelný chvost (tvar je pro každou kometu jiný, ale pevný – žádná animace)
+    const rnd = seeded(c.id);
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(c.heading);
-    ctx.fillStyle = used ? "rgba(148,163,184,0.05)" : "rgba(103,232,249,0.09)";
-    ctx.fillRect(-c.radius - L, -W / 2, L, W);
+    const steps = 9;
+    const top: { x: number; y: number }[] = [];
+    const bot: { x: number; y: number }[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const k = i / steps;
+      // šířka: u jádra úzký, v první třetině plný, ke konci se rozpadá
+      const base = (W / 2) * (k < 0.35 ? 0.45 + k * 1.6 : 1 - (k - 0.35) * 0.9);
+      const x = -c.radius - k * L;
+      top.push({ x: x + (rnd() - 0.5) * 10, y: -(base + (rnd() - 0.5) * (W * 0.45)) });
+      bot.push({ x: x + (rnd() - 0.5) * 10, y: base + (rnd() - 0.5) * (W * 0.45) });
+    }
+    ctx.beginPath();
+    ctx.moveTo(-c.radius * 0.6, 0);
+    for (const p of top) ctx.lineTo(p.x, p.y);
+    // roztřepený konec
+    ctx.lineTo(-c.radius - L - 6 - rnd() * 14, (rnd() - 0.5) * 8);
+    for (let i = bot.length - 1; i >= 0; i--) ctx.lineTo(bot[i].x, bot[i].y);
+    ctx.closePath();
+    ctx.fillStyle = used ? "rgba(148,163,184,0.06)" : "rgba(103,232,249,0.10)";
+    ctx.fill();
     ctx.strokeStyle = used ? "rgba(148,163,184,0.25)" : "rgba(103,232,249,0.35)";
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 5]);
-    ctx.strokeRect(-c.radius - L, -W / 2, L, W);
+    ctx.stroke();
     ctx.setLineDash([]);
-    // pixelový ohon: jasná osa + krystaly
+    // pixelový ohon: jasná, mírně zvlněná osa + rozházené krystaly
     const step = 4;
     const cnt = Math.floor(L / step);
+    let wob = 0;
     for (let i = 0; i < cnt; i++) {
       const x = -c.radius - i * step;
       const k = i / cnt;
-      const flick = i % 2 === 0; // statické krystaly (bez animace – šetří výkon)
+      wob += (rnd() - 0.5) * 2.2;
+      wob *= 0.9;
+      const y = wob * (0.3 + k);
       ctx.fillStyle = k < 0.3 ? "#f0f9ff" : k < 0.6 ? "#a5f3fc" : "#0e7490";
       ctx.globalAlpha = (used ? 0.4 : 1) * (1 - k * 0.6);
-      ctx.fillRect(x, -2, step, 4);
-      if (i % 3 === 0 && flick) {
+      // osa se ke konci drolí na kusy
+      if (k < 0.55 || rnd() < 0.7) ctx.fillRect(x, y - 2 + (k > 0.6 ? Math.round((rnd() - 0.5) * 6) : 0), step, k < 0.5 ? 4 : 3);
+      if (rnd() < 0.35) {
         ctx.fillStyle = "#67e8f9";
-        const off = 4 + (i % 2) * 4 + k * (W / 2 - 8);
-        ctx.fillRect(x, -off - 2, 3, 3);
-        ctx.fillRect(x + 2, off, 3, 3);
+        const off = (rnd() - 0.5) * (6 + k * W * 1.1);
+        ctx.fillRect(x + Math.round(rnd() * 3), y + off, 3, 3);
       }
-      if (i > 10 && i % 5 === 0) {
+      if (i > 8 && rnd() < 0.22) {
         ctx.fillStyle = "#164e63";
-        ctx.fillRect(x - 1, -W / 2 + 4 + (i % 4) * 3, 3, 3);
-        ctx.fillRect(x + 1, W / 2 - 7 - (i % 3) * 3, 3, 3);
+        ctx.fillRect(x - 1, y + (rnd() - 0.5) * W * 1.2, 2 + Math.round(rnd() * 2), 2 + Math.round(rnd() * 2));
       }
     }
     ctx.globalAlpha = 1;
@@ -521,8 +555,7 @@ export class Renderer {
     const pal: Record<string, string> = { "#": "#a8a29e", L: "#f5f5f4", K: "#57534e" };
     const px = (c.radius * 2) / 9;
     ctx.save();
-    ctx.translate(c.x, c.y);
-    ctx.rotate(c.x); // jádro bez otáčení
+    ctx.translate(c.x, c.y); // jádro se neotáčí
     ROCK.forEach((row, yy) =>
       [...row].forEach((ch, xx) => {
         const col = pal[ch];

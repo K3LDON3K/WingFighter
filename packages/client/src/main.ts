@@ -677,6 +677,7 @@ function mountGame() {
 
 function unmountGame() {
   cancelAnimationFrame(raf);
+  inputAbort.abort();
   resizeObs?.disconnect();
   canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = null;
   render();
@@ -1596,7 +1597,12 @@ function chooseIcon(shipId: string, id: string) {
   renderSide();
 }
 
+/** Posluchače na window patří k právě otevřené hře; při jejím opuštění se odeberou (jinak se hromadily a drželi staré plátno v paměti). */
+let inputAbort = new AbortController();
+
 function bindInput(c: HTMLCanvasElement) {
+  inputAbort.abort();
+  inputAbort = new AbortController();
   let panning = false;
   let moved = false;
   let lastX = 0;
@@ -1811,11 +1817,11 @@ function bindInput(c: HTMLCanvasElement) {
     game.hoverIcon = ic ? `${ic.shipId}:${ic.id}` : undefined;
     game.hoverId = ic ? undefined : entityAt(w.x, w.y)?.id;
     if (!ic && !game.anim && game.aimingShipId) aimAt(w.x, w.y);
-  });
+  }, { signal: inputAbort.signal });
 
   window.addEventListener("mouseup", () => {
     panning = false;
-  });
+  }, { signal: inputAbort.signal });
 
   c.addEventListener("click", (e) => {
     if (isTouchMode() || moved || !cam || !game || game.anim || game.submitted) return;
@@ -2059,7 +2065,7 @@ function bindInput(c: HTMLCanvasElement) {
       }
     } else return;
     e.preventDefault();
-  });
+  }, { signal: inputAbort.signal });
 }
 
 function hitPos(hit: Entity): { x: number; y: number } {
