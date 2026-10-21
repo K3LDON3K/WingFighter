@@ -27,7 +27,7 @@ import {
   parseManeuverId,
   resolveManeuver,
   STRESS,
-  stressCost,
+  maneuverStress,
   effStressCost,
   profileFor,
   effEvadeCost,
@@ -345,7 +345,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   }
 
   /* ---- 2. manévr (svislý sloupec) ---- */
-  const dcolor = man ? (o.droid?.overdrive && stressCost(man.difficulty) > 0 ? DIFFICULTY_COLOR.white : DIFFICULTY_COLOR[man.difficulty]) : "#f87171";
+  const dcolor = man ? (o.droid?.overdrive && maneuverStress(man) > 0 ? DIFFICULTY_COLOR.white : DIFFICULTY_COLOR[man.difficulty]) : "#f87171";
   const maneuver = h(
     "div",
     { class: "pnl bb-maneuver" },
@@ -353,11 +353,11 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     h(
       "div",
       { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] : "Neplatný manévr" },
-      h("span", { class: "man-glyph", style: `color:${dcolor}` }, angleGlyph(cur.angle, cur.koiogran)),
+      h("span", { class: "man-glyph", style: `color:${dcolor}` }, angleGlyph(cur.angle, false), cur.koiogran ? h("span", { class: "man-koi", title: "Otočka 180° na konci" }, "⟲") : null),
       h("span", { class: "man-speed" }, String(cur.speed)),
     ),
-    h("div", { class: "man-angle" }, cur.koiogran ? "180°" : `${Math.abs(cur.angle)}°`),
-    h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man.difficulty, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && stressCost(man.difficulty) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
+    h("div", { class: "man-angle" }, `${Math.abs(cur.angle)}°${cur.koiogran ? " +180°" : ""}`),
+    h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && maneuverStress(man) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
     h("div", { class: "spacer" }),
     h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
   );
@@ -416,7 +416,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           },
           (() => {
             // cena ve všech surovinách: otočka 2 akce + stres červeného manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
-            const manStress = a.id === "koiogran" ? effStressCost("red", o) : a.id === "move" && man ? effStressCost(man.difficulty, o) : 0;
+            const manStress = a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : 0;
             const c = { actions: a.id === "koiogran" ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];
             if (c.stress > 0) parts.push(`${c.stress} stres`);

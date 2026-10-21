@@ -118,5 +118,21 @@
     "text": "minihry pro hackování budov, systémů apod. Například ve hře - obrana velké lodi, hráč co má na starosti velkou loď tak bude provádět upravy pomocí miniher",
     "status": "later",
     "done": false
+  },
+  {
+    "id": "c0v3vxx8",
+    "group": "Nový modul",
+    "title": "Antigravitační jádro",
+    "text": "snižuje váhu ostatních komponent o procenta, tím vlastně zvyšuje rychlost i naplněné lodi",
+    "status": "mid",
+    "done": false
+  },
+  {
+    "id": "cznvie1c",
+    "group": "Nová mechianika",
+    "title": "Multicrew lodě a mise",
+    "text": "více hráčů může ovládat obrovskou loď a plnit mise nebo odrážet ostatní. hráč může i vyletět stíhačem z této lodi a fungovat samostatně",
+    "status": "later",
+    "done": false
   }
 ]

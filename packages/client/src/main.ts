@@ -449,16 +449,16 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
   const o = game.orders.get(shipId);
   if (!ship || !o) return false;
   const profile = profileFor(ship, o);
-  speed = Math.max(1, Math.min(profile.maxSpeed, Math.round(speed)));
+  speed = Math.max(koiogran ? 2 : 1, Math.min(profile.maxSpeed, Math.round(speed)));
   let man = makeManeuver(profile, speed, angle, koiogran, ship.speed);
-  if (!man && !koiogran) {
+  if (!man) {
     const max = profile.maxAngle[speed];
     const clamped = Math.sign(angle) * Math.min(Math.abs(angle), max);
-    man = makeManeuver(profile, speed, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, false, ship.speed);
+    man = makeManeuver(profile, speed, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, koiogran, ship.speed);
   }
   if (!man) return false;
   // bez volných stresových bodů se manévr vůbec nenabízí (dřív šel vybrat a jen se neprovedl)
-  if (effStressCost(man.difficulty, o) > ship.stressPoints) return false;
+  if (effStressCost(man, o) > ship.stressPoints) return false;
   if (actionCost(ship, { ...o, maneuverId: man.id }) > RULES.actionPoints) return false;
   if (man.id !== o.maneuverId) {
     game.orders.set(shipId, { ...o, maneuverId: man.id });
@@ -741,8 +741,8 @@ function buildOverlay(view: ViewModel): Overlay {
     if (aiming) {
       const dots: { x: number; y: number; color: string }[] = [];
       for (let a = -MAX_ANGLE; a <= MAX_ANGLE; a += ANGLE_STEP) {
-        const mm = makeManeuver(profile, man.speed, a, false, ship.speed);
-        if (!mm || effStressCost(mm.difficulty, o) > ship.stressPoints) continue;
+        const mm = makeManeuver(profile, man.speed, a, man.koiogran, ship.speed);
+        if (!mm || effStressCost(mm, o) > ship.stressPoints) continue;
         const e = maneuverEnd(ship, mm);
         dots.push({ x: e.x, y: e.y, color: DIFFICULTY_COLOR[mm.difficulty] });
       }
@@ -1505,12 +1505,9 @@ function aimAt(wx: number, wy: number) {
   // koncový bod oblouku leží na polovině úhlu zatáčky → úhel = 2 × směr k myši
   let angle = Math.round((((bearing * 180) / Math.PI) * 2) / ANGLE_STEP) * ANGLE_STEP;
   angle = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, angle));
-  const speed = g.speedLock.get(id) ?? Math.max(1, Math.min(5, Math.round(d / (MOVE_UNIT * 0.9))));
-  if (cur.koiogran) {
-    setManeuver(id, speed, 0, true);
-    return;
-  }
-  setManeuver(id, speed, angle, false);
+  // v režimu otočky je nejnižší rychlost 2
+  const speed = g.speedLock.get(id) ?? Math.max(cur.koiogran ? 2 : 1, Math.min(5, Math.round(d / (MOVE_UNIT * 0.9))));
+  setManeuver(id, speed, angle, cur.koiogran);
 }
 
 function confirmManeuver(id: string): boolean {
@@ -1519,7 +1516,7 @@ function confirmManeuver(id: string): boolean {
   const o = g.orders.get(id);
   if (!ship || !o) return false;
   const man = resolveManeuver(profileFor(ship, o), o.maneuverId, ship.speed);
-  if (!man || effStressCost(man.difficulty, o) > ship.stressPoints) {
+  if (!man || effStressCost(man, o) > ship.stressPoints) {
     showError("Na tento manévr nemáš dost stresových bodů.");
     return false;
   }
@@ -1910,7 +1907,7 @@ function bindInput(c: HTMLCanvasElement) {
         if (cur) {
           const sp = Math.max(1, Math.min(5, cur.speed + (e.deltaY < 0 ? 1 : -1)));
           game.speedLock.set(id, sp);
-          setManeuver(id, sp, cur.koiogran ? 0 : cur.angle, cur.koiogran);
+          setManeuver(id, sp, cur.angle, cur.koiogran);
         }
         return;
       }
@@ -2024,7 +2021,7 @@ function bindInput(c: HTMLCanvasElement) {
       renderSide();
     } else if (/^[1-5]$/.test(e.key)) {
       game.speedLock.set(id, Number(e.key));
-      setManeuver(id, Number(e.key), cur.koiogran ? 0 : cur.angle, cur.koiogran);
+      setManeuver(id, Number(e.key), cur.angle, cur.koiogran);
     } else if (e.key === "k" || e.key === "K") {
       chooseIcon(id, "koiogran");
     } else if (e.key === " ") {

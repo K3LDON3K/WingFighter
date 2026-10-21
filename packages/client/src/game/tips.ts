@@ -10,7 +10,7 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
   const w = warn ? { warn: `Nelze: ${warn}.` } : {};
   switch (id) {
     case "move": {
-      const st = man ? effStressCost(man.difficulty, o) : 0;
+      const st = man ? effStressCost(man, o) : 0;
       return {
         icon: "pen",
         iconColor: "#e2e8f0",
@@ -31,13 +31,13 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
         icon: "turn",
         iconColor: "#e2e8f0",
         title: "Otočka 180°",
-        cost: { actions: over ? 1 : 2, stress: effStressCost("red", o) },
+        cost: { actions: over ? 1 : 2, stress: man?.koiogran ? effStressCost(man, o) : effStressCost("red", o) },
         fx: [
-          { icon: "ship", text: "letí rovně, na konci se otočí" },
+          { icon: "ship", text: "na konci křivky se otočí o 180°" },
           { icon: "speed", text: `rychlost −${RULES.koiogranSpeedDrop} po otočce`, tone: "bad" },
-          { icon: "stress", text: over ? "overdrive: bez stresu" : "červený manévr", tone: over ? "good" : undefined },
+          { icon: "stress", text: over ? "overdrive: bez stresu" : `stres: zelená/bílá ${STRESS.costRed} · červená ${STRESS.costRed + 1} · nebezpečná ${STRESS.costDanger + 1}`, tone: over ? "good" : undefined },
         ],
-        note: "jen při rychlosti 3–4",
+        note: "od rychlosti 2 · zapni před kreslením i po něm",
         ...w,
       };
     case "evade":

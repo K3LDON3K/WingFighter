@@ -9,12 +9,14 @@ export type Difficulty = "green" | "white" | "red" | "danger";
 
 /** Manévr = rychlost (1–5) + změna kurzu ve stupních (po 15°, záporné = vlevo), případně otočka o 180°. */
 export interface Maneuver {
-  /** Stabilní identifikátor, např. "m3a-30" nebo "k3". */
+  /** Stabilní identifikátor, např. "m3a-30" nebo "k3a-30" (otočka 180° na konci křivky). */
   id: string;
   speed: number;
   angle: number;
   koiogran: boolean;
   difficulty: Difficulty;
+  /** U otočky: náročnost samotné křivky (otočka k ní přidává stres: zelená/bílá → 1, červená → 2, nebezpečná → 3). */
+  base?: Difficulty;
 }
 
 /** Co motor/trup dovolí. Index pole maxAngle = rychlost. */

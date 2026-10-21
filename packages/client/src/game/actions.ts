@@ -113,15 +113,15 @@ export const ACTIONS: ActionOption[] = [
     id: "koiogran",
     glyph: "⟲",
     label: "Otočka 180° (2 akce)",
-    description: `Loď poletí rovně a na konci se otočí o 180°; její rychlost pak klesne o ${RULES.koiogranSpeedDrop}. Jde jen při rychlosti 3–4. Stojí obě akce kola. Otočka je červený manévr (1 stresový bod) – jiný postih není.`,
+    description: `Na konci nakreslené křivky (nebo rovné dráhy) se loď otočí o 180°; její rychlost pak klesne o ${RULES.koiogranSpeedDrop}. Jde od rychlosti 2. Stojí obě akce kola. Stres: 1 na zelené/bílé křivce, 2 na červené, 3 na nebezpečné (ta navíc zraní trup). Zapni před kreslením, nebo až po něm – duch v cíli se otočí.`,
     disabled: (ship, _s, o) => {
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.koiogran) return null;
       const profile = profileFor(ship, o);
-      const sp = profile.koiogranSpeeds.includes(ship.speed) ? ship.speed : profile.koiogranSpeeds[0];
-      const man = makeManeuver(profile, sp, 0, true, ship.speed);
+      const sp = Math.max(2, cur?.speed ?? ship.speed);
+      const man = makeManeuver(profile, sp, cur?.angle ?? 0, true, ship.speed) ?? makeManeuver(profile, sp, 0, true, ship.speed);
       if (!man) return "loď otočku nezvládne";
-      if (effStressCost(man.difficulty, o) > ship.stressPoints) return `chybí stresový bod (otočka stojí ${effStressCost(man.difficulty, o)})`;
+      if (effStressCost(man, o) > ship.stressPoints) return `chybí stres (otočka stojí ${effStressCost(man, o)})`;
       const cost = actionCost(ship, { ...o, maneuverId: man.id });
       return cost > RULES.actionPoints ? `otočka by stála ${cost} akce` : null;
     },
@@ -129,9 +129,10 @@ export const ACTIONS: ActionOption[] = [
     apply: (o, ship) => {
       const profile = profileFor(ship, o);
       const cur = parseManeuverId(o.maneuverId);
-      if (cur?.koiogran) return { maneuverId: makeManeuver(profile, ship.speed, 0, false, ship.speed)?.id ?? o.maneuverId };
-      const sp = profile.koiogranSpeeds.includes(ship.speed) ? ship.speed : profile.koiogranSpeeds[0];
-      return { maneuverId: makeManeuver(profile, sp, 0, true, ship.speed)?.id ?? o.maneuverId };
+      // přepínač: zachová rychlost i úhel křivky; otočka jde od rychlosti 2
+      if (cur?.koiogran) return { maneuverId: makeManeuver(profile, cur.speed, cur.angle, false, ship.speed)?.id ?? o.maneuverId };
+      const sp = Math.max(2, cur?.speed ?? ship.speed);
+      return { maneuverId: (makeManeuver(profile, sp, cur?.angle ?? 0, true, ship.speed) ?? makeManeuver(profile, sp, 0, true, ship.speed))?.id ?? o.maneuverId };
     },
   },
 ];

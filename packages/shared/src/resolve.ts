@@ -31,7 +31,7 @@ import {
   type Pose,
   type Vec,
 } from "./geometry.ts";
-import { makeManeuver, maneuverLength, maneuverPath, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
+import { makeManeuver, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
 import { cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 
@@ -359,8 +359,9 @@ export function droidCost(o: Pick<ShipOrders, "droid"> | undefined): number {
  * Stres za manévr s ohledem na droida: overdrive = červený/nebezpečný bez stresu, autopilot = zelený vrací víc.
  * Záporná hodnota = regenerace.
  */
-export function effStressCost(d: Difficulty, o?: Pick<ShipOrders, "droid">): number {
-  const base = stressCost(d);
+export function effStressCost(x: Difficulty | Maneuver, o?: Pick<ShipOrders, "droid">): number {
+  const d = typeof x === "string" ? x : x.difficulty;
+  const base = typeof x === "string" ? stressCost(x) : maneuverStress(x);
   if (base > 0 && o?.droid?.overdrive) return 0;
   if (d === "green" && o?.droid?.autopilot) return -DROID.autopilotRegen;
   return base;
@@ -376,7 +377,7 @@ export function effEvadeCost(o?: Pick<ShipOrders, "droid">): number {
 
 /** Může si loď manévr dovolit (stresové body)? */
 export function canAfford(ship: Ship, man: Maneuver, o?: Pick<ShipOrders, "droid">): boolean {
-  return effStressCost(man.difficulty, o) <= ship.stressPoints;
+  return effStressCost(man, o) <= ship.stressPoints;
 }
 
 /** Výchozí rozkaz (bez akcí): stejná rychlost rovně, nestřílí. */
@@ -1456,7 +1457,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const man = maneuverOf.get(ship.id)!;
     const od = orders.get(ship.id);
     ship.speed = man.koiogran ? Math.max(1, man.speed - RULES.koiogranSpeedDrop) : man.speed;
-    const cost = effStressCost(man.difficulty, od);
+    const cost = effStressCost(man, od);
     const stM = statsOf(state, ship.ownerId);
     if (stM) {
       stM.maneuvers[man.difficulty]++;

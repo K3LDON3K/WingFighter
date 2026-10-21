@@ -35,6 +35,10 @@ import {
   carveCrater,
   circleHitsAsteroid,
   createGame,
+  parseManeuverId,
+  effStressCost,
+  maneuverStress,
+  STRESS,
   sanitizeBattles,
   currentBattle,
   isSeries,
@@ -127,7 +131,9 @@ describe("manévry", () => {
     expect(classifyManeuver(P, 4, 45, false, 2)).toBe("danger");
     expect(classifyManeuver(P, 5, 60, false, 5)).toBeNull(); // nad limit úhlu
     expect(classifyManeuver(P, 3, 0, true, 3)).toBe("red");
-    expect(classifyManeuver(P, 3, 0, true, 1)).toBe("danger");
+    // otočka na červené křivce (změna rychlosti o 2, rovně) zůstává červená, stojí ale 2 stres
+    expect(classifyManeuver(P, 3, 0, true, 1)).toBe("red");
+    expect(maneuverStress(makeManeuver(P, 3, 0, true, 1)!)).toBe(STRESS.costRed + 1);
     expect(listManeuvers(P, 2).length).toBeGreaterThan(30);
   });
 });
@@ -1427,5 +1433,50 @@ describe("série bitev", () => {
     dm.status = "finished";
     dm.result = { winnerTeam: dm.players[0].team, winnerPlayerId: "p1", reason: "elimination" };
     expect(battleResult(dm, 0).winner).toBe("p1");
+  });
+});
+
+describe("otočka na konci křivky", () => {
+  const P = FIGHTER_PROFILE;
+  it("jde od rychlosti 2 s libovolným povoleným úhlem; id a parsování", () => {
+    expect(makeManeuver(P, 1, 0, true, 1)).toBeNull();
+    const k = makeManeuver(P, 3, -45, true, 3)!;
+    expect(k.id).toBe("k3a-45");
+    expect(parseManeuverId("k3a-45")).toEqual({ speed: 3, angle: -45, koiogran: true });
+    expect(parseManeuverId("k3")).toEqual({ speed: 3, angle: 0, koiogran: true });
+    expect(makeManeuver(P, 5, 60, true, 5)).toBeNull(); // rychlost 5 dovolí jen ±45°
+    expect(makeManeuver(P, 5, 45, true, 5)).not.toBeNull();
+  });
+  it("stres: zelená/bílá křivka 1, červená 2, nebezpečná 3 (a zůstává nebezpečná)", () => {
+    const g = makeManeuver(P, 2, 15, true, 2)!; // křivka zelená
+    expect(g.base).toBe("green");
+    expect(g.difficulty).toBe("red");
+    expect(maneuverStress(g)).toBe(STRESS.costRed);
+    const w = makeManeuver(P, 4, 15, true, 4)!; // bílá
+    expect(maneuverStress(w)).toBe(STRESS.costRed);
+    const r = makeManeuver(P, 4, 45, true, 4)!; // červená (rychlost 4, 45°)
+    expect(r.base).toBe("red");
+    expect(maneuverStress(r)).toBe(STRESS.costRed + 1);
+    const d = makeManeuver(P, 4, 45, true, 2)!; // nebezpečná (změna o 2 + ostrý)
+    expect(d.difficulty).toBe("danger");
+    expect(maneuverStress(d)).toBe(STRESS.costDanger + 1);
+    expect(effStressCost(d, { droid: { overdrive: true } })).toBe(0);
+  });
+  it("dráha: křivka a na konci otočení o 180°, pak pokles rychlosti", () => {
+    const k = makeManeuver(P, 3, 60, true, 3)!;
+    const end = maneuverEnd({ x: 0, y: 0, heading: 0 }, k);
+    const plain = maneuverEnd({ x: 0, y: 0, heading: 0 }, makeManeuver(P, 3, 60, false, 3)!);
+    expect(end.x).toBeCloseTo(plain.x, 5);
+    expect(end.y).toBeCloseTo(plain.y, 5);
+    expect(Math.abs(((end.heading - plain.heading) % (Math.PI * 2)) - Math.PI)).toBeLessThan(1e-9);
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g.asteroids = [];
+    const me = g.ships[0];
+    me.speed = 3;
+    me.stressPoints = 3;
+    const r = resolveTurn(g, [{ shipId: me.id, maneuverId: "k3a60", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    const s = r.state.ships[0];
+    expect(s.speed).toBe(Math.max(1, 3 - RULES.koiogranSpeedDrop));
+    expect(s.stressPoints).toBe(3 - STRESS.costRed);
   });
 });

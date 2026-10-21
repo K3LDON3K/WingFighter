@@ -10,16 +10,19 @@ export const MAX_ANGLE = 90;
 export const FIGHTER_PROFILE: ManeuverProfile = {
   maxSpeed: 5,
   maxAngle: [0, 90, 90, 90, 60, 45],
-  koiogranSpeeds: [3, 4],
+  /** Otočka 180° jde od rychlosti 2 (při libovolném úhlu, který rychlost dovolí). */
+  koiogranSpeeds: [2, 3, 4, 5],
 };
 
 export function maneuverId(speed: number, angle: number, koiogran = false): string {
-  return koiogran ? `k${speed}` : `m${speed}a${angle}`;
+  return koiogran ? (angle ? `k${speed}a${angle}` : `k${speed}`) : `m${speed}a${angle}`;
 }
 
 export function parseManeuverId(id: string): { speed: number; angle: number; koiogran: boolean } | null {
   let m = /^k(\d)$/.exec(id);
   if (m) return { speed: Number(m[1]), angle: 0, koiogran: true };
+  m = /^k(\d)a(-?\d+)$/.exec(id);
+  if (m) return { speed: Number(m[1]), angle: Number(m[2]), koiogran: true };
   m = /^m(\d)a(-?\d+)$/.exec(id);
   if (m) return { speed: Number(m[1]), angle: Number(m[2]), koiogran: false };
   return null;
@@ -32,21 +35,28 @@ export function isSharp(speed: number, angle: number, koiogran = false): boolean
 }
 
 /**
- * Náročnost manévru podle rychlosti, úhlu a změny rychlosti oproti minulému kolu; null = loď to nezvládne.
+ * Náročnost křivky podle rychlosti, úhlu a změny rychlosti oproti minulému kolu; null = loď to nezvládne.
  * zelený = mírný (odstraní stres), červený = prudký (stres, bez akce),
  * nebezpečný = změna rychlosti o 2+ spolu s ostrým úhlem (jako červený + 1 zranění).
+ * Otočka (koiogran) na konci křivky: jde od rychlosti 2; výsledek je červený (nebezpečná křivka zůstává nebezpečná),
+ * stres viz `maneuverStress`.
  */
 export function classifyManeuver(profile: ManeuverProfile, speed: number, angle: number, koiogran: boolean, prevSpeed: number): Difficulty | null {
+  const base = classifyCurve(profile, speed, angle, prevSpeed);
+  if (!base) return null;
+  if (!koiogran) return base;
+  if (!profile.koiogranSpeeds.includes(speed)) return null;
+  return base === "danger" ? "danger" : "red";
+}
+
+/** Náročnost samotné křivky (bez otočky). */
+export function classifyCurve(profile: ManeuverProfile, speed: number, angle: number, prevSpeed: number): Difficulty | null {
   if (!Number.isInteger(speed) || speed < 1 || speed > profile.maxSpeed) return null;
-  if (koiogran) {
-    if (!profile.koiogranSpeeds.includes(speed) || angle !== 0) return null;
-  } else {
-    if (!Number.isInteger(angle) || angle % ANGLE_STEP !== 0) return null;
-    if (Math.abs(angle) > profile.maxAngle[speed]) return null;
-  }
+  if (!Number.isInteger(angle) || angle % ANGLE_STEP !== 0) return null;
+  if (Math.abs(angle) > profile.maxAngle[speed]) return null;
   const a = Math.abs(angle);
   const bigChange = Math.abs(speed - prevSpeed) >= 2;
-  const sharp = isSharp(speed, angle, koiogran);
+  const sharp = isSharp(speed, angle, false);
   if (bigChange && sharp) return "danger";
   if (bigChange || sharp) return "red";
   if ((speed <= 2 && a <= 45) || (speed === 3 && a === 0)) return "green";
@@ -56,7 +66,19 @@ export function classifyManeuver(profile: ManeuverProfile, speed: number, angle:
 export function makeManeuver(profile: ManeuverProfile, speed: number, angle: number, koiogran: boolean, prevSpeed: number): Maneuver | null {
   const difficulty = classifyManeuver(profile, speed, angle, koiogran, prevSpeed);
   if (!difficulty) return null;
-  return { id: maneuverId(speed, angle, koiogran), speed, angle, koiogran, difficulty };
+  const man: Maneuver = { id: maneuverId(speed, angle, koiogran), speed, angle, koiogran, difficulty };
+  if (koiogran) man.base = classifyCurve(profile, speed, angle, prevSpeed) ?? "white";
+  return man;
+}
+
+/**
+ * Stres za manévr (záporné = dobije). Otočka: 1 na zelené/bílé křivce, červená křivka +1 (= 2),
+ * nebezpečná +1 (= 3).
+ */
+export function maneuverStress(man: Maneuver): number {
+  if (!man.koiogran) return stressCost(man.difficulty);
+  const b = man.base ?? "white";
+  return b === "danger" ? STRESS.costDanger + 1 : b === "red" ? STRESS.costRed + 1 : STRESS.costRed;
 }
 
 export function resolveManeuver(profile: ManeuverProfile, id: string, prevSpeed: number): Maneuver | null {
@@ -73,8 +95,10 @@ export function listManeuvers(profile: ManeuverProfile, prevSpeed: number): Mane
       const m = makeManeuver(profile, speed, angle, false, prevSpeed);
       if (m) out.push(m);
     }
-    const k = makeManeuver(profile, speed, 0, true, prevSpeed);
-    if (k) out.push(k);
+    for (let angle = -MAX_ANGLE; angle <= MAX_ANGLE; angle += ANGLE_STEP) {
+      const k = makeManeuver(profile, speed, angle, true, prevSpeed);
+      if (k) out.push(k);
+    }
   }
   return out;
 }
@@ -103,7 +127,7 @@ export function maneuverEnd(start: Pose, man: Maneuver): Pose {
 }
 
 export function maneuverLabel(man: Maneuver): string {
-  if (man.koiogran) return `Otočka ${man.speed}`;
+  if (man.koiogran) return man.angle === 0 ? `Otočka ${man.speed}` : `Rychlost ${man.speed}, ${Math.abs(man.angle)}° ${man.angle < 0 ? "vlevo" : "vpravo"} + otočka`;
   if (man.angle === 0) return `Rovně ${man.speed}`;
   return `Rychlost ${man.speed}, ${Math.abs(man.angle)}° ${man.angle < 0 ? "vlevo" : "vpravo"}`;
 }

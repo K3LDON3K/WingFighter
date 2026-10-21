@@ -147,6 +147,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.86 – **Otočka 180° na konci křivky.** Otočka už nenutí rovný let: jde na konci jakéhokoli nakresleného
+  manévru (rychlost 2–5, úhel podle profilu). Tlačítko OTOČKA je přepínač – zapni ho před kreslením (pak
+  kreslíš s nejnižší rychlostí 2) nebo až po něm; duch lodi v cíli je otočený o 180° se žlutým odznakem ⟲.
+  Stres: 1 na zelené/bílé křivce, 2 na červené, 3 na nebezpečné (ta navíc zraní trup jako dosud); cena se
+  ukazuje na tlačítku i v panelu manévru („45° +180°“). Po otočce rychlost klesá jako dřív; otočka se každé
+  kolo zapíná znovu. Id manévru s otočkou je `k{rychlost}a{úhel}`.
 - v3.85 – **Animace remízy**: tři stíhače v barvách týmů 1–3 vletí zleva, zprava a shora po křivkách, vystřelí
   po sobě mimo, těsně se minou (bílé švihnutí s jiskrami) a odletí z obrazovky; pak se nad tabulkou zjasní bílý
   nápis REMÍZA. Hraje se všem při remíze bitvy i nerozhodné sérii (po poslední bitvě).

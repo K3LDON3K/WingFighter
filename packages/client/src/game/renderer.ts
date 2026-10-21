@@ -826,13 +826,16 @@ export class Renderer {
     ctx.restore();
     drawSprite(ctx, this.sprites.fighter(color), end.x, end.y, end.heading, 0.45);
     if (man.koiogran) {
-      // otočka: značka ↺ nad duchem lodi
+      // otočka: žlutý odznak s ikonou ⟲ vedle otočeného ducha (vpravo nahoře)
+      const s = 1.4;
+      const bx = end.x + ship.radius + 6;
+      const by = end.y - ship.radius - 2;
       ctx.save();
-      ctx.fillStyle = dcol;
-      ctx.font = "16px Jersey, ui-monospace, Menlo, monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
-      ctx.fillText("↺", end.x, end.y - ship.radius - 8);
+      ctx.fillStyle = "#0b1020";
+      ctx.fillRect(bx - 8 * s, by - 8 * s, 16 * s, 16 * s);
+      ctx.fillStyle = "#fbbf24";
+      ctx.fillRect(bx - 7 * s, by - 7 * s, 14 * s, 14 * s);
+      this.drawPixelIcon("turn", bx, by, s, "#0b1020");
       ctx.restore();
     }
   }

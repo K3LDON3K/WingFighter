@@ -4402,3 +4402,8 @@ button.start-chip.on:hover:not(:disabled) {
 .overlay.celebrate .card {
   margin-top: min(260px, 30vh);
 }
+.man-koi {
+  color: #fbbf24;
+  font-size: 14px;
+  margin-left: 2px;
+}
