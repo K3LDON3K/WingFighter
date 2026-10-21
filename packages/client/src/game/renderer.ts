@@ -128,9 +128,13 @@ export class Renderer {
         sc.height = height;
       }
       const sx = sc.getContext("2d")!;
+      // vždy od čistého stavu (ořez a transformace z minulého překreslení nesmí zůstat)
+      sx.reset?.();
       sx.setTransform(1, 0, 0, 1, 0, 0);
+      sx.clearRect(0, 0, width, height);
       sx.fillStyle = "#04060d";
       sx.fillRect(0, 0, width, height);
+      sx.save();
       sx.setTransform(dpr, 0, 0, dpr, 0, 0);
       sx.scale(cam.zoom, cam.zoom);
       sx.translate(-cam.x, -cam.y);
@@ -146,6 +150,7 @@ export class Renderer {
       if (state.border) drawBorderStorm(sx, state.width, state.height, state.border, cam.zoom);
       if (state.storms?.length) drawStormClouds(sx, state.storms, cam.zoom);
       this.ctx = saved;
+      sx.restore();
       this.staticKey = key;
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);

@@ -110,6 +110,9 @@
   "moduleDamagePct": 50,
   "moduleDropChance": 45,
   "brokenSellPct": 10,
+  "repairPct": 50,
+  "borderWidth": 450,
+  "borderDamage": 10,
   "moduleHpPct": 100,
   "usedSellPct": 60
 }

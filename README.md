@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.92 – Oprava grafických glitchů po v3.91 (mezipaměť statické vrstvy si držela ořez z minulého překreslení –
+  násobené elipsy okraje a zbytky starého obrazu).
 - v3.91 – Výkon pro velké mapy a hodně hráčů: za tvrdým okrajem se nekreslí nic (ořez), objekty mimo obraz se
   přeskakují, blesky bouří se kreslí jen hráči, jehož loď v bouři je. Lodě a komety se posílají už 160 jednotek
   za hranicí dohledu (v mlze ztlumené), takže do dohledu vplouvají a neobjeví se naráz. **Rozlišení mapy**
