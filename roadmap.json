@@ -1,0 +1,122 @@
+[
+  {
+    "id": "ui",
+    "group": "UI",
+    "title": "Úprava UI",
+    "text": "Průběžné zpřehledňování a zkompaktnění obrazovek.",
+    "status": "doing",
+    "done": false
+  },
+  {
+    "id": "droid-strelec",
+    "group": "Nový droid",
+    "title": "Droid Střelec",
+    "text": "zvyšuje dostah nebo zranění zbraně, umí ovládat torpéda manévry, zlepšuje ovladatelnost torpéd",
+    "status": "next",
+    "done": false
+  },
+  {
+    "id": "hyperpohon",
+    "group": "Nový modul",
+    "title": "Velký modul – Hyperpohon",
+    "text": "",
+    "status": "next",
+    "done": false
+  },
+  {
+    "id": "atomovka",
+    "group": "Nový modul",
+    "title": "Velký modul – Atomová bomba",
+    "text": "",
+    "status": "next",
+    "done": false
+  },
+  {
+    "id": "mapa-vizual",
+    "group": "Prvky na mapě",
+    "title": "Vizuální prvky bez efektů",
+    "text": "",
+    "status": "next",
+    "done": false
+  },
+  {
+    "id": "feedback",
+    "group": "Zpětná vazba",
+    "title": "Zpětná vazba po zápase",
+    "text": "Po dokončení zápasu může hráč napsat zpětnou vazbu; admin ji uvidí v roadmapě jako seznam zpráv.",
+    "status": "next",
+    "done": false
+  },
+  {
+    "id": "droid-hacker",
+    "group": "Nový droid",
+    "title": "Droid Hacker",
+    "text": "",
+    "status": "mid",
+    "done": false
+  },
+  {
+    "id": "stredni-lod",
+    "group": "Nová loď",
+    "title": "Střední loď",
+    "text": "",
+    "status": "mid",
+    "done": false
+  },
+  {
+    "id": "mapa-budovy",
+    "group": "Prvky na mapě",
+    "title": "Budovy, vesmírné stanice",
+    "text": "",
+    "status": "mid",
+    "done": false
+  },
+  {
+    "id": "mapa-hazard",
+    "group": "Prvky na mapě",
+    "title": "Nové druhy hazardu",
+    "text": "Slunce, planety.",
+    "status": "mid",
+    "done": false
+  },
+  {
+    "id": "mapa-suroviny",
+    "group": "Prvky na mapě",
+    "title": "Skryté suroviny či moduly v asteroidech",
+    "text": "",
+    "status": "mid",
+    "done": false
+  },
+  {
+    "id": "velka-lod",
+    "group": "Nová loď",
+    "title": "Velká loď",
+    "text": "",
+    "status": "later",
+    "done": false
+  },
+  {
+    "id": "mod-obrana",
+    "group": "Herní mód",
+    "title": "Obrana Velké lodi",
+    "text": "",
+    "status": "later",
+    "done": false
+  },
+  {
+    "id": "mod-utok",
+    "group": "Herní mód",
+    "title": "Útok na Velkou loď",
+    "text": "",
+    "status": "later",
+    "done": false
+  },
+  {
+    "id": "6jjtcsps",
+    "group": "Herní mechanika",
+    "title": "Hackovací minihry",
+    "text": "minihry pro hackování budov, systémů apod. Například ve hře - obrana velké lodi, hráč co má na starosti velkou loď tak bude provádět upravy pomocí miniher",
+    "status": "later",
+    "done": false
+  }
+]

@@ -2,7 +2,7 @@ import {
   RULES,
   HULLS,
   PILOTS,
-  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary } from "@wingfighter/shared";
+  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement } from "@wingfighter/shared";
 import { logoCanvas } from "./logo.ts";
 import { openRoadmap } from "./roadmap.ts";
 import { openMusicPanel } from "./main.ts";
@@ -165,6 +165,9 @@ function roomView(m: LobbyModel, net: Net) {
   const isHost = room.hostId === m.playerId;
   const me = room.players.find((p) => p.id === m.playerId);
   const tdm = room.settings.mode === "tdm";
+  const placement = effectivePlacement(room.settings);
+  const teamManual = tdm && placement === "teamManual";
+  const randomPlacement = placement === "random" || placement === "teamRandom";
   /** Místnost ještě není otevřená: host dokončuje nastavení, ostatní se nemohou připojit. */
   const setup = !room.open;
 
@@ -198,13 +201,14 @@ function roomView(m: LobbyModel, net: Net) {
       "div",
       { class: `trow ${p.id === m.playerId ? "me" : ""}` },
       h("span", { class: "t-strip", style: `background:${color}` }),
-      h("span", { class: "t-name" }, h("span", { class: `dot ${p.connected ? "" : "off"}` }), " ", p.name, p.id === room.hostId ? h("span", { class: "host" }, " HOST") : null, p.isBot ? h("span", { class: "bot-tag" }, "BOT") : null),
+      h("span", { class: "t-name" }, h("span", { class: `dot ${p.connected ? "" : "off"}` }), " ", teamManual && p.commander ? h("span", { class: "cmd-star", title: "Velitel týmu – vybírá startovní bod týmu" }, "★ ") : null, p.name, p.id === room.hostId ? h("span", { class: "host" }, " HOST") : null, p.isBot ? h("span", { class: "bot-tag" }, "BOT") : null),
       h("span", { class: "t-fleet" }, ...fleet.map(shipChip)),
       h("span", { class: `t-status txt ${status[0]}` }, status[1]),
       h(
         "span",
         { class: "t-act" },
         canMove ? h("button", { class: "px tiny", title: "Přesunout do dalšího týmu", onclick: () => net.send({ type: "setTeam", team: (p.team + 1) % nTeams, playerId: p.id }) }, "⇄") : null,
+        teamManual && !p.commander && (isHost || (me?.commander && me.team === p.team)) ? h("button", { class: "px tiny", title: "Předat velení týmu tomuto hráči (bude vybírat startovní bod týmu)", onclick: () => net.send({ type: "setCommander", playerId: p.id }) }, "★") : null,
         canEditBot(p) ? h("button", { class: `px tiny ${open ? "on" : ""}`, title: "Naklikat výbavu bota", onclick: () => ((botEdit = open ? null : p.id), rerender()) }, "⚙") : null,
         p.isBot && isHost ? h("button", { class: "px tiny", title: "Odebrat bota", onclick: () => net.send({ type: "removeBot", botId: p.id }) }, "✕") : null,
       ),
@@ -251,7 +255,7 @@ function roomView(m: LobbyModel, net: Net) {
     ...(tdm
       ? Array.from({ length: nTeams }, (_, t) => [teamHead(t), ...room.players.filter((p) => p.team === t).flatMap((p) => [playerRow(p, TEAM_COLORS[t]), botEditor(p)])]).flat()
       : room.players.flatMap((p, i) => [playerRow(p, TEAM_COLORS[i % TEAM_COLORS.length]), botEditor(p)])),
-    h("div", { class: "muted txt", style: "font-size:12px;margin-top:8px" }, `Najetí na loď ukáže celou výbavu. ⇄ = přesun do dalšího týmu (host kohokoli, ty sebe)${isHost ? ", ⚙ = výbava bota (v režimu „ruční“), ✕ = odebrat bota" : ""}.${tdm ? " Prázdný tým se do bitvy nepočítá." : ""}`),
+    h("div", { class: "muted txt", style: "font-size:12px;margin-top:8px" }, `Najetí na loď ukáže celou výbavu. ⇄ = přesun do dalšího týmu (host kohokoli, ty sebe)${isHost ? ", ⚙ = výbava bota (v režimu „ruční“), ✕ = odebrat bota" : ""}${teamManual ? ", ★ = velitel týmu (vybírá start týmu; host nebo velitel může velení předat)" : ""}.${tdm ? " Prázdný tým se do bitvy nepočítá." : ""}`),
   );
   const botEditor = (p: RoomPlayer) =>
     botEdit === p.id && canEditBot(p)
@@ -373,8 +377,10 @@ function roomView(m: LobbyModel, net: Net) {
       const ROCKS_CLUSTER: [number, number, number][] = [[11, 12, 3.5], [17, 10, 2.5], [15, 17, 3], [9, 18, 2], [19, 16, 2]];
       const ROCK_LEVEL: [number, number, number][][] = [[[13, 13, 4]], [[8, 9, 3.5], [18, 17, 4]], [[7, 7, 3], [19, 8, 3.5], [9, 19, 3.5], [19, 19, 2.5], [14, 13, 2]]];
       const STORM_SIZES: MapSettings["stormSize"][] = ["small", "medium", "large"];
-      const bots = room.players.filter((p) => p.isBot);
       // Startovní bod: hráč volí jen sobě; host navíc botům – klikne na čip bota, pak na kroužek v mapě.
+      // Týmové ruční umístění: vybírá jen velitel týmu (★); host navíc za boty-velitele.
+      const bots = room.players.filter((p) => p.isBot && (!teamManual || p.commander));
+      const iPick = !randomPlacement && (!teamManual || !!me?.commander);
       if (startFor && !bots.some((b) => b.id === startFor)) startFor = null;
       const startChip = (p: RoomPlayer | null) => {
         const id = p?.id ?? null;
@@ -388,7 +394,20 @@ function roomView(m: LobbyModel, net: Net) {
           set ? h("span", { class: "sc-tick" }, icon("tick", "#4ade80", 10)) : null,
         );
       };
-      const startChips = isHost && bots.length ? h("div", { class: "start-chips" }, h("span", { class: "txt muted", style: "font-size:13px" }, "Start pro"), startChip(null), ...bots.map((b) => startChip(b))) : null;
+      const startChips = isHost && bots.length && !randomPlacement ? h("div", { class: "start-chips" }, h("span", { class: "txt muted", style: "font-size:13px" }, "Start pro"), iPick ? startChip(null) : null, ...bots.map((b) => startChip(b))) : null;
+      const myCommander = teamManual ? room.players.find((p) => p.team === me?.team && p.commander) : undefined;
+      const startHelp = randomPlacement
+        ? `${PLACEMENT_LABEL[placement]}: startovní body se rozdělí náhodně při startu bitvy${placement === "teamRandom" ? ", tým startuje ve formaci vedle sebe" : ""}.`
+        : startFor
+          ? `Vybíráš start pro ${room.players.find((p) => p.id === startFor)?.name ?? "bota"} – klikni na kroužek na okraji mapy.`
+          : teamManual
+            ? me?.commander
+              ? "Jsi velitel týmu (★): klikni na kroužek na okraji = start celého týmu (spoluhráči budou ve formaci vedle tebe)."
+              : `Start týmu vybírá velitel ${myCommander?.name ?? "týmu"} (★). Host nebo velitel může velení předat v tabulce týmů.`
+            : "Klikni na kroužek na okraji = tvůj start (barva = tým, ostatní vidí, kde kdo startuje). Bez volby dostaneš volný bod.";
+      const pickerId = startFor ?? (iPick ? m.playerId : "");
+      // hvězdička velitele jen tam, kde má smysl
+      const previewPlayers = teamManual ? room.players : room.players.map((p) => ({ ...p, commander: false }));
       const pickStart = (index: number | null) => {
         net.send({ type: "setStart", index, ...(startFor ? { botId: startFor } : {}) });
         startFor = null;
@@ -419,7 +438,7 @@ function roomView(m: LobbyModel, net: Net) {
           );
         }),
       );
-      const summary = `${MAP_SIZES[map.size]?.label ?? map.size} · asteroidy ${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids} · ${map.storms === 0 ? "bez bouří" : `${map.storms} bouře`} · komety ${{ none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"]} · seed ${map.seed} · ${settings.mode === "tdm" ? "týmový deathmatch" : "deathmatch"} · startovní kredity ${budget}`;
+      const summary = `${MAP_SIZES[map.size]?.label ?? map.size} · asteroidy ${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids} · ${map.storms === 0 ? "bez bouří" : `${map.storms} bouře`} · komety ${{ none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"]} · seed ${map.seed} · ${settings.mode === "tdm" ? "týmový deathmatch" : "deathmatch"} · ${PLACEMENT_LABEL[placement].toLowerCase()} · startovní kredity ${budget}`;
       const PAGES = ["Mapa", "Bitva", "Lodě a piloti", "Moduly"];
       const pageBar = h(
         "div",
@@ -438,13 +457,15 @@ function roomView(m: LobbyModel, net: Net) {
           { class: "card gamecard open" },
           h("h3", { style: "display:flex;align-items:center;gap:8px" }, icon("target", "#7dd3fc", 12), " ", label("Nastavení hry"), h("span", { class: "txt muted", style: "font-size:13px" }, "hotovo, místnost otevřená"), h("span", { class: "spacer" }), isHost ? h("button", { class: "px tiny", title: "Místnost se zavře pro nové hráče, dokud nastavení znovu nedokončíš", onclick: () => ((gamePage = 0), net.send({ type: "openRoom", open: false })) }, icon("pen", "currentColor", 10), " ", label("upravit")) : null),
           h("div", { class: "txt muted", style: "margin-bottom:8px;font-size:13px" }, summary),
-          h(
-            "div",
-            { class: "game-side" },
-            h("div", { class: "fsec-h" }, label("Mapa · startovní bod"), h("span", { class: "spacer" }), startChips),
-            renderMapPreview(map, room.players, startFor ?? m.playerId, pickStart, 1200),
-            h("div", { class: "muted txt" }, startFor ? `Vybíráš start pro ${room.players.find((p) => p.id === startFor)?.name ?? "bota"} – klikni na kroužek na okraji mapy.` : "Klikni na kroužek na okraji = tvůj start (barva = tým, ostatní vidí, kde kdo startuje). Bez volby dostaneš volný bod."),
-          ),
+          randomPlacement
+            ? h("div", { class: "game-side" }, h("div", { class: "fsec-h" }, label("Mapa · umístění")), h("div", { class: "muted txt place-note" }, icon("target", "#94a3b8", 12), " ", startHelp))
+            : h(
+                "div",
+                { class: "game-side" },
+                h("div", { class: "fsec-h" }, label(teamManual ? "Mapa · start týmu" : "Mapa · startovní bod"), h("span", { class: "spacer" }), startChips),
+                renderMapPreview(map, previewPlayers, pickerId, pickStart, 1200, !!pickerId),
+                h("div", { class: "muted txt" }, startHelp),
+              ),
         );
       const pageOf = (i: number, ...nodes: (Node | null)[]) => (gamePage === i ? nodes : []);
       return h(
@@ -533,6 +554,12 @@ function roomView(m: LobbyModel, net: Net) {
               "Bitva",
               frow("Herní mód", sel(settings.mode, [["tdm", "Týmový deathmatch"], ["dm", "Deathmatch (všichni proti všem)"]], (v) => set({ mode: v as "tdm" | "dm" }))),
               frow(
+                "Umístění na mapě",
+                sel(settings.placement ?? "manual", PLACEMENTS.filter((p) => tdm || (p !== "teamRandom" && p !== "teamManual")).map((p) => [p, PLACEMENT_LABEL[p]] as [string, string]), (v) => set({ placement: v as Placement })),
+                `${PLACEMENT_HINT.random}\n${PLACEMENT_HINT.manual}\n${PLACEMENT_HINT.teamRandom}\n${PLACEMENT_HINT.teamManual}\nTýmové varianty jen v týmovém deathmatchi.`,
+              ),
+              frow("", h("span", { class: "txt muted fsub" }, PLACEMENT_HINT[settings.placement ?? "manual"])),
+              frow(
                 "Startovní kredity",
                 h("div", { class: "fpair" }, h("input", { class: "fsel", type: "number", value: String(budget), min: "0", max: "5000", step: "50", disabled: !isHost, style: "width:118px", onchange: (e) => net.send({ type: "setTuning", tuning: { startBudget: Math.max(0, Math.min(5000, Math.round(Number((e.target as HTMLInputElement).value) || 0))) } }) }), ...(isHost ? [300, 500, 800, 1200].map((n) => h("button", { class: `px tiny ${budget === n ? "on" : ""}`, onclick: () => net.send({ type: "setTuning", tuning: { startBudget: n } }) }, String(n))) : [])),
                 "Kredity každého hráče na začátku (výbava se z nich kupuje; výdělky z bitev se přičítají). Totéž co ladění → Ekonomika → Rozpočet na výbavu.",
@@ -600,9 +627,9 @@ function roomView(m: LobbyModel, net: Net) {
             : h(
             "div",
             { class: "game-side" },
-            h("div", { class: "fsec-h" }, label("Náhled mapy · startovní bod")),
-            renderMapPreview(map, room.players, startFor ?? m.playerId, pickStart, 520),
-            h("div", { class: "muted txt" }, "Klikni na kroužek na okraji = tvůj start (barva = tým, ostatní vidí, kde kdo startuje). Bez volby dostaneš volný bod."),
+            h("div", { class: "fsec-h" }, label(randomPlacement ? "Náhled mapy" : teamManual ? "Náhled mapy · start týmu" : "Náhled mapy · startovní bod")),
+            renderMapPreview(map, previewPlayers, pickerId, pickStart, 520, !!pickerId),
+            h("div", { class: "muted txt" }, startHelp),
             startChips,
           ),
         ),

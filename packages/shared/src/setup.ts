@@ -3,7 +3,7 @@ import { MAP, RULES } from "./constants.ts";
 import type { Pose } from "./geometry.ts";
 import { computeStats, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf, shipNames, pilotList } from "./ships.ts";
 import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
-import type { Asteroid, GameSettings, GameState, PlayerInfo, Ship, ShipLoadout, Storm } from "./types.ts";
+import { effectivePlacement, type Asteroid, type GameSettings, type GameState, type PlayerInfo, type Ship, type ShipLoadout, type Storm } from "./types.ts";
 import { generateMap, START_MARGIN } from "./mapgen.ts";
 
 /** Mapa 1 – statické asteroidy (vx, vy = 0; v budoucnu mohou létat). Tvar se generuje ze seedu. */
@@ -54,6 +54,12 @@ function spawnZones(teamCount: number, w: number, h: number): Pose[] {
   return zones;
 }
 
+/** Velitel týmu: označený člen, jinak první člověk, jinak první člen. */
+export function commanderOf<T extends { team: number; isBot: boolean; commander?: boolean }>(players: T[], team: number): T | undefined {
+  const members = players.filter((p) => p.team === team);
+  return members.find((p) => p.commander) ?? members.find((p) => !p.isBot) ?? members[0];
+}
+
 export interface CreateGameOptions {
   players: PlayerInfo[];
   settings: GameSettings;
@@ -83,49 +89,80 @@ export function createGame(opts: CreateGameOptions): GameState {
   let asteroids: Asteroid[] = structuredClone(MAP_1_ASTEROIDS);
   let storms: Storm[] = [];
   let startAt: ((p: PlayerInfo) => Pose) | null = null;
+  let teamPose: ((team: number) => Pose) | null = null;
+  const poseOf = (st: { x: number; y: number; heading: number } | undefined): Pose => (st ? { x: st.x, y: st.y, heading: st.heading } : { x: START_MARGIN, y: height / 2, heading: 0 });
   if (settings.map) {
     const gen = generateMap(settings.map);
     width = gen.width;
     height = gen.height;
     asteroids = gen.asteroids;
     storms = gen.storms;
-    const taken = new Set(players.map((p) => p.startIndex).filter((i): i is number => typeof i === "number" && i >= 0 && i < gen.starts.length));
-    const freeIdx = gen.starts.map((_, i) => i).filter((i) => !taken.has(i));
-    const assigned = new Map<string, number>();
-    for (const p of players) {
-      let i = typeof p.startIndex === "number" && p.startIndex >= 0 && p.startIndex < gen.starts.length && !assigned.has(`i${p.startIndex}`) ? p.startIndex : undefined;
-      if (i === undefined || [...assigned.values()].includes(i)) {
-        // volný bod co nejdál od už obsazených (hlavně od cizích týmů)
-        const used = [...assigned.entries()].map(([pid, idx]) => ({ idx, team: players.find((q) => q.id === pid)?.team }));
-        let best = freeIdx[0];
-        let bestScore = -1;
-        for (const cand of freeIdx) {
-          const c = gen.starts[cand];
-          let score = Infinity;
-          for (const u of used) {
-            const o = gen.starts[u.idx];
-            const d = Math.hypot(c.x - o.x, c.y - o.y) * (u.team === p.team ? 0.4 : 1);
-            score = Math.min(score, d);
-          }
-          if (used.length === 0) score = 0;
-          if (score > bestScore) {
-            bestScore = score;
-            best = cand;
+    const placement = effectivePlacement(settings);
+    const rnd = (n: number) => Math.floor(Math.random() * n);
+    if (placement === "random") {
+      // každý hráč náhodný volný bod, zvolené body se ignorují
+      const pool = gen.starts.map((_, i) => i);
+      for (const p of players) {
+        const at = pool.length ? pool.splice(rnd(pool.length), 1)[0] : rnd(gen.starts.length);
+        p.startIndex = at;
+      }
+      startAt = (p) => poseOf(gen.starts[p.startIndex ?? 0]);
+    } else if (placement === "teamRandom" || placement === "teamManual") {
+      // tým = jeden bod (náhodný, nebo zvolený velitelem), lodě týmu ve formaci vedle sebe
+      const pool = gen.starts.map((_, i) => i);
+      const teamIdx = new Map<number, number>();
+      if (placement === "teamManual") {
+        for (const team of teams) {
+          const cmd = commanderOf(players, team);
+          const i = cmd?.startIndex;
+          if (typeof i === "number" && pool.includes(i)) {
+            teamIdx.set(team, i);
+            pool.splice(pool.indexOf(i), 1);
           }
         }
-        i = best ?? Math.floor(Math.random() * gen.starts.length);
-        const at = freeIdx.indexOf(i);
-        if (at >= 0) freeIdx.splice(at, 1);
       }
-      assigned.set(p.id, i);
-      p.startIndex = i;
+      for (const team of teams) {
+        if (teamIdx.has(team)) continue;
+        teamIdx.set(team, pool.length ? pool.splice(rnd(pool.length), 1)[0] : rnd(gen.starts.length));
+      }
+      for (const p of players) p.startIndex = teamIdx.get(p.team);
+      teamPose = (team) => poseOf(gen.starts[teamIdx.get(team) ?? 0]);
+    } else {
+      const taken = new Set(players.map((p) => p.startIndex).filter((i): i is number => typeof i === "number" && i >= 0 && i < gen.starts.length));
+      const freeIdx = gen.starts.map((_, i) => i).filter((i) => !taken.has(i));
+      const assigned = new Map<string, number>();
+      for (const p of players) {
+        let i = typeof p.startIndex === "number" && p.startIndex >= 0 && p.startIndex < gen.starts.length && !assigned.has(`i${p.startIndex}`) ? p.startIndex : undefined;
+        if (i === undefined || [...assigned.values()].includes(i)) {
+          // volný bod co nejdál od už obsazených (hlavně od cizích týmů)
+          const used = [...assigned.entries()].map(([pid, idx]) => ({ idx, team: players.find((q) => q.id === pid)?.team }));
+          let best = freeIdx[0];
+          let bestScore = -1;
+          for (const cand of freeIdx) {
+            const c = gen.starts[cand];
+            let score = Infinity;
+            for (const u of used) {
+              const o = gen.starts[u.idx];
+              const d = Math.hypot(c.x - o.x, c.y - o.y) * (u.team === p.team ? 0.4 : 1);
+              score = Math.min(score, d);
+            }
+            if (used.length === 0) score = 0;
+            if (score > bestScore) {
+              bestScore = score;
+              best = cand;
+            }
+          }
+          i = best ?? Math.floor(Math.random() * gen.starts.length);
+          const at = freeIdx.indexOf(i);
+          if (at >= 0) freeIdx.splice(at, 1);
+        }
+        assigned.set(p.id, i);
+        p.startIndex = i;
+      }
+      startAt = (p) => poseOf(gen.starts[assigned.get(p.id) ?? 0] ?? { x: START_MARGIN, y: height / 2, heading: 0 });
     }
-    startAt = (p) => {
-      const st = gen.starts[assigned.get(p.id) ?? 0] ?? { x: START_MARGIN, y: height / 2, heading: 0 };
-      return { x: st.x, y: st.y, heading: st.heading };
-    };
   }
-  const zones = spawnZones(teams.length, width, height);
+  const zones = teamPose ? teams.map((t) => teamPose!(t)) : spawnZones(teams.length, width, height);
 
   const ships: Ship[] = [];
   teams.forEach((team, zi) => {

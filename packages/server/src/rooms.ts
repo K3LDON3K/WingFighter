@@ -48,6 +48,8 @@ import {
   PILOTS,
   pilotList,
   sanitizePilots,
+  PLACEMENTS,
+  effectivePlacement,
 } from "@wingfighter/shared";
 import { savePilots } from "./pilot-store.ts";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -74,6 +76,8 @@ interface RoomMember {
   manualLoadout?: boolean;
   /** Zvolený startovní bod. */
   startIndex?: number;
+  /** Velitel týmu (týmové ruční umístění). */
+  commander?: boolean;
   /** Ekonomika mezi bitvami: kredity = rozpočet místnosti + vyděláno − utraceno. */
   earned: number;
   spent: number;
@@ -158,6 +162,32 @@ class Room {
     return [...this.members.values()].filter((m) => !m.isBot);
   }
 
+  /** Každý tým má právě jednoho velitele: stávající, pokud je pořád v týmu (a není bot, když je v týmu člověk), jinak první člověk, jinak první bot. */
+  refreshCommanders(): void {
+    const all = [...this.members.values()];
+    const teams = new Set(all.map((m) => m.team));
+    for (const team of teams) {
+      const members = all.filter((m) => m.team === team);
+      const hasHuman = members.some((m) => !m.isBot);
+      let cmd = members.find((m) => m.commander && (!hasHuman || !m.isBot));
+      if (!cmd) cmd = members.find((m) => !m.isBot) ?? members[0];
+      for (const m of members) m.commander = m === cmd;
+    }
+    // týmové ruční umístění: startovní bod má jen velitel
+    if (effectivePlacement(this.settings) === "teamManual") for (const m of all) if (!m.commander) m.startIndex = undefined;
+  }
+
+  /** Předání velení: zvolený startovní bod týmu přejde na nového velitele. */
+  passCommand(to: RoomMember): void {
+    const old = [...this.members.values()].find((m) => m.team === to.team && m.commander);
+    if (old && old !== to) {
+      to.startIndex = old.startIndex;
+      old.startIndex = undefined;
+      old.commander = false;
+    }
+    to.commander = true;
+  }
+
   toState(clients: Map<string, Client>): RoomState {
     return {
       code: this.code,
@@ -178,6 +208,7 @@ class Room {
         loadout: m.loadouts[0],
         loadouts: m.loadouts,
         startIndex: m.startIndex,
+        commander: m.commander,
         credits: m.isBot ? undefined : this.walletOf(m),
         connected: m.isBot ? true : !!clients.get(m.id)?.ws,
       })),
@@ -356,6 +387,12 @@ export class Hub {
         const m = room.members.get(targetId);
         if (!m) return;
         if (msg.botId && (room.hostId !== client.id || !m.isBot)) return;
+        const placement = effectivePlacement(room.settings);
+        if (placement === "random" || placement === "teamRandom") return this.error(client, "Startovní body se rozdělí náhodně při startu bitvy.");
+        if (placement === "teamManual") {
+          room.refreshCommanders();
+          if (!m.commander) return this.error(client, "Startovní bod týmu vybírá velitel (★).");
+        }
         if (msg.index === null) {
           m.startIndex = undefined;
         } else {
@@ -364,6 +401,18 @@ export class Hub {
           if ([...room.members.values()].some((o) => o.id !== m.id && o.startIndex === i)) return this.error(client, "Tenhle startovní bod už někdo má.");
           m.startIndex = i;
         }
+        this.broadcastRoom(room);
+        return;
+      }
+      case "setCommander": {
+        if (!room || room.game) return;
+        const target = room.members.get(msg.playerId);
+        if (!target) return;
+        room.refreshCommanders();
+        const me = room.members.get(client.id);
+        const myCommand = !!me?.commander && me.team === target.team;
+        if (room.hostId !== client.id && !myCommand) return this.error(client, "Velení může předat jen host nebo velitel týmu.");
+        room.passCommand(target);
         this.broadcastRoom(room);
         return;
       }
@@ -432,6 +481,7 @@ export class Hub {
           room.resizeFleets();
           for (const m of room.members.values()) if (m.isBot && !m.manualLoadout) m.loadouts = this.botFleet(room);
         }
+        if (s.placement && PLACEMENTS.includes(s.placement)) room.settings.placement = s.placement;
         if (s.botLoadout === "default" || s.botLoadout === "random" || s.botLoadout === "manual") {
           room.settings.botLoadout = s.botLoadout;
           for (const m of room.members.values()) if (m.isBot && !m.manualLoadout) m.loadouts = this.botFleet(room);
@@ -588,7 +638,7 @@ export class Hub {
       if (err) return this.error(host, `${m.name} – letka: ${err}.`);
       if (!m.isBot) m.walletAtStart = room.walletOf(m);
     }
-    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadouts[0]), loadouts: m.loadouts.map(refillLoadout), credits: m.isBot ? undefined : room.walletOf(m), startIndex: m.startIndex }));
+    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadouts[0]), loadouts: m.loadouts.map(refillLoadout), credits: m.isBot ? undefined : room.walletOf(m), startIndex: m.startIndex, commander: m.commander }));
     const state = createGame({ players, settings: room.settings, tuning: room.tuning });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     room.game = { state, orders: new Map(), rng, memory: new Map(), pendingEvents: [] };
@@ -795,6 +845,7 @@ export class Hub {
   }
 
   private broadcastRoom(room: Room) {
+    room.refreshCommanders();
     this.broadcast(room, { type: "room", room: room.toState(this.clients) });
   }
 

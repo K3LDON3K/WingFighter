@@ -35,6 +35,9 @@ import {
   carveCrater,
   circleHitsAsteroid,
   createGame,
+  type MapSettings,
+  commanderOf,
+  effectivePlacement,
   createRng,
   generateProfile,
   FIGHTER_PROFILE,
@@ -1300,5 +1303,56 @@ describe("záložní štít", () => {
       expect(s.loadout.modules.find((m) => m.id === "s2")?.off).toBeUndefined();
       expect(s.shields).toBe(s.stats.shields);
     }
+  });
+});
+
+describe("umístění na mapě", () => {
+  const map: MapSettings = { size: "small", asteroids: "few", storms: 0, stormSize: "small", seed: 7, symmetric: false, comets: "none", clusters: false, cometsHitAsteroids: false };
+  const base = { mode: "tdm" as const, turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" as const, map };
+  const four = [
+    { id: "a1", name: "A1", team: 0, isBot: false, startIndex: 3 },
+    { id: "a2", name: "A2", team: 0, isBot: false, startIndex: 4 },
+    { id: "b1", name: "B1", team: 1, isBot: false, startIndex: 5 },
+    { id: "b2", name: "B2", team: 1, isBot: true },
+  ];
+  it("náhodné: každý hráč jiný startovní bod, zvolené body se ignorují", () => {
+    const gen = generateMap(map);
+    const g = createGame({ players: four, settings: { ...base, placement: "random" } });
+    const idx = g.players.map((p) => p.startIndex!);
+    expect(new Set(idx).size).toBe(4);
+    for (const s of g.ships) {
+      const p = g.players.find((q) => q.id === s.ownerId)!;
+      expect(s.x).toBe(gen.starts[p.startIndex!].x);
+    }
+  });
+  it("týmové náhodné: tým sdílí bod, lodě ve formaci vedle sebe, týmy na různých bodech", () => {
+    const g = createGame({ players: four, settings: { ...base, placement: "teamRandom" } });
+    const a = g.players.filter((p) => p.team === 0).map((p) => p.startIndex);
+    const b = g.players.filter((p) => p.team === 1).map((p) => p.startIndex);
+    expect(a[0]).toBe(a[1]);
+    expect(b[0]).toBe(b[1]);
+    expect(a[0]).not.toBe(b[0]);
+    const sa = g.ships.filter((s) => s.team === 0);
+    expect(Math.hypot(sa[0].x - sa[1].x, sa[0].y - sa[1].y)).toBeCloseTo(60, 5);
+    expect(sa[0].heading).toBe(sa[1].heading);
+  });
+  it("týmové ruční: bod určuje velitel (označený, jinak první člověk), ostatní volby se ignorují", () => {
+    const gen = generateMap(map);
+    const g = createGame({ players: [{ ...four[0] }, { ...four[1], commander: true }, four[2], four[3]], settings: { ...base, placement: "teamManual" } });
+    expect(g.players.filter((p) => p.team === 0).every((p) => p.startIndex === 4)).toBe(true);
+    expect(g.players.filter((p) => p.team === 1).every((p) => p.startIndex === 5)).toBe(true);
+    const sa = g.ships.filter((s) => s.team === 0);
+    const mid = { x: (sa[0].x + sa[1].x) / 2, y: (sa[0].y + sa[1].y) / 2 };
+    expect(mid.x).toBeCloseTo(gen.starts[4].x, 5);
+    expect(mid.y).toBeCloseTo(gen.starts[4].y, 5);
+    expect(commanderOf(four, 0)?.id).toBe("a1");
+    expect(commanderOf(four, 1)?.id).toBe("b1");
+    expect(commanderOf([four[3]], 1)?.id).toBe("b2");
+  });
+  it("v deathmatchi se týmové varianty chovají jako ne-týmové", () => {
+    expect(effectivePlacement({ mode: "dm", placement: "teamManual" })).toBe("manual");
+    expect(effectivePlacement({ mode: "dm", placement: "teamRandom" })).toBe("random");
+    expect(effectivePlacement({ mode: "tdm", placement: "teamRandom" })).toBe("teamRandom");
+    expect(effectivePlacement({ mode: "tdm" })).toBe("manual");
   });
 });

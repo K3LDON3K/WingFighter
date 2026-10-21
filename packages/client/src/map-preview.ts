@@ -5,7 +5,11 @@ import { h } from "./dom.ts";
  * Náhled generované mapy v místnosti: asteroidy, bouře, startovní body (obsazené barvou týmu + jméno).
  * Klik na volný bod = zvolit start.
  */
-export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], myId: string, onPick: (index: number | null) => void, width = 520): HTMLElement {
+/**
+ * Náhled generované mapy se startovními body. `myId` = kdo právě vybírá (zvýrazněný bod, klik ho mění);
+ * `interactive=false` = jen prohlížení (náhodné umístění, nebo start týmu vybírá velitel).
+ */
+export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], myId: string, onPick: (index: number | null) => void, width = 520, interactive = true): HTMLElement {
   const gen = generateMap(settings);
   const scale = width / gen.width;
   /** Měřítko značek a písma vůči základní šířce 520 px. */
@@ -68,7 +72,7 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
       ctx.fillStyle = "#e2e8f0";
       ctx.font = `${Math.round(9 * k)}px Jersey, ui-monospace, monospace`;
       ctx.textAlign = x > width / 2 ? "right" : "left";
-      ctx.fillText(p.name, x + (x > width / 2 ? -10 : 10) * k, y + 3 * k);
+      ctx.fillText((p.commander ? "★ " : "") + p.name, x + (x > width / 2 ? -10 : 10) * k, y + 3 * k);
     } else {
       ctx.strokeStyle = "rgba(148,163,184,0.8)";
       ctx.lineWidth = 1.5 * k;
@@ -80,6 +84,11 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
   ctx.strokeStyle = "rgba(148,163,184,0.5)";
   ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
 
+  if (!interactive) {
+    canvas.title = "Náhled mapy";
+    canvas.style.cursor = "default";
+    return canvas;
+  }
   canvas.addEventListener("click", (ev) => {
     const r = canvas.getBoundingClientRect();
     const mx = ((ev.clientX - r.left) / r.width) * width;

@@ -4004,3 +4004,11 @@ button.start-chip.on:hover:not(:disabled) {
   gap: 6px;
   justify-content: flex-end;
 }
+.cmd-star {
+  color: #fbbf24;
+}
+.place-note {
+  padding: 10px 12px;
+  border: 1px dashed #334155;
+  font-size: 13px;
+}

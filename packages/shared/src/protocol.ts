@@ -13,6 +13,8 @@ export interface RoomPlayer {
   loadout: ShipLoadout;
   loadouts: ShipLoadout[];
   startIndex?: number;
+  /** Velitel týmu (★) – vybírá start týmu u týmového ručního umístění; host nebo velitel může velení předat. */
+  commander?: boolean;
   /** Kredity hráče v místnosti (rozpočet + výdělky z bitev − výbava). Boti nemají. */
   credits?: number;
 }
@@ -56,6 +58,8 @@ export type ClientMessage =
   | { type: "openRoom"; open: boolean }
   /** Startovní bod (null = uvolnit); host může nastavit botovi. */
   | { type: "setStart"; index: number | null; botId?: string }
+  /** Předat velení týmu jinému členovi (host komukoli, velitel ve svém týmu). */
+  | { type: "setCommander"; playerId: string }
   /** Vlastní výbava, nebo (host) výbava bota. */
   | { type: "setLoadout"; loadout: ShipLoadout; botId?: string; index?: number }
   | { type: "setPilots"; pilots: PilotDef[] }

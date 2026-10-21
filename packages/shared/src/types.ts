@@ -302,6 +302,8 @@ export interface PlayerInfo {
   credits?: number;
   /** Zvolený startovní bod (index v generované mapě). */
   startIndex?: number;
+  /** Velitel týmu (u týmového ručního umístění vybírá start týmu). */
+  commander?: boolean;
 }
 
 /** Vyhozený modul plující vesmírem – lze sestřelit laserem za odměnu. */
@@ -359,6 +361,41 @@ export interface GameSettings {
   botLoadout: "default" | "random" | "manual";
   /** Generovaná mapa (chybí = klasická pevná mapa 1). */
   map?: MapSettings;
+  /** Umístění na mapě při startu (chybí = ruční). */
+  placement?: Placement;
+}
+
+/**
+ * Umístění lodí při startu bitvy:
+ * random = každý hráč náhodný startovní bod (mapa se před bitvou nevybírá);
+ * teamRandom = tým dostane náhodný bod a spoluhráči startují ve formaci vedle sebe;
+ * manual = každý si vybere startovní bod sám;
+ * teamManual = velitel týmu vybere bod, tým startuje ve formaci vedle něj.
+ * V deathmatchi se týmové varianty chovají jako ne-týmové.
+ */
+export type Placement = "random" | "teamRandom" | "manual" | "teamManual";
+
+export const PLACEMENTS: Placement[] = ["random", "teamRandom", "manual", "teamManual"];
+
+export const PLACEMENT_LABEL: Record<Placement, string> = {
+  random: "Náhodné umístění",
+  teamRandom: "Týmové náhodné umístění",
+  manual: "Ruční umístění",
+  teamManual: "Týmové ruční umístění",
+};
+
+export const PLACEMENT_HINT: Record<Placement, string> = {
+  random: "Každý hráč dostane náhodný startovní bod; mapa se před bitvou nevybírá.",
+  teamRandom: "Tým dostane náhodné místo na mapě a spoluhráči startují ve formaci vedle sebe.",
+  manual: "Každý hráč si vybere startovní bod na náhledu mapy sám.",
+  teamManual: "Velitel týmu (★) vybere startovní bod a tým startuje ve formaci vedle něj.",
+};
+
+/** Efektivní umístění: v deathmatchi nejsou týmy, týmové varianty se chovají jako ne-týmové. */
+export function effectivePlacement(settings: { mode: GameMode; placement?: Placement }): Placement {
+  const p = settings.placement ?? "manual";
+  if (settings.mode !== "tdm") return p === "teamRandom" ? "random" : p === "teamManual" ? "manual" : p;
+  return p;
 }
 
 export interface GameResult {

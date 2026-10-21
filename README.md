@@ -147,6 +147,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.74 – Nastavení hry → Bitva → **Umístění na mapě**: *Náhodné* (každý náhodný startovní bod, mapa se před
+  bitvou nevybírá), *Týmové náhodné* (tým náhodný bod, spoluhráči ve formaci vedle sebe, rozestup 60), *Ruční*
+  (dosavadní výběr bodu na náhledu mapy) a *Týmové ruční* (velitel týmu ★ vybere bod, tým startuje ve formaci
+  vedle něj). Velitel = první člověk v týmu; host nebo velitel ho může předat tlačítkem ★ v tabulce týmů (zvolený
+  start přejde s velením); tým jen z botů velí první bot (start mu vybere host). V deathmatchi se týmové varianty
+  chovají jako ne-týmové. Náhodné umístění je čistě náhodné (soupeři mohou startovat blízko sebe).
 - v3.73 – `Spustit server.command` po spuštění přijímá příkazy: `r` restartuje server (včetně nového sestavení
   klienta) bez zavírání okna, `i` přeinstaluje závislosti, `p` stáhne změny z gitu, `s` stav, `q` konec.
 - v3.72 – Roadmapa se **upravuje přímo ve hře**: tlačítko UPRAVIT → přidat položku, upravit (oblast, název, popis,
