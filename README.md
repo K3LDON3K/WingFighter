@@ -147,6 +147,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.108 – Tlačítko OTEVŘÍT MÍSTNOST je zelené v hlavičce místnosti vedle OPUSTIT; vedle něj čtyři kroky nastavení
+  (zeleně projité, modře aktuální) – host vidí, kolik kroků z průvodce už prošel. Tlačítko dole a v posledním
+  kroku průvodce zmizelo.
 - v3.107 – Hvězdy přesunuty z herní vrstvy do vzdáleného pozadí ve dvou hloubkách (matné daleké + jasnější bližší,
   posouvají se pomaleji než mapa). Na herní vrstvě zůstávají jen aktivní prvky, ovál mapy a mřížka. Při
   vypnutém vzdáleném pozadí zůstanou nehybné hvězdy jako dřív.

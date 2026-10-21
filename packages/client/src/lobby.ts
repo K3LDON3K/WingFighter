@@ -161,6 +161,9 @@ let fleetTab = 0;
 let botTab = 0;
 /** Stránka průvodce Nastavení hry (0 mapa, 1 bitva, 2 lodě a piloti, 3 moduly). */
 let gamePage = 0;
+/** Které kroky nastavení host už navštívil (počítadlo u tlačítka OTEVŘÍT MÍSTNOST); nuluje se s novou místností. */
+let visitedPages = new Set<number>([0]);
+let visitedRoom = "";
 /** Vybraná bitva série v nastavení (index). */
 let battleSel = 0;
 /** Komu host vybírá startovní bod (null = sobě). */
@@ -176,6 +179,13 @@ function roomView(m: LobbyModel, net: Net) {
   const randomPlacement = placement === "random" || placement === "teamRandom";
   /** Místnost ještě není otevřená: host dokončuje nastavení, ostatní se nemohou připojit. */
   const setup = !room.open;
+  if (visitedRoom !== room.code) {
+    visitedRoom = room.code;
+    visitedPages = new Set([0]);
+    gamePage = 0;
+  }
+  if (setup) visitedPages.add(gamePage);
+  const SETUP_STEPS = 4;
 
   applyTuning(room.tuning);
   const budget = room.tuning.startBudget;
@@ -192,6 +202,19 @@ function roomView(m: LobbyModel, net: Net) {
       { class: "ship-chip", title: `${hull} · ${pilot}\n${mods}` },
       pilotPortrait(l.pilotId, 20),
       h("span", { class: "sc-mods" }, ...(l.modules.length ? l.modules.map((m) => icon(MODULES[m.type].icon, m.hp !== undefined && m.hp <= 0 ? "#f87171" : "#60a5fa", 10)) : [h("span", { class: "muted", style: "font-size:11px" }, "–")])),
+    );
+  };
+  /** Tlačítko OTEVŘÍT MÍSTNOST v hlavičce s počítadlem projitých kroků nastavení. */
+  const openRoomControl = () => {
+    const n = visitedPages.size;
+    const all = n >= SETUP_STEPS;
+    const tip = all ? "Prošel jsi všechny kroky nastavení – místnost můžeš otevřít ostatním." : `Prošel jsi ${n} ze ${SETUP_STEPS} kroků nastavení (${["Bitvy", "Pravidla", "Lodě a piloti", "Moduly"].filter((_, i) => !visitedPages.has(i)).join(", ")} ještě ne). Otevřít jde i tak.`;
+    const open = () => net.send({ type: "openRoom", open: true });
+    return h(
+      "span",
+      { class: "open-wrap", title: tip },
+      h("span", { class: "open-pips" }, ...Array.from({ length: SETUP_STEPS }, (_, i) => h("span", { class: `open-pip ${visitedPages.has(i) ? "done" : ""} ${i === gamePage ? "cur" : ""}` }, String(i + 1)))),
+      h("button", { class: "go open-btn", onclick: open }, icon("tick", "currentColor", 12), label("Otevřít místnost")),
     );
   };
   /** Potvrzení připravenosti; loď beze zbraně se nejdřív potvrzuje (hráč si za to odpovídá sám). */
@@ -324,6 +347,7 @@ function roomView(m: LobbyModel, net: Net) {
         h("span", { class: "muted" }, "KOD "),
         h("span", { class: "code", style: "font-size:22px;font-weight:700;color:var(--accent);letter-spacing:3px" }, room.code),
         h("div", { class: "spacer" }),
+        setup && isHost ? openRoomControl() : null,
         !setup && !isHost && me
           ? me.lobbyReady
             ? h("button", { class: "on", title: "Jsi připraven. Klik = vzít zpět a ještě něco upravit (po každé vlastní změně se připravenost ruší sama).", onclick: () => net.send({ type: "setLobbyReady", ready: false }) }, icon("tick", "currentColor", 12), label("Připraven · upravit"))
@@ -710,9 +734,7 @@ function roomView(m: LobbyModel, net: Net) {
         ...PAGES.map((t, i) => h("button", { class: `wiz-step ${i === gamePage ? "on" : ""} ${i < gamePage ? "done" : ""}`, onclick: () => ((gamePage = i), rerender()) }, h("span", { class: "wiz-n" }, String(i + 1)), label(t))),
         h("span", { class: "spacer" }),
         h("button", { class: "px", disabled: gamePage === 0, onclick: () => ((gamePage = Math.max(0, gamePage - 1)), rerender()) }, "‹ ", label("zpět")),
-        gamePage === PAGES.length - 1 && isHost
-          ? h("button", { class: "px primary", onclick: () => net.send({ type: "openRoom", open: true }) }, icon("tick", "currentColor", 12), " ", label("Otevřít místnost"))
-          : h("button", { class: "px primary", disabled: gamePage === PAGES.length - 1, onclick: () => ((gamePage = Math.min(PAGES.length - 1, gamePage + 1)), rerender()) }, label("další"), " ›"),
+        h("button", { class: "px primary", disabled: gamePage === PAGES.length - 1, onclick: () => ((gamePage = Math.min(PAGES.length - 1, gamePage + 1)), rerender()) }, label("další"), " ›"),
       );
       // otevřená místnost: nastavení jen jako souhrn (host může zpět do úprav), zůstává náhled mapy se startovním bodem
       if (!setup)
@@ -959,7 +981,7 @@ function roomView(m: LobbyModel, net: Net) {
       h("div", { class: "spacer" }),
       setup
         ? isHost
-          ? h("button", { class: "primary", onclick: () => net.send({ type: "openRoom", open: true }) }, icon("tick", "currentColor", 12), label("Otevřít místnost"))
+          ? h("span", { class: "muted txt" }, "Až budeš mít nastaveno, otevři místnost tlačítkem nahoře.")
           : h("span", { class: "muted txt" }, "Čeká se, až zakladatel dokončí nastavení…")
         : isHost
           ? notReady.length

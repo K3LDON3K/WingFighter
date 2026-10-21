@@ -3915,6 +3915,36 @@ button.start-chip.on:hover:not(:disabled) {
 .roadmap-btn {
   left: 110px;
 }
+.open-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.open-pips {
+  display: inline-flex;
+  gap: 3px;
+}
+.open-pip {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ui);
+  font-size: 11px;
+  border: 1px solid #334155;
+  color: #64748b;
+  background: #0a0e1c;
+}
+.open-pip.done {
+  border-color: #86efac;
+  color: #86efac;
+}
+.open-pip.cur {
+  background: #7dd3fc;
+  border-color: #7dd3fc;
+  color: #05070f;
+}
 .gfx-btn {
   left: 222px;
 }
