@@ -349,6 +349,10 @@ function resetOrders() {
   game.picking = null;
   game.minePick = null;
   game.cargoOpen = false;
+  game.droidOpen = false;
+  game.scanOpen = false;
+  game.scanPick = false;
+  game.shieldEdit = false;
   const my = game.state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const s of my) game.orders.set(s.id, defaultOrders(s));
   if (!game.selectedShipId || !my.some((s) => s.id === game!.selectedShipId)) game.selectedShipId = my[0]?.id;
@@ -543,6 +547,10 @@ function submitOrders(force = false) {
   game.confirmOpen = false;
   game.aimingShipId = null;
   closeShieldEdit(game, game.selectedShipId ?? null);
+  game.droidOpen = false;
+  game.scanOpen = false;
+  game.scanPick = false;
+  game.cargoOpen = false;
   sfx("launch");
   net.send({ type: "submitOrders", orders: [...game.orders.values()] });
   game.submitted = true;
@@ -1468,6 +1476,9 @@ function confirmManeuver(id: string): boolean {
 function chooseIcon(shipId: string, id: string) {
   const g = game!;
   g.selectedShipId = shipId;
+  // volba jiné akce zavře otevřená okénka droida / skeneru
+  g.droidOpen = false;
+  if (!g.scanPick) g.scanOpen = false;
   const ship = g.state.ships.find((s) => s.id === shipId)!;
   const o = g.orders.get(shipId)!;
   if (id.startsWith("mine-side:") && o.special?.type === "mine") {
@@ -1738,6 +1749,15 @@ function bindInput(c: HTMLCanvasElement) {
     let closed = false;
     if (g.cargoOpen) {
       g.cargoOpen = false;
+      closed = true;
+    }
+    // otevřená okénka droida / skeneru: klik vedle je zavře (volby v plánu zůstávají)
+    if (g.droidOpen) {
+      g.droidOpen = false;
+      closed = true;
+    }
+    if (g.scanOpen && !g.scanPick) {
+      g.scanOpen = false;
       closed = true;
     }
     if (g.shieldEdit) {

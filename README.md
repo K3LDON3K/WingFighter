@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.65 – Okénka tlačítek (štít, droid, skener, náklad) se zavřou klikem vedle (na mapu), volbou jiné akce i při
+  SPUSTIT KOLO; po novém kole nezůstává žádné tlačítko „zapnuté“. Zapnuté volby droida v plánu zůstávají.
 - v3.64 – V panelu lodi zmizel popisek „štít vypnut / ⚡ bouře“ vpravo dole (byl oříznutý) – stav je vidět přímo
   v nákresu lodi; řádek celolodního štítu (% a účinnost) zůstává jen mimo bouři.
 - v3.63 – Ukazatel rychlosti v panelu lodi hned ukazuje **plánovanou rychlost** nakresleného manévru (modře; ve
