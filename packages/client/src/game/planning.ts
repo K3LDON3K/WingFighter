@@ -421,7 +421,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];
             if (c.stress > 0) parts.push(`${c.stress} stres`);
             if (c.stress < 0) parts.push(`vrací ${-c.stress} stres`);
-            return costPipsAll(c, dots > 0, `stojí ${parts.join(" + ")}${a.id === "move" ? " (rovně stejnou rychlostí zdarma)" : ""}`);
+            // během kreslení manévru (aiming) ukazujeme cenu bez fajfek – zaplaceno je až po potvrzení
+            return costPipsAll(c, dots > 0 && !(isMove && aiming), `stojí ${parts.join(" + ")}${a.id === "move" ? " (rovně stejnou rychlostí zdarma)" : ""}`);
           })(),
           icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),

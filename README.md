@@ -145,6 +145,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.55 – Při kreslení manévru ukazuje tlačítko Potvrdit cenu surovin bez fajfek (barevné čtverečky se mění podle
+  dráhy); fajfky se objeví až po potvrzení manévru.
 - v3.54 – Cena akce na tlačítku ve **všech surovinách**: červené čtverečky = akce, růžové = stres, žluté = technologie.
   Otočka 2 červené + 1 růžový, úhyb 1 + 1, manévr 1 + stres podle nakreslené dráhy (zelený manévr ukáže růžové „+“ –
   stres vrací), sken lodi / vesmíru žluté. Zaplacené čtverečky ztmavnou s fajfkou.
