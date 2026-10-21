@@ -147,6 +147,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.99 – Oprava segmentového štítu: nové rozdělení segmentů se během přehrávání kola už nevrací na starý
+  stav (přerozdělení platí od začátku kola, animace ho teď přebírá hned). Úprava štítu už se v animaci nehlásí
+  chybně jako „úskok“.
 - v3.98 – Ocas komety se během přehrávání kola lehce kývá jako vlajka (plynule se rozjede i zastaví); při
   plánování stojí.
 - v3.97 – Ladění parametrů (v místnosti i ve hře) je schované pod heslem – po odemknutí si ho prohlížeč pamatuje.

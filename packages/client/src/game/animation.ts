@@ -484,6 +484,12 @@ export class TurnAnimation {
       case "action": {
         const s = v.ships.find((x) => x.id === e.shipId);
         if (!s) break;
+        if (e.ok && e.action.type === "shield") {
+          // přerozdělení segmentů platí od začátku kola – ve view hned, aby se štít během animace nevracel na starý stav
+          s.segments = [...e.action.segments] as import("@wingfighter/shared").Segments;
+          break;
+        }
+        if (e.ok && (e.action.type === "jettison" || e.action.type === "pickup")) break; // mají vlastní události
         if (e.ok) {
           if (e.action.type === "evade") s.evading = true;
           if (e.action.type === "focus") s.tokens.focus = 1;
