@@ -187,6 +187,8 @@ export class TurnAnimation {
   private startedAt = 0;
   private started = false;
   finished = false;
+  /** Průběh přehrávání 0..1 (pro plynulé rozjetí a dojetí průběžných animací, např. ocasu komety). */
+  progress = 0;
 
   constructor(
     prev: GameState,
@@ -321,6 +323,7 @@ export class TurnAnimation {
       this.startedAt = now;
     }
     const t = now - this.startedAt;
+    this.progress = this.total > 0 ? Math.min(1, t / this.total) : 1;
 
     for (const s of this.schedule) {
       if (s.fired || s.time > t) continue;

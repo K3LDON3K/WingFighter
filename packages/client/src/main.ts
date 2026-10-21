@@ -734,7 +734,7 @@ function actionGhost(end: Pose, o: ShipOrders): Pose | undefined {
 function buildOverlay(view: ViewModel): Overlay {
   const g = game!;
   const me = g.state.players.find((p) => p.id === playerId);
-  const overlay: Overlay = { myTeam: me?.team, hoverId: g.hoverId };
+  const overlay: Overlay = { myTeam: me?.team, hoverId: g.hoverId, animating: g.anim ? g.anim.progress : undefined };
   g.icons = [];
   // fog of war: dohled vlastního týmu (během animace z aktuálních pozic)
   overlay.vision = view.ships

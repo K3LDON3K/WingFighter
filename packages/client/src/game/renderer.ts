@@ -87,6 +87,8 @@ export interface Overlay {
   myTeam?: number;
   /** Plánování: kreslit předpověď dráhy komet v tomto kole. */
   cometPredict?: boolean;
+  /** Průběh přehrávání kola 0..1 (undefined = plánování, nic se nehýbe). */
+  animating?: number;
   /** Vlastní lodě (ocas komety, který už využily, se kreslí vybledle). */
   myShipIds?: string[];
 }
@@ -499,7 +501,10 @@ export class Renderer {
     const phase = rnd() * Math.PI * 2;
     const amp = 5; // amplituda vlny (herní jednotky)
     const waves = 1.6; // počet period na délku ocasu
-    const axisY = (k: number) => Math.sin(phase + k * waves * Math.PI * 2) * amp * (0.3 + k);
+    // ocas se kývá jako vlajka jen během pohybu (animace kola); při plánování stojí – obálka sin(π·p) kývání plynule rozjede i zastaví
+    const env = overlay.animating === undefined ? 0 : Math.sin(Math.PI * overlay.animating);
+    const sway = 1 + env * (Math.sin((now / 1000) * 2.4 + phase) - 1);
+    const axisY = (k: number) => Math.sin(phase + k * waves * Math.PI * 2) * amp * (0.3 + k) * sway;
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(c.heading);
