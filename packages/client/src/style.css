@@ -3545,3 +3545,44 @@ button.start-chip.on:hover:not(:disabled) {
   background: #0b1020;
   border-color: #831843;
 }
+/* zničená zbraň: šrafované tlačítko s křížkem (varianta B) */
+.bb-weapon.destroyed,
+.bb-weapon.destroyed:disabled {
+  background: repeating-linear-gradient(135deg, #2a0a0a 0 4px, #160404 4px 8px);
+  border-color: #7f1d1d;
+  color: #9f4040;
+  opacity: 1;
+}
+.bb-weapon.destroyed .lbl {
+  color: #9f4040;
+}
+.bb-weapon.destroyed .pi {
+  opacity: 0.5;
+}
+.bb-weapon.destroyed .cost-pips i {
+  filter: grayscale(0.8);
+  opacity: 0.5;
+}
+.dead-x {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  line-height: 1;
+  color: #ef4444;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.seg.destroyed,
+.seg.destroyed:disabled {
+  position: relative;
+  background: repeating-linear-gradient(135deg, #2a0a0a 0 3px, #160404 3px 6px);
+  border-color: #7f1d1d;
+  color: #9f4040;
+  opacity: 1;
+}
+.seg.destroyed .dead-x {
+  font-size: 18px;
+}

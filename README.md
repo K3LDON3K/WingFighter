@@ -145,6 +145,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.58 – **Zničená zbraň v liště akcí** (varianta B): když jsou všechny moduly dané zbraně zničené, je její tlačítko
+  červeně šrafované s křížkem a nejde kliknout. U více modulů stejného typu je takto označené jen malé tlačítko
+  zničeného modulu (1↑ / 2←) pod hlavním tlačítkem a nejde ho vybrat; hlavní tlačítko zůstává funkční.
 - v3.57 – **Výzbroj kompaktně** (varianta E, panel 136 px): bez názvů a čísel – svislá „baterie“ životů modulu
   (5 segmentů po 20 %, zelená/žlutá/červená, zničený = tmavě červená), políčko s ikonkou zbraně (šipka = natočení,
   zničený = červené políčko) a munice ikonkami (plná = k dispozici, šedá = spotřebovaná; kulomet proužky, lasery ∞).

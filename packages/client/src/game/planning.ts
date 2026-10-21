@@ -382,14 +382,16 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       const shieldDone = a.id === "shield" && !!planned && !editing;
       const done = moveDone || shieldDone;
       const stormOff = stormed && (a.id === "laser" || a.id === "shield");
-      const why = stormOff ? "systém je v bouři mimo provoz" : a.disabled(ship, m.state, o);
+      // všechny moduly, které akce potřebuje, jsou zničené → tlačítko „zničeno“ (šrafování + křížek)
+      const destroyed = !!a.requiresModule && ship.loadout.modules.some((x) => x.type === a.requiresModule) && !ship.loadout.modules.some((x) => x.type === a.requiresModule && moduleWorking(x));
+      const why = destroyed ? "ZNIČENO – modul nefunguje" : stormOff ? "systém je v bouři mimo provoz" : a.disabled(ship, m.state, o);
       const dots = dotsFor(a.id); // > 0 = akce je za toto tlačítko utracená
       const wbtn =
         h(
           "button",
           {
-            class: `px bb-weapon ${active && !stormOff && !done ? "on" : ""} ${done ? "done" : ""} ${stormOff ? "stormed" : ""} ${dots > 0 ? "spent" : ""}`,
-            disabled: locked || stormOff || (!!why && !active && !done && dots === 0),
+            class: `px bb-weapon ${active && !stormOff && !done ? "on" : ""} ${done ? "done" : ""} ${stormOff ? "stormed" : ""} ${dots > 0 ? "spent" : ""} ${destroyed ? "destroyed" : ""}`,
+            disabled: locked || stormOff || destroyed || (!!why && !active && !done && dots === 0),
             title: moveDone
               ? `Manévr je nakreslený a platí. Stisk = reset: loď poletí rovně stejnou rychlostí (zdarma).\nNovou dráhu nakreslíš tažením z lodi.`
               : shieldDone
@@ -413,6 +415,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
           done ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
+          destroyed ? h("span", { class: "dead-x" }, "✕") : null,
         );
       if (a.id === "shield" && editing) row.append(h("div", { class: "scan-holder stack" }, shieldPop, wbtn));
       else row.append(wbtn);
@@ -523,7 +526,11 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     return h(
       "div",
       { class: "segs-btn", title: `Ze kterého modulu (${MODULES[type].name}) – jeden za akci` },
-      ...mods.map((m, i) => seg(`${i + 1}${FACING_GLYPH[m.facing ?? "front"]}${m.ammo !== undefined ? `·${m.ammo}` : ""}`, m.id === currentId, `${MODULES[type].name} ${i + 1} – ${FACING_NAMES[m.facing ?? "front"]}${m.ammo !== undefined ? ` (munice ${m.ammo})` : ""}`, () => onPick(m.id))),
+      ...mods.map((m, i) =>
+        moduleWorking(m)
+          ? seg(`${i + 1}${FACING_GLYPH[m.facing ?? "front"]}${m.ammo !== undefined ? `·${m.ammo}` : ""}`, m.id === currentId, `${MODULES[type].name} ${i + 1} – ${FACING_NAMES[m.facing ?? "front"]}${m.ammo !== undefined ? ` (munice ${m.ammo})` : ""}`, () => onPick(m.id))
+          : h("button", { class: "px seg destroyed", disabled: true, title: `${MODULES[type].name} ${i + 1} – ${FACING_NAMES[m.facing ?? "front"]}: ZNIČENÝ – nefunguje` }, `${i + 1}${FACING_GLYPH[m.facing ?? "front"]}`, h("span", { class: "dead-x" }, "✕")),
+      ),
     );
   };
   if (m.scanOpen && scannerModule(ship.loadout)) {
