@@ -360,12 +360,34 @@ export class Renderer {
   private drawBackground(state: GameState, cam: Camera) {
     const ctx = this.ctx;
     if (!this.starPattern) this.starPattern = ctx.createPattern(this.sprites.stars, "repeat");
-    ctx.save();
     const vw = cam.viewW / cam.zoom;
     const vh = cam.viewH / cam.zoom;
-    ctx.fillStyle = this.starPattern!;
-    ctx.fillRect(cam.x, cam.y, vw, vh);
-    ctx.restore();
+    if (parallaxEnabled()) {
+      // hvězdy patří do vzdálené vrstvy: dvě hloubky – matné daleké (skoro se nehýbou) a jasnější bližší
+      const layer = (depth: number, alpha: number, scale: number, shift: number) => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(cam.x, cam.y, vw, vh);
+        ctx.clip();
+        // paralaxa dlaždicového vzoru: posun počátku vzoru o (1 − hloubka) pohybu kamery
+        ctx.translate(cam.x * (1 - depth) + shift, cam.y * (1 - depth) + shift);
+        ctx.scale(scale, scale);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = this.starPattern!;
+        const x0 = (cam.x - cam.x * (1 - depth) - shift) / scale;
+        const y0 = (cam.y - cam.y * (1 - depth) - shift) / scale;
+        ctx.fillRect(x0 - 2, y0 - 2, vw / scale + 4, vh / scale + 4);
+        ctx.restore();
+      };
+      layer(0.12, 0.4, 0.7, 37);
+      layer(0.3, 0.85, 1, 0);
+    } else {
+      // bez vzdáleného pozadí: nehybné hvězdy jako dřív
+      ctx.save();
+      ctx.fillStyle = this.starPattern!;
+      ctx.fillRect(cam.x, cam.y, vw, vh);
+      ctx.restore();
+    }
     // hrací plocha je ovál
     ctx.strokeStyle = "rgba(148,163,184,0.35)";
     ctx.lineWidth = 2;

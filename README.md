@@ -147,6 +147,9 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.107 – Hvězdy přesunuty z herní vrstvy do vzdáleného pozadí ve dvou hloubkách (matné daleké + jasnější bližší,
+  posouvají se pomaleji než mapa). Na herní vrstvě zůstávají jen aktivní prvky, ovál mapy a mřížka. Při
+  vypnutém vzdáleném pozadí zůstanou nehybné hvězdy jako dřív.
 - v3.106 – Vzdálené pozadí utlumené na polovinu, aby nekonkurovalo lodím a dráhám.
 - v3.105 – Náhled mapy v místnosti ukazuje i zvolené vzdálené pozadí (motiv, rozložení galaxií a planet).
 - v3.104 – Vzdálené paralaxní pozadí: galaxie, mlhoviny a planety hluboko za mapou (pixel-art ze seedu mapy, posouvají
