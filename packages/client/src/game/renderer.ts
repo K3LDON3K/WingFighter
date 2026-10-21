@@ -21,7 +21,7 @@ import {
 } from "@wingfighter/shared";
 import type { Camera } from "./camera.ts";
 import { segmentColor, strengthColor } from "./shield-ui.ts";
-import { drawBorderStorm, drawStorms, drawStormSparks } from "./storm-draw.ts";
+import { drawBorderStorm, drawStormBolts, drawStormClouds, drawStormSparks } from "./storm-draw.ts";
 import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
 import type { ViewComet, ViewDebris, ViewModel, ViewShip } from "./view.ts";
@@ -97,6 +97,9 @@ export class Renderer {
   readonly sprites = new SpriteCache();
   private stormsRef: import("@wingfighter/shared").Storm[] | null = null;
   private starPattern: CanvasPattern | null = null;
+  /** Mezipaměť statické vrstvy (hvězdy, mřížka, okrajová bouře, mraky bouří) v obrazovkových pixelech. */
+  private staticCanvas: HTMLCanvasElement | null = null;
+  private staticKey = "";
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -111,15 +114,40 @@ export class Renderer {
     ctx.fillRect(0, 0, width, height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    // statická vrstva: překreslí se jen při změně kamery / velikosti / mapy, jinak jen jeden drawImage
+    this.stormsRef = state.storms ?? null;
+    const key = `${width}x${height}|${cam.x.toFixed(2)},${cam.y.toFixed(2)},${cam.zoom.toFixed(4)}|${state.width}x${state.height}|${state.border ?? 0}|${(state.storms ?? []).map((st) => st.id).join(",")}`;
+    if (!this.staticCanvas || this.staticKey !== key) {
+      if (!this.staticCanvas) this.staticCanvas = document.createElement("canvas");
+      const sc = this.staticCanvas;
+      if (sc.width !== width || sc.height !== height) {
+        sc.width = width;
+        sc.height = height;
+      }
+      const sx = sc.getContext("2d")!;
+      sx.setTransform(1, 0, 0, 1, 0, 0);
+      sx.fillStyle = "#04060d";
+      sx.fillRect(0, 0, width, height);
+      sx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      sx.scale(cam.zoom, cam.zoom);
+      sx.translate(-cam.x, -cam.y);
+      const saved = this.ctx;
+      this.ctx = sx;
+      this.drawBackground(state, cam);
+      this.drawGrid(state);
+      if (state.border) drawBorderStorm(sx, state.width, state.height, state.border, cam.zoom);
+      if (state.storms?.length) drawStormClouds(sx, state.storms, cam.zoom);
+      this.ctx = saved;
+      this.staticKey = key;
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(this.staticCanvas, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     ctx.save();
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
-
-    this.drawBackground(state, cam);
-    this.drawGrid(state);
-    this.stormsRef = state.storms ?? null;
-    if (state.border) drawBorderStorm(ctx, state.width, state.height, state.border, cam.zoom);
-    if (state.storms?.length) drawStorms(ctx, state.storms, now, cam.zoom);
+    if (state.storms?.length) drawStormBolts(ctx, state.storms, now);
     for (const a of view.asteroids) this.drawAsteroid(a);
     for (const m of view.mines) this.drawMine(m, now);
     this.marks = [];
@@ -229,6 +257,7 @@ export class Renderer {
   }
 
   private fogCanvas: HTMLCanvasElement | null = null;
+  private fogKey = "";
 
   /** Fog of war: ztmaví vše mimo dohled vlastních lodí. */
   private drawFog(vision: { x: number; y: number; r: number }[], cam: Camera) {
@@ -241,23 +270,28 @@ export class Renderer {
       fc.width = w;
       fc.height = h;
     }
-    const f = fc.getContext("2d")!;
-    f.setTransform(1, 0, 0, 1, 0, 0);
-    f.globalCompositeOperation = "source-over";
-    f.clearRect(0, 0, w, h);
-    f.fillStyle = "rgba(2,4,10,0.78)";
-    f.fillRect(0, 0, w, h);
-    f.globalCompositeOperation = "destination-out";
-    for (const v of vision) {
-      const c = cam.toScreen(v.x, v.y);
-      const r = v.r * cam.zoom;
-      const grad = f.createRadialGradient(c.x, c.y, r * 0.85, c.x, c.y, r);
-      grad.addColorStop(0, "rgba(0,0,0,1)");
-      grad.addColorStop(1, "rgba(0,0,0,0)");
-      f.fillStyle = grad;
-      f.beginPath();
-      f.arc(c.x, c.y, r, 0, Math.PI * 2);
-      f.fill();
+    // mlha se přepočítá jen při změně kamery nebo dohledu (jinak jen jeden drawImage)
+    const key = `${w}x${h}|${cam.x.toFixed(2)},${cam.y.toFixed(2)},${cam.zoom.toFixed(4)}|${vision.map((v) => `${v.x.toFixed(1)},${v.y.toFixed(1)},${v.r}`).join(";")}`;
+    if (this.fogKey !== key) {
+      this.fogKey = key;
+      const f = fc.getContext("2d")!;
+      f.setTransform(1, 0, 0, 1, 0, 0);
+      f.globalCompositeOperation = "source-over";
+      f.clearRect(0, 0, w, h);
+      f.fillStyle = "rgba(2,4,10,0.78)";
+      f.fillRect(0, 0, w, h);
+      f.globalCompositeOperation = "destination-out";
+      for (const v of vision) {
+        const c = cam.toScreen(v.x, v.y);
+        const r = v.r * cam.zoom;
+        const grad = f.createRadialGradient(c.x, c.y, r * 0.85, c.x, c.y, r);
+        grad.addColorStop(0, "rgba(0,0,0,1)");
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        f.fillStyle = grad;
+        f.beginPath();
+        f.arc(c.x, c.y, r, 0, Math.PI * 2);
+        f.fill();
+      }
     }
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -282,9 +316,17 @@ export class Renderer {
     const ctx = this.ctx;
     if (!this.starPattern) this.starPattern = ctx.createPattern(this.sprites.stars, "repeat");
     ctx.save();
-    ctx.fillStyle = this.starPattern!;
     const vw = cam.viewW / cam.zoom;
     const vh = cam.viewH / cam.zoom;
+    if (state.border) {
+      // za tvrdým okrajem se vesmír nekreslí – jen plná barva husté bouře; hvězdy jen uvnitř
+      ctx.fillStyle = "#1a0a24";
+      ctx.fillRect(cam.x, cam.y, vw, vh);
+      ctx.beginPath();
+      ctx.ellipse(state.width / 2, state.height / 2, state.width / 2 + state.border, state.height / 2 + state.border, 0, 0, Math.PI * 2);
+      ctx.clip();
+    }
+    ctx.fillStyle = this.starPattern!;
     ctx.fillRect(cam.x, cam.y, vw, vh);
     ctx.restore();
     // hrací plocha je ovál
@@ -562,9 +604,10 @@ export class Renderer {
   private drawShield(s: ViewShip, now: number, planned?: Segments) {
     const GAP = SHIELD_GAP;
     const ctx = this.ctx;
+    // loď bez štítu (žádný funkční modul štítu): nic nekreslit
+    if (s.shieldType === "none") return;
     if (this.stormsRef && pointInStorm(this.stormsRef, s)) {
       // v bouři štít nefunguje: jen slabý fialový tečkovaný obrys tam, kde býval
-      if (s.shieldType === "none") return;
       ctx.save();
       ctx.strokeStyle = "rgba(168,85,247,0.45)";
       ctx.lineWidth = 1.5;

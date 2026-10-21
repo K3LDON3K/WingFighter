@@ -476,7 +476,7 @@ export type TurnEvent =
   | { type: "torpedoExpire"; torpedoId: string; x: number; y: number }
   | { type: "torpedoShot"; torpedoId: string; shooterId: string; x: number; y: number; attackDice: DieFace[]; defenseDice: DieFace[]; destroyed: boolean }
   | { type: "debrisShot"; debrisId: string; shooterId: string; x: number; y: number; destroyed: boolean; reward: number }
-  | { type: "jettison"; shipId: string; debris: Debris ; dropped?: boolean }
+  | { type: "jettison"; shipId: string; debris: Debris; dropped?: boolean; /** typ štítu lodi po vyhození (none = štít už nemá) */ shieldType?: ShieldType }
   /** Zvednutí nákladu: ok = zvednuto; jinak důvod (lost = předmět uchvátila jiná loď). */
   | { type: "pickup"; shipId: string; debrisId: string; x: number; y: number; ok: boolean; reason?: "lost" | "range" | "speed" | "full" | "gone"; winnerId?: string; module?: ModuleInstance }
   | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" | "comet" | "tail" }

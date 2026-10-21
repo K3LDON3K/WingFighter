@@ -91,6 +91,9 @@ export function shieldBubble(ship: BubbleShip, teamColor: string, planned?: Segm
       const on = i < Math.round((ship.shieldEff / 100) * n);
       svg.append(rect(cx + 51 * Math.cos(a * D) - 2, cy + 51 * Math.sin(a * D) - 2, 4, 4, on ? "#9aa3ad" : SHIELD_DARK));
     }
+  } else if (ship.shieldType === "none") {
+    // bez štítu: jen tmavý obrys a nápis
+    svg.append(text(cx, cy - 44, "BEZ ŠTÍTU", "#64748b", 9));
   } else {
     const cur = ship.segments;
     const plan = planned ?? cur;

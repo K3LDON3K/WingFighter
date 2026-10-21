@@ -462,9 +462,16 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
   if (actionCost(ship, { ...o, maneuverId: man.id }) > RULES.actionPoints) return false;
   if (man.id !== o.maneuverId) {
     game.orders.set(shipId, { ...o, maneuverId: man.id });
-    renderSide();
+    // při kreslení myší se manévr mění mnohokrát za sekundu – panel překreslit až v dalším snímku
+    requestSide();
   }
   return true;
+}
+
+/** Odložené překreslení postranního panelu (sloučí víc změn do jednoho snímku). */
+let sideDirty = false;
+function requestSide() {
+  sideDirty = true;
 }
 
 function pumpQueue() {
@@ -671,8 +678,16 @@ function unmountGame() {
   render();
 }
 
+let lastFrameAt = 0;
 function frame(now: number) {
   if (!game || !renderer || !cam || !canvas) return;
+  if (sideDirty) {
+    sideDirty = false;
+    renderSide();
+  }
+  // bez běžící animace stačí ~30 snímků/s (tahová hra) – šetří procesor
+  if (!game.anim && now - lastFrameAt < 30) return;
+  lastFrameAt = now;
   if (game.anim) {
     game.anim.update(now);
     if (game.anim.finished) {

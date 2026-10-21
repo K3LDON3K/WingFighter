@@ -4407,3 +4407,27 @@ button.start-chip.on:hover:not(:disabled) {
   font-size: 14px;
   margin-left: 2px;
 }
+/* okénka Vyhodit / Zvednout: širší, nákres lodi v plné čitelné velikosti */
+.jettison-pop,
+.cargo-pop {
+  width: 460px;
+  padding: 10px 12px 8px;
+  gap: 8px;
+}
+.jettison-pop .loadout.compact,
+.cargo-pop .loadout.compact {
+  width: 100%;
+}
+.jettison-pop .lo-svg,
+.cargo-pop .lo-svg {
+  width: 420px;
+  height: auto;
+}
+.jettison-pop .lo-diagram,
+.cargo-pop .lo-diagram {
+  gap: 10px;
+}
+.jettison-pop .lo-cargo,
+.cargo-pop .lo-cargo {
+  margin-top: 4px;
+}

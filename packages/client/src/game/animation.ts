@@ -405,6 +405,7 @@ export class TurnAnimation {
       case "jettison": {
         const sh = v.ships.find((x) => x.id === e.shipId);
         v.debris.push({ ...e.debris });
+        if (sh && e.shieldType) sh.shieldType = e.shieldType; // vyhozený štít: prstenec zmizí hned
         if (e.dropped) {
           // modul vylétá z vraku do místa trosek
           const from = sh ? { x: sh.x, y: sh.y } : { x: e.debris.x, y: e.debris.y };

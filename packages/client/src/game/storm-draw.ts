@@ -38,7 +38,8 @@ function artFor(storm: Storm): StormArt {
   return a;
 }
 
-export function drawStorms(ctx: CanvasRenderingContext2D, storms: Storm[], now: number, zoom: number) {
+/** Statická část bouří (mraky, šum, obrys) – kreslí se do mezipaměti při změně kamery. */
+export function drawStormClouds(ctx: CanvasRenderingContext2D, storms: Storm[], zoom: number) {
   for (const storm of storms) {
     const art = artFor(storm);
     // měkké mraky
@@ -71,7 +72,13 @@ export function drawStorms(ctx: CanvasRenderingContext2D, storms: Storm[], now: 
       ctx.stroke();
     }
     ctx.restore();
-    // blesky
+  }
+}
+
+/** Dynamická část bouří: občasné blesky (levné, kreslí se každý snímek). */
+export function drawStormBolts(ctx: CanvasRenderingContext2D, storms: Storm[], now: number) {
+  for (const storm of storms) {
+    const art = artFor(storm);
     if (now >= art.nextBolt) {
       const b = storm.blobs[Math.floor(Math.random() * storm.blobs.length)];
       const pts = [{ x: b.x + (Math.random() - 0.5) * b.r, y: b.y - b.r * 0.6 }];
@@ -123,7 +130,6 @@ export function drawBorderStorm(ctx: CanvasRenderingContext2D, w: number, h: num
   const cy = h / 2;
   const a = w / 2;
   const b = h / 2;
-  const FAR = B * 6;
   const ellipse = (ra: number, rb: number) => {
     ctx.beginPath();
     ctx.ellipse(cx, cy, Math.max(1, ra), Math.max(1, rb), 0, 0, Math.PI * 2);
@@ -137,20 +143,11 @@ export function drawBorderStorm(ctx: CanvasRenderingContext2D, w: number, h: num
     return `rgba(${rr},${gg},${bb},${al})`;
   };
   ctx.save();
-  // jen mimo hrací plochu
+  // jen prstenec mezi hranou mapy a tvrdým okrajem (za ním je plná barva z pozadí)
   ctx.beginPath();
-  ctx.rect(-FAR, -FAR, w + 2 * FAR, h + 2 * FAR);
+  ctx.ellipse(cx, cy, a + B, b + B, 0, 0, Math.PI * 2);
   ctx.ellipse(cx, cy, a, b, 0, 0, Math.PI * 2);
   ctx.clip("evenodd");
-  // za tvrdým okrajem: hustá bouře všude
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(-FAR, -FAR, w + 2 * FAR, h + 2 * FAR);
-  ctx.ellipse(cx, cy, a + B, b + B, 0, 0, Math.PI * 2);
-  ctx.clip("evenodd");
-  ctx.fillStyle = col(1);
-  ctx.fillRect(-FAR, -FAR, w + 2 * FAR, h + 2 * FAR);
-  ctx.restore();
   // prstenec: soustředné elipsy od tvrdého okraje dovnitř (každá překryje vnitřek – vrstvení dá přechod)
   const N = 18;
   for (let i = N; i >= 1; i--) {

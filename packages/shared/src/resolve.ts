@@ -686,7 +686,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       module: { ...mod },
     };
     state.debris.push(debris);
-    events.push({ type: "jettison", shipId: ship.id, debris });
+    events.push({ type: "jettison", shipId: ship.id, debris, shieldType: ship.shieldType });
     events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
   }
   const scaleEvade = (ship: Ship, dmg: number) => (evading.has(ship.id) ? Math.round(dmg * (1 - RULES.evadeDamageReduction / 100)) : dmg);
