@@ -1,4 +1,5 @@
 import { ICONS } from "../icons.ts";
+import type { Segments } from "@wingfighter/shared";
 import {
   shipCircles,
   COMET,
@@ -68,6 +69,8 @@ export interface Overlay {
   scanRanges?: { ship: number; deep: number };
   /** Náhled pole miny na startovní pozici lodi. */
   mineField?: { x: number; y: number; timer?: number };
+  /** Plánovaná úprava štítu vlastních lodí (platí od začátku kola) – kreslí se hned. */
+  plannedSegments?: Record<string, Segments>;
   /** Zvolený cíl (loď / torpédo) a bod pro torpédo. */
   targetId?: string;
   targetPoint?: { x: number; y: number };
@@ -547,7 +550,7 @@ export class Renderer {
   }
 
   /** Štít na mapě: celolodní = kruh obarvený podle síly; segmentový = 4 oblouky otáčející se s lodí. */
-  private drawShield(s: ViewShip, now: number) {
+  private drawShield(s: ViewShip, now: number, planned?: Segments) {
     const GAP = SHIELD_GAP;
     const ctx = this.ctx;
     if (this.stormsRef && pointInStorm(this.stormsRef, s)) {
@@ -586,8 +589,9 @@ export class Renderer {
     const half = (40 * Math.PI) / 180;
     ctx.save();
     ctx.lineWidth = 3;
+    const segs = planned ?? s.segments;
     for (let i = 0; i < 4; i++) {
-      const hp = s.segments[i] ?? 0;
+      const hp = segs[i] ?? 0;
       const mid = s.heading + (i * Math.PI) / 2;
       ctx.beginPath();
       ctx.arc(s.x, s.y, r, mid - half, mid + half);
@@ -638,7 +642,7 @@ export class Renderer {
       ctx.restore();
     }
 
-    this.drawShield(s, now);
+    this.drawShield(s, now, overlay.plannedSegments?.[s.id]);
 
     const f = forward(s.heading);
     ctx.save();

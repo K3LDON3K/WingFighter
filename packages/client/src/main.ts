@@ -718,11 +718,13 @@ function buildOverlay(view: ViewModel): Overlay {
   overlay.showSelectRing = showSelectRing();
   overlay.picking = g.picking ?? undefined;
   overlay.previews = [];
+  overlay.plannedSegments = {};
 
   const my = g.state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const ship of my) {
     const vs = view.ships.find((s) => s.id === ship.id);
     const o = g.orders.get(ship.id);
+    if (o?.action?.type === "shield") overlay.plannedSegments[ship.id] = o.action.segments;
     if (!vs || !o) continue;
     const profile = profileFor(ship, o);
     const man = resolveManeuver(profile, o.maneuverId, ship.speed);
