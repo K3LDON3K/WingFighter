@@ -494,27 +494,31 @@ export class Renderer {
     const L = COMET.tailLength;
     const W = COMET.tailWidth;
     const used = overlay.myShipIds?.length ? overlay.myShipIds.every((id) => c.tailUsed.includes(id)) : false;
-    // ocas: nepravidelný chvost (tvar je pro každou kometu jiný, ale pevný – žádná animace)
+    // ocas: mírně zvlněný (malá sinusoida podél osy, fáze pro každou kometu jiná) – bez animace
     const rnd = seeded(c.id);
+    const phase = rnd() * Math.PI * 2;
+    const amp = 5; // amplituda vlny (herní jednotky)
+    const waves = 1.6; // počet period na délku ocasu
+    const axisY = (k: number) => Math.sin(phase + k * waves * Math.PI * 2) * amp * (0.3 + k);
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(c.heading);
-    const steps = 9;
+    const steps = 16;
     const top: { x: number; y: number }[] = [];
     const bot: { x: number; y: number }[] = [];
     for (let i = 0; i <= steps; i++) {
       const k = i / steps;
-      // šířka: u jádra úzký, v první třetině plný, ke konci se rozpadá
-      const base = (W / 2) * (k < 0.35 ? 0.45 + k * 1.6 : 1 - (k - 0.35) * 0.9);
+      // šířka: u jádra užší, v první třetině plná, ke konci se zužuje
+      const half = (W / 2) * (k < 0.3 ? 0.5 + k * 1.67 : 1 - (k - 0.3) * 0.85);
       const x = -c.radius - k * L;
-      top.push({ x: x + (rnd() - 0.5) * 10, y: -(base + (rnd() - 0.5) * (W * 0.45)) });
-      bot.push({ x: x + (rnd() - 0.5) * 10, y: base + (rnd() - 0.5) * (W * 0.45) });
+      const y = axisY(k);
+      top.push({ x, y: y - half });
+      bot.push({ x, y: y + half });
     }
     ctx.beginPath();
     ctx.moveTo(-c.radius * 0.6, 0);
     for (const p of top) ctx.lineTo(p.x, p.y);
-    // roztřepený konec
-    ctx.lineTo(-c.radius - L - 6 - rnd() * 14, (rnd() - 0.5) * 8);
+    ctx.lineTo(-c.radius - L - 8, axisY(1));
     for (let i = bot.length - 1; i >= 0; i--) ctx.lineTo(bot[i].x, bot[i].y);
     ctx.closePath();
     ctx.fillStyle = used ? "rgba(148,163,184,0.06)" : "rgba(103,232,249,0.10)";
@@ -524,28 +528,26 @@ export class Renderer {
     ctx.setLineDash([3, 5]);
     ctx.stroke();
     ctx.setLineDash([]);
-    // pixelový ohon: jasná, mírně zvlněná osa + rozházené krystaly
+    // pixelový ohon: jasná osa sleduje vlnu + krystaly po stranách
     const step = 4;
     const cnt = Math.floor(L / step);
-    let wob = 0;
     for (let i = 0; i < cnt; i++) {
       const x = -c.radius - i * step;
       const k = i / cnt;
-      wob += (rnd() - 0.5) * 2.2;
-      wob *= 0.9;
-      const y = wob * (0.3 + k);
+      const y = Math.round(axisY(k));
       ctx.fillStyle = k < 0.3 ? "#f0f9ff" : k < 0.6 ? "#a5f3fc" : "#0e7490";
       ctx.globalAlpha = (used ? 0.4 : 1) * (1 - k * 0.6);
-      // osa se ke konci drolí na kusy
-      if (k < 0.55 || rnd() < 0.7) ctx.fillRect(x, y - 2 + (k > 0.6 ? Math.round((rnd() - 0.5) * 6) : 0), step, k < 0.5 ? 4 : 3);
-      if (rnd() < 0.35) {
+      ctx.fillRect(x, y - 2, step, k < 0.5 ? 4 : 3);
+      if (i % 3 === 0 && i % 2 === 0) {
         ctx.fillStyle = "#67e8f9";
-        const off = (rnd() - 0.5) * (6 + k * W * 1.1);
-        ctx.fillRect(x + Math.round(rnd() * 3), y + off, 3, 3);
+        const off = 4 + (i % 4) * 2 + k * (W / 2 - 10);
+        ctx.fillRect(x, y - off - 2, 3, 3);
+        ctx.fillRect(x + 2, y + off, 3, 3);
       }
-      if (i > 8 && rnd() < 0.22) {
+      if (i > 10 && i % 5 === 0) {
         ctx.fillStyle = "#164e63";
-        ctx.fillRect(x - 1, y + (rnd() - 0.5) * W * 1.2, 2 + Math.round(rnd() * 2), 2 + Math.round(rnd() * 2));
+        ctx.fillRect(x - 1, y - W / 2 + 6 + (i % 4) * 3, 3, 3);
+        ctx.fillRect(x + 1, y + W / 2 - 9 - (i % 3) * 3, 3, 3);
       }
     }
     ctx.globalAlpha = 1;

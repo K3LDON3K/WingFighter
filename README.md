@@ -147,6 +147,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.96 – Ocas komety: hladký obrys s malou sinusoidou (osa i krystaly sledují vlnu, fáze pro každou kometu jiná).
 - v3.95 – Oprava zpomalování po delším hraní v jedné záložce: každá spuštěná bitva přidávala další posluchače myši
   a klávesnice na okno (a držela staré plátno v paměti); teď se s koncem bitvy odebírají. Kometa: nepravidelný
   ocas místo obdélníku (tvar je pro každou kometu jiný, bez animace), jádro se neotáčí, a při odletu z mapy letí
