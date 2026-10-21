@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.75 – Nastavení → Bitva: Herní mód, Umístění na mapě a Výbava botů jsou ikonková tlačítka (jako ostatní řádky)
+  místo rozbalovacích seznamů; najetí ukáže popis, vedle je text zvolené volby.
 - v3.74 – Nastavení hry → Bitva → **Umístění na mapě**: *Náhodné* (každý náhodný startovní bod, mapa se před
   bitvou nevybírá), *Týmové náhodné* (tým náhodný bod, spoluhráči ve formaci vedle sebe, rozestup 60), *Ruční*
   (dosavadní výběr bodu na náhledu mapy) a *Týmové ruční* (velitel týmu ★ vybere bod, tým startuje ve formaci

@@ -4012,3 +4012,21 @@ button.start-chip.on:hover:not(:disabled) {
   border: 1px dashed #334155;
   font-size: 13px;
 }
+.pip-combo {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pip-combo .pip-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+}
+.pip-q {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}

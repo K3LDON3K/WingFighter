@@ -439,6 +439,77 @@ function roomView(m: LobbyModel, net: Net) {
         }),
       );
       const summary = `${MAP_SIZES[map.size]?.label ?? map.size} · asteroidy ${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids} · ${map.storms === 0 ? "bez bouří" : `${map.storms} bouře`} · komety ${{ none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"]} · seed ${map.seed} · ${settings.mode === "tdm" ? "týmový deathmatch" : "deathmatch"} · ${PLACEMENT_LABEL[placement].toLowerCase()} · startovní kredity ${budget}`;
+      /** Pixelové pictogramy pro řádky Herní mód / Umístění / Výbava botů (26×26). */
+      const dot = (s: SVGElement, x: number, y: number, c: string, r = 2.2) => s.append(svgEl("circle", { cx: String(x), cy: String(y), r: String(r), fill: c }));
+      const ring = (s: SVGElement, x: number, y: number, c: string, r = 3) => s.append(svgEl("circle", { cx: String(x), cy: String(y), r: String(r), fill: "none", stroke: c, "stroke-width": "1.5", "stroke-dasharray": "2 1.5" }));
+      const txt = (s: SVGElement, x: number, y: number, t: string, c: string, size = 11) => {
+        const e = svgEl("text", { x: String(x), y: String(y), fill: c, "font-size": String(size), "font-family": "Jersey, monospace", "text-anchor": "middle", "font-weight": "700" });
+        e.textContent = t;
+        s.append(e);
+      };
+      const BLUE = "#60a5fa";
+      const RED = "#f87171";
+      const modeSvg = (mode: "tdm" | "dm", on: boolean) => {
+        const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+        const c = (k: string) => (on ? k : "#475569");
+        if (mode === "tdm") {
+          for (const [x, y] of [[5, 8], [9, 8], [7, 12]] as const) dot(s, x, y, c(BLUE));
+          for (const [x, y] of [[17, 14], [21, 14], [19, 18]] as const) dot(s, x, y, c(RED));
+          s.append(svgEl("line", { x1: "11", y1: "19", x2: "15", y2: "7", stroke: c("#94a3b8"), "stroke-width": "1", "stroke-dasharray": "2 2" }));
+        } else {
+          dot(s, 6, 6, c(BLUE));
+          dot(s, 20, 7, c(RED));
+          dot(s, 7, 19, c("#fbbf24"));
+          dot(s, 19, 19, c("#4ade80"));
+          dot(s, 13, 13, c("#c084fc"));
+        }
+        return s;
+      };
+      const placeSvg = (pl: Placement, on: boolean) => {
+        const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+        const c = (k: string) => (on ? k : "#475569");
+        if (pl === "random") {
+          ring(s, 6, 6, c("#94a3b8"));
+          ring(s, 20, 8, c("#94a3b8"));
+          ring(s, 7, 20, c("#94a3b8"));
+          ring(s, 20, 20, c("#94a3b8"));
+          txt(s, 13, 17, "?", c("#fbbf24"), 13);
+        } else if (pl === "teamRandom") {
+          dot(s, 5, 7, c(BLUE));
+          dot(s, 9, 7, c(BLUE));
+          dot(s, 17, 19, c(RED));
+          dot(s, 21, 19, c(RED));
+          txt(s, 13, 17, "?", c("#fbbf24"), 13);
+        } else if (pl === "manual") {
+          ring(s, 6, 6, c("#94a3b8"));
+          ring(s, 20, 20, c("#94a3b8"));
+          dot(s, 20, 7, c(BLUE), 3);
+          // kurzor
+          s.append(svgEl("path", { d: "M7 12 L7 22 L10 19 L12 23 L14 22 L12 18 L16 18 Z", fill: c("#e2e8f0"), stroke: c("#0b1020"), "stroke-width": "0.8" }));
+        } else {
+          dot(s, 8, 13, c(BLUE), 3);
+          dot(s, 14, 13, c(BLUE));
+          dot(s, 19, 13, c(BLUE));
+          txt(s, 8, 9, "★", c("#fbbf24"), 9);
+          s.append(svgEl("path", { d: "M12 15 L12 24 L14.5 21.5 L16 24.5 L17.5 23.5 L16 20.5 L19 20.5 Z", fill: c("#e2e8f0"), stroke: c("#0b1020"), "stroke-width": "0.8" }));
+        }
+        return s;
+      };
+      const botLoadSvg = (kind: "default" | "random" | "manual", on: boolean) => {
+        const wrap = h("span", { class: "pip-combo" });
+        wrap.append(icon("bot", on ? "#7dd3fc" : "#475569", 16));
+        const badge = kind === "default" ? icon("tick", on ? "#4ade80" : "#475569", 9) : kind === "manual" ? icon("pen", on ? "#fbbf24" : "#475569", 9) : h("span", { class: "pip-q", style: `color:${on ? "#fbbf24" : "#475569"}` }, "?");
+        badge.classList.add("pip-badge");
+        wrap.append(badge);
+        return wrap;
+      };
+      const pipRow = <T extends string>(cls: string, value: T, opts: [T, string, (on: boolean) => Node][], onPick: (v: T) => void, text: string) =>
+        h(
+          "div",
+          { class: "pips-row" },
+          ...opts.map(([v, title, draw]) => h("button", { class: `pip ${cls} ${value === v ? "on" : ""}`, disabled: !isHost, title, onclick: () => onPick(v) }, draw(value === v))),
+          h("span", { class: "txt muted pips-txt" }, text),
+        );
       const PAGES = ["Mapa", "Bitva", "Lodě a piloti", "Moduly"];
       const pageBar = h(
         "div",
@@ -552,11 +623,15 @@ function roomView(m: LobbyModel, net: Net) {
               1,
             section(
               "Bitva",
-              frow("Herní mód", sel(settings.mode, [["tdm", "Týmový deathmatch"], ["dm", "Deathmatch (všichni proti všem)"]], (v) => set({ mode: v as "tdm" | "dm" }))),
+              frow(
+                "Herní mód",
+                pipRow("size", settings.mode, [["tdm", "Týmový deathmatch – týmy proti sobě", (on) => modeSvg("tdm", on)], ["dm", "Deathmatch – všichni proti všem", (on) => modeSvg("dm", on)]], (v) => set({ mode: v }), settings.mode === "tdm" ? "týmový deathmatch" : "deathmatch · všichni proti všem"),
+                "Týmový deathmatch: týmy proti sobě. Deathmatch: každý sám za sebe.",
+              ),
               frow(
                 "Umístění na mapě",
-                sel(settings.placement ?? "manual", PLACEMENTS.filter((p) => tdm || (p !== "teamRandom" && p !== "teamManual")).map((p) => [p, PLACEMENT_LABEL[p]] as [string, string]), (v) => set({ placement: v as Placement })),
-                `${PLACEMENT_HINT.random}\n${PLACEMENT_HINT.manual}\n${PLACEMENT_HINT.teamRandom}\n${PLACEMENT_HINT.teamManual}\nTýmové varianty jen v týmovém deathmatchi.`,
+                pipRow("size", (settings.placement ?? "manual") as Placement, PLACEMENTS.filter((p) => tdm || (p !== "teamRandom" && p !== "teamManual")).map((p) => [p, `${PLACEMENT_LABEL[p]}\n${PLACEMENT_HINT[p]}`, (on: boolean) => placeSvg(p, on)] as [Placement, string, (on: boolean) => Node]), (v) => set({ placement: v }), PLACEMENT_LABEL[settings.placement ?? "manual"].toLowerCase()),
+                `${PLACEMENT_HINT.random}\n${PLACEMENT_HINT.teamRandom}\n${PLACEMENT_HINT.manual}\n${PLACEMENT_HINT.teamManual}\nTýmové varianty jen v týmovém deathmatchi.`,
               ),
               frow("", h("span", { class: "txt muted fsub" }, PLACEMENT_HINT[settings.placement ?? "manual"])),
               frow(
@@ -569,7 +644,11 @@ function roomView(m: LobbyModel, net: Net) {
                 pips(3, settings.shipPoints, "size", () => icon("ship", "#7dd3fc", 18), () => icon("ship", "#334155", 18), (k) => `${k} lodní body`, (v) => set({ shipPoints: Math.max(1, v) }), `${settings.shipPoints} ${settings.shipPoints === 1 ? "bod" : "body"} · stíhač = 1`),
                 "Každý hráč musí body využít přesně: stíhač stojí 1 bod (větší lodě víc). Všechny lodě hráče mají jednu peněženku.",
               ),
-              frow("Výbava botů", sel(settings.botLoadout, [["default", "výchozí sestava"], ["random", "náhodná"], ["manual", "ruční (naklikám u bota)"]], (v) => set({ botLoadout: v as "default" | "random" | "manual" }))),
+              frow(
+                "Výbava botů",
+                pipRow("size", settings.botLoadout, [["default", "Výchozí sestava", (on) => botLoadSvg("default", on)], ["random", "Náhodná výbava", (on) => botLoadSvg("random", on)], ["manual", "Ruční – host nakliká výbavu u bota (⚙ v tabulce týmů)", (on) => botLoadSvg("manual", on)]], (v) => set({ botLoadout: v }), { default: "výchozí sestava", random: "náhodná", manual: "ruční (naklikám u bota)" }[settings.botLoadout]),
+                "Jakou výbavu dostanou boti: výchozí sestavu, náhodnou, nebo ji host nakliká ručně.",
+              ),
             ),
             ),
             ...pageOf(
