@@ -3592,3 +3592,8 @@ button.start-chip.on:hover:not(:disabled) {
   width: 72px;
   align-self: flex-start;
 }
+/* technologie v plánu (droid): obrys žlutě, vnitřek tmavý – odečte se při SPUSTIT KOLO */
+.apip.yellow i.plan {
+  background: #0b1020;
+  border-color: #fbbf24;
+}

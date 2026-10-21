@@ -379,7 +379,7 @@ function roomView(m: LobbyModel, net: Net) {
         net.send({ type: "setStart", index, ...(startFor ? { botId: startFor } : {}) });
         startFor = null;
       };
-      const TILE_COLOR: Record<ModuleType, string> = { laser: "#f87171", torpedo: "#fb923c", mine: "#fbbf24", "shield-segment": "#7dd3fc", mg: "#fde047", scanner: "#a78bfa", "shield-whole": "#38bdf8" };
+      const TILE_COLOR: Record<ModuleType, string> = { laser: "#f87171", torpedo: "#fb923c", mine: "#fbbf24", "shield-segment": "#7dd3fc", mg: "#fde047", scanner: "#a78bfa", "shield-whole": "#38bdf8", droid: "#c084fc" };
       const allowedOn = (t: ModuleType) => settings.allowedModules[t] !== 0;
       const setAllowed = (t: ModuleType, on: boolean) => {
         const next: Partial<Record<ModuleType, number>> = { ...settings.allowedModules };

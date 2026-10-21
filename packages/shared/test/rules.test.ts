@@ -3,6 +3,10 @@ import {
   applyLoadoutTrade,
   laserTarget,
   laserOdds,
+  profileOf,
+  resolveManeuver,
+  canAfford,
+  DROID,
   laserReach,
   cometOnMap,
   COMET,
@@ -1194,5 +1198,46 @@ describe("cíl částečně ve výseči", () => {
     // celá mimo → žádný cíl
     place(g, "ship-p2-0", 900, 500, Math.PI);
     expect(laserTarget(g, me)).toBeUndefined();
+  });
+});
+
+describe("droid – pilot", () => {
+  it("overdrive: otočka za 1 akci bez stresu, nebezpečný bez poškození; autopilot: zelený +2 stres; platí se technologií při vyhodnocení", () => {
+    const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g.asteroids = [];
+    const me = g.ships[0];
+    me.loadout.modules = [newModule("droid", "left", "dr")];
+    me.speed = 3;
+    me.stressPoints = 0; // bez stresu by otočka (červená) nešla
+    place(g, "ship-p1-0", 1500, 1000, 0);
+    place(g, "ship-p2-0", 3000, 1800, Math.PI);
+    // bez overdrivu: otočka = 2 akce, nejde bez stresu
+    expect(actionCost(me, { shipId: me.id, maneuverId: "k3", fire: false })).toBe(2);
+    expect(canAfford(me, resolveManeuver(profileOf(me.loadout), "k3", 3)!)).toBe(false);
+    // s overdrivem: 1 akce a jde
+    const oo = { shipId: me.id, maneuverId: "k3", fire: false, droid: { overdrive: true } };
+    expect(actionCost(me, oo)).toBe(1);
+    expect(canAfford(me, resolveManeuver(profileOf(me.loadout), "k3", 3)!, oo)).toBe(true);
+    const san = sanitizeOrders(g, "p1", [oo]);
+    expect(san[0].maneuverId).toBe("k3");
+    expect(san[0].droid?.overdrive).toBe(true);
+    let r = resolveTurn(g, [san[0], { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    const ev = r.events.find((e) => e.type === "droid");
+    expect(ev && ev.type === "droid" && ev.cost).toBe(DROID.overdriveCost);
+    expect(r.state.ships[0].techPoints).toBe(6 - DROID.overdriveCost);
+    expect(r.state.ships[0].stressPoints).toBe(0); // otočka nic nestála
+    expect(r.state.ships[0].hull).toBe(100);
+    // bez technologie se droid vypne a otočka spadne na výchozí manévr
+    const g2 = structuredClone(g);
+    g2.ships[0].techPoints = 1;
+    expect(sanitizeOrders(g2, "p1", [oo])[0].droid).toBeUndefined();
+    expect(sanitizeOrders(g2, "p1", [oo])[0].maneuverId).not.toBe("k3");
+    // autopilot: zelený manévr (rovně 2) vrátí +2
+    const g3 = structuredClone(g);
+    g3.ships[0].stressPoints = 0;
+    g3.ships[0].speed = 2;
+    r = resolveTurn(g3, [{ shipId: me.id, maneuverId: "m2a0", fire: false, droid: { autopilot: true } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.state.ships[0].stressPoints).toBe(DROID.autopilotRegen);
+    expect(r.state.ships[0].techPoints).toBe(6 - DROID.autopilotCost);
   });
 });

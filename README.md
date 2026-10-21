@@ -145,6 +145,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.60 – **Nový modul Droid – pilot** (kategorie Speciální, malý, váha 0,5, cena 140; Ladění → Droid). Čerpá
+  technologii, nebere akci, zapíná se pro kolo a platí se až při SPUSTIT KOLO (rezervované body jsou v hlavičce
+  obrysově, zrušit jde zdarma). **Overdrive** (3): v tomto kole manévry nestojí stres – červený i nebezpečný jsou
+  „bílé“ (nebezpečný bez ztráty trupu), úhyb bez stresu, otočka jen za 1 akci; ceny na tlačítkách se hned přepočítají.
+  **Autopilot** (2): zelený manévr vrátí +2 stresové body místo +1. V bouři droid nefunguje; zničený droid = šrafované
+  tlačítko. Bez dostatku technologie server funkce vypne.
 - v3.59 – Štít: tlačítko se při otevřeném okénku už neprotahuje; zavření okénka bez změny rozložení akci neutratí
   (akce stojí jen skutečná úprava – platí i pro klik vedle a pro SPUSTIT KOLO); štítek „plán“ u lodi vlevo odstraněn.
 - v3.58 – **Zničená zbraň v liště akcí** (varianta B): když jsou všechny moduly dané zbraně zničené, je její tlačítko

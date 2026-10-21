@@ -1,4 +1,4 @@
-import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, stressCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
+import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -87,7 +87,7 @@ export const ACTIONS: ActionOption[] = [
     glyph: "⤭",
     label: "Úhybný manévr (1 akce)",
     description: `Během pohybu proletíš skrz nepřátelské lodě (každá z nich ztratí ${RULES.evadePassStress} stresový bod), asteroidy i komety bez srážky; nesmíš ale v nich skončit – v nepříteli = normální srážka, v asteroidu nebo kometě = dvojité zranění. Zranění minou i torpédem je v tomto kole nižší o ${RULES.evadeDamageReduction} %. Stojí ${RULES.evadeStressCost} stresový bod.`,
-    disabled: (ship, _s, o) => (ship.stressPoints < RULES.evadeStressCost ? "chybí stresový bod" : noAp(ship, o, o.action?.type === "evade")),
+    disabled: (ship, _s, o) => (ship.stressPoints < effEvadeCost(o) ? "chybí stresový bod" : noAp(ship, o, o.action?.type === "evade")),
     active: (o) => o.action?.type === "evade",
     apply: (o) => ({ action: o.action?.type === "evade" ? undefined : { type: "evade" } }),
   },
@@ -121,7 +121,7 @@ export const ACTIONS: ActionOption[] = [
       const sp = profile.koiogranSpeeds.includes(ship.speed) ? ship.speed : profile.koiogranSpeeds[0];
       const man = makeManeuver(profile, sp, 0, true, ship.speed);
       if (!man) return "loď otočku nezvládne";
-      if (stressCost(man.difficulty) > ship.stressPoints) return `chybí stresový bod (otočka stojí ${stressCost(man.difficulty)})`;
+      if (effStressCost(man.difficulty, o) > ship.stressPoints) return `chybí stresový bod (otočka stojí ${effStressCost(man.difficulty, o)})`;
       const cost = actionCost(ship, { ...o, maneuverId: man.id });
       return cost > RULES.actionPoints ? `otočka by stála ${cost} akce` : null;
     },

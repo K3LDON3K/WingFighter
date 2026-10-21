@@ -86,6 +86,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "mg":
         lines.push(`${name(e.shooterId)} kulomet → ${name(e.targetId)}: ${e.hits}/${e.shots} zásahů${e.damage ? `, −${e.damage}` : ""}${e.destroyed ? " – zničeno" : ""}.`);
         break;
+      case "droid":
+        lines.push(`${name(e.shipId)}: droid – ${[e.overdrive ? "overdrive" : "", e.autopilot ? "autopilot" : ""].filter(Boolean).join(" + ")} (−${e.cost} technologie).`);
+        break;
       case "scan":
         lines.push(e.mode === "ship" ? `${name(e.shipId)} skenoval ${e.targetId ? name(e.targetId) : "loď"}.` : e.mode === "deep" ? `${name(e.shipId)} provedl hluboký sken – mapa odkryta do konce kola.` : `${name(e.shipId)} vynutil cooldown skeneru.`);
         break;
@@ -267,6 +270,7 @@ export class TurnAnimation {
           time = e.reason === "survive" ? moveStart + MOVE_DURATION + 300 : lastTime + 80;
           break;
         case "scan":
+        case "droid":
           time = 0;
           break;
         case "action":

@@ -2,7 +2,7 @@
  * Ladicí parametry hry (balanc). Host je může měnit v lobby i během bitvy;
  * server je aplikuje před každým vyhodnocením, klient před vykreslením.
  */
-import { CARGO, COMET, CRATER_RADIUS_REF, LASER, MG, MINE, RULES, SCANNER, STRESS, TECH, TORPEDO } from "./constants.ts";
+import { CARGO, COMET, CRATER_RADIUS_REF, DROID, LASER, MG, MINE, RULES, SCANNER, STRESS, TECH, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
 import { HULLS, LASER_DICE, MODULE_HP_PCT, MODULES, STRESS_MAX_REF, WEIGHT } from "./ships.ts";
 
@@ -93,6 +93,11 @@ export interface Tuning {
   scannerDeepRange: number;
   priceScanner: number;
   weightScanner: number;
+  priceDroid: number;
+  weightDroid: number;
+  droidOverdriveCost: number;
+  droidAutopilotCost: number;
+  droidAutopilotRegen: number;
   // komety
   cometSpeed: number;
   cometHull: number;
@@ -209,6 +214,11 @@ export const DEFAULT_TUNING: Tuning = {
   scannerDeepRange: 2000,
   priceScanner: 130,
   weightScanner: 1,
+  priceDroid: 140,
+  weightDroid: 0.5,
+  droidOverdriveCost: 3,
+  droidAutopilotCost: 2,
+  droidAutopilotRegen: 2,
   cometSpeed: 300,
   cometHull: 30,
   cometDamage: 30,
@@ -341,6 +351,12 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "scannerDeepRange", label: "Hluboký sken – dosah", group: "Skener", min: 100, max: 6000, step: 100, hint: "odkryje mapu týmu do konce kola" },
   { key: "priceScanner", label: "Modul – cena", group: "Skener", min: 0, max: 2000, step: 10 },
   { key: "weightScanner", label: "Modul – váha", group: "Skener", min: 0, max: 20, step: 0.5 },
+  // --- droid ---
+  { key: "priceDroid", label: "Modul – cena", group: "Droid", min: 0, max: 2000, step: 10 },
+  { key: "weightDroid", label: "Modul – váha", group: "Droid", min: 0, max: 20, step: 0.5 },
+  { key: "droidOverdriveCost", label: "Overdrive – cena (technologie)", group: "Droid", min: 0, max: 6, step: 1, hint: "manévry bez stresu, otočka za 1 akci, nebezpečný bez poškození" },
+  { key: "droidAutopilotCost", label: "Autopilot – cena (technologie)", group: "Droid", min: 0, max: 6, step: 1 },
+  { key: "droidAutopilotRegen", label: "Autopilot – stres za zelený manévr", group: "Droid", min: 1, max: 5, step: 1, hint: "bez droida +1" },
   // --- komety ---
   { key: "cometSpeed", label: "Rychlost / kolo", group: "Komety", min: 50, max: 1000, step: 10, hint: "torpédo má 240" },
   { key: "cometHull", label: "Odolnost (trup komety)", group: "Komety", min: 5, max: 300, step: 5 },
@@ -477,6 +493,11 @@ export function applyTuning(t: Tuning): void {
   SCANNER.deepRange = t.scannerDeepRange;
   MODULES.scanner.price = t.priceScanner;
   MODULES.scanner.weight = t.weightScanner;
+  MODULES.droid.price = t.priceDroid;
+  MODULES.droid.weight = t.weightDroid;
+  DROID.overdriveCost = t.droidOverdriveCost;
+  DROID.autopilotCost = t.droidAutopilotCost;
+  DROID.autopilotRegen = t.droidAutopilotRegen;
   COMET.speed = t.cometSpeed;
   COMET.hull = t.cometHull;
   COMET.damage = t.cometDamage;

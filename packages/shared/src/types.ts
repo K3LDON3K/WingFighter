@@ -61,11 +61,19 @@ export interface ShipOrders {
   mgModuleId?: string;
   /** Preferovaný cíl laserů (loď nebo torpédo); když není ve výseči, střílí se na nejbližší nepřátelskou loď. */
   preferredTargetId?: string;
+  /** Droid – pilot: funkce zapnuté pro toto kolo (platí se technologií při vyhodnocení). */
+  droid?: DroidOrder;
+}
+
+/** Funkce droida-pilota v kole: overdrive = manévry bez stresu (otočka za 1 akci, nebezpečný bez poškození), autopilot = zelený manévr vrací víc stresu. */
+export interface DroidOrder {
+  overdrive?: boolean;
+  autopilot?: boolean;
 }
 
 /** Sloty stíhače. */
 export type SlotId = "front" | "back" | "left" | "right";
-export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg";
+export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg" | "droid";
 
 /** Trup lodi – nese moduly ve slotech. */
 export interface HullDef {
@@ -428,6 +436,8 @@ export type TurnEvent =
   | { type: "moduleDamage"; shipId: string; moduleId: string; moduleType: ModuleType; damage: number; hp: number; maxHp: number; broken: boolean }
   /** Skener (vyhodnocuje se hned při plánování, ale zapisuje se do logu kola). */
   | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }
+  /** Droid – pilot aktivoval funkce (technologie odečtena). */
+  | { type: "droid"; shipId: string; overdrive: boolean; autopilot: boolean; cost: number; techPoints: number }
   | { type: "action"; shipId: string; action: ActionOrder; ok: boolean; path?: Pose[] }
   | {
       type: "laser";

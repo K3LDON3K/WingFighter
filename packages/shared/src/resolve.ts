@@ -12,6 +12,7 @@ import {
   MG,
   RULES,
   SCANNER,
+  DROID,
   STRESS,
   TORPEDO,
   TORPEDO_AGILITY,
@@ -42,7 +43,7 @@ export function inStorm(state: GameState, p: Vec): boolean {
 function laserBlockedByStorm(state: GameState, a: Vec, b: Vec): boolean {
   return (state.storms?.length ?? 0) > 0 && (inStorm(state, a) || inStorm(state, b) || lineCrossesStorm(state.storms, a, b));
 }
-import type { ModuleInstance } from "./types.ts";
+import type { Difficulty, DroidOrder, ModuleInstance } from "./types.ts";
 
 /** Pozice lodi natočená podle směru modulu (výseč laserů, výlet torpéda). */
 function aimPose(ship: Pose, mod: ModuleInstance | undefined): Pose {
@@ -336,9 +337,32 @@ export function validShieldAction(ship: Ship, segments: unknown): segments is Se
   return sum === cur;
 }
 
+/** Funkční droid-pilot na lodi. */
+export function droidModule(ship: Ship): ModuleInstance | undefined {
+  return ship.loadout.modules.find((m) => m.type === "droid" && moduleWorking(m));
+}
+/** Kolik technologie stojí zapnuté funkce droida. */
+export function droidCost(o: Pick<ShipOrders, "droid"> | undefined): number {
+  return (o?.droid?.overdrive ? DROID.overdriveCost : 0) + (o?.droid?.autopilot ? DROID.autopilotCost : 0);
+}
+/**
+ * Stres za manévr s ohledem na droida: overdrive = červený/nebezpečný bez stresu, autopilot = zelený vrací víc.
+ * Záporná hodnota = regenerace.
+ */
+export function effStressCost(d: Difficulty, o?: Pick<ShipOrders, "droid">): number {
+  const base = stressCost(d);
+  if (base > 0 && o?.droid?.overdrive) return 0;
+  if (d === "green" && o?.droid?.autopilot) return -DROID.autopilotRegen;
+  return base;
+}
+/** Stres za úhyb (overdrive = zdarma). */
+export function effEvadeCost(o?: Pick<ShipOrders, "droid">): number {
+  return o?.droid?.overdrive ? 0 : RULES.evadeStressCost;
+}
+
 /** Může si loď manévr dovolit (stresové body)? */
-export function canAfford(ship: Ship, man: Maneuver): boolean {
-  return stressCost(man.difficulty) <= ship.stressPoints;
+export function canAfford(ship: Ship, man: Maneuver, o?: Pick<ShipOrders, "droid">): boolean {
+  return effStressCost(man.difficulty, o) <= ship.stressPoints;
 }
 
 /** Výchozí rozkaz (bez akcí): stejná rychlost rovně, nestřílí. */
@@ -359,7 +383,11 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
   const out: { id: ActionId; label: string }[] = [];
   const m = parseManeuverId(o.maneuverId);
   if (m) {
-    if (m.koiogran) out.push({ id: "move", label: "úprava pohybu" }, { id: "koiogran", label: "otočka 180°" }); // otočka stojí 2 akce
+    if (m.koiogran) {
+      // otočka stojí 2 akce; s overdrivem droida jen 1
+      if (!o.droid?.overdrive) out.push({ id: "move", label: "úprava pohybu" });
+      out.push({ id: "koiogran", label: "otočka 180°" });
+    }
     else if (m.speed !== ship.speed || m.angle !== 0) out.push({ id: "move", label: "úprava pohybu" });
   }
   if (o.action?.type === "evade") out.push({ id: "evade", label: "úhybný manévr" });
@@ -432,11 +460,14 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       continue;
     }
     const profile = profileOf(ship.loadout);
+    // droid: jen s funkčním modulem, mimo bouři a s dostatkem technologie
+    let droid: DroidOrder | undefined = raw.droid && (raw.droid.overdrive || raw.droid.autopilot) ? { overdrive: !!raw.droid.overdrive, autopilot: !!raw.droid.autopilot } : undefined;
+    if (droid && (!droidModule(ship) || inStorm(state, ship) || droidCost({ droid }) > ship.techPoints)) droid = undefined;
     let man = resolveManeuver(profile, raw.maneuverId, ship.speed);
-    if (!man || !canAfford(ship, man)) man = resolveManeuver(profile, def.maneuverId, ship.speed)!;
+    if (!man || !canAfford(ship, man, { droid })) man = resolveManeuver(profile, def.maneuverId, ship.speed)!;
 
     let action: ActionOrder | undefined;
-    if (raw.action?.type === "evade") action = ship.stressPoints >= RULES.evadeStressCost ? { type: "evade" } : undefined;
+    if (raw.action?.type === "evade") action = ship.stressPoints >= effEvadeCost({ droid }) ? { type: "evade" } : undefined;
     else if (raw.action?.type === "shield") action = validShieldAction(ship, raw.action.segments) ? { type: "shield", segments: raw.action.segments.map((n) => Math.round(Number(n))) as Segments } : undefined;
     else if (raw.action?.type === "jettison") {
       const wantedId = raw.action.moduleId;
@@ -469,7 +500,7 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     const preferredTargetId = enemyTarget(state, ship, raw.preferredTargetId)?.id ?? state.debris.find((d) => d.id === raw.preferredTargetId)?.id ?? (state.comets ?? []).find((c) => c.id === raw.preferredTargetId)?.id;
     const laserMod = laserModule(ship, raw.laserModuleId);
     const mgMod = mgModule(ship, raw.mgModuleId);
-    const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, fire: !!raw.fire && !!laserMod, laserModuleId: laserMod?.id, fireMg: !!raw.fireMg && !!mgMod, mgModuleId: mgMod?.id, preferredTargetId };
+    const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, fire: !!raw.fire && !!laserMod, laserModuleId: laserMod?.id, fireMg: !!raw.fireMg && !!mgMod, mgModuleId: mgMod?.id, preferredTargetId, droid };
     // limit akcí: nejdřív padá zbraň, pak lasery, pak úhyb, nakonec manévr
     if (actionCost(ship, o) > RULES.actionPoints) o.special = undefined;
     if (actionCost(ship, o) > RULES.actionPoints) o.action = undefined;
@@ -581,15 +612,30 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   const startPose = new Map<string, Pose>();
   for (const ship of state.ships) startPose.set(ship.id, { x: ship.x, y: ship.y, heading: ship.heading });
 
+  /* ---------- 0. Droid – pilot: zaplacení funkcí technologií ---------- */
+  for (const ship of state.ships) {
+    if (!ship.alive) continue;
+    const o = orders.get(ship.id)!;
+    if (!o.droid || (!o.droid.overdrive && !o.droid.autopilot)) continue;
+    const cost = droidCost(o);
+    if (!droidModule(ship) || inStorm(state, ship) || cost > ship.techPoints) {
+      o.droid = undefined;
+      continue;
+    }
+    ship.techPoints -= cost;
+    events.push({ type: "droid", shipId: ship.id, overdrive: !!o.droid.overdrive, autopilot: !!o.droid.autopilot, cost, techPoints: ship.techPoints });
+  }
+
   // Úhybný manévr: zaplatí stres hned; po celé kolo snižuje zranění minou/torpédem a dovolí prolétnout nepřáteli.
   const evading = new Set<string>();
   for (const ship of state.ships) {
     const o = orders.get(ship.id);
     if (!ship.alive || o?.action?.type !== "evade") continue;
-    if (ship.stressPoints < RULES.evadeStressCost) continue;
+    const evCost = effEvadeCost(o);
+    if (ship.stressPoints < evCost) continue;
     evading.add(ship.id);
     const before = ship.stressPoints;
-    ship.stressPoints -= RULES.evadeStressCost;
+    ship.stressPoints -= evCost;
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
     events.push({ type: "action", shipId: ship.id, action: { type: "evade" }, ok: true });
   }
@@ -859,7 +905,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const o = orders.get(ship.id)!;
     const profile = profileOf(ship.loadout);
     let man = resolveManeuver(profile, o.maneuverId, ship.speed);
-    if (!man || !canAfford(ship, man)) man = resolveManeuver(profile, defaultOrders(ship).maneuverId, ship.speed)!;
+    if (!man || !canAfford(ship, man, o)) man = resolveManeuver(profile, defaultOrders(ship).maneuverId, ship.speed)!;
     maneuverOf.set(ship.id, man);
     shipMovers.set(ship.id, {
       samples: samplePath(maneuverPath(ship, man), MOVE_STEPS),
@@ -1394,8 +1440,9 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   for (const ship of state.ships) {
     if (!ship.alive) continue;
     const man = maneuverOf.get(ship.id)!;
+    const od = orders.get(ship.id);
     ship.speed = man.koiogran ? Math.max(1, man.speed - RULES.koiogranSpeedDrop) : man.speed;
-    const cost = stressCost(man.difficulty);
+    const cost = effStressCost(man.difficulty, od);
     const stM = statsOf(state, ship.ownerId);
     if (stM) {
       stM.maneuvers[man.difficulty]++;
@@ -1404,7 +1451,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const before = ship.stressPoints;
     ship.stressPoints = clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
-    if (man.difficulty === "danger") applyDamage(ship, Math.max(1, Math.round((ship.stats.hull * STRESS.dangerHullPercent) / 100)), events);
+    if (man.difficulty === "danger" && !od?.droid?.overdrive) applyDamage(ship, Math.max(1, Math.round((ship.stats.hull * STRESS.dangerHullPercent) / 100)), events);
   }
 
   /* ---------- 2. Akce ---------- */

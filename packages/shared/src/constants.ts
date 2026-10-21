@@ -155,6 +155,8 @@ export const SCANNER = {
   range: 600,
   deepRange: 2000,
 };
+/** Droid – pilot (mutovatelné kvůli ladění): ceny funkcí v technologii, regenerace stresu s autopilotem. */
+export const DROID = { overdriveCost: 3, autopilotCost: 2, autopilotRegen: 2 };
 /** Technologie: body na celou bitvu (nedobíjí se); utrácí je skener. Mutovatelné kvůli ladění. */
 export const TECH = { max: 6 };
 

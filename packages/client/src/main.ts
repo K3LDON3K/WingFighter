@@ -20,7 +20,7 @@ import {
   resolveManeuver,
   maneuverPath,
   rightOf,
-  stressCost,
+  effStressCost,
   TEAM_COLORS,
   TEAM_NAMES,
   TORPEDO,
@@ -141,6 +141,7 @@ interface GameSession {
   skipConfirm: boolean;
   /** Skener: vysunutá tlačítka / výběr cíle skenu lodi. */
   scanOpen: boolean;
+  droidOpen: boolean;
   scanPick: boolean;
   /** Vysunutá nabídka nákladu (vyhodit / zvednout). */
   cargoOpen: boolean;
@@ -315,6 +316,7 @@ function startGame(state: GameState) {
     confirmOpen: false,
     skipConfirm: !loadAskConfirm(),
     scanOpen: false,
+    droidOpen: false,
     scanPick: false,
     cargoOpen: false,
     mouse: null,
@@ -444,7 +446,7 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
   }
   if (!man) return false;
   // bez volných stresových bodů se manévr vůbec nenabízí (dřív šel vybrat a jen se neprovedl)
-  if (stressCost(man.difficulty) > ship.stressPoints) return false;
+  if (effStressCost(man.difficulty, o) > ship.stressPoints) return false;
   if (actionCost(ship, { ...o, maneuverId: man.id }) > RULES.actionPoints) return false;
   if (man.id !== o.maneuverId) {
     game.orders.set(shipId, { ...o, maneuverId: man.id });
@@ -722,7 +724,7 @@ function buildOverlay(view: ViewModel): Overlay {
       const dots: { x: number; y: number; color: string }[] = [];
       for (let a = -MAX_ANGLE; a <= MAX_ANGLE; a += ANGLE_STEP) {
         const mm = makeManeuver(profile, man.speed, a, false, ship.speed);
-        if (!mm || stressCost(mm.difficulty) > ship.stressPoints) continue;
+        if (!mm || effStressCost(mm.difficulty, o) > ship.stressPoints) continue;
         const e = maneuverEnd(ship, mm);
         dots.push({ x: e.x, y: e.y, color: DIFFICULTY_COLOR[mm.difficulty] });
       }
@@ -1147,6 +1149,7 @@ function renderSide() {
       shieldEdit: game.shieldEdit,
       inventoryOpen: game.inventoryOpen,
       scanOpen: game.scanOpen,
+      droidOpen: game.droidOpen,
       scanPick: game.scanPick,
       cargoOpen: game.cargoOpen,
       askConfirm: !game.skipConfirm,
@@ -1259,6 +1262,11 @@ function renderSide() {
         renderSide();
       },
       centerOn: (id) => centerOnShip(id),
+      droidToggle: (id) => {
+        game!.selectedShipId = id;
+        game!.droidOpen = !game!.droidOpen;
+        renderSide();
+      },
       scanToggle: (id) => {
         game!.selectedShipId = id;
         game!.scanOpen = !game!.scanOpen;
@@ -1446,7 +1454,7 @@ function confirmManeuver(id: string): boolean {
   const o = g.orders.get(id);
   if (!ship || !o) return false;
   const man = resolveManeuver(profileOf(ship.loadout), o.maneuverId, ship.speed);
-  if (!man || stressCost(man.difficulty) > ship.stressPoints) {
+  if (!man || effStressCost(man.difficulty, o) > ship.stressPoints) {
     showError("Na tento manévr nemáš dost stresových bodů.");
     return false;
   }

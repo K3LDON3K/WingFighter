@@ -28,6 +28,11 @@ import {
   resolveManeuver,
   STRESS,
   stressCost,
+  effStressCost,
+  effEvadeCost,
+  droidModule,
+  droidCost,
+  DROID,
   TEAM_COLORS,
   type Difficulty,
   type GameState,
@@ -58,6 +63,7 @@ export interface PlanningCallbacks {
   jettisonPick(shipId: string): void;
   /** Skener: vysunout/zasunout tlačítka, zapnout výběr cíle, provést hned. */
   scanToggle(shipId: string): void;
+  droidToggle(shipId: string): void;
   scanPickTarget(shipId: string, on: boolean): void;
   scan(shipId: string, mode: "deep" | "cooldown"): void;
   /** Pozorovatel: tabulka skóre / opuštění hry. */
@@ -91,6 +97,7 @@ export interface PlanningModel {
   shieldEdit?: boolean;
   /** Skener: vysunutá tlačítka, čeká se na klik na loď. */
   scanOpen?: boolean;
+  droidOpen?: boolean;
   scanPick?: boolean;
   /** Vysunutá nabídka nákladu (vyhodit / zvednout). */
   cargoOpen?: boolean;
@@ -330,7 +337,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   }
 
   /* ---- 2. manévr (svislý sloupec) ---- */
-  const dcolor = man ? DIFFICULTY_COLOR[man.difficulty] : "#f87171";
+  const dcolor = man ? (o.droid?.overdrive && stressCost(man.difficulty) > 0 ? DIFFICULTY_COLOR.white : DIFFICULTY_COLOR[man.difficulty]) : "#f87171";
   const maneuver = h(
     "div",
     { class: "pnl bb-maneuver" },
@@ -342,7 +349,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       h("span", { class: "man-speed" }, String(cur.speed)),
     ),
     h("div", { class: "man-angle" }, cur.koiogran ? "180°" : `${Math.abs(cur.angle)}°`),
-    h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (stressCost(man.difficulty) > ship.stressPoints ? "chybí stres" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
+    h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man.difficulty, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && stressCost(man.difficulty) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
     h("div", { class: "spacer" }),
     h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
   );
@@ -356,7 +363,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   for (let i = 0; i < ship.stats.stressMax; i++) spips.append(h("i", { class: i < ship.stressPoints ? "on" : "" }));
   const inStormNow = inStorm(m.state, ship);
   const tpips = h("div", { class: `apip yellow ${inStormNow ? "storm" : ""}` });
-  for (let i = 0; i < ship.stats.techMax; i++) tpips.append(h("i", { class: i < ship.techPoints ? "on" : "" }));
+  const reserved = droidCost(o); // v plánu (droid) – odečte se při SPUSTIT KOLO
+  for (let i = 0; i < ship.stats.techMax; i++) tpips.append(h("i", { class: i < ship.techPoints - reserved ? "on" : i < ship.techPoints ? "plan" : "" }));
   const resources = h(
     "div",
     { class: "res-row" },
@@ -369,7 +377,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const buttons = h("div", { class: "bb-weapons" });
   for (const grp of ACTION_GROUPS) {
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
-    if (avail.length === 0 && !(grp.label === "Speciální" && scannerModule(ship.loadout))) continue; // skupina bez dostupných akcí se neukazuje
+    if (avail.length === 0 && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.loadout.modules.some((x) => x.type === "droid")))) continue; // skupina bez dostupných akcí se neukazuje
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
@@ -402,8 +410,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           },
           (() => {
             // cena ve všech surovinách: otočka 2 akce + stres červeného manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
-            const manStress = a.id === "koiogran" ? stressCost("red") : a.id === "move" && man ? stressCost(man.difficulty) : 0;
-            const c = { actions: a.id === "koiogran" ? 2 : 1, stress: a.id === "evade" ? RULES.evadeStressCost : manStress };
+            const manStress = a.id === "koiogran" ? effStressCost("red", o) : a.id === "move" && man ? effStressCost(man.difficulty, o) : 0;
+            const c = { actions: a.id === "koiogran" ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];
             if (c.stress > 0) parts.push(`${c.stress} stres`);
             if (c.stress < 0) parts.push(`vrací ${-c.stress} stres`);
@@ -507,6 +515,49 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
               { class: `scan-pop ${popClass(`scan:${ship.id}`)}` },
               h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || tech < SCANNER.shipCost, title: `Sken lodi (${SCANNER.shipCost} technologie): klikni na cizí loď v dohledu do ${SCANNER.range}. Proběhne hned, nebere akci.`, onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(SCANNER.shipCost)),
               h("button", { class: "px bb-weapon sm", disabled: locked || tech < SCANNER.deepCost, title: `Hluboký sken (${SCANNER.deepCost} technologie): hned odkryje mapu do ${SCANNER.deepRange} celému týmu do konce kola.`, onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(SCANNER.deepCost)),
+            ),
+          );
+        }
+        row.append(holder);
+      }
+      // Droid – pilot: tlačítko s okénkem Overdrive / Autopilot (platí se technologií až při SPUSTIT KOLO)
+      const hasDroid = ship.loadout.modules.some((x) => x.type === "droid");
+      if (hasDroid) {
+        const dmod = droidModule(ship);
+        const dDestroyed = !dmod;
+        const tech = ship.techPoints;
+        const od = o.droid ?? {};
+        const planned = droidCost(o);
+        const anyOn = !!od.overdrive || !!od.autopilot;
+        const holder = h("div", { class: "scan-holder" });
+        const title = `${MODULES.droid.name}\n${MODULES.droid.description}\nTechnologie: ${tech}/${ship.stats.techMax}${planned ? ` (v plánu −${planned})` : ""}${dDestroyed ? "\nZNIČENO – modul nefunguje" : stormed ? "\nV bouři nefunguje." : ""}`;
+        holder.append(
+          h(
+            "button",
+            {
+              class: `px bb-weapon droid-btn ${m.droidOpen && !stormed && !dDestroyed ? "on" : ""} ${anyOn && !m.droidOpen ? "done" : ""} ${stormed ? "stormed" : ""} ${dDestroyed ? "destroyed" : ""}`,
+              disabled: locked || stormed || dDestroyed,
+              title,
+              onclick: () => cb.droidToggle(ship.id),
+            },
+            icon("bot", "currentColor", 22),
+            h("span", { class: "lbl" }, label("Droid")),
+            anyOn ? costPipsAll({ tech: planned }, true, `v plánu: ${planned} technologie`) : null,
+            anyOn && !m.droidOpen ? h("span", { class: "reset-strip" }, label(`${[od.overdrive ? "overdrive" : "", od.autopilot ? "autopilot" : ""].filter(Boolean).join(" + ")}`)) : null,
+            stormed ? h("span", { class: "sb" }, "⚡") : null,
+            dDestroyed ? h("span", { class: "dead-x" }, "✕") : null,
+          ),
+        );
+        if (m.droidOpen && !stormed && !dDestroyed) {
+          const cost = (n: number, on: boolean) => costPipsAll({ tech: n }, on, `${n} ${n === 1 ? "bod" : "body"} technologie – platí se až při SPUSTIT KOLO`);
+          const canOver = od.overdrive || tech - planned >= DROID.overdriveCost;
+          const canAuto = od.autopilot || tech - planned >= DROID.autopilotCost;
+          holder.append(
+            h(
+              "div",
+              { class: `scan-pop ${popClass(`droid:${ship.id}`)}` },
+              h("button", { class: `px bb-weapon sm ${od.overdrive ? "on" : ""}`, disabled: locked || !canOver, title: `Overdrive (${DROID.overdriveCost} technologie): v tomto kole manévry nestojí stres – červený i nebezpečný jsou „bílé“ (nebezpečný bez ztráty trupu), úhyb bez stresu, otočka za 1 akci. Nebere akci; zrušit jde zdarma do odeslání kola.`, onclick: () => cb.setOrders(ship.id, { droid: { ...od, overdrive: !od.overdrive } }) }, icon("speed", "currentColor", 22), h("span", { class: "lbl" }, label("Overdrive")), cost(DROID.overdriveCost, !!od.overdrive)),
+              h("button", { class: `px bb-weapon sm ${od.autopilot ? "on" : ""}`, disabled: locked || !canAuto, title: `Autopilot (${DROID.autopilotCost} technologie): zelený manévr v tomto kole vrátí +${DROID.autopilotRegen} stresové body místo +1. Nebere akci.`, onclick: () => cb.setOrders(ship.id, { droid: { ...od, autopilot: !od.autopilot } }) }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Autopilot")), cost(DROID.autopilotCost, !!od.autopilot)),
             ),
           );
         }
