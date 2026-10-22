@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.117 – Pozadí mapy: nová volba „Bez pozadí“ (jen hvězdy) je výchozí; galaxie a planety si zakladatel zapne
+  výběrem motivu nebo „náhodné“.
 - v3.116 – Klik na nepřítele, na kterého zvolený laser nedosáhne, vypíše důvod s čísly (mimo dostřel 318 / 300,
   mimo výseč o X°, asteroid v cestě, bouře) a připomene, že laser vystřelí na nejbližšího ve výseči.
 - v3.115 – Tři obtížnosti botů, volba u každého bota v jeho řádku (Kadet ★ / Pilot ★★ / Eso ★★★), štítek u jména.

@@ -349,7 +349,7 @@ export interface MapSettings {
   /** Komety naráží do asteroidů (zmizí a vykousnou kráter); jinak jimi proletí. */
   cometsHitAsteroids: boolean;
   /** Vzdálené pozadí (paralaxní vrstva, jen vizuální): motiv, nebo náhodný podle seedu. */
-  sky?: SkyTheme | "random";
+  sky?: SkyChoice;
 }
 
 export type BotLevel = "kadet" | "pilot" | "eso";
@@ -363,10 +363,14 @@ export const BOT_LEVEL_HINT: Record<BotLevel, string> = {
 
 export type SkyTheme = "spirala" | "mlhovina" | "soustava" | "hluboko";
 export const SKY_THEMES: SkyTheme[] = ["spirala", "mlhovina", "soustava", "hluboko"];
-export const SKY_LABEL: Record<SkyTheme | "random", string> = { random: "Náhodné", spirala: "Spirální galaxie", mlhovina: "Mlhovina", soustava: "Planetární soustava", hluboko: "Hluboký vesmír" };
+export type SkyChoice = SkyTheme | "random" | "none";
+export const SKY_CHOICES: SkyChoice[] = ["none", "random", ...SKY_THEMES];
+export const SKY_LABEL: Record<SkyChoice, string> = { none: "Bez pozadí", random: "Náhodné", spirala: "Spirální galaxie", mlhovina: "Mlhovina", soustava: "Planetární soustava", hluboko: "Hluboký vesmír" };
 /** Motiv pozadí pro mapu (náhodný = podle seedu). */
-export function skyThemeOf(map: { sky?: SkyTheme | "random"; seed: number }): SkyTheme {
-  return map.sky && map.sky !== "random" ? map.sky : SKY_THEMES[Math.abs(Math.floor(map.seed / 7)) % SKY_THEMES.length];
+export function skyThemeOf(map: { sky?: SkyChoice; seed: number }): SkyTheme | null {
+  const sky = map.sky ?? "none";
+  if (sky === "none") return null;
+  return sky !== "random" ? sky : SKY_THEMES[Math.abs(Math.floor(map.seed / 7)) % SKY_THEMES.length];
 }
 
 /** Elektromagnetická bouře: shluk kruhů. Uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener a dohled nepronikne. */

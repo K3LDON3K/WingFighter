@@ -2,7 +2,7 @@ import {
   RULES,
   HULLS,
   PILOTS,
-  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner, LOADOUT_PRESETS, applyPreset, unarmedShips, hasWeapon, SKY_THEMES, SKY_LABEL, type SkyTheme, BOT_LEVELS, BOT_LEVEL_LABEL, BOT_LEVEL_HINT, type BotLevel } from "@wingfighter/shared";
+  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner, LOADOUT_PRESETS, applyPreset, unarmedShips, hasWeapon, SKY_CHOICES, SKY_LABEL, type SkyChoice, BOT_LEVELS, BOT_LEVEL_LABEL, BOT_LEVEL_HINT, type BotLevel } from "@wingfighter/shared";
 import { confirmDialog } from "./dialog.ts";
 import { logoCanvas } from "./logo.ts";
 import { openRoadmap } from "./roadmap.ts";
@@ -617,10 +617,18 @@ function roomView(m: LobbyModel, net: Net) {
         return s;
       };
       /** Ikona motivu pozadí. */
-      const skySvg = (k: SkyTheme | "random", on: boolean) => {
+      const skySvg = (k: SkyChoice, on: boolean) => {
         const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
         const c = (col: string) => (on ? col : "#475569");
-        if (k === "random") {
+        if (k === "none") {
+          // prázdný vesmír: jen pár hvězdiček
+          dot(s, 7, 8, c("#94a3b8"), 1);
+          dot(s, 18, 6, c("#94a3b8"), 0.8);
+          dot(s, 13, 15, c("#94a3b8"), 1.2);
+          dot(s, 20, 19, c("#94a3b8"), 0.8);
+          dot(s, 6, 20, c("#94a3b8"), 1);
+          s.append(svgEl("rect", { x: "3", y: "3", width: "20", height: "20", fill: "none", stroke: c("#475569"), "stroke-width": "1", "stroke-dasharray": "2 2" }));
+        } else if (k === "random") {
           dot(s, 6, 7, c("#c4b5fd"), 1.5);
           dot(s, 20, 6, c("#7dd3fc"), 1.2);
           dot(s, 19, 20, c("#fdba74"), 2.2);
@@ -782,7 +790,7 @@ function roomView(m: LobbyModel, net: Net) {
             kv("Asteroidy", `${lvl(bm.asteroids, AST)}${bm.clusters ? " ve shlucích" : ""}`),
             kv("Bouře", bm.storms === 0 ? "žádné" : `${bm.storms} (${["malé", "střední", "velké"][["small", "medium", "large"].indexOf(bm.stormSize)] ?? bm.stormSize})`),
             kv("Komety", `${lvl(bm.comets ?? "none", COM)}${bm.cometsHitAsteroids ? " · naráží do asteroidů" : ""}`),
-            kv("Pozadí", SKY_LABEL[(bm.sky ?? "random") as SkyTheme | "random"]),
+            kv("Pozadí", SKY_LABEL[bm.sky ?? "none"]),
             kv("Limit kol", b.turnLimit ? `${b.turnLimit} kol` : "bez limitu"),
             kv("Umístění", PLACEMENT_LABEL[pl]),
           );
@@ -901,7 +909,7 @@ function roomView(m: LobbyModel, net: Net) {
               frow("", h("div", { class: "fpair" }, h("span", { class: "txt muted fsub" }, "komety naráží do asteroidů"), toggle(!!map.cometsHitAsteroids, (v) => setMap({ cometsHitAsteroids: v }))), "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím."),
               frow(
                 "Pozadí",
-                pipRow("size", (map.sky ?? "random") as SkyTheme | "random", (["random", ...SKY_THEMES] as (SkyTheme | "random")[]).map((k) => [k, SKY_LABEL[k] + (k === "random" ? " – motiv podle seedu (u série může mít každá bitva jiný)" : ""), (on: boolean) => skySvg(k, on)] as [SkyTheme | "random", string, (on: boolean) => Node]), (v) => setMap({ sky: v }), SKY_LABEL[(map.sky ?? "random") as SkyTheme | "random"].toLowerCase()),
+                pipRow("size", map.sky ?? "none", SKY_CHOICES.map((k) => [k, SKY_LABEL[k] + (k === "random" ? " – motiv podle seedu (u série může mít každá bitva jiný)" : k === "none" ? " – jen hvězdy" : ""), (on: boolean) => skySvg(k, on)] as [SkyChoice, string, (on: boolean) => Node]), (v) => setMap({ sky: v }), SKY_LABEL[map.sky ?? "none"].toLowerCase()),
                 "Vzdálená paralaxní vrstva (galaxie, mlhoviny, planety) – jen vizuální, na hru nemá vliv. Hráč si ji může vypnout v Nastavení grafiky.",
               ),
               frow(

@@ -19,7 +19,7 @@ export const MAP_SIZES: Record<MapSettings["size"], { w: number; h: number; labe
 /** Startovní pásmo u okraje mapy (startovní body leží v této vzdálenosti od okraje). */
 export const START_MARGIN = 160;
 
-export const DEFAULT_MAP: MapSettings = { size: "medium", asteroids: "medium", clusters: false, storms: 2, stormSize: "medium", seed: 1, symmetric: false, comets: "few", cometsHitAsteroids: false, sky: "random" };
+export const DEFAULT_MAP: MapSettings = { size: "medium", asteroids: "medium", clusters: false, storms: 2, stormSize: "medium", seed: 1, symmetric: false, comets: "few", cometsHitAsteroids: false, sky: "none" };
 
 export interface GeneratedMap {
   width: number;
@@ -43,7 +43,7 @@ export function sanitizeMapSettings(raw: unknown, base: MapSettings = DEFAULT_MA
   if (typeof r.symmetric === "boolean") out.symmetric = r.symmetric;
   if (r.comets === "none" || r.comets === "few" || r.comets === "medium" || r.comets === "many") out.comets = r.comets;
   if (typeof r.cometsHitAsteroids === "boolean") out.cometsHitAsteroids = r.cometsHitAsteroids;
-  if (r.sky === "random" || (typeof r.sky === "string" && (SKY_THEMES as string[]).includes(r.sky))) out.sky = r.sky as MapSettings["sky"];
+  if (r.sky === "random" || r.sky === "none" || (typeof r.sky === "string" && (SKY_THEMES as string[]).includes(r.sky))) out.sky = r.sky as MapSettings["sky"];
   return out;
 }
 

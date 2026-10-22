@@ -35,7 +35,8 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
     ctx.ellipse(cx, cy, ra + Bs, rb + Bs, 0, 0, Math.PI * 2);
     ctx.clip();
     ctx.setTransform(scale, 0, 0, scale, pad * scale, pad * scale);
-    drawParallax(ctx, skyThemeOf(settings), settings.seed, gen.width, gen.height, { x: -pad, y: -pad, zoom: scale, viewW: width, viewH: height }, scale, true);
+    const sky = skyThemeOf(settings);
+    if (sky) drawParallax(ctx, sky, settings.seed, gen.width, gen.height, { x: -pad, y: -pad, zoom: scale, viewW: width, viewH: height }, scale, true);
     ctx.restore();
   }
   if (border > 0) {
