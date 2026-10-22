@@ -31,6 +31,7 @@ import {
   generateMap,
   newModule,
   actionCost,
+  defaultOrders,
   classifyManeuver,
   carveCrater,
   circleHitsAsteroid,
@@ -1522,5 +1523,36 @@ describe("otočka na konci křivky", () => {
     const s = r.state.ships[0];
     expect(s.speed).toBe(Math.max(1, 3 - RULES.koiogranSpeedDrop));
     expect(s.stressPoints).toBe(3 - STRESS.costRed);
+  });
+});
+
+describe("více zbraní v kole", () => {
+  it("dva lasery = dvě akce, každý vlastní cíl; střílí z pozice modulu na trupu", () => {
+    const g = createGame({ players: [...players, { id: "p3", name: "Gama", team: 1, isBot: false }], settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    g.asteroids = [];
+    g.storms = [];
+    const me = g.ships.find((s) => s.ownerId === "p1")!;
+    me.loadout.modules = [newModule("laser", "front", "la"), { ...newModule("laser", "right", "lb"), facing: "right" as const }];
+    place(g, me.id, 500, 500, 0); // míří doprava (+x); pravobok = +y
+    place(g, "ship-p2-0", 680, 500, Math.PI); // před přídí
+    place(g, "ship-p3-0", 500, 680, -Math.PI / 2); // po pravoboku
+    const man = defaultOrders(me).maneuverId;
+    const orders = [{ shipId: me.id, maneuverId: man, shots: [{ moduleId: "la", targetId: "ship-p2-0" }, { moduleId: "lb", targetId: "ship-p3-0" }] }, { shipId: "ship-p2-0", maneuverId: "m1a0", shots: [] }, { shipId: "ship-p3-0", maneuverId: "m1a0", shots: [] }];
+    const fixed = sanitizeOrders(g, "p1", [orders[0]]);
+    expect(fixed[0].shots!.length).toBe(2);
+    expect(actionCost(me, fixed[0])).toBe(2);
+    const r = resolveTurn(g, orders, createRng(3));
+    const lasers = r.events.filter((e): e is Extract<TurnEvent, { type: "laser" }> => e.type === "laser" && e.shooterId === me.id);
+    expect(lasers.map((e) => e.targetId).sort()).toEqual(["ship-p2-0", "ship-p3-0"]);
+    // přední laser střílí z přídě (x > 500), boční z pravoboku (y > 500)
+    const front = lasers.find((e) => e.targetId === "ship-p2-0")!;
+    const side = lasers.find((e) => e.targetId === "ship-p3-0")!;
+    expect(front.from.x).toBeGreaterThan(505);
+    expect(Math.abs(front.from.y - 500)).toBeLessThan(1);
+    expect(side.from.y).toBeGreaterThan(505);
+    // třetí střela (stejný modul podruhé) se zahodí, přes limit akcí odpadají od konce
+    const dup = sanitizeOrders(g, "p1", [{ shipId: me.id, maneuverId: man, shots: [{ moduleId: "la" }, { moduleId: "la" }, { moduleId: "lb" }], special: { type: "mine" } }]);
+    expect(dup[0].shots!.map((s) => s.moduleId)).toEqual(["la", "lb"]);
+    expect(actionCost(me, dup[0])).toBeLessThanOrEqual(RULES.actionPoints);
   });
 });

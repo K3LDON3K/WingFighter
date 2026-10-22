@@ -54,7 +54,7 @@ export interface Overlay {
   selectedShipId?: string;
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
-  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; laserArc?: { heading: number; halfArc: number }; mgArc?: { heading: number; halfArc: number; range: number } }[];
+  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; laserArcs?: { x: number; y: number; heading: number; halfArc: number }[]; mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[] }[];
   /** Dohled vlastního týmu (fog of war). */
   vision?: { x: number; y: number; r: number }[];
   /** Kreslit slabý kruh dohledu kolem vlastních lodí. */
@@ -221,7 +221,7 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
-    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArc, p.mgArc);
+    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArcs, p.mgArcs);
 
     for (const t of view.torpedoes) {
       // plamen motoru
@@ -469,7 +469,9 @@ export class Renderer {
   private drawTargetMark(x: number, y: number, r: number, weapons: string[]) {
     const ctx = this.ctx;
     const R = r + 6;
-    const col = weapons.length === 1 ? WEAPON_COLOR[weapons[0]] ?? "#fbbf24" : "#fbbf24";
+    // "laser#2" = druhý laser (číslo se vykreslí do rohu ikony)
+    const base = (w: string) => w.split("#")[0];
+    const col = weapons.length === 1 ? WEAPON_COLOR[base(weapons[0])] ?? "#fbbf24" : "#fbbf24";
     ctx.save();
     ctx.strokeStyle = col;
     ctx.lineWidth = 2;
@@ -484,10 +486,20 @@ export class Renderer {
     weapons.forEach((w, i) => {
       const bx = x + R + i * (14 * s + 2);
       const by = y - R;
-      const wc = WEAPON_COLOR[w] ?? "#fbbf24";
+      const [kind, num] = w.split("#");
+      const wc = WEAPON_COLOR[kind] ?? "#fbbf24";
       ctx.fillStyle = wc;
       ctx.fillRect(bx - 7 * s, by - 7 * s, 14 * s, 14 * s);
-      this.drawPixelIcon(WEAPON_ICON[w] ?? w, bx, by, s, "#0b1020");
+      this.drawPixelIcon(WEAPON_ICON[kind] ?? kind, bx, by, s, "#0b1020");
+      if (num) {
+        // číslo modulu v rohu ikony
+        ctx.fillStyle = "#0b1020";
+        ctx.fillRect(bx + 7 * s - 9, by + 7 * s - 10, 9, 10);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "10px Jersey, ui-monospace, Menlo, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(num, bx + 7 * s - 4.5, by + 7 * s - 1);
+      }
     });
     ctx.restore();
   }
@@ -925,7 +937,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArc?: { heading: number; halfArc: number }, mgArc?: { heading: number; halfArc: number; range: number }) {
+  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArcs?: { x: number; y: number; heading: number; halfArc: number }[], mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[]) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[ship.team];
     const pts = samplePath(maneuverPath(ship, man), 24);
@@ -950,8 +962,9 @@ export class Renderer {
       ctx.fill();
     }
     ctx.restore();
-    if (fire) this.drawArc({ x: ship.x, y: ship.y, heading: laserArc?.heading ?? ship.heading }, color, LASER.range, laserArc?.halfArc ?? LASER.halfArc); // lasery střílí ze startovní pozice, před pohybem
-    if (mgArc) this.drawArc({ x: ship.x, y: ship.y, heading: mgArc.heading }, "#fbbf24", mgArc.range, mgArc.halfArc);
+    // výseče zbraní: každá z pozice svého modulu na trupu (lasery střílí ze startovní pozice, před pohybem)
+    for (const a of laserArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, color, LASER.range, a.halfArc);
+    for (const a of mgArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, "#fbbf24", a.range, a.halfArc);
     ctx.save();
     ctx.strokeStyle = shade(color, 1.3);
     ctx.lineWidth = 1;

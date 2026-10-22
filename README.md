@@ -147,6 +147,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.113 – Střelba po modulech: každý laser a každý kulomet má v liště vlastní dlaždici (s natočením) a střílí za
+  vlastní akci s vlastním cílem – dva lasery mohou mířit na dva nepřátele, nebo oba na jednoho (dvě samostatné
+  salvy). Klik na dlaždici = střílet a zvolit modul (bílý rám), klik na nepřítele = cíl zvoleného modulu; ✓ = střílí.
+  Zbraně střílí z pozice modulu na trupu (příď / boky / záď): odtud se měří dosah i výseč, odtud vychází paprsek,
+  dávka kulometu i start torpéda. U cíle je značka zbraně s číslem modulu. Rozkaz nese seznam střel (modul + cíl);
+  server hlídá jeden výstřel na modul a limit akcí. Bot využije zbylé akce na další lasery.
 - v3.112 – Po restartu serveru s novou verzí se otevřené stránky se starým klientem samy obnoví (mimo rozehranou
   bitvu – tam jen upozorní). Řeší situaci, kdy hráč se starou stránkou neměl tlačítko PŘIPRAVEN a host nemohl
   spustit bitvu.

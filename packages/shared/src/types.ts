@@ -55,16 +55,23 @@ export interface ShipOrders {
   maneuverId: string;
   action?: ActionOrder;
   special?: SpecialOrder;
-  fire: boolean;
-  /** Ze kterého laserového modulu se střílí (když je jich víc). */
+  /** Střelba: jedna položka = jeden modul (lasery / kulomet), každá stojí 1 akci a může mít vlastní cíl. */
+  shots?: Shot[];
+  /** Starší zápis (jeden laser / jeden kulomet) – převádí se na `shots`, když `shots` chybí. */
+  fire?: boolean;
   laserModuleId?: string;
-  /** Kulomet: dávka na začátku kola (1 akce), ze kterého modulu. */
   fireMg?: boolean;
   mgModuleId?: string;
-  /** Preferovaný cíl laserů (loď nebo torpédo); když není ve výseči, střílí se na nejbližší nepřátelskou loď. */
+  /** Výchozí cíl (loď, torpédo, trosky, kometa) pro střely bez vlastního cíle; když není ve výseči, střílí se na nejbližší nepřátelskou loď. */
   preferredTargetId?: string;
   /** Droid – pilot: funkce zapnuté pro toto kolo (platí se technologií při vyhodnocení). */
   droid?: DroidOrder;
+}
+
+/** Výstřel z jednoho modulu v kole; `targetId` přebíjí `preferredTargetId` lodi. */
+export interface Shot {
+  moduleId: string;
+  targetId?: string;
 }
 
 /** Funkce droida-pilota v kole: overdrive = manévry bez stresu (otočka za 1 akci, nebezpečný bez poškození), autopilot = zelený manévr vrací víc stresu. */

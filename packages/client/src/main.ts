@@ -43,6 +43,10 @@ import {
   LASER,
   laserReach,
   laserArcOf,
+  moduleWorking,
+  shotsOf,
+  shotsOfType,
+  shotTargetId,
   laserOdds,
   mgArcOf,
   mgPreview,
@@ -129,6 +133,8 @@ interface GameSession {
   orders: Map<string, ShipOrders>;
   /** Loď, které se právě kreslí dráha myší (null = nic). */
   aimingShipId: string | null;
+  /** Aktivní střela (id modulu): klik na nepřítele jí přiřadí cíl. */
+  activeShot?: string;
   /** Rychlost zamknutá kolečkem/klávesou – myš pak mění jen směr. */
   speedLock: Map<string, number>;
   selectedShipId?: string;
@@ -356,6 +362,7 @@ function resetOrders() {
   if (!game) return;
   game.orders.clear();
   game.aimingShipId = null;
+  game.activeShot = undefined;
   game.speedLock.clear();
   game.picking = null;
   game.minePick = null;
@@ -783,7 +790,9 @@ function buildOverlay(view: ViewModel): Overlay {
     const man = resolveManeuver(profile, o.maneuverId, ship.speed);
     if (!man) continue;
     const aiming = g.aimingShipId === ship.id && !g.submitted;
-    overlay.previews.push({ ship: vs, maneuver: man, aiming, fire: !!o.fire, laserArc: o.fire ? laserArcOf(ship, o.laserModuleId) : undefined, mgArc: o.fireMg ? mgArcOf(ship, o.mgModuleId) : undefined });
+    const laserShots = shotsOfType(ship, o, "laser");
+    const mgShots = shotsOfType(ship, o, "mg");
+    overlay.previews.push({ ship: vs, maneuver: man, aiming, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(ship, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(ship, mod.id)) });
     const end = maneuverEnd(ship, man);
 
     if (aiming) {
@@ -806,13 +815,18 @@ function buildOverlay(view: ViewModel): Overlay {
           if (!id) return;
           (tw[id] ??= []).push(w);
         };
-        if (o.fire) {
-          const tgt = laserTarget(g.state, ship, o.preferredTargetId, o.laserModuleId);
-          const pt = o.preferredTargetId && !g.state.ships.some((x) => x.id === o.preferredTargetId) ? ((g.state.debris ?? []).find((d) => d.id === o.preferredTargetId) ?? (g.state.comets ?? []).find((c) => c.id === o.preferredTargetId) ?? g.state.torpedoes.find((t) => t.id === o.preferredTargetId)) : undefined;
-          if (pt && !laserReach(g.state, ship, pt, o.laserModuleId)) add(pt.id, "laser");
-          else if (tgt) add(tgt.id, "laser");
+        // každá střela zvlášť: značka s číslem modulu (pořadí mezi moduly stejného typu), když je jich víc
+        const lasersAll = ship.loadout.modules.filter((x) => x.type === "laser");
+        const mgsAll = ship.loadout.modules.filter((x) => x.type === "mg");
+        for (const { shot, mod } of shotsOfType(ship, o, "laser")) {
+          const tid = shotTargetId(o, shot);
+          const tag = lasersAll.length > 1 ? `laser#${lasersAll.indexOf(mod) + 1}` : "laser";
+          const tgt = laserTarget(g.state, ship, tid, mod.id);
+          const pt = tid && !g.state.ships.some((x) => x.id === tid) ? ((g.state.debris ?? []).find((d) => d.id === tid) ?? (g.state.comets ?? []).find((c) => c.id === tid) ?? g.state.torpedoes.find((t) => t.id === tid)) : undefined;
+          if (pt && !laserReach(g.state, ship, pt, mod.id)) add(pt.id, tag);
+          else if (tgt) add(tgt.id, tag);
         }
-        if (o.fireMg) add(mgPreview(g.state, ship, o.preferredTargetId, o.mgModuleId)?.targetId, "mg");
+        for (const { shot, mod } of shotsOfType(ship, o, "mg")) add(mgPreview(g.state, ship, shotTargetId(o, shot), mod.id)?.targetId, mgsAll.length > 1 ? `mg#${mgsAll.indexOf(mod) + 1}` : "mg");
         if (o.special?.type === "torpedo") add(o.special.targetId, "torpedo");
         overlay.targetWeapons = tw;
       }
@@ -823,30 +837,36 @@ function buildOverlay(view: ViewModel): Overlay {
         overlay.rangeCircle2 = { radius: TORPEDO.pointRange };
       } else {
         overlay.targetId = o.preferredTargetId;
-        if (o.fireMg && !o.fire) {
-          const pv = mgPreview(g.state, ship, o.preferredTargetId, o.mgModuleId);
+        // náhled šance: aktivní střela (naposledy zvolený modul), jinak první
+        const activeOf = (type: "laser" | "mg") => {
+          const list = shotsOfType(ship, o, type);
+          return list.find((x) => x.mod.id === g.activeShot) ?? list[0];
+        };
+        const mgA = activeOf("mg");
+        const laA = activeOf("laser");
+        if (mgA && (!laA || g.activeShot === mgA.mod.id)) {
+          const pv = mgPreview(g.state, ship, shotTargetId(o, mgA.shot), mgA.mod.id);
           if (pv) {
             const pct = Math.round(pv.hitChance * 100);
             overlay.targetId = pv.targetId;
             const cov = Math.round(pv.coverage * 100);
             overlay.laserOdds = { x: pv.x, y: pv.y, text: `${pct} % ×${pv.shots}`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171", sub: pv.coverage < 1 ? `${cov} % v dosahu` : undefined };
             if (pv.coverage < 1) {
-              const arc = mgArcOf(ship, o.mgModuleId);
-              overlay.partialTarget = { id: pv.targetId, x: ship.x, y: ship.y, heading: arc.heading, range: arc.range, halfArc: arc.halfArc };
+              const arc = mgArcOf(ship, mgA.mod.id);
+              overlay.partialTarget = { id: pv.targetId, x: arc.x, y: arc.y, heading: arc.heading, range: arc.range, halfArc: arc.halfArc };
             }
           }
-        }
-        if (o.fire) {
-          const tgt = laserTarget(g.state, ship, o.preferredTargetId, o.laserModuleId);
+        } else if (laA) {
+          const tgt = laserTarget(g.state, ship, shotTargetId(o, laA.shot), laA.mod.id);
           if (tgt) {
-            const odds = laserOdds(ship, tgt, o.laserModuleId);
+            const odds = laserOdds(ship, tgt, laA.mod.id);
             const pct = Math.round(odds.hitChance * 100);
             overlay.targetId = tgt.id;
             const cov = Math.round(odds.coverage * 100);
             overlay.laserOdds = { x: tgt.x, y: tgt.y, text: `${pct} %`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171", sub: odds.coverage < 1 ? `${cov} % v dosahu` : undefined };
             if (odds.coverage < 1) {
-              const arc = laserArcOf(ship, o.laserModuleId);
-              overlay.partialTarget = { id: tgt.id, x: ship.x, y: ship.y, heading: arc.heading, range: LASER.range, halfArc: arc.halfArc };
+              const arc = laserArcOf(ship, laA.mod.id);
+              overlay.partialTarget = { id: tgt.id, x: arc.x, y: arc.y, heading: arc.heading, range: LASER.range, halfArc: arc.halfArc };
             }
           }
         }
@@ -1255,6 +1275,7 @@ function renderSide() {
       myId: playerId,
       orders: game.orders,
       aimingShipId: game.aimingShipId,
+      activeShot: game.activeShot,
       selectedShipId: game.selectedShipId,
       submitted: game.submitted,
       ready: game.ready,
@@ -1602,6 +1623,34 @@ function chooseIcon(shipId: string, id: string) {
     renderSide();
     return;
   }
+  if (id.startsWith("shot:")) {
+    // dlaždice modulu zbraně: vypnuto → zapnout (a zvolit), zapnuto a nezvolené → zvolit, zvolené → vypnout
+    const moduleId = id.slice(5);
+    const mod = ship.loadout.modules.find((x) => x.id === moduleId);
+    if (!mod) return;
+    const shots = shotsOf(ship, o);
+    const has = shots.some((sh) => sh.moduleId === moduleId);
+    if (has && g.activeShot === moduleId) {
+      g.orders.set(shipId, { ...o, shots: shots.filter((sh) => sh.moduleId !== moduleId) });
+      g.activeShot = undefined;
+      sfx("cancel");
+    } else if (has) {
+      g.activeShot = moduleId;
+      sfx("toggle");
+    } else {
+      const why = mod.type === "laser" && inStorm(g.state, ship) ? "v bouři lasery nefungují" : !moduleWorking(mod) ? "modul je zničený" : mod.type === "mg" && (mod.ammo ?? 0) <= 0 ? "došly náboje" : actionCost(ship, o) >= RULES.actionPoints ? `žádná volná akce (max. ${RULES.actionPoints} za kolo)` : null;
+      if (why) {
+        showError(`${MODULES[mod.type].name}: ${why}.`);
+        return;
+      }
+      g.orders.set(shipId, { ...o, shots: [...shots, { moduleId }] });
+      g.activeShot = moduleId;
+      sfx("toggle");
+    }
+    g.picking = null;
+    renderSide();
+    return;
+  }
   const a = actionById(id);
   if (!a) return;
   const why = a.disabled(ship, g.state, o);
@@ -1610,9 +1659,9 @@ function chooseIcon(shipId: string, id: string) {
     return;
   }
   const next = { ...o, ...a.apply(o, ship, g.state) };
-  sfx(a.active(next) ? "toggle" : "cancel");
+  sfx(a.active(next, ship) ? "toggle" : "cancel");
   g.orders.set(shipId, next);
-  g.picking = a.pick && a.active(next) ? a.pick : null;
+  g.picking = a.pick && a.active(next, ship) ? a.pick : null;
   g.shieldEdit = a.id === "shield" && next.action?.type === "shield";
   if (a.id === "jettison") g.jettisonPick = false; // výběr modulu probíhá v okénku nad tlačítkem
   if (a.id === "jettison" || a.id === "pickup") g.cargoOpen = true;
@@ -1924,8 +1973,19 @@ function bindInput(c: HTMLCanvasElement) {
       renderSide();
       return;
     }
+    /** Cíl pro aktivní střelu (zvolený modul), jinak výchozí cíl lodi pro všechny střely bez vlastního cíle. */
+    const setTarget = (id: string | undefined) => {
+      const shots = shotsOf(sel, o);
+      const idx = shots.findIndex((sh) => sh.moduleId === g.activeShot);
+      if (idx >= 0) {
+        const next = shots.map((sh, i) => (i === idx ? (id ? { ...sh, targetId: id } : { moduleId: sh.moduleId }) : sh));
+        g.orders.set(sel.id, { ...o, shots: next });
+      } else g.orders.set(sel.id, { ...o, preferredTargetId: id });
+    };
     if (hit && (hit.kind === "debris" || hit.kind === "comet")) {
-      g.orders.set(sel.id, { ...o, preferredTargetId: o.preferredTargetId === hit.id ? undefined : hit.id });
+      const curShot = shotsOf(sel, o).find((sh) => sh.moduleId === g.activeShot);
+      const cur = curShot ? curShot.targetId : o.preferredTargetId;
+      setTarget(cur === hit.id ? undefined : hit.id);
       renderSide();
       return;
     }
@@ -1933,9 +1993,7 @@ function bindInput(c: HTMLCanvasElement) {
       if (o.special?.type === "torpedo" && dist(sel, hitPos(hit)) <= TORPEDO.lockRange) {
         g.orders.set(sel.id, { ...o, special: { type: "torpedo", targetId: hit.id }, preferredTargetId: hit.id });
         g.picking = null;
-      } else {
-        g.orders.set(sel.id, { ...o, preferredTargetId: hit.id });
-      }
+      } else setTarget(hit.id);
       renderSide();
       return;
     }

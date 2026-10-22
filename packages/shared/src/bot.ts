@@ -1,3 +1,4 @@
+import { moduleWorking } from "./ships.ts";
 import { insideMap } from "./mapshape.ts";
 import { LASER, RULES, TORPEDO } from "./constants.ts";
 import { actionCost } from "./resolve.ts";
@@ -40,16 +41,25 @@ export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrder
     const nearest = enemies.length ? enemies.reduce((a, b) => (dist(ship, a) < dist(ship, b) ? a : b)) : undefined;
     const willHaveTarget = enemies.some((e) => inArc(end, e, LASER.halfArc * 2) && dist(end, e) <= LASER.range);
 
-    const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, fire: false, preferredTargetId: nearest?.id };
+    const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, shots: [], preferredTargetId: nearest?.id };
     const left = () => RULES.actionPoints - actionCost(ship, orders);
+    const lasers = ship.loadout.modules.filter((m) => m.type === "laser" && moduleWorking(m));
+    const addLaser = () => {
+      const m = lasers.find((x) => !orders.shots!.some((sh) => sh.moduleId === x.id));
+      if (m) orders.shots!.push({ moduleId: m.id });
+      return !!m;
+    };
     const torpTarget = enemies.find((e) => dist(ship, e) <= TORPEDO.lockRange);
-    if (left() > 0 && willHaveTarget) orders.fire = true;
+    if (left() > 0 && willHaveTarget) addLaser();
     if (left() > 0 && ship.ammo.torpedoes > 0 && torpTarget && rng.next() < 0.5) {
       orders.special = { type: "torpedo", targetId: torpTarget.id };
     } else if (left() > 0 && ship.ammo.mines > 0 && nearest && dist(ship, nearest) < 200 && Math.abs(bearingTo(ship, nearest)) > Math.PI / 2 && rng.next() < 0.5) {
       orders.special = { type: "mine" };
     }
-    if (left() > 0 && !orders.fire) orders.fire = true;
+    // zbylé akce: další lasery (každý modul zvlášť)
+    while (left() > 0 && addLaser()) {
+      /* další laser */
+    }
     // nemá-li střílet na nic, radši nechat akci na pohyb příště (nic nestojí)
     out.push(orders);
   }

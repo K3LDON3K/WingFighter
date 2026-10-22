@@ -1,4 +1,4 @@
-import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, profileFor, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders } from "@wingfighter/shared";
+import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, profileFor, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders, shotsOf, shotsOfType } from "@wingfighter/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -9,7 +9,7 @@ export interface ActionOption {
   /** Vrátí důvod, proč nejde vybrat, nebo null. */
   disabled(ship: Ship, state: GameState, o: ShipOrders): string | null;
   /** Je právě vybraná? */
-  active(o: ShipOrders): boolean;
+  active(o: ShipOrders, ship: Ship): boolean;
   /** Úprava rozkazu po kliknutí (přepíná zapnuto/vypnuto). */
   apply(o: ShipOrders, ship: Ship, state: GameState): Partial<ShipOrders>;
   /** Po výběru čeká na kliknutí na cíl na mapě. */
@@ -25,6 +25,13 @@ export function actionAvailable(a: ActionOption, ship: Ship): boolean {
   return !a.requiresModule || ship.loadout.modules.some((m) => m.type === a.requiresModule);
 }
 
+/** Klávesa / obecná akce: vypne všechny střely daného typu, nebo zapne první funkční modul. */
+const toggleType = (ship: Ship, o: ShipOrders, type: "laser" | "mg"): Partial<ShipOrders> => {
+  const shots = shotsOf(ship, o);
+  if (shotsOfType(ship, o, type).length) return { shots: shots.filter((sh) => ship.loadout.modules.find((m) => m.id === sh.moduleId)?.type !== type) };
+  const mod = ship.loadout.modules.find((m) => m.type === type && moduleWorking(m) && (type !== "mg" || (m.ammo ?? 0) > 0));
+  return mod ? { shots: [...shots, { moduleId: mod.id }] } : {};
+};
 const noAp = (ship: Ship, o: ShipOrders, active: boolean) => (!active && actionCost(ship, o) >= RULES.actionPoints ? `žádná volná akce (max. ${RULES.actionPoints} za kolo)` : null);
 
 export const ACTIONS: ActionOption[] = [
@@ -46,9 +53,9 @@ export const ACTIONS: ActionOption[] = [
     glyph: "⚡",
     label: "Lasery (1 akce)",
     description: "Na začátku kola (před pohybem) vystřelí lasery ze současné pozice na cíl ve výseči ±20° do 300 (preferovaný cíl, jinak nejbližší nepřítel; ne skrz asteroid). Bez této akce loď nestřílí.",
-    disabled: (ship, s, o) => (!ship.loadout.modules.some((m) => m.type === "laser") ? "loď nemá laserový modul" : !ship.loadout.modules.some((m) => m.type === "laser" && moduleWorking(m)) ? "lasery jsou zničené" : inStorm(s, ship) ? "v bouři lasery nefungují" : noAp(ship, o, !!o.fire)),
-    active: (o) => !!o.fire,
-    apply: (o, ship) => ({ fire: !o.fire, laserModuleId: o.fire ? undefined : ship.loadout.modules.find((m) => m.type === "laser" && moduleWorking(m))?.id }),
+    disabled: (ship, s, o) => (!ship.loadout.modules.some((m) => m.type === "laser") ? "loď nemá laserový modul" : !ship.loadout.modules.some((m) => m.type === "laser" && moduleWorking(m)) ? "lasery jsou zničené" : inStorm(s, ship) ? "v bouři lasery nefungují" : noAp(ship, o, shotsOfType(ship, o, "laser").length > 0)),
+    active: (o, ship) => shotsOfType(ship, o, "laser").length > 0,
+    apply: (o, ship) => toggleType(ship, o, "laser"),
     requiresModule: "laser",
   },
   {
@@ -56,9 +63,9 @@ export const ACTIONS: ActionOption[] = [
     glyph: "⁘",
     label: "Kulomet (1 akce)",
     description: "Na začátku kola vystřelí dávku projektilů s rozptylem na cíl ve výseči kulometu (krátký dosah, široká výseč). Každý projektil má šanci zasáhnout podle vzdálenosti a dává malé zranění. Míří na preferovaný cíl (loď, torpédo, trosky), jinak na nejbližší nepřátelskou loď. Funguje i v bouři.",
-    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mg") ? "loď nemá kulomet" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m)) ? "kulomet je zničený" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m) && (m.ammo ?? 0) > 0) ? "došly náboje" : noAp(ship, o, !!o.fireMg)),
-    active: (o) => !!o.fireMg,
-    apply: (o, ship) => ({ fireMg: !o.fireMg, mgModuleId: o.fireMg ? undefined : ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m) && (m.ammo ?? 0) > 0)?.id }),
+    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mg") ? "loď nemá kulomet" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m)) ? "kulomet je zničený" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m) && (m.ammo ?? 0) > 0) ? "došly náboje" : noAp(ship, o, shotsOfType(ship, o, "mg").length > 0)),
+    active: (o, ship) => shotsOfType(ship, o, "mg").length > 0,
+    apply: (o, ship) => toggleType(ship, o, "mg"),
     requiresModule: "mg",
   },
   {

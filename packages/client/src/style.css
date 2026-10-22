@@ -719,6 +719,33 @@ h3,
 .bb-weapon .lbl {
   font-size: 14px;
 }
+/* dlaždice jednoho modulu zbraně: natočení za názvem, ✓ = střílí, zvolený (aktivní) modul = bílý rám */
+.bb-weapon .wfac {
+  margin-left: 3px;
+  color: #fde68a;
+  font-size: 12px;
+}
+.bb-weapon.on .wfac {
+  color: #7f1d1d;
+}
+.bb-weapon .shot-tick {
+  position: absolute;
+  right: 3px;
+  top: 2px;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #16a34a;
+  color: #f0fdf4;
+  font-size: 11px;
+  border: 1px solid #052e16;
+}
+.bb-weapon.aim {
+  outline: 2px solid #f8fafc;
+  outline-offset: -2px;
+}
 .bb-details {
   display: flex;
   align-items: center;

@@ -43,6 +43,9 @@ import {
   type Segments,
   type ShipOrders,
   defaultOrders,
+  shotsOfType,
+  shotTargetId,
+  actionCost,
 } from "@wingfighter/shared";
 import { clear, h } from "../dom.ts";
 import { actionTip } from "./tips.ts";
@@ -92,6 +95,8 @@ export interface PlanningModel {
   myId: string;
   orders: Map<string, ShipOrders>;
   aimingShipId: string | null;
+  /** Aktivní střela (id modulu) – klik na nepřítele jí přiřadí cíl. */
+  activeShot?: string;
   selectedShipId?: string;
   submitted: boolean;
   ready: string[];
@@ -413,8 +418,48 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
+      if (a.id === "laser" || a.id === "mg") {
+        // jedna dlaždice na každý modul: každý laser / kulomet střílí zvlášť (vlastní akce a cíl)
+        const type = a.id;
+        const mods = ship.loadout.modules.filter((x) => x.type === type);
+        const shots = shotsOfType(ship, o, type);
+        const stormOff = stormed && type === "laser";
+        mods.forEach((mod, i) => {
+          const shot = shots.find((x) => x.mod.id === mod.id);
+          const on = !!shot;
+          const isActive = on && m.activeShot === mod.id;
+          const destroyed = !moduleWorking(mod);
+          const noAmmo = type === "mg" && (mod.ammo ?? 0) <= 0;
+          const noAp = !on && actionCost(ship, o) >= RULES.actionPoints;
+          const why = destroyed ? "ZNIČENO – modul nefunguje" : stormOff ? "systém je v bouři mimo provoz" : noAmmo ? "došly náboje" : noAp ? `žádná volná akce (max. ${RULES.actionPoints} za kolo)` : null;
+          const name = `${MODULES[type].name}${mods.length > 1 ? ` ${i + 1}` : ""} · ${FACING_NAMES[mod.facing ?? "front"]}`;
+          const tid = shot ? shotTargetId(o, shot.shot) : undefined;
+          const tname = tid ? (m.state.ships.find((x) => x.id === tid)?.name ?? "cíl") : null;
+          const btn = h(
+            "button",
+            {
+              class: `px bb-weapon ${on && !stormOff ? "on" : ""} ${isActive ? "aim" : ""} ${stormOff ? "stormed" : ""} ${on ? "spent" : ""} ${destroyed ? "destroyed" : ""}`,
+              disabled: locked || stormOff || destroyed || (!!why && !on),
+              ...tipAttr({
+                ...actionTip(a.id, ship, o, man, destroyed ? null : why),
+                ...(on ? { note: `${name}${tname ? ` → ${tname}` : " → výchozí cíl / nejbližší"}${isActive ? " · aktivní: klik na nepřítele = cíl tohoto modulu · stisk = vypnout" : " · stisk = zvolit (pak klik na nepřítele = jeho cíl)"}` } : { note: `${name} · stisk = střílet (1 akce)` }),
+                ...(destroyed ? { warn: "ZNIČENO – modul nefunguje" } : {}),
+              }),
+              onclick: () => cb.chooseAction(ship.id, `shot:${mod.id}`),
+            },
+            costPipsAll({ actions: 1 }, on, "stojí 1 akci"),
+            icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
+            h("span", { class: "lbl" }, label(type === "laser" ? "Lasery" : "Kulomet"), h("span", { class: "wfac" }, `${mods.length > 1 ? i + 1 : ""}${FACING_GLYPH[mod.facing ?? "front"]}`)),
+            on ? h("span", { class: "shot-tick" }, "✓") : null,
+            stormOff ? h("span", { class: "sb" }, "⚡") : null,
+            destroyed ? h("span", { class: "dead-x" }, "✕") : null,
+          );
+          row.append(btn);
+        });
+        continue;
+      }
       const isMove = a.id === "move";
-      const active = isMove ? aiming : a.active(o);
+      const active = isMove ? aiming : a.active(o, ship);
       // manévr nakreslen a potvrzen: zelené tlačítko, stisk = reset na rovně stejnou rychlostí
       const moveDone = isMove && !aiming && o.maneuverId !== defaultOrders(ship).maneuverId;
       // štít: upraveno a okénko zavřené = hotovo (zelené), stisk = reset (zrušit úpravu)
@@ -627,12 +672,14 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     details.append(icon("scan", "#7dd3fc"));
     if (m.scanPick) details.append(h("span", { class: "warn" }, label(`klikni na cizí loď v dohledu (dosah ${SCANNER.range}) – sken proběhne hned`)), h("span", { class: "muted" }, label(`· technologie ${ship.techPoints}/${ship.stats.techMax} · nebere akci`)));
     else details.append(h("span", { class: "muted" }, label(`technologie ${ship.techPoints}/${ship.stats.techMax} · nedobíjí se · nebere akci`)));
-  } else if (o.fireMg && o.special?.type !== "torpedo" && o.special?.type !== "mine") {
-    const picker = modulePicker("mg", o.mgModuleId, (id) => cb.setOrders(ship.id, { mgModuleId: id }));
-    if (picker) details.append(picker);
-    const pv = mgPreview(m.state, ship, o.preferredTargetId, o.mgModuleId);
+  } else if (shotsOfType(ship, o, "mg").length && o.special?.type !== "torpedo" && o.special?.type !== "mine" && (!shotsOfType(ship, o, "laser").length || shotsOfType(ship, o, "mg").some((x) => x.mod.id === m.activeShot))) {
+    // kulomet: aktivní (zvolený) kulomet, jinak první
+    const list = shotsOfType(ship, o, "mg");
+    const cur = list.find((x) => x.mod.id === m.activeShot) ?? list[0];
+    const mgs = ship.loadout.modules.filter((x) => x.type === "mg");
+    const pv = mgPreview(m.state, ship, shotTargetId(o, cur.shot), cur.mod.id);
     const tname = pv ? (m.state.ships.find((x) => x.id === pv.targetId)?.name ?? (m.state.torpedoes.some((x) => x.id === pv.targetId) ? "torpédo" : "trosky")) : null;
-    details.append(icon("target", pv ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, pv ? `kulomet: ${tname}` : "nikdo ve výseči kulometu"));
+    details.append(icon("target", pv ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, `kulomet${mgs.length > 1 ? ` ${mgs.indexOf(cur.mod) + 1}` : ""}: ${pv ? tname : "nikdo ve výseči"}`));
     if (pv) {
       const pct = Math.round(pv.hitChance * 100);
       details.append(
@@ -640,7 +687,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         h("span", { class: "muted" }, label(`· ${pv.shots} projektilů · průměr ${Math.round(pv.expectedDamage)} zranění`)),
       );
     }
-    details.append(h("span", { class: "muted" }, label("· klik na cíl = zaměřit")));
+    details.append(h("span", { class: "muted" }, label(list.length > 1 ? "· klik na nepřítele = cíl zvoleného kulometu" : "· klik na cíl = zaměřit")));
   } else if (o.special?.type === "torpedo") {
     const sp = o.special;
     const tname = sp.targetId ? (m.state.ships.find((x) => x.id === sp.targetId)?.name ?? "torpédo") : null;
@@ -691,16 +738,19 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     else details.append(h("span", { class: "muted" }, label(`· rychlost ${sp} ok · po střelbě, před pohybem`)));
   } else if (o.action?.type === "shield") {
     details.append(icon("segments", "#60a5fa"), h("span", { class: "txt" }, `štít ${o.action.segments.join(" / ")}`), inHand > 0 ? h("span", { class: "warn" }, label(`← rozmísti ${inHand} b. v panelu lodi`)) : h("span", { class: "muted" }, label("· platí od začátku kola")));
-  } else if (o.fire) {
-    const picker = modulePicker("laser", o.laserModuleId, (id) => cb.setOrders(ship.id, { laserModuleId: id }));
-    if (picker) details.append(picker);
-    const debrisTarget = o.preferredTargetId ? (m.state.debris ?? []).find((d) => d.id === o.preferredTargetId) : undefined;
-    const cometTarget = o.preferredTargetId ? (m.state.comets ?? []).find((c) => c.id === o.preferredTargetId) : undefined;
-    const tname = o.preferredTargetId ? (m.state.ships.find((x) => x.id === o.preferredTargetId)?.name ?? (debrisTarget ? `trosky ${MODULES[debrisTarget.type].short} (+${debrisTarget.value})` : cometTarget ? `kometa (${cometTarget.hull} HP, +${COMET.reward})` : "torpédo")) : null;
-    const target = debrisTarget || cometTarget ? undefined : laserTarget(m.state, ship, o.preferredTargetId, o.laserModuleId);
-    details.append(icon("target", target ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, tname ?? (target ? `nejbližší: ${target.name}` : "nikdo ve výseči")));
+  } else if (shotsOfType(ship, o, "laser").length) {
+    // lasery: aktivní (zvolený) laser, jinak první; každý má vlastní cíl
+    const list = shotsOfType(ship, o, "laser");
+    const cur = list.find((x) => x.mod.id === m.activeShot) ?? list[0];
+    const lasers = ship.loadout.modules.filter((x) => x.type === "laser");
+    const tid = shotTargetId(o, cur.shot);
+    const debrisTarget = tid ? (m.state.debris ?? []).find((d) => d.id === tid) : undefined;
+    const cometTarget = tid ? (m.state.comets ?? []).find((c) => c.id === tid) : undefined;
+    const tname = tid ? (m.state.ships.find((x) => x.id === tid)?.name ?? (debrisTarget ? `trosky ${MODULES[debrisTarget.type].short} (+${debrisTarget.value})` : cometTarget ? `kometa (${cometTarget.hull} HP, +${COMET.reward})` : "torpédo")) : null;
+    const target = debrisTarget || cometTarget ? undefined : laserTarget(m.state, ship, tid, cur.mod.id);
+    details.append(icon("target", target ? "#4ade80" : "#fbbf24"), h("span", { class: "txt" }, `${lasers.length > 1 ? `laser ${lasers.indexOf(cur.mod) + 1}${FACING_GLYPH[cur.mod.facing ?? "front"]}: ` : ""}${tname ?? (target ? `nejbližší: ${target.name}` : "nikdo ve výseči")}`));
     if (target) {
-      const odds = laserOdds(ship, target, o.laserModuleId);
+      const odds = laserOdds(ship, target, cur.mod.id);
       const pct = Math.round(odds.hitChance * 100);
       const cov = Math.round(odds.coverage * 100);
       details.append(
@@ -712,13 +762,13 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         ...(odds.coverage < 1 ? [h("span", { class: "muted" }, label(`· ${cov} % v dosahu`))] : []),
         h("span", { class: "muted" }, label(`· průměr ${Math.round(odds.expectedDamage)} zranění`)),
       );
-    } else if (o.preferredTargetId && !debrisTarget && !cometTarget) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
+    } else if (tid && !debrisTarget && !cometTarget) details.append(h("span", { class: "warn" }, label("cíl mimo výseč – střelí na nejbližšího")));
     const pt = cometTarget ?? debrisTarget;
     if (pt) {
-      const why = laserReach(m.state, ship, pt, o.laserModuleId);
+      const why = laserReach(m.state, ship, pt, cur.mod.id);
       details.append(why ? h("span", { class: "warn" }, label(`${why} – nevystřelí`)) : h("span", { class: "odds", style: "color:#4ade80" }, label("v dosahu")));
     }
-    details.append(h("span", { class: "muted" }, label("· klik na nepřítele = cíl")));
+    details.append(h("span", { class: "muted" }, label(list.length > 1 ? "· klik na nepřítele = cíl zvoleného laseru" : "· klik na nepřítele = cíl")));
   } else if (stormed) {
     details.append(h("span", { class: "pv" }, label("⚡ v bouři: lasery, štít a skener dočasně mimo provoz · torpéda letí rovně")));
   } else {

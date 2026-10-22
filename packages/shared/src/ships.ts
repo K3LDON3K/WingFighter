@@ -139,6 +139,18 @@ export function defaultFacing(type: ModuleType, slot: SlotId): Facing | undefine
 }
 
 /** Úhel směru modulu vůči kurzu lodi. */
+/** Poloha slotu na trupu v souřadnicích lodi (x dopředu, y doprava) – odtud zbraň střílí a měří dosah. */
+export function slotOffset(slot: SlotId | undefined): { x: number; y: number } {
+  return slot === "front" ? { x: 14, y: 0 } : slot === "back" ? { x: -12, y: 0 } : slot === "left" ? { x: -4, y: -12 } : slot === "right" ? { x: -4, y: 12 } : { x: 0, y: 0 };
+}
+/** Světová pozice modulu na lodi. */
+export function modulePos(ship: { x: number; y: number; heading: number }, mod: { slot?: SlotId } | undefined): { x: number; y: number } {
+  const o = slotOffset(mod?.slot);
+  const c = Math.cos(ship.heading);
+  const s = Math.sin(ship.heading);
+  return { x: ship.x + o.x * c - o.y * s, y: ship.y + o.x * s + o.y * c };
+}
+
 export function facingAngle(f: Facing | undefined): number {
   return f === "right" ? Math.PI / 2 : f === "back" ? Math.PI : f === "left" ? -Math.PI / 2 : 0;
 }
