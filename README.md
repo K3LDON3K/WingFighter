@@ -147,6 +147,14 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.115 – Tři obtížnosti botů, volba u každého bota v jeho řádku (Kadet ★ / Pilot ★★ / Eso ★★★), štítek u jména.
+  Boti nepodvádí – plánují ze stavu svého týmu s mlhou války (dřív viděli celou mapu). Kadet = dosavadní bot.
+  Pilot: předvídá pohyb nepřátel, hodnotí pozici po manévru (můj útok − jejich hrozba, bezpečnost), střílí všemi
+  zbraněmi na nejvýhodnější cíle, uhýbá při silné palbě, přerozděluje segmenty štítu k hrozbě, torpédo se
+  zámkem, mina za záď; manévr za akci jen když stojí za víc než ztracená akce. Eso: navíc více odhadů manévru
+  soupeře (průměr + nejhorší případ), pohled o kolo dál, otočka, torpédo na předvídaný bod, overdrive /
+  autopilot droida, sběr ocasu komety při vybitém štítu, koncovka podle limitu kol. Headless turnaj (30 bitev na dvojici,
+  stejná výbava): Pilot–Kadet 16:11, Eso–Pilot 14:8, Eso–Kadet 17:4.
 - v3.114 – Víc zbraní stejného typu = jedna dlaždice s vyjížděcím podmenu (tlačítka 1↑, 2→ … jako u skeneru);
   na sbalené dlaždici čipy jednotlivých modulů (zelený střílí, šedý ne, bílý rám = zvolený), ✓ s počtem; částečně
   použitá zbraň má tlumenější modrou, plně použitá jasnou. Nová skupina LOĎ s tlačítkem NÁKLAD (vyhodit / zvednout)

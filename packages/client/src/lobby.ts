@@ -2,7 +2,7 @@ import {
   RULES,
   HULLS,
   PILOTS,
-  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner, LOADOUT_PRESETS, applyPreset, unarmedShips, hasWeapon, SKY_THEMES, SKY_LABEL, type SkyTheme } from "@wingfighter/shared";
+  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner, LOADOUT_PRESETS, applyPreset, unarmedShips, hasWeapon, SKY_THEMES, SKY_LABEL, type SkyTheme, BOT_LEVELS, BOT_LEVEL_LABEL, BOT_LEVEL_HINT, type BotLevel } from "@wingfighter/shared";
 import { confirmDialog } from "./dialog.ts";
 import { logoCanvas } from "./logo.ts";
 import { openRoadmap } from "./roadmap.ts";
@@ -247,12 +247,19 @@ function roomView(m: LobbyModel, net: Net) {
       "div",
       { class: `trow ${p.id === m.playerId ? "me" : ""}` },
       h("span", { class: "t-strip", style: `background:${color}` }),
-      h("span", { class: "t-name" }, h("span", { class: `dot ${p.connected ? "" : "off"}` }), " ", teamManual && p.commander ? h("span", { class: "cmd-star", title: "Velitel týmu – vybírá startovní bod týmu" }, "★ ") : null, p.name, p.id === room.hostId ? h("span", { class: "host" }, " HOST") : null, p.isBot ? h("span", { class: "bot-tag" }, "BOT") : null),
+      h("span", { class: "t-name" }, h("span", { class: `dot ${p.connected ? "" : "off"}` }), " ", teamManual && p.commander ? h("span", { class: "cmd-star", title: "Velitel týmu – vybírá startovní bod týmu" }, "★ ") : null, p.name, p.id === room.hostId ? h("span", { class: "host" }, " HOST") : null, p.isBot ? h("span", { class: `bot-tag lvl-${p.botLevel ?? "kadet"}`, title: BOT_LEVEL_HINT[p.botLevel ?? "kadet"] }, `BOT · ${BOT_LEVEL_LABEL[p.botLevel ?? "kadet"].toUpperCase()} ${"★".repeat(BOT_LEVELS.indexOf(p.botLevel ?? "kadet") + 1)}`) : null),
       h("span", { class: "t-fleet" }, ...fleet.map(shipChip)),
       h("span", { class: `t-status txt ${status[0]}` }, status[1]),
       h(
         "span",
         { class: "t-act" },
+        p.isBot && isHost
+          ? h(
+              "span",
+              { class: "bot-lvl", title: "Obtížnost bota" },
+              ...BOT_LEVELS.map((lv) => h("button", { class: `px tiny lvl-${lv} ${(p.botLevel ?? "kadet") === lv ? "on" : ""}`, title: `${BOT_LEVEL_LABEL[lv]} – ${BOT_LEVEL_HINT[lv]}`, onclick: () => net.send({ type: "setBotLevel", botId: p.id, level: lv }) }, label(BOT_LEVEL_LABEL[lv]), h("span", { class: "lvl-stars" }, "★".repeat(BOT_LEVELS.indexOf(lv) + 1)))),
+            )
+          : null,
         canMove ? h("button", { class: "px tiny", title: "Přesunout do dalšího týmu", onclick: () => net.send({ type: "setTeam", team: (p.team + 1) % nTeams, playerId: p.id }) }, "⇄") : null,
         teamManual && !p.commander && (isHost || (me?.commander && me.team === p.team)) ? h("button", { class: "px tiny", title: "Předat velení týmu tomuto hráči (bude vybírat startovní bod týmu)", onclick: () => net.send({ type: "setCommander", playerId: p.id }) }, "★") : null,
         canEditBot(p) ? h("button", { class: `px tiny ${open ? "on" : ""}`, title: "Naklikat výbavu bota", onclick: () => ((botEdit = open ? null : p.id), rerender()) }, "⚙") : null,

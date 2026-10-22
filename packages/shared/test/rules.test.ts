@@ -75,6 +75,7 @@ import {
   TORPEDO,
   type Asteroid,
   type GameState,
+  type TurnEvent,
   type PlayerInfo,
   type ShipOrders,
 } from "../src/index.ts";

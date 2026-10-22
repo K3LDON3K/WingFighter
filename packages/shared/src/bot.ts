@@ -7,13 +7,15 @@ import { isRed, listManeuvers, maneuverEnd, maneuverPath, maneuverStress } from 
 import { circleHitsAsteroid } from "./asteroids.ts";
 import type { Rng } from "./rng.ts";
 import { profileOf } from "./ships.ts";
-import type { GameState, Ship, ShipOrders } from "./types.ts";
+import type { BotLevel, GameState, Ship, ShipOrders } from "./types.ts";
+import { planSmartBot } from "./bot-ai.ts";
 
 /**
  * Jednoduchý bot: vybere manévr, po kterém bude mít nejvíc nepřátel ve výseči
  * a ideální vzdálenost; občas vypustí torpédo nebo položí minu.
  */
-export function planBot(state: GameState, playerId: string, rng: Rng): ShipOrders[] {
+export function planBot(state: GameState, playerId: string, rng: Rng, level: BotLevel = "kadet"): ShipOrders[] {
+  if (level === "pilot" || level === "eso") return planSmartBot(state, playerId, rng, level);
   const out: ShipOrders[] = [];
   const myShips = state.ships.filter((s) => s.alive && s.ownerId === playerId);
   for (const ship of myShips) {
@@ -86,5 +88,7 @@ function scorePose(state: GameState, ship: Ship, end: Pose, enemies: Ship[]): nu
     if (inArc(e, end, LASER.halfArc) && d <= LASER.range) score -= 5;
   }
   for (const m of state.mines) if (circlesOverlap(end, r, m, m.radius + 20)) score -= 30;
+  // nikdo v dohledu (mlha): letět ke středu mapy
+  if (enemies.length === 0) score -= dist(end, { x: state.width / 2, y: state.height / 2 }) / 40;
   return score;
 }

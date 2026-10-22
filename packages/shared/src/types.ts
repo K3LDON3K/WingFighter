@@ -306,6 +306,8 @@ export interface PlayerInfo {
   name: string;
   team: number;
   isBot: boolean;
+  /** Obtížnost bota (kadet = základní, pilot = chytřejší, eso = nejtěžší). */
+  botLevel?: BotLevel;
   loadout?: ShipLoadout;
   /** Letka: jedna výbava na loď (chybí = jedna loď podle `loadout`). */
   loadouts?: ShipLoadout[];
@@ -349,6 +351,15 @@ export interface MapSettings {
   /** Vzdálené pozadí (paralaxní vrstva, jen vizuální): motiv, nebo náhodný podle seedu. */
   sky?: SkyTheme | "random";
 }
+
+export type BotLevel = "kadet" | "pilot" | "eso";
+export const BOT_LEVELS: BotLevel[] = ["kadet", "pilot", "eso"];
+export const BOT_LEVEL_LABEL: Record<BotLevel, string> = { kadet: "Kadet", pilot: "Pilot", eso: "Eso" };
+export const BOT_LEVEL_HINT: Record<BotLevel, string> = {
+  kadet: "Základní: letí k nepříteli, střílí, co má ve výseči; nebrání se.",
+  pilot: "Chytřejší: předvídá pohyb nepřítele, využije všechny zbraně, uhýbá a přerozděluje štít.",
+  eso: "Nejtěžší: hledá dvě kola dopředu, používá otočku, torpéda na bod, komety i droida. Nepodvádí – vidí jen to, co jeho tým.",
+};
 
 export type SkyTheme = "spirala" | "mlhovina" | "soustava" | "hluboko";
 export const SKY_THEMES: SkyTheme[] = ["spirala", "mlhovina", "soustava", "hluboko"];

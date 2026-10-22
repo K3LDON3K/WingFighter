@@ -1,4 +1,5 @@
 import {
+  type BotLevel,
   applyTuning,
   computeStats,
   DEFAULT_TUNING,
@@ -76,6 +77,7 @@ interface RoomMember {
   name: string;
   team: number;
   isBot: boolean;
+  botLevel?: BotLevel;
   ready: boolean;
   /** Potvrzená připravenost v místnosti (false po každé vlastní změně, po změně nastavení a po návratu z bitvy). */
   lobbyReady?: boolean;
@@ -231,6 +233,7 @@ class Room {
         name: m.name,
         team: m.team,
         isBot: m.isBot,
+        botLevel: m.isBot ? (m.botLevel ?? "kadet") : undefined,
         ready: m.ready,
         lobbyReady: m.isBot || m.id === this.hostId || !!m.lobbyReady,
         loadout: m.loadouts[0],
@@ -488,9 +491,18 @@ export class Hub {
         const id = `bot-${randomBytes(3).toString("hex")}`;
         const used = new Set([...room.members.values()].map((m) => m.name));
         const name = BOT_NAMES.find((n) => !used.has(`Bot ${n}`)) ?? randomBytes(2).toString("hex");
-        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, (room.settings.teams ?? 2) - 1), isBot: true, ready: true, loadouts: this.botFleet(room), earned: 0, spent: 0 });
+        const level: BotLevel = msg.level === "pilot" || msg.level === "eso" ? msg.level : "kadet";
+        room.members.set(id, { id, name: `Bot ${name}`, team: clampInt(msg.team, 0, (room.settings.teams ?? 2) - 1), isBot: true, botLevel: level, ready: true, loadouts: this.botFleet(room), earned: 0, spent: 0 });
         this.broadcastRoom(room);
         this.broadcastRooms();
+        return;
+      }
+      case "setBotLevel": {
+        if (!room || room.game || room.hostId !== client.id) return;
+        const bm = room.members.get(msg.botId);
+        if (!bm || !bm.isBot) return;
+        bm.botLevel = msg.level === "pilot" || msg.level === "eso" ? msg.level : "kadet";
+        this.broadcastRoom(room);
         return;
       }
       case "removeBot": {
@@ -708,7 +720,7 @@ export class Hub {
       if (err) return this.error(host, `${m.name} – letka: ${err}.`);
       if (!m.isBot) m.walletAtStart = room.walletOf(m);
     }
-    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, loadout: refillLoadout(m.loadouts[0]), loadouts: m.loadouts.map(refillLoadout), credits: m.isBot ? undefined : room.walletOf(m), startIndex: m.startIndex, commander: m.commander }));
+    const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, botLevel: m.isBot ? (m.botLevel ?? "kadet") : undefined, loadout: refillLoadout(m.loadouts[0]), loadouts: m.loadouts.map(refillLoadout), credits: m.isBot ? undefined : room.walletOf(m), startIndex: m.startIndex, commander: m.commander }));
     const state = createGame({ players, settings: room.settings, tuning: room.tuning });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     room.game = { state, orders: new Map(), rng, memory: new Map(), pendingEvents: [] };
@@ -769,7 +781,9 @@ export class Hub {
     const g = room.game!;
     for (const m of room.members.values()) {
       if (!m.isBot) continue;
-      g.orders.set(m.id, sanitizeOrders(g.state, m.id, planBot(g.state, m.id, g.rng)));
+      // bot nepodvádí: plánuje ze stavu svého týmu (mlha války), podle své obtížnosti
+      const seen = stateForTeam(g.state, m.team, memoryFor(g, m.team));
+      g.orders.set(m.id, sanitizeOrders(g.state, m.id, planBot(seen, m.id, g.rng, m.botLevel ?? "kadet")));
       m.ready = true;
     }
   }

@@ -3498,6 +3498,37 @@ button.mod-hex:hover:not(:disabled) {
   color: var(--yellow);
   font-size: 14px;
 }
+.bot-lvl {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.bot-lvl .px.tiny {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.bot-lvl .lvl-stars {
+  margin-left: 4px;
+  font-size: 9px;
+  color: #fbbf24;
+  letter-spacing: -1px;
+}
+.bot-lvl .px.tiny.on.lvl-pilot {
+  background: #1d4ed8;
+  color: #dbeafe;
+}
+.bot-lvl .px.tiny.on.lvl-eso {
+  background: #b45309;
+  color: #fef3c7;
+}
+.trow .bot-tag.lvl-pilot {
+  color: #93c5fd;
+}
+.trow .bot-tag.lvl-eso {
+  color: #fbbf24;
+}
 .trow .bot-tag {
   font-size: 11px;
   color: #94a3b8;

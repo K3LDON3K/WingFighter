@@ -1,6 +1,6 @@
 import type { Tuning } from "./tuning.ts";
 import type { SeriesState } from "./series.ts";
-import type { GameSettings, GameState, PilotDef, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
+import type { BotLevel, GameSettings, GameState, PilotDef, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
 
 /** Stav místnosti v lobby. */
 export interface RoomPlayer {
@@ -8,6 +8,8 @@ export interface RoomPlayer {
   name: string;
   team: number;
   isBot: boolean;
+  /** Obtížnost bota. */
+  botLevel?: BotLevel;
   ready: boolean;
   /** V místnosti: hráč potvrdil, že je připravený (bitva jde spustit až když jsou všichni). Boti a host vždy true. */
   lobbyReady: boolean;
@@ -70,7 +72,9 @@ export type ClientMessage =
   /** Vlastní výbava, nebo (host) výbava bota. */
   | { type: "setLoadout"; loadout: ShipLoadout; botId?: string; index?: number }
   | { type: "setPilots"; pilots: PilotDef[] }
-  | { type: "addBot"; team: number }
+  | { type: "addBot"; team: number; level?: BotLevel }
+  /** Host změní obtížnost bota. */
+  | { type: "setBotLevel"; botId: string; level: BotLevel }
   | { type: "removeBot"; botId: string }
   | { type: "setSettings"; settings: Partial<GameSettings> }
   | { type: "setTuning"; tuning: Partial<Tuning> }
