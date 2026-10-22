@@ -278,8 +278,8 @@ const BOT_NAMES = ["Rex", "Nova", "Kael", "Zara", "Orin", "Vex", "Lyra", "Dax", 
 export class Hub {
   clients = new Map<string, Client>();
   rooms = new Map<string, Room>();
-  /** Identifikace sestavení klienta (název hlavního skriptu v dist/index.html) – klient se po restartu serveru s novou verzí sám obnoví. */
-  clientBuild = "";
+  /** Identifikace sestavení klienta (název hlavního skriptu v dist/index.html) – klient se starší verzí se sám obnoví. Čte se při každém připojení (dist se může přebudovat za běhu). */
+  clientBuild: () => string = () => "";
 
   /* ---------------- připojení ---------------- */
 
@@ -300,7 +300,7 @@ export class Hub {
     }
     client.name = cleanName(msg.name) || client.name;
     this.clients.set(client.id, client);
-    this.send(client, { type: "welcome", playerId: client.id, sessionId: client.sessionId, name: client.name, build: this.clientBuild || undefined });
+    this.send(client, { type: "welcome", playerId: client.id, sessionId: client.sessionId, name: client.name, build: this.clientBuild() || undefined });
     const room = client.roomCode ? this.rooms.get(client.roomCode) : undefined;
     if (room) {
       const member = room.members.get(client.id);
@@ -349,7 +349,7 @@ export class Hub {
           if (m) m.name = client.name;
           this.broadcastRoom(room);
         }
-        this.send(client, { type: "welcome", playerId: client.id, sessionId: client.sessionId, name: client.name, build: this.clientBuild || undefined });
+        this.send(client, { type: "welcome", playerId: client.id, sessionId: client.sessionId, name: client.name, build: this.clientBuild() || undefined });
         return;
       }
       case "listRooms":

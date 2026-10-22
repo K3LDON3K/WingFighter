@@ -135,6 +135,8 @@ interface GameSession {
   aimingShipId: string | null;
   /** Aktivní střela (id modulu): klik na nepřítele jí přiřadí cíl. */
   activeShot?: string;
+  /** Otevřené podmenu zbraně s více moduly. */
+  weaponOpen?: "laser" | "mg" | null;
   /** Rychlost zamknutá kolečkem/klávesou – myš pak mění jen směr. */
   speedLock: Map<string, number>;
   selectedShipId?: string;
@@ -363,6 +365,7 @@ function resetOrders() {
   game.orders.clear();
   game.aimingShipId = null;
   game.activeShot = undefined;
+  game.weaponOpen = null;
   game.speedLock.clear();
   game.picking = null;
   game.minePick = null;
@@ -1285,6 +1288,7 @@ function renderSide() {
       shieldEdit: game.shieldEdit,
       inventoryOpen: game.inventoryOpen,
       scanOpen: game.scanOpen,
+      weaponOpen: game.weaponOpen,
       droidOpen: game.droidOpen,
       scanPick: game.scanPick,
       cargoOpen: game.cargoOpen,
@@ -1403,8 +1407,16 @@ function renderSide() {
         game!.droidOpen = !game!.droidOpen;
         renderSide();
       },
+      weaponToggle: (id, type) => {
+        game!.selectedShipId = id;
+        game!.weaponOpen = game!.weaponOpen === type ? null : type;
+        game!.droidOpen = false;
+        if (!game!.scanPick) game!.scanOpen = false;
+        renderSide();
+      },
       scanToggle: (id) => {
         game!.selectedShipId = id;
+        game!.weaponOpen = null;
         game!.scanOpen = !game!.scanOpen;
         game!.scanPick = false;
         renderSide();
@@ -1600,9 +1612,10 @@ function confirmManeuver(id: string): boolean {
 function chooseIcon(shipId: string, id: string) {
   const g = game!;
   g.selectedShipId = shipId;
-  // volba jiné akce zavře otevřená okénka droida / skeneru
+  // volba jiné akce zavře otevřená okénka droida / skeneru (podmenu zbraně zůstává jen pro její vlastní tlačítka)
   g.droidOpen = false;
   if (!g.scanPick) g.scanOpen = false;
+  if (!id.startsWith("shot:")) g.weaponOpen = null;
   const ship = g.state.ships.find((s) => s.id === shipId)!;
   const o = g.orders.get(shipId)!;
   if (id.startsWith("mine-side:") && o.special?.type === "mine") {

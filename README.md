@@ -147,6 +147,11 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.114 – Víc zbraní stejného typu = jedna dlaždice s vyjížděcím podmenu (tlačítka 1↑, 2→ … jako u skeneru);
+  na sbalené dlaždici čipy jednotlivých modulů (zelený střílí, šedý ne, bílý rám = zvolený), ✓ s počtem; částečně
+  použitá zbraň má tlumenější modrou, plně použitá jasnou. Nová skupina LOĎ s tlačítkem NÁKLAD (vyhodit / zvednout)
+  – dřív zmizelo, když loď neměla segmentový štít ani skener/droida. Verze klienta se čte při každém připojení
+  (po přebudování klienta bez restartu se stránky obnoví správně).
 - v3.113 – Střelba po modulech: každý laser a každý kulomet má v liště vlastní dlaždici (s natočením) a střílí za
   vlastní akci s vlastním cílem – dva lasery mohou mířit na dva nepřátele, nebo oba na jednoho (dvě samostatné
   salvy). Klik na dlaždici = střílet a zvolit modul (bílý rám), klik na nepřítele = cíl zvoleného modulu; ✓ = střílí.

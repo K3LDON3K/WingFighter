@@ -97,13 +97,18 @@ const http = createServer((req, res) => {
 });
 
 const hub = new Hub();
-// verze klienta = název hlavního skriptu v index.html (má hash obsahu); posílá se v „welcome“
-try {
-  const html = readFileSync(join(CLIENT_DIST, "index.html"), "utf8");
-  hub.clientBuild = html.match(/assets\/(main-[A-Za-z0-9_-]+\.js)/)?.[1] ?? "";
-} catch {
-  /* klient není sestaven */
-}
+// verze klienta = název hlavního skriptu v index.html (má hash obsahu); posílá se v „welcome“, čte se podle mtime souboru
+let buildCache = { mtime: 0, build: "" };
+hub.clientBuild = () => {
+  try {
+    const file = join(CLIENT_DIST, "index.html");
+    const mtime = statSync(file).mtimeMs;
+    if (mtime !== buildCache.mtime) buildCache = { mtime, build: readFileSync(file, "utf8").match(/assets\/(main-[A-Za-z0-9_-]+\.js)/)?.[1] ?? "" };
+    return buildCache.build;
+  } catch {
+    return "";
+  }
+};
 const wss = new WebSocketServer({ server: http, path: "/ws" });
 
 wss.on("connection", (ws) => {

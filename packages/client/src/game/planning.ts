@@ -71,6 +71,8 @@ export interface PlanningCallbacks {
   jettisonPick(shipId: string): void;
   /** Skener: vysunout/zasunout tlačítka, zapnout výběr cíle, provést hned. */
   scanToggle(shipId: string): void;
+  /** Otevřít / zavřít podmenu zbraně s více moduly. */
+  weaponToggle(shipId: string, type: "laser" | "mg"): void;
   droidToggle(shipId: string): void;
   scanPickTarget(shipId: string, on: boolean): void;
   scan(shipId: string, mode: "deep" | "cooldown"): void;
@@ -107,6 +109,8 @@ export interface PlanningModel {
   shieldEdit?: boolean;
   /** Skener: vysunutá tlačítka, čeká se na klik na loď. */
   scanOpen?: boolean;
+  /** Otevřené podmenu zbraně (víc modulů stejného typu): "laser" | "mg". */
+  weaponOpen?: "laser" | "mg" | null;
   droidOpen?: boolean;
   scanPick?: boolean;
   /** Vysunutá nabídka nákladu (vyhodit / zvednout). */
@@ -137,6 +141,7 @@ const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: 
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
   { label: "Pohyb", ids: ["move", "evade", "koiogran"] },
+  { label: "Loď", ids: [] },
   { label: "Speciální", ids: ["shield"] },
 ];
 const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
@@ -414,17 +419,20 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const buttons = h("div", { class: "bb-weapons" });
   for (const grp of ACTION_GROUPS) {
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
-    if (avail.length === 0 && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.loadout.modules.some((x) => x.type === "droid")))) continue; // skupina bez dostupných akcí se neukazuje
+    // skupina bez dostupných akcí se neukazuje; Loď = NÁKLAD (vyhodit / zvednout), Speciální = štít, skener, droid
+    if (grp.label === "Loď" && ship.loadout.modules.length === 0) continue;
+    if (avail.length === 0 && grp.label !== "Loď" && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.loadout.modules.some((x) => x.type === "droid")))) continue;
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
       if (a.id === "laser" || a.id === "mg") {
-        // jedna dlaždice na každý modul: každý laser / kulomet střílí zvlášť (vlastní akce a cíl)
+        // jedna dlaždice na typ zbraně; víc modulů = vyjížděcí podmenu s jedním tlačítkem na modul (vlastní akce a cíl)
         const type = a.id;
         const mods = ship.loadout.modules.filter((x) => x.type === type);
         const shots = shotsOfType(ship, o, type);
         const stormOff = stormed && type === "laser";
-        mods.forEach((mod, i) => {
+        const allDestroyed = mods.length > 0 && mods.every((x) => !moduleWorking(x));
+        const modTile = (mod: ModuleInstance, i: number, small: boolean) => {
           const shot = shots.find((x) => x.mod.id === mod.id);
           const on = !!shot;
           const isActive = on && m.activeShot === mod.id;
@@ -435,27 +443,62 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           const name = `${MODULES[type].name}${mods.length > 1 ? ` ${i + 1}` : ""} · ${FACING_NAMES[mod.facing ?? "front"]}`;
           const tid = shot ? shotTargetId(o, shot.shot) : undefined;
           const tname = tid ? (m.state.ships.find((x) => x.id === tid)?.name ?? "cíl") : null;
-          const btn = h(
+          return h(
             "button",
             {
-              class: `px bb-weapon ${on && !stormOff ? "on" : ""} ${isActive ? "aim" : ""} ${stormOff ? "stormed" : ""} ${on ? "spent" : ""} ${destroyed ? "destroyed" : ""}`,
+              class: `px bb-weapon ${small ? "sm" : ""} ${on && !stormOff ? "on" : ""} ${isActive ? "aim" : ""} ${stormOff ? "stormed" : ""} ${on ? "spent" : ""} ${destroyed ? "destroyed" : ""}`,
               disabled: locked || stormOff || destroyed || (!!why && !on),
               ...tipAttr({
                 ...actionTip(a.id, ship, o, man, destroyed ? null : why),
-                ...(on ? { note: `${name}${tname ? ` → ${tname}` : " → výchozí cíl / nejbližší"}${isActive ? " · aktivní: klik na nepřítele = cíl tohoto modulu · stisk = vypnout" : " · stisk = zvolit (pak klik na nepřítele = jeho cíl)"}` } : { note: `${name} · stisk = střílet (1 akce)` }),
+                ...(on ? { note: `${name}${tname ? ` → ${tname}` : " → výchozí cíl / nejbližší"}${isActive ? " · zvolený: klik na nepřítele = jeho cíl · stisk = vypnout" : " · stisk = zvolit (pak klik na nepřítele = jeho cíl)"}` } : { note: `${name} · stisk = střílet (1 akce)` }),
                 ...(destroyed ? { warn: "ZNIČENO – modul nefunguje" } : {}),
               }),
               onclick: () => cb.chooseAction(ship.id, `shot:${mod.id}`),
             },
             costPipsAll({ actions: 1 }, on, "stojí 1 akci"),
             icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
-            h("span", { class: "lbl" }, label(type === "laser" ? "Lasery" : "Kulomet"), h("span", { class: "wfac" }, `${mods.length > 1 ? i + 1 : ""}${FACING_GLYPH[mod.facing ?? "front"]}`)),
+            h("span", { class: "lbl" }, label(small ? `${i + 1}` : type === "laser" ? "Lasery" : "Kulomet"), h("span", { class: "wfac" }, FACING_GLYPH[mod.facing ?? "front"]), small ? h("span", { class: "wammo" }, mod.ammo !== undefined ? ` ${mod.ammo}` : "") : null),
             on ? h("span", { class: "shot-tick" }, "✓") : null,
             stormOff ? h("span", { class: "sb" }, "⚡") : null,
             destroyed ? h("span", { class: "dead-x" }, "✕") : null,
           );
-          row.append(btn);
-        });
+        };
+        if (mods.length <= 1) {
+          if (mods[0]) row.append(modTile(mods[0], 0, false));
+          continue;
+        }
+        // souhrnná dlaždice: počet střílejících modulů; klik otevře podmenu
+        const onCount = shots.length;
+        const open = m.weaponOpen === type;
+        const holder = h("div", { class: `scan-holder ${open ? "stack" : ""}` });
+        holder.append(
+          h(
+            "button",
+            {
+              class: `px bb-weapon ${onCount > 0 && !stormOff ? "on" : ""} ${onCount > 0 && onCount < mods.filter((x) => moduleWorking(x)).length ? "partial" : ""} ${open ? "open" : ""} ${stormOff ? "stormed" : ""} ${onCount > 0 ? "spent" : ""} ${allDestroyed ? "destroyed" : ""}`,
+              disabled: locked || stormOff || allDestroyed,
+              ...tipAttr({ ...actionTip(a.id, ship, o, man, allDestroyed ? null : stormOff ? "systém je v bouři mimo provoz" : null), note: `${mods.length}× ${MODULES[type].name} · stisk otevře volbu modulů (každý modul = 1 akce, vlastní cíl)${onCount ? ` · střílí ${onCount}` : ""}` }),
+              onclick: () => cb.weaponToggle(ship.id, type),
+            },
+            costPipsAll({ actions: onCount || 1 }, onCount > 0, onCount ? `utraceno ${onCount} ${onCount === 1 ? "akce" : "akce"}` : "1 akce za každý modul"),
+            icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
+            h("span", { class: "lbl" }, label(type === "laser" ? "Lasery" : "Kulomet")),
+            // stav jednotlivých modulů i bez rozbalení: zeleně střílí, bílý rám = zvolený, šedě nestřílí, přeškrtnuté = zničený
+            h(
+              "span",
+              { class: "wmods" },
+              ...mods.map((mod, i) => {
+                const on = shots.some((x) => x.mod.id === mod.id);
+                return h("i", { class: `${on ? "on" : ""} ${on && m.activeShot === mod.id ? "aim" : ""} ${moduleWorking(mod) ? "" : "dead"}` }, `${i + 1}${FACING_GLYPH[mod.facing ?? "front"]}`);
+              }),
+            ),
+            onCount > 0 ? h("span", { class: "shot-tick" }, onCount > 1 ? `✓${onCount}` : "✓") : null,
+            stormOff ? h("span", { class: "sb" }, "⚡") : null,
+            allDestroyed ? h("span", { class: "dead-x" }, "✕") : null,
+          ),
+        );
+        if (open && !stormOff) holder.append(h("div", { class: `scan-pop ${popClass(`weapon:${type}:${ship.id}`)}` }, ...mods.map((mod, i) => modTile(mod, i, true))));
+        row.append(holder);
         continue;
       }
       const isMove = a.id === "move";
@@ -502,7 +545,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       if (a.id === "shield" && editing) row.append(h("div", { class: "scan-holder stack" }, shieldPop, wbtn));
       else row.append(wbtn);
     }
-    if (grp.label === "Speciální") {
+    if (grp.label === "Loď") {
       // spojené tlačítko NÁKLAD: vyhodit modul / zvednout náklad
       const jet = ACTIONS.find((x) => x.id === "jettison")!;
       const pick = ACTIONS.find((x) => x.id === "pickup")!;
@@ -573,6 +616,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         holder.append(pop);
       }
       row.append(holder);
+    }
+    if (grp.label === "Speciální") {
       const sc = scannerModule(ship.loadout);
       if (sc) {
         const tech = ship.techPoints;

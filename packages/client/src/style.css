@@ -730,7 +730,7 @@ h3,
 }
 .bb-weapon .shot-tick {
   position: absolute;
-  right: 3px;
+  left: 3px;
   top: 2px;
   width: 14px;
   height: 14px;
@@ -741,6 +741,60 @@ h3,
   color: #f0fdf4;
   font-size: 11px;
   border: 1px solid #052e16;
+}
+/* stav modulů na souhrnné dlaždici zbraně (bez rozbalení) – dlaždice zůstává stejně vysoká, obsah se zhustí */
+.bb-weapon:has(.wmods) {
+  gap: 2px;
+  padding-top: 2px;
+}
+.bb-weapon:has(.wmods) .lbl {
+  font-size: 12px;
+}
+.bb-weapon .wmods {
+  display: inline-flex;
+  gap: 3px;
+}
+.bb-weapon .wmods i {
+  font-style: normal;
+  font-family: var(--ui);
+  font-size: 10px;
+  line-height: 1;
+  padding: 1px 3px;
+  border: 1px solid #334155;
+  color: #64748b;
+  background: #0a0e1c;
+}
+.bb-weapon .wmods i.on {
+  background: #16a34a;
+  border-color: #86efac;
+  color: #f0fdf4;
+}
+.bb-weapon .wmods i.aim {
+  outline: 1px solid #f8fafc;
+}
+.bb-weapon .wmods i.dead {
+  text-decoration: line-through;
+  color: #7f1d1d;
+}
+.bb-weapon.on .wmods i:not(.on) {
+  background: rgba(2, 6, 23, 0.5);
+  border-color: #bae6fd;
+  color: #e0f2fe;
+}
+/* část modulů střílí, část ne: tlumenější modrá než plně použitá zbraň */
+.bb-weapon.on.partial,
+.bb-weapon.on.partial:hover:not(:disabled) {
+  background: #1d6fa5;
+  border-color: #7dd3fc #0c4a6e #0c4a6e #7dd3fc;
+  color: #e0f2fe;
+}
+.bb-weapon.on.partial .wfac,
+.bb-weapon.on.partial .c {
+  color: #fde68a;
+}
+.bb-weapon .wammo {
+  font-size: 11px;
+  color: #cbd5e1;
 }
 .bb-weapon.aim {
   outline: 2px solid #f8fafc;
