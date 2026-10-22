@@ -147,6 +147,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.116 – Klik na nepřítele, na kterého zvolený laser nedosáhne, vypíše důvod s čísly (mimo dostřel 318 / 300,
+  mimo výseč o X°, asteroid v cestě, bouře) a připomene, že laser vystřelí na nejbližšího ve výseči.
 - v3.115 – Tři obtížnosti botů, volba u každého bota v jeho řádku (Kadet ★ / Pilot ★★ / Eso ★★★), štítek u jména.
   Boti nepodvádí – plánují ze stavu svého týmu s mlhou války (dřív viděli celou mapu). Kadet = dosavadní bot.
   Pilot: předvídá pohyb nepřátel, hodnotí pozici po manévru (můj útok − jejich hrozba, bezpečnost), střílí všemi

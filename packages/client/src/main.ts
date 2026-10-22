@@ -43,6 +43,7 @@ import {
   LASER,
   laserReach,
   laserArcOf,
+  laserReachShip,
   moduleWorking,
   shotsOf,
   shotsOfType,
@@ -2006,7 +2007,17 @@ function bindInput(c: HTMLCanvasElement) {
       if (o.special?.type === "torpedo" && dist(sel, hitPos(hit)) <= TORPEDO.lockRange) {
         g.orders.set(sel.id, { ...o, special: { type: "torpedo", targetId: hit.id }, preferredTargetId: hit.id });
         g.picking = null;
-      } else setTarget(hit.id);
+      } else {
+        setTarget(hit.id);
+        // zvolený laser na cíl nedosáhne: říct proč (dostřel / výseč / asteroid / bouře)
+        const act = shotsOf(sel, g.orders.get(sel.id)!).find((sh) => sh.moduleId === g.activeShot);
+        const mod = act && sel.loadout.modules.find((x) => x.id === act.moduleId);
+        const tShip = hit.kind === "ship" ? g.state.ships.find((x) => x.id === hit.id) : undefined;
+        if (mod?.type === "laser" && tShip) {
+          const why = laserReachShip(g.state, sel, tShip, mod.id);
+          if (why) showNotice(`${MODULES.laser.name}${sel.loadout.modules.filter((x) => x.type === "laser").length > 1 ? ` ${sel.loadout.modules.filter((x) => x.type === "laser").indexOf(mod) + 1}` : ""}: ${why} – vystřelí na nejbližšího ve výseči.`);
+        }
+      }
       renderSide();
       return;
     }

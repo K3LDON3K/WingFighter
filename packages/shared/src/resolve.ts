@@ -1701,6 +1701,24 @@ export function laserReach(state: GameState, ship: Ship, p: Vec, laserModuleId?:
   return null;
 }
 
+/** Proč laser (daný modul) nedosáhne na nepřátelskou loď – s čísly pro hráče; null = v pořádku. */
+export function laserReachShip(state: GameState, ship: Ship, target: Ship, laserModuleId?: string): string | null {
+  if (inStorm(state, ship)) return "loď je v bouři – lasery nefungují";
+  const lmod = laserModule(ship, laserModuleId);
+  const aim = aimPose(ship, lmod);
+  const arc = laserHalfArc(lmod?.facing);
+  const cov = sectorCoverage(aim, LASER.range, arc, target);
+  if (cov > 0) {
+    if (lineBlocked(state.asteroids, aim, target)) return "v cestě je asteroid";
+    if (laserBlockedByStorm(state, ship, target)) return "cíl je v bouři";
+    return null;
+  }
+  const d = Math.round(dist(aim, target) - target.stats.radius);
+  if (d > LASER.range) return `mimo dostřel (${d} / ${LASER.range})`;
+  const rel = Math.round((Math.abs(normalizeAngle(Math.atan2(target.y - aim.y, target.x - aim.x) - aim.heading)) * 180) / Math.PI);
+  return `mimo výseč laseru (${rel}° od osy, výseč ±${Math.round((arc * 180) / Math.PI)}°)`;
+}
+
 export function laserArcOf(ship: Ship, laserModuleId?: string): { x: number; y: number; heading: number; halfArc: number } {
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
