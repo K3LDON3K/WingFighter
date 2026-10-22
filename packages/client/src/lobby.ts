@@ -186,7 +186,7 @@ function roomView(m: LobbyModel, net: Net) {
     gamePage = 0;
   }
   if (setup) visitedPages.add(gamePage);
-  const SETUP_STEPS = 4;
+  const SETUP_STEPS = 5;
 
   applyTuning(room.tuning);
   const budget = room.tuning.startBudget;
@@ -209,7 +209,7 @@ function roomView(m: LobbyModel, net: Net) {
   const openRoomControl = () => {
     const n = visitedPages.size;
     const all = n >= SETUP_STEPS;
-    const tip = all ? "Prošel jsi všechny kroky nastavení – místnost můžeš otevřít ostatním." : `Prošel jsi ${n} ze ${SETUP_STEPS} kroků nastavení (${["Bitvy", "Pravidla", "Lodě a piloti", "Moduly"].filter((_, i) => !visitedPages.has(i)).join(", ")} ještě ne). Otevřít jde i tak.`;
+    const tip = all ? "Prošel jsi všechny kroky nastavení – místnost můžeš otevřít ostatním." : `Prošel jsi ${n} ze ${SETUP_STEPS} kroků nastavení (${["Bitvy", "Pravidla", "Lodě a piloti", "Moduly", "Souhrn"].filter((_, i) => !visitedPages.has(i)).join(", ")} ještě ne). Otevřít jde i tak.`;
     const open = () => net.send({ type: "openRoom", open: true });
     return h(
       "span",
@@ -682,7 +682,7 @@ function roomView(m: LobbyModel, net: Net) {
           ...opts.map(([v, title, draw]) => h("button", { class: `pip ${cls} ${value === v ? "on" : ""}`, disabled: !isHost, title, onclick: () => onPick(v) }, draw(value === v))),
           h("span", { class: "txt muted pips-txt" }, text),
         );
-      const PAGES = ["Bitvy", "Pravidla", "Lodě a piloti", "Moduly"];
+      const PAGES = ["Bitvy", "Pravidla", "Lodě a piloti", "Moduly", "Souhrn"];
       /** Dlaždice bitev série: číslo, stav (odehraná / příští / další), zkrácený popis mapy. */
       /** Ikona bitvy: zkřížené střely; k malých křížků = počet bitev (volba počtu). */
       const crossAt = (sv: SVGElement, x: number, y: number, r: number, on: boolean) => {
@@ -735,7 +735,9 @@ function roomView(m: LobbyModel, net: Net) {
         ...PAGES.map((t, i) => h("button", { class: `wiz-step ${i === gamePage ? "on" : ""} ${i < gamePage ? "done" : ""}`, onclick: () => ((gamePage = i), rerender()) }, h("span", { class: "wiz-n" }, String(i + 1)), label(t))),
         h("span", { class: "spacer" }),
         h("button", { class: "px", disabled: gamePage === 0, onclick: () => ((gamePage = Math.max(0, gamePage - 1)), rerender()) }, "‹ ", label("zpět")),
-        h("button", { class: "px primary", disabled: gamePage === PAGES.length - 1, onclick: () => ((gamePage = Math.min(PAGES.length - 1, gamePage + 1)), rerender()) }, label("další"), " ›"),
+        gamePage === PAGES.length - 1
+          ? h("span", { class: "txt muted", style: "font-size:13px" }, "Hotovo? Otevři místnost tlačítkem ", h("b", { style: "color:#86efac" }, "OTEVŘÍT MÍSTNOST"), " nahoře.")
+          : h("button", { class: "px primary", onclick: () => ((gamePage = Math.min(PAGES.length - 1, gamePage + 1)), rerender()) }, label("další"), " ›"),
       );
       // otevřená místnost: nastavení jen jako souhrn (host může zpět do úprav), zůstává náhled mapy se startovním bodem
       if (!setup)
@@ -755,6 +757,51 @@ function roomView(m: LobbyModel, net: Net) {
                 h("div", { class: "muted txt" }, startHelp),
               ),
         );
+      /** Poslední krok: výpis celé konfigurace (jen ke kontrole; otevření je tlačítkem nahoře). */
+      const summaryPage = (): Node[] => {
+        const kv = (k: string, v: string | Node, warn = false) => h("div", { class: "sum-kv" }, h("span", { class: "txt muted sum-k" }, k), h("span", { class: `txt sum-v ${warn ? "warn" : ""}` }, v));
+        const lvl = (v: string, m: Record<string, string>) => m[v] ?? v;
+        const AST = { none: "žádné", few: "málo", medium: "střední", many: "hodně" };
+        const COM = { none: "žádné", few: "málo", medium: "středně", many: "hodně" };
+        const battleList = series ? battles : [{ map: settings.map ?? DEFAULT_MAP, turnLimit: settings.turnLimit, placement: settings.placement } as BattleSettings];
+        const battleBlock = (b: BattleSettings, i: number) => {
+          const bm = b.map;
+          const pl = effectivePlacement({ mode: settings.mode, placement: b.placement });
+          return h(
+            "div",
+            { class: "sum-battle" },
+            h("div", { class: "fsec-h" }, label(series ? `Bitva ${i + 1}` : "Bitva")),
+            kv("Mapa", `${MAP_SIZES[bm.size]?.label ?? bm.size} · seed ${bm.seed}${bm.symmetric ? " · zrcadlená" : ""}`),
+            kv("Asteroidy", `${lvl(bm.asteroids, AST)}${bm.clusters ? " ve shlucích" : ""}`),
+            kv("Bouře", bm.storms === 0 ? "žádné" : `${bm.storms} (${["malé", "střední", "velké"][["small", "medium", "large"].indexOf(bm.stormSize)] ?? bm.stormSize})`),
+            kv("Komety", `${lvl(bm.comets ?? "none", COM)}${bm.cometsHitAsteroids ? " · naráží do asteroidů" : ""}`),
+            kv("Pozadí", SKY_LABEL[(bm.sky ?? "random") as SkyTheme | "random"]),
+            kv("Limit kol", b.turnLimit ? `${b.turnLimit} kol` : "bez limitu"),
+            kv("Umístění", PLACEMENT_LABEL[pl]),
+          );
+        };
+        const bannedHulls = Object.keys(HULLS).filter((id) => settings.allowedHulls?.[id] === 0).map((id) => HULLS[id].name);
+        const bannedPilots = Object.keys(PILOTS).filter((id) => settings.allowedPilots?.[id] === 0).map((id) => PILOTS[id].name);
+        const bannedMods = MODULE_TYPES.filter((t) => !allowedOn(t)).map((t) => MODULES[t].name);
+        return [
+          section(
+            "Souhrn nastavení",
+            h("div", { class: "txt muted", style: "font-size:13px;margin-bottom:6px" }, "Zkontroluj nastavení. Po otevření místnosti ho jde ještě upravit (tlačítko UPRAVIT), ale hráči mezitím vybírají týmy a výbavu."),
+            h("div", { class: "sum-grid" }, ...battleList.map(battleBlock)),
+            h("div", { class: "fsec-h", style: "margin-top:8px" }, label("Pravidla")),
+            kv("Herní mód", settings.mode === "tdm" ? `týmový deathmatch · ${settings.teams ?? 2} týmy` : "deathmatch · každý sám"),
+            kv("Startovní kredity", `${budget} CR`),
+            kv("Lodní body na hráče", `${settings.shipPoints} (stíhač = 1)`),
+            kv("Výbava botů", { default: "výchozí", random: "náhodná", manual: "ruční (host)" }[settings.botLoadout] ?? settings.botLoadout),
+            series ? kv("Série", `${battles.length} bitev · body výhra 3 / remíza 1 / prohra 0`) : null,
+            h("div", { class: "fsec-h", style: "margin-top:8px" }, label("Lodě, piloti a moduly")),
+            kv("Trupy", bannedHulls.length ? `zakázané: ${bannedHulls.join(", ")}` : "všechny povolené"),
+            kv("Piloti", bannedPilots.length ? `zakázaní: ${bannedPilots.join(", ")}` : "všichni povolení"),
+            kv("Moduly", bannedMods.length ? `vyřazené: ${bannedMods.join(", ")}` : `všechny (${MODULE_TYPES.length}) ve hře`, bannedMods.length === MODULE_TYPES.length),
+            h("div", { class: "txt muted", style: "font-size:13px;margin-top:10px" }, "Hotovo? Otevři místnost tlačítkem ", h("b", { style: "color:#86efac" }, "OTEVŘÍT MÍSTNOST"), " nahoře."),
+          ),
+        ];
+      };
       const pageOf = (i: number, ...nodes: (Node | null)[]) => (gamePage === i ? nodes : []);
       return h(
         "div",
@@ -943,6 +990,7 @@ function roomView(m: LobbyModel, net: Net) {
               h("div", { class: "txt muted mt-foot" }, `${onCount} ze ${MODULE_TYPES.length} modulů ve hře`, isHost ? h("span", {}, " · ", h("a", { href: "#", onclick: (e: Event) => (e.preventDefault(), setAll(true)) }, "všechny"), " · ", h("a", { href: "#", onclick: (e: Event) => (e.preventDefault(), setAll(false)) }, "žádný")) : null, " · vyřazený modul nejde koupit; kdo ho má v sestavě, musí ho před bitvou prodat."),
             ),
             ),
+            ...pageOf(4, ...summaryPage()),
           ),
           gamePage !== 0
             ? null

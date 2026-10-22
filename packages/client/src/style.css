@@ -3985,6 +3985,26 @@ button.start-chip.on:hover:not(:disabled) {
 .tune-float .tune-card {
   width: 100%;
 }
+.sum-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+.sum-battle {
+  border: 1px solid #1e293b;
+  padding: 6px 10px;
+  background: rgba(2, 6, 23, 0.35);
+}
+.sum-kv {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 8px;
+  font-size: 14px;
+  padding: 2px 0;
+}
+.sum-kv .sum-v.warn {
+  color: var(--yellow);
+}
 .gfx-btn {
   left: 222px;
 }

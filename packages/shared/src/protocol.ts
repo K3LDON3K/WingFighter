@@ -86,7 +86,7 @@ export type ClientMessage =
 
 /** Server → klient */
 export type ServerMessage =
-  | { type: "welcome"; playerId: string; sessionId: string; name: string }
+  | { type: "welcome"; playerId: string; sessionId: string; name: string; /** Sestavení klienta, které server servíruje (klient se starší verzí se obnoví). */ build?: string }
   | { type: "rooms"; rooms: RoomSummary[] }
   | { type: "room"; room: RoomState | null }
   | { type: "gameStart"; state: GameState }

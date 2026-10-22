@@ -234,6 +234,7 @@ net.on((msg) => {
     case "welcome":
       playerId = msg.playerId;
       if (!playerName) setName(msg.name);
+      checkBuild(msg.build);
       break;
     case "rooms":
       rooms = msg.rooms;
@@ -682,6 +683,26 @@ function unmountGame() {
   resizeObs?.disconnect();
   canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = null;
   render();
+}
+
+/** Server po restartu servíruje novější klienta: otevřená stránka se starou verzí se sama obnoví (jednou, mimo rozehranou bitvu). */
+function checkBuild(build: string | undefined) {
+  if (!build) return;
+  const mine = [...document.querySelectorAll<HTMLScriptElement>("script[src]")].map((s) => s.src.match(/assets\/(main-[A-Za-z0-9_-]+\.js)/)?.[1]).find(Boolean);
+  if (!mine || mine === build) return;
+  let done = "";
+  try {
+    done = sessionStorage.getItem("wingfighter.reloadedFor") ?? "";
+    sessionStorage.setItem("wingfighter.reloadedFor", build);
+  } catch {
+    /* bez úložiště obnovíme jen jednou díky porovnání */
+  }
+  if (done === build) return;
+  if (game) {
+    showNotice("Je k dispozici nová verze hry – po bitvě obnov stránku.");
+    return;
+  }
+  location.reload();
 }
 
 let lastFrameAt = 0;

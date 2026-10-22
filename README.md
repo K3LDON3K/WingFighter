@@ -147,6 +147,12 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.112 – Po restartu serveru s novou verzí se otevřené stránky se starým klientem samy obnoví (mimo rozehranou
+  bitvu – tam jen upozorní). Řeší situaci, kdy hráč se starou stránkou neměl tlačítko PŘIPRAVEN a host nemohl
+  spustit bitvu.
+- v3.111 – Průvodce nastavením má pátý krok „Souhrn“ – výpis celé konfigurace (bitvy a mapy, pravidla, trupy,
+  piloti, moduly). V posledním kroku už není DALŠÍ, místnost se otevírá tlačítkem OTEVŘÍT MÍSTNOST nahoře
+  (počítadlo kroků je 5).
 - v3.110 – Záložky v ladění čitelnější: vybraná je tmavě modrá se světlým textem a světlým rámem, ostatní šedé.
 - v3.109 – Tlačítko LADĚNÍ je vlevo nahoře u ostatních tlačítek (jen v místnosti); ladění se otevírá jako překryvné
   okno přes celou šířku. Tlačítka v hlavičce ladění sjednocená (stejná výška, bez zalamování, velká písmena).

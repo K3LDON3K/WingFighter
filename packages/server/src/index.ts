@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import { extname, join, normalize, resolve } from "node:path";
@@ -97,6 +97,13 @@ const http = createServer((req, res) => {
 });
 
 const hub = new Hub();
+// verze klienta = název hlavního skriptu v index.html (má hash obsahu); posílá se v „welcome“
+try {
+  const html = readFileSync(join(CLIENT_DIST, "index.html"), "utf8");
+  hub.clientBuild = html.match(/assets\/(main-[A-Za-z0-9_-]+\.js)/)?.[1] ?? "";
+} catch {
+  /* klient není sestaven */
+}
 const wss = new WebSocketServer({ server: http, path: "/ws" });
 
 wss.on("connection", (ws) => {
