@@ -147,6 +147,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.118 – Herní obrazovka na telefonu/tabletu: rozložení lišty, HUD a panelů je vždy stejné jako na počítači, jen se celé zmenší podle šířky okna (do šířky 1280 px = 100 %, min. 50 %); dvousloupcová lišta zůstává jen pro telefon na výšku (pod 620 px).
 - v3.117 – Pozadí mapy: nová volba „Bez pozadí“ (jen hvězdy) je výchozí; galaxie a planety si zakladatel zapne
   výběrem motivu nebo „náhodné“.
 - v3.116 – Klik na nepřítele, na kterého zvolený laser nedosáhne, vypíše důvod s čísly (mimo dostřel 318 / 300,

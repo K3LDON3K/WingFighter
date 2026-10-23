@@ -660,7 +660,14 @@ function mountGame() {
   const ctx = canvas.getContext("2d")!;
   renderer = new Renderer(canvas, ctx);
   cam = new Camera(mapEl.clientWidth, mapEl.clientHeight);
+  /** Rozložení lišty je vždy stejné; na užších obrazovkách se celá zmenší (zoom), nic se nepřeskládá. */
+  const fitUi = () => {
+    const w = window.innerWidth;
+    const scale = Math.max(0.5, Math.min(1, w / UI_DESIGN_WIDTH));
+    document.documentElement.style.setProperty("--ui-zoom", String(scale));
+  };
   const resize = () => {
+    fitUi();
     if (!canvas || !mapEl || !cam) return;
     const dpr = (window.devicePixelRatio || 1) * renderScale();
     const w = mapEl.clientWidth;
@@ -715,6 +722,9 @@ function checkBuild(build: string | undefined) {
   }
   location.reload();
 }
+
+/** Šířka okna, pro kterou je lišta navržená; užší okno ji celou zmenší. */
+const UI_DESIGN_WIDTH = 1280;
 
 let lastFrameAt = 0;
 /** Poslední vstup myší/kolečkem (po něm chvíli kreslíme plnou rychlostí). */

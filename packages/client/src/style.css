@@ -527,6 +527,20 @@ h3,
   padding: 6px;
   background: var(--panel);
   border-top: 4px solid #1e293b;
+  /* stejné rozložení na všech obrazovkách – na užších se celá lišta zmenší (nastavuje klient podle šířky okna) */
+  zoom: var(--ui-zoom, 1);
+}
+.map-tools,
+.map-zoom,
+.hud,
+.map .hint,
+.pstat,
+.maplog,
+.confirm-wrap,
+.menu-wrap,
+.tune-wrap,
+.toast {
+  zoom: var(--ui-zoom, 1);
 }
 .bottombar .pnl {
   padding: 10px;
@@ -1032,7 +1046,8 @@ h3,
 .bb-go .keycap {
   margin: 2px auto 0;
 }
-@media (max-width: 1100px) {
+/* jen velmi úzké (telefon na výšku): lišta se přeskládá do dvou sloupců */
+@media (max-width: 620px) {
   .bottombar {
     grid-template-columns: 1fr 1fr;
     height: auto;
