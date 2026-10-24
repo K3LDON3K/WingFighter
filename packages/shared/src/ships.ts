@@ -98,6 +98,28 @@ export const MODULE_TYPES = Object.keys(MODULES) as ModuleType[];
 /** Zbraně – s nimi jde aktivně vyhrát (sestřelit soupeře). */
 export const WEAPON_TYPES: ModuleType[] = ["laser", "torpedo", "mine", "mg"];
 
+/** Kategorie modulů (obchod, barvy v UI). */
+export type ModuleCategory = "weapon" | "shield" | "droid" | "tech";
+export const MODULE_CATEGORIES: ModuleCategory[] = ["weapon", "shield", "droid", "tech"];
+export const MODULE_CATEGORY: Record<ModuleType, ModuleCategory> = {
+  laser: "weapon",
+  torpedo: "weapon",
+  mine: "weapon",
+  mg: "weapon",
+  "shield-segment": "shield",
+  "shield-whole": "shield",
+  droid: "droid",
+  scanner: "tech",
+};
+export const CATEGORY_LABEL: Record<ModuleCategory, string> = { weapon: "Zbraně", shield: "Štíty", droid: "Droidi", tech: "Technologie" };
+/** Druh zbraně: energetická (bez munice) nebo projektilová (má munici). */
+export type WeaponKind = "energy" | "projectile";
+export const WEAPON_KIND_LABEL: Record<WeaponKind, string> = { energy: "energetická", projectile: "projektilová" };
+export function weaponKind(type: ModuleType): WeaponKind | null {
+  if (MODULE_CATEGORY[type] !== "weapon") return null;
+  return MODULES[type].ammo ? "projectile" : "energy";
+}
+
 /** Výchozí sestava (lasery, torpéda, miny, segmentový štít). */
 export const DEFAULT_LOADOUT: ShipLoadout = {
   hullId: "fighter",

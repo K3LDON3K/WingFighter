@@ -78,10 +78,62 @@ function endgameWeights(state: GameState, ship: Ship, enemies: Ship[]): { off: n
   return mine > theirs ? { off: 0.7, def: 2 } : { off: 1.8, def: 0.6 };
 }
 
-/** Bezpečnost pozice: okraj, asteroidy, bouře, miny, srážky. */
-function safety(state: GameState, ship: Ship, end: Pose, path: (t: number) => Pose): number {
+/** Kontext plánování: dráhy spoluhráčů, které už jsou známé (naplánovaní boti, odeslané rozkazy lidí). */
+export interface BotContext {
+  allyPaths?: Map<string, (t: number) => Pose>;
+}
+
+/** Dráhy lodí z rozkazů (pro předání dalším botům ve stejném týmu). */
+export function plannedPaths(state: GameState, orders: ShipOrders[]): Map<string, (t: number) => Pose> {
+  const out = new Map<string, (t: number) => Pose>();
+  for (const o of orders) {
+    const ship = state.ships.find((s) => s.id === o.shipId && s.alive);
+    if (!ship) continue;
+    const man = listManeuvers(profileOf(ship.loadout), ship.speed).find((m) => m.id === o.maneuverId);
+    if (man) out.set(ship.id, maneuverPath(ship, man));
+  }
+  return out;
+}
+
+/** Předpokládaná dráha cizí lodi: známý plán, u spoluhráče jinak „rovně stejnou rychlostí“, u nepřítele stojí. */
+function expectedPath(ship: Ship, other: Ship, ctx?: BotContext): (t: number) => Pose {
+  const known = ctx?.allyPaths?.get(other.id);
+  if (known) return known;
+  if (other.team === ship.team) {
+    const man = makeManeuver(profileOf(other.loadout), other.speed, 0, false, other.speed);
+    if (man) return maneuverPath(other, man);
+  }
+  return () => other;
+}
+
+/**
+ * Hrozba srážky s jinou lodí během manévru: obě dráhy se vzorkují ve stejném čase.
+ * Známá dráha spoluhráče = jistá srážka (velká pokuta); odhad = menší pokuta.
+ */
+export function shipCollisionPenalty(state: GameState, ship: Ship, path: (t: number) => Pose, ctx?: BotContext): number {
   let s = 0;
   const r = ship.stats.radius;
+  for (const o of state.ships) {
+    if (o.id === ship.id || !o.alive) continue;
+    const op = expectedPath(ship, o, ctx);
+    const known = !!ctx?.allyPaths?.has(o.id);
+    const ally = o.team === ship.team;
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      if (circlesOverlap(path(t), r + 6, op(t), o.stats.radius)) {
+        s -= known ? 90 : ally ? 45 : 25;
+        break;
+      }
+    }
+  }
+  return s;
+}
+
+/** Bezpečnost pozice: okraj, asteroidy, bouře, miny, srážky. */
+function safety(state: GameState, ship: Ship, end: Pose, path: (t: number) => Pose, ctx?: BotContext): number {
+  let s = 0;
+  const r = ship.stats.radius;
+  s += shipCollisionPenalty(state, ship, path, ctx);
   if (!insideMap(state, end, r + 40)) s -= 60;
   if (state.border && !insideMap(state, end, r)) s -= 300;
   for (const p of samplePath(path, 8)) {
@@ -127,9 +179,12 @@ function positionValue(state: GameState, ship: Ship, end: Pose, enemies: Ship[],
     else if (d > LASER.range * 1.6) v -= (d - LASER.range * 1.6) / 60;
   }
   if (enemies.length === 0) {
-    // nikdo v dohledu: letět ke středu mapy (průzkum)
+    // nikdo v dohledu: opatrný průzkum – ke středu mapy, ale pomalu, dál od okraje, bouří a spoluhráčů
     const c = { x: state.width / 2, y: state.height / 2 };
     v -= dist(end, c) / 40;
+    if (!insideMap(state, end, ship.stats.radius + 90)) v -= 15;
+    if (state.storms?.length && pointInStorm(state.storms, end, ship.stats.radius)) v -= 10;
+    for (const o of state.ships) if (o.id !== ship.id && o.alive && o.team === ship.team && dist(end, o) < 90) v -= 15;
   }
   return v;
 }
@@ -152,7 +207,7 @@ interface Candidate {
   score: number;
 }
 
-function rankManeuvers(state: GameState, ship: Ship, enemies: Ship[], guesses: Map<string, Guess[]>, level: BotLevel, overdrive: boolean, rng: Rng): Candidate[] {
+function rankManeuvers(state: GameState, ship: Ship, enemies: Ship[], guesses: Map<string, Guess[]>, level: BotLevel, overdrive: boolean, rng: Rng, ctx?: BotContext): Candidate[] {
   const o = { droid: overdrive ? { overdrive: true } : undefined };
   const dial = listManeuvers(profileOf(ship.loadout), ship.speed).filter((m) => canAfford(ship, m, o));
   const out: Candidate[] = [];
@@ -161,7 +216,8 @@ function rankManeuvers(state: GameState, ship: Ship, enemies: Ship[], guesses: M
     if (man.koiogran && level !== "eso") continue; // otočku používá jen Eso
     const path = maneuverPath(ship, man);
     const end = maneuverEnd(ship, man);
-    let score = positionValue(state, ship, end, enemies, guesses, level) + safety(state, ship, end, path);
+    let score = positionValue(state, ship, end, enemies, guesses, level) + safety(state, ship, end, path, ctx);
+    if (enemies.length === 0 && man.speed > 2) score -= (man.speed - 2) * 5; // při hledání nespěchat
     // stres: červený manévr jen když to stojí za to; zelený dobíjí
     const stress = effStressCost(man, o);
     if (stress > 0) score -= stress * (ship.stressPoints <= 1 ? 12 : 4);
@@ -176,7 +232,7 @@ function rankManeuvers(state: GameState, ship: Ship, enemies: Ship[], guesses: M
 }
 
 /** Eso: pro nejlepší kandidáty se podívá ještě o kolo dál – jak dobrá bude nejlepší odpověď z dosažené pozice. */
-function lookahead(state: GameState, ship: Ship, cands: Candidate[], enemies: Ship[], level: BotLevel, rng: Rng, freeId?: string): Candidate[] {
+function lookahead(state: GameState, ship: Ship, cands: Candidate[], enemies: Ship[], level: BotLevel, rng: Rng, freeId?: string, ctx?: BotContext): Candidate[] {
   if (!cands.length) return cands;
   const top = cands.slice(0, 8);
   const free = freeId ? cands.find((c) => c.man.id === freeId) : undefined;
@@ -191,7 +247,7 @@ function lookahead(state: GameState, ship: Ship, cands: Candidate[], enemies: Sh
   }
   const scored = top.map((c) => {
     const there: Ship = { ...ship, x: c.end.x, y: c.end.y, heading: c.end.heading, speed: c.man.speed, stressPoints: Math.max(0, Math.min(ship.stats.stressMax, ship.stressPoints - effStressCost(c.man))) };
-    const replies = rankManeuvers(state, there, enemies, next, "pilot", false, rng);
+    const replies = rankManeuvers(state, there, enemies, next, "pilot", false, rng, ctx);
     return { ...c, score: c.score + 0.8 * (replies[0]?.score ?? -50) };
   });
   scored.sort((a, b) => b.score - a.score);
@@ -264,9 +320,12 @@ function shieldPlan(ship: Ship, enemies: Ship[]): Segments | undefined {
   return gain >= 1 ? want : undefined;
 }
 
-export function planSmartBot(state: GameState, playerId: string, rng: Rng, level: BotLevel): ShipOrders[] {
+export function planSmartBot(state: GameState, playerId: string, rng: Rng, level: BotLevel, ctx: BotContext = {}): ShipOrders[] {
   const out: ShipOrders[] = [];
   const myShips = state.ships.filter((s) => s.alive && s.ownerId === playerId);
+  // vlastní lodě se plánují postupně a každá zná dráhy těch předchozích
+  const allyPaths = new Map(ctx.allyPaths ?? []);
+  ctx = { ...ctx, allyPaths };
   for (const ship of myShips) {
     const enemies = state.ships.filter((e) => e.alive && e.team !== ship.team);
     const guesses = new Map<string, Guess[]>();
@@ -275,18 +334,19 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
     const inStormNow = !!state.storms?.length && pointInStorm(state.storms, ship, ship.stats.radius);
 
     // 1. manévr (Eso: zváží i overdrive, když by pomohl červený/nebezpečný manévr)
-    let cands = rankManeuvers(state, ship, enemies, guesses, level, false, rng);
+    let cands = rankManeuvers(state, ship, enemies, guesses, level, false, rng, ctx);
     let overdrive = false;
     if (level === "eso" && droid && !inStormNow && ship.techPoints >= DROID.overdriveCost) {
-      const withOd = rankManeuvers(state, ship, enemies, guesses, level, true, rng);
+      const withOd = rankManeuvers(state, ship, enemies, guesses, level, true, rng, ctx);
       if (withOd[0] && cands[0] && withOd[0].score > cands[0].score + 15) {
         cands = withOd;
         overdrive = true;
       }
     }
     const freeId = defaultOrders(ship).maneuverId;
-    if (level === "eso") cands = lookahead(state, ship, cands, enemies, level, rng, freeId);
+    if (level === "eso") cands = lookahead(state, ship, cands, enemies, level, rng, freeId, ctx);
     const chosen = cands[0];
+    allyPaths.set(ship.id, maneuverPath(ship, chosen.man));
     const orders: ShipOrders = { shipId: ship.id, maneuverId: chosen.man.id, shots: [], preferredTargetId: enemies[0]?.id };
     if (overdrive) orders.droid = { overdrive: true };
     const left = () => RULES.actionPoints - actionCost(ship, orders);

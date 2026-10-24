@@ -9,6 +9,8 @@ import {
   createRng,
   MAX_TEAMS_TDM,
   planBot,
+  plannedPaths,
+  type Pose,
   resolveTurn,
   resultForTeam,
   sanitizeOrders,
@@ -94,6 +96,8 @@ interface RoomMember {
   spent: number;
   /** Kredity při startu bitvy (rozdíl na konci = vyděláno). */
   walletAtStart?: number;
+  /** Výbava při startu bitvy – u samostatné bitvy (bez série) se po konci vrátí beze změn. */
+  loadoutsAtStart?: ShipLoadout[];
 }
 
 interface RunningGame {
@@ -719,6 +723,7 @@ export class Hub {
       const err = validateFleet(m.loadouts, room.settings, m.isBot ? room.tuning.startBudget : undefined);
       if (err) return this.error(host, `${m.name} – letka: ${err}.`);
       if (!m.isBot) m.walletAtStart = room.walletOf(m);
+      m.loadoutsAtStart = structuredClone(m.loadouts);
     }
     const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, botLevel: m.isBot ? (m.botLevel ?? "kadet") : undefined, loadout: refillLoadout(m.loadouts[0]), loadouts: m.loadouts.map(refillLoadout), credits: m.isBot ? undefined : room.walletOf(m), startIndex: m.startIndex, commander: m.commander }));
     const state = createGame({ players, settings: room.settings, tuning: room.tuning });
@@ -779,11 +784,28 @@ export class Hub {
 
   private planBots(room: Room) {
     const g = room.game!;
+    // dráhy spoluhráčů, které už jsou známé (odeslané rozkazy lidí i dřív naplánovaní boti) – ať si boti nelétají do cesty
+    const teamPaths = new Map<number, Map<string, (t: number) => Pose>>();
+    const pathsOf = (team: number) => {
+      let m = teamPaths.get(team);
+      if (!m) {
+        m = new Map();
+        for (const [pid, orders] of g.orders) {
+          const owner = room.members.get(pid);
+          if (owner?.team === team) for (const [id, p] of plannedPaths(g.state, orders)) m.set(id, p);
+        }
+        teamPaths.set(team, m);
+      }
+      return m;
+    };
     for (const m of room.members.values()) {
       if (!m.isBot) continue;
       // bot nepodvádí: plánuje ze stavu svého týmu (mlha války), podle své obtížnosti
       const seen = stateForTeam(g.state, m.team, memoryFor(g, m.team));
-      g.orders.set(m.id, sanitizeOrders(g.state, m.id, planBot(seen, m.id, g.rng, m.botLevel ?? "kadet")));
+      const allyPaths = pathsOf(m.team);
+      const orders = sanitizeOrders(g.state, m.id, planBot(seen, m.id, g.rng, m.botLevel ?? "kadet", { allyPaths }));
+      g.orders.set(m.id, orders);
+      for (const [id, p] of plannedPaths(g.state, orders)) allyPaths.set(id, p);
       m.ready = true;
     }
   }
@@ -850,8 +872,19 @@ export class Hub {
     const g = room.game;
     if (!g || g.settled) return;
     g.settled = true;
-    if (isSeries(room.settings) && room.seriesResults.length < room.settings.battles!.length) room.seriesResults.push(battleResult(g.state, room.seriesResults.length));
+    if (!isSeries(room.settings)) {
+      // samostatná bitva: všem (hráčům i ručně vybaveným botům) se vrátí výbava, munice, životy modulů,
+      // náklad, pilot i peněženka přesně do stavu před bitvou – jako by se nestala
+      for (const m of room.members.values()) {
+        if (m.loadoutsAtStart) m.loadouts = structuredClone(m.loadoutsAtStart);
+        m.loadoutsAtStart = undefined;
+        m.walletAtStart = undefined;
+      }
+      return;
+    }
+    if (room.seriesResults.length < room.settings.battles!.length) room.seriesResults.push(battleResult(g.state, room.seriesResults.length));
     for (const m of room.members.values()) {
+      m.loadoutsAtStart = undefined;
       if (m.isBot) continue;
       const mine = g.state.ships.filter((s) => s.ownerId === m.id);
       if (mine.length) {

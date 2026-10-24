@@ -2718,6 +2718,43 @@ body.touch .lo-refill {
 }
 .lo-shop {
   gap: 2px 4px;
+  flex-direction: column;
+  align-items: stretch;
+}
+.lo-shop-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.lo-shop-cap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  margin: 4px 0 0 4px;
+}
+.lo-shop-cap .cat-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+}
+.lo-shop-kinds {
+  display: inline-flex;
+  gap: 10px;
+  margin-left: 10px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+.lo-shop-kinds span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.lo-shop-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
 }
 
 /* ---- bouře v UI ---- */
@@ -2806,6 +2843,23 @@ body.touch .lo-refill {
 }
 .pstat .p.off {
   opacity: 0.5;
+}
+.pstat .p.dead span {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.pstat .tcap {
+  font-size: 11px;
+  opacity: 0.85;
+  margin: 1px 0 2px;
+}
+.pstat .tcap.gap {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 2px solid var(--bevel-d);
+}
+.pstat .p.dead.me span {
+  text-decoration: line-through underline;
 }
 .pstat .leg {
   margin-top: 4px;

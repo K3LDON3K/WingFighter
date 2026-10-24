@@ -1218,14 +1218,23 @@ function renderPlayersStatus() {
   const players = room?.players ?? [];
   const playing = !!game.anim;
   pstatEl.append(h("div", { class: "pcap" }, label(playing ? "přehrává se" : "hráči")));
-  for (const p of players) {
+  const tdm = game.state.settings.mode === "tdm";
+  const sorted = tdm ? [...players].sort((a, b) => a.team - b.team) : players;
+  let lastTeam = -1;
+  for (const p of sorted) {
+    if (tdm && p.team !== lastTeam) {
+      // oddělené týmy: hlavička v barvě týmu (a mezera mezi týmy)
+      pstatEl.append(h("div", { class: `tcap ${lastTeam >= 0 ? "gap" : ""}`, style: `color:${TEAM_COLORS[p.team]}` }, label(TEAM_NAMES[p.team] ?? `tým ${p.team + 1}`)));
+      lastTeam = p.team;
+    }
     const alive = game.state.ships.some((sh) => sh.ownerId === p.id && sh.alive);
     const done = p.isBot || game.ready.includes(p.id) || !alive;
     const off = !p.isBot && !p.connected;
-    const mark = off ? icon("wait", "#64748b", 10) : playing ? icon("play", "#64748b", 10) : done ? icon("check", "#4ade80", 10) : icon("wait", "#facc15", 10);
-    pstatEl.append(h("div", { class: `p ${p.id === playerId ? "me" : ""} ${off ? "off" : ""}`, title: off ? "odpojen" : done ? "kolo odesláno" : "plánuje" }, mark, h("span", { style: `color:${TEAM_COLORS[p.team]}` }, p.name)));
+    const hasShip = game.state.ships.some((sh) => sh.ownerId === p.id);
+    const dead = hasShip && !alive;
+    const mark = dead ? icon("skull", "#94a3b8", 10) : off ? icon("wait", "#64748b", 10) : playing ? icon("play", "#64748b", 10) : done ? icon("check", "#4ade80", 10) : icon("wait", "#facc15", 10);
+    pstatEl.append(h("div", { class: `p ${p.id === playerId ? "me" : ""} ${off ? "off" : ""} ${dead ? "dead" : ""}`, title: dead ? "sestřelen" : off ? "odpojen" : done ? "kolo odesláno" : "plánuje" }, mark, h("span", { style: `color:${TEAM_COLORS[p.team]}` }, p.name)));
   }
-  pstatEl.append(h("div", { class: "leg" }, "✔ odesláno · ⌛ plánuje", h("br"), "šedě = odpojen"));
 }
 
 /** Dialog: spustit kolo i s nevyužitými akcemi? */

@@ -34,8 +34,16 @@ import {
   type ModuleType,
   type ShipLoadout,
   type SlotId,
+  MODULE_CATEGORIES,
+  MODULE_CATEGORY,
+  CATEGORY_LABEL,
+  WEAPON_KIND_LABEL,
+  weaponKind,
+  type ModuleCategory,
+  type WeaponKind,
 } from "@wingfighter/shared";
 import { h } from "./dom.ts";
+import { tipAttr } from "./tooltip.ts";
 import { icon, label } from "./icons.ts";
 import { pilotPortrait } from "./pilot-ui.ts";
 
@@ -157,10 +165,11 @@ function hpFrac(m: ModuleInstance): number {
   return max > 0 ? Math.max(0, Math.min(1, moduleHp(m) / max)) : 1;
 }
 
-/** Barva kategorie: zbraně červeně, speciální moduly modře. */
+/** Barvy kategorií: zbraně červeně (energetické oranžověji), štíty modře, droidi fialově, technologie tyrkysově. */
+export const CATEGORY_COLOR: Record<ModuleCategory, string> = { weapon: "#ef4444", shield: "#3b82f6", droid: "#c084fc", tech: "#2dd4bf" };
 export function moduleColor(type: ModuleType): string {
-  if (type === "droid") return "#c084fc";
-  return type === "laser" || type === "torpedo" || type === "mine" || type === "mg" ? "#ef4444" : "#3b82f6";
+  if (weaponKind(type) === "energy") return "#fb923c";
+  return CATEGORY_COLOR[MODULE_CATEGORY[type]];
 }
 
 export function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>, text?: string): SVGElementTagNameMap[K] {
@@ -530,6 +539,15 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   /* --- nákup --- */
   const shopEl = h("div", { class: "lo-shop" });
   if (!ro) {
+    // obchod po kategoriích: řádek s barevným nadpisem pro zbraně, štíty, droidy a technologie
+    const rows = new Map<ModuleCategory, HTMLElement>();
+    for (const cat of MODULE_CATEGORIES) {
+      const row = h("div", { class: "lo-shop-row" });
+      rows.set(cat, row);
+      shopEl.append(
+        h("div", { class: "lo-shop-cat" }, h("div", { class: "lo-shop-cap", style: `color:${CATEGORY_COLOR[cat]}` }, h("i", { class: "cat-dot", style: `background:${CATEGORY_COLOR[cat]}` }), label(CATEGORY_LABEL[cat]), cat === "weapon" ? h("span", { class: "lo-shop-kinds" }, h("span", { style: "color:#fb923c" }, kindBadgeHtml("energy"), " ", label("energetické")), h("span", { style: "color:#ef4444" }, kindBadgeHtml("projectile"), " ", label("projektilové"))) : null), row),
+      );
+    }
     for (const t of MODULE_TYPES) {
       const def = MODULES[t];
       const have = loadout.modules.filter((m) => m.type === t).length;
@@ -552,7 +570,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         }
       });
       if (pickType === t) btn.classList.add("picked");
-      shopEl.append(btn);
+      rows.get(MODULE_CATEGORY[t])!.append(btn);
     }
   }
 
@@ -663,7 +681,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
 
 /** Nákupní tlačítko ve tvaru hexagonu: ikona, název, cena, počet kusů; stejná barva kategorie jako v plástvi. */
 /** Hexagon modulu (obchod, dostupné moduly): ikona, název, podtext; `dim` = zašedlý. */
-export function moduleHexSvg(t: ModuleType, sub: string, dim: boolean, weight?: number): SVGSVGElement {
+export function moduleHexSvg(t: ModuleType, sub: string, dim: boolean, weight?: number, ammo?: number, price?: number): SVGSVGElement {
   const def = MODULES[t];
   const col = moduleColor(t);
   const W = 112;
@@ -677,42 +695,145 @@ export function moduleHexSvg(t: ModuleType, sub: string, dim: boolean, weight?: 
   svg.append(svgEl("polygon", { points: pts, fill: dim ? "#334155" : col, opacity: 0.16 }));
   const ic = icon(def.icon, dim ? "#64748b" : col, 16);
   ic.setAttribute("x", String(cx - 8));
-  ic.setAttribute("y", "14");
+  ic.setAttribute("y", "10");
   svg.append(ic);
-  const words = def.name.toUpperCase().split(" ");
+  const kind = weaponKind(t);
+  if (kind) {
+    // značka druhu zbraně v pravém horním rohu: blesk = energetická, náboj = projektilová
+    const g = svgEl("g", { transform: `translate(${cx + 22}, 20)`, class: "hex-kind", opacity: dim ? 0.5 : 1 });
+    g.append(svgEl("circle", { cx: 0, cy: 0, r: 7, fill: "#0b1020", stroke: dim ? "#334155" : col, "stroke-width": 1.5 }));
+    g.append(kindShape(kind, dim ? "#64748b" : col));
+    g.append(svgEl("title", {}, WEAPON_KIND_LABEL[kind] + " zbraň"));
+    svg.append(g);
+  }
+  // pevný vnitřní layout (stejná místa ve všech dlaždicích): ikona 12, název 40/51, cena 65, munice 69–77, váha 80
+  const words = def.name.toUpperCase().replace(/ [–-] /g, " ").split(" ").slice(0, 2);
   const fs = Math.max(...words.map((w) => w.length)) > 8 ? 13 : 15;
-  words.forEach((w, i) => svg.append(svgEl("text", { x: cx, y: 46 + i * 11, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: dim ? "#64748b" : "#f8fafc", "text-anchor": "middle" }, w)));
-  if (sub) svg.append(svgEl("text", { x: cx, y: 46 + words.length * 11 + 4, "font-family": "Jersey", "font-size": 12, fill: dim ? "#64748b" : "#fbbf24", "text-anchor": "middle" }, sub));
-  if (weight !== undefined && weight > 0) {
-    // váha jako počet závaží (půlka = oříznutá ikona)
-    const n = Math.floor(weight);
-    const half = weight % 1 > 0;
-    const total = n + (half ? 0.5 : 0);
+  const hasAmmo = ammo !== undefined && !!def.ammo;
+  words.forEach((w, i) => svg.append(svgEl("text", { x: cx, y: 38 + i * 11, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: dim ? "#64748b" : "#f8fafc", "text-anchor": "middle" }, w)));
+  let y = 62;
+  if (price !== undefined) {
+    // cena: mince + číslo (ať je jasné, že jde o kredity)
+    const txt = `${price}${sub ? ` ${sub}` : ""}`;
+    const tw = txt.length * 6.2;
+    const x0 = cx - (tw + 12) / 2;
+    const coin = icon("credits", dim ? "#64748b" : "#fbbf24", 10);
+    coin.setAttribute("x", String(x0));
+    coin.setAttribute("y", String(y - 9));
+    svg.append(coin);
+    svg.append(svgEl("text", { x: x0 + 13, y, "font-family": "Jersey", "font-size": 12, fill: dim ? "#64748b" : "#fbbf24", "text-anchor": "start" }, txt));
+  } else if (sub) svg.append(svgEl("text", { x: cx, y, "font-family": "Jersey", "font-size": 12, fill: dim ? "#64748b" : "#fbbf24", "text-anchor": "middle" }, sub));
+  if (hasAmmo) {
+    // munice v modulu: do 10 kusů ikonky (náboje), jinak dílky + počet
+    const max = def.ammo!;
+    const yy = y + 4;
+    const acol = dim ? "#64748b" : "#fbbf24";
+    if (max <= 10) {
+      const size = 9;
+      const x0 = cx - (max * (size + 1)) / 2;
+      for (let i = 0; i < max; i++) {
+        const ic = icon(def.icon, i < ammo! ? acol : "#475569", size);
+        ic.setAttribute("x", String(x0 + i * (size + 1)));
+        ic.setAttribute("y", String(yy));
+        svg.append(ic);
+      }
+    } else {
+      const slots = 5;
+      const size = 7;
+      const txt = `${ammo}`;
+      const total = slots * (size + 1) + 4 + txt.length * 6;
+      const x0 = cx - total / 2;
+      for (let i = 0; i < slots; i++) {
+        const on = i < Math.round((ammo! / max) * slots);
+        svg.append(svgEl("rect", { x: x0 + i * (size + 1), y: yy + 2, width: size, height: 5, fill: on ? acol : "none", stroke: on ? acol : "#475569", "stroke-width": 1 }));
+      }
+      svg.append(svgEl("text", { x: x0 + slots * (size + 1) + 4, y: yy + 8, "font-family": "Jersey", "font-size": 11, fill: acol, "text-anchor": "start" }, txt));
+    }
+  }
+  y = 73;
+  const ammoW = hasAmmo ? +((def.ammoWeight ?? 0) * ammo!).toFixed(2) : 0;
+  if ((weight !== undefined && weight > 0) || ammoW > 0) {
+    // váha jako závaží: šedá = modul, žlutá = munice (půlka = oříznutá ikona)
     const iw = 9;
-    const x0 = cx - (total * (iw + 1)) / 2;
-    const yy = 46 + words.length * 11 + 8;
-    for (let i = 0; i < n; i++) {
-      const w = icon("weight", dim ? "#64748b" : "#94a3b8", iw);
-      w.setAttribute("x", String(x0 + i * (iw + 1)));
-      w.setAttribute("y", String(yy));
-      svg.append(w);
+    const parts: { w: number; col: string }[] = [
+      { w: weight ?? 0, col: dim ? "#64748b" : "#94a3b8" },
+      { w: ammoW, col: dim ? "#64748b" : "#fbbf24" },
+    ].filter((p) => p.w > 0);
+    const units = (w: number) => Math.floor(w) + (w % 1 > 0 ? 0.5 : 0);
+    const total = parts.reduce((s, p) => s + units(p.w), 0) + (parts.length - 1) * 0.4;
+    let x = cx - (total * (iw + 1)) / 2;
+    const yy = y + 4;
+    const g = svgEl("g", {});
+    g.append(svgEl("title", {}, `Váha: modul ${weight ?? 0}${ammoW ? ` + munice ${ammoW}` : ""}`));
+    for (const p of parts) {
+      const n = Math.floor(p.w);
+      for (let i = 0; i < n; i++) {
+        const w = icon("weight", p.col, iw);
+        w.setAttribute("x", String(x));
+        w.setAttribute("y", String(yy));
+        g.append(w);
+        x += iw + 1;
+      }
+      if (p.w % 1 > 0) {
+        const w = icon("weight", p.col, iw);
+        w.setAttribute("x", String(x));
+        w.setAttribute("y", String(yy));
+        w.setAttribute("viewBox", "0 0 4 8");
+        w.setAttribute("width", String(iw / 2));
+        g.append(w);
+        x += iw / 2 + 1;
+      }
+      x += 0.4 * (iw + 1);
     }
-    if (half) {
-      const w = icon("weight", dim ? "#64748b" : "#94a3b8", iw);
-      w.setAttribute("x", String(x0 + n * (iw + 1)));
-      w.setAttribute("y", String(yy));
-      w.setAttribute("viewBox", "0 0 4 8");
-      w.setAttribute("width", String(iw / 2));
-      svg.append(w);
-    }
+    svg.append(g);
   }
   return svg;
 }
 
+/** Tvar značky druhu zbraně (SVG, střed 0,0): blesk = energetická, náboj = projektilová. */
+function kindShape(kind: WeaponKind, col: string): SVGElement {
+  if (kind === "energy") return svgEl("polygon", { points: "0.5,-4.5 -2.5,0.5 -0.2,0.5 -1,4.5 2.5,-0.8 0.2,-0.8", fill: col });
+  const g = svgEl("g", {});
+  g.append(svgEl("path", { d: "M -1.6 -1.2 Q -1.6 -4.2 0 -4.2 Q 1.6 -4.2 1.6 -1.2 Z", fill: col }));
+  g.append(svgEl("rect", { x: -1.6, y: -1.2, width: 3.2, height: 4.6, fill: col }));
+  g.append(svgEl("rect", { x: -2.2, y: 3.2, width: 4.4, height: 1.2, fill: col }));
+  return g;
+}
+/** Totéž jako HTML (do nadpisů). */
+function kindBadgeHtml(kind: WeaponKind): SVGSVGElement {
+  const svg = svgEl("svg", { viewBox: "-5 -5 10 10", width: 10, height: 10, class: "kind-badge" });
+  svg.append(kindShape(kind, "currentColor"));
+  return svg;
+}
+
+/** Vysvětlivka modulu v obchodě: kategorie, druh, popis, cena, váha modulu, munice (kusy, váha, cena), životy. */
+function moduleTip(t: ModuleType, why: string | null) {
+  const def = MODULES[t];
+  const cat = MODULE_CATEGORY[t];
+  const kind = weaponKind(t);
+  const fx: { icon: string; text: string; tone?: "good" | "bad" }[] = [
+    { icon: "credits", text: `cena ${def.price}` },
+    { icon: "weight", text: `váha modulu ${def.weight}` },
+  ];
+  if (def.ammo) {
+    fx.push({ icon: "weight", text: `munice ${def.ammo} ks × ${def.ammoWeight} = váha ${+(def.ammo * (def.ammoWeight ?? 0)).toFixed(2)}` });
+    fx.push({ icon: "credits", text: `doplnění ${def.ammoPrice}/ks` });
+  }
+  fx.push({ icon: "hull", text: `životy ${def.hp}` });
+  return tipAttr({
+    icon: def.icon,
+    iconColor: moduleColor(t),
+    title: `${def.name} · ${CATEGORY_LABEL[cat]}${kind ? ` (${WEAPON_KIND_LABEL[kind]})` : ""}`,
+    fx,
+    note: `${def.description}${def.ammo ? ` Celková váha s plnou municí ${+(def.weight + def.ammo * (def.ammoWeight ?? 0)).toFixed(2)}.` : ""}`,
+    warn: why ? `Nelze: ${why}` : undefined,
+  });
+}
+
 function hexBuyButton(t: ModuleType, have: number, why: string | null, onClick: () => void): HTMLElement {
   const def = MODULES[t];
-  const svg = moduleHexSvg(t, `${def.price}${have ? ` ×${have}` : ""}`, !!why, def.weight);
-  const btn = h("button", { class: `lo-hexbuy ${why ? "dis" : ""}`, disabled: !!why, title: `${def.name}\n${def.description}\nCena ${def.price} · váha ${def.weight}${def.ammo ? ` + ${def.ammoWeight} × ${def.ammo} munice` : ""}${why ? `\nNelze: ${why}` : ""}`, onclick: onClick }, svg);
+  const svg = moduleHexSvg(t, have ? `×${have}` : "", !!why, def.weight, def.ammo, def.price);
+  const btn = h("button", { class: `lo-hexbuy ${why ? "dis" : ""}`, disabled: !!why, ...moduleTip(t, why), onclick: onClick }, svg);
   return btn;
 }
 

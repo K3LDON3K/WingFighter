@@ -8,16 +8,18 @@ import { circleHitsAsteroid } from "./asteroids.ts";
 import type { Rng } from "./rng.ts";
 import { profileOf } from "./ships.ts";
 import type { BotLevel, GameState, Ship, ShipOrders } from "./types.ts";
-import { planSmartBot } from "./bot-ai.ts";
+import { planSmartBot, shipCollisionPenalty, type BotContext } from "./bot-ai.ts";
 
 /**
  * Jednoduchý bot: vybere manévr, po kterém bude mít nejvíc nepřátel ve výseči
  * a ideální vzdálenost; občas vypustí torpédo nebo položí minu.
  */
-export function planBot(state: GameState, playerId: string, rng: Rng, level: BotLevel = "kadet"): ShipOrders[] {
-  if (level === "pilot" || level === "eso") return planSmartBot(state, playerId, rng, level);
+export function planBot(state: GameState, playerId: string, rng: Rng, level: BotLevel = "kadet", ctx: BotContext = {}): ShipOrders[] {
+  if (level === "pilot" || level === "eso") return planSmartBot(state, playerId, rng, level, ctx);
   const out: ShipOrders[] = [];
   const myShips = state.ships.filter((s) => s.alive && s.ownerId === playerId);
+  const allyPaths = new Map(ctx.allyPaths ?? []);
+  ctx = { ...ctx, allyPaths };
   for (const ship of myShips) {
     const enemies = state.ships.filter((e) => e.alive && e.team !== ship.team);
     const dial = listManeuvers(profileOf(ship.loadout), ship.speed).filter((m) => maneuverStress(m) <= ship.stressPoints && m.difficulty !== "danger");
@@ -32,6 +34,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng, level: Bot
         if (!insideMap(state, p, r)) score -= 15;
         for (const a of state.asteroids) if (circleHitsAsteroid(a, p, r)) score -= 15;
       }
+      score += shipCollisionPenalty(state, ship, maneuverPath(ship, man), ctx) / 3; // kadet: srážky řeší jen hrubě
       if (isRed(man.difficulty)) score -= 3;
       if (man.difficulty === "green" && ship.stressPoints < 3) score += 2;
       if (score > bestScore) {
@@ -40,6 +43,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng, level: Bot
       }
     }
     const end = maneuverEnd(ship, best);
+    allyPaths.set(ship.id, maneuverPath(ship, best));
     const nearest = enemies.length ? enemies.reduce((a, b) => (dist(ship, a) < dist(ship, b) ? a : b)) : undefined;
     const willHaveTarget = enemies.some((e) => inArc(end, e, LASER.halfArc * 2) && dist(end, e) <= LASER.range);
 
