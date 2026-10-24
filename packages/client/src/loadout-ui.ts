@@ -44,6 +44,8 @@ import {
 } from "@wingfighter/shared";
 import { h } from "./dom.ts";
 import { tipAttr } from "./tooltip.ts";
+/** Dávka kulometu (nábojů na jeden výstřel) – dílek munice v dlaždici. */
+const MG_BURST = 10;
 import { icon, label } from "./icons.ts";
 import { pilotPortrait } from "./pilot-ui.ts";
 
@@ -738,16 +740,22 @@ export function moduleHexSvg(t: ModuleType, sub: string, dim: boolean, weight?: 
         svg.append(ic);
       }
     } else {
-      const slots = 5;
-      const size = 7;
-      const txt = `${ammo}`;
-      const total = slots * (size + 1) + 4 + txt.length * 6;
+      // kulomet: munice po dávkách – „10× [zásobník] DÁVKA“ (zásobník = 10 nábojů = jedna dávka)
+      const loaded = Math.floor(ammo! / MG_BURST);
+      const txt = `${loaded}×`;
+      const lbl = "DÁVKA";
+      const tw = txt.length * 4.8;
+      const cwid = 31;
+      const lw = lbl.length * 4.3;
+      const total = tw + 1 + cwid + 2 + lw;
       const x0 = cx - total / 2;
-      for (let i = 0; i < slots; i++) {
-        const on = i < Math.round((ammo! / max) * slots);
-        svg.append(svgEl("rect", { x: x0 + i * (size + 1), y: yy + 2, width: size, height: 5, fill: on ? acol : "none", stroke: on ? acol : "#475569", "stroke-width": 1 }));
-      }
-      svg.append(svgEl("text", { x: x0 + slots * (size + 1) + 4, y: yy + 8, "font-family": "Jersey", "font-size": 11, fill: acol, "text-anchor": "start" }, txt));
+      svg.append(svgEl("text", { x: x0 + tw, y: yy + 8, "font-family": "Jersey", "font-size": 11, fill: acol, "text-anchor": "end" }, txt));
+      const g = svgEl("g", { transform: `translate(${x0 + tw + 1}, ${yy + 1.5}) scale(0.7)` });
+      g.append(svgEl("rect", { x: 0, y: 0, width: 44, height: 10, fill: "none", stroke: acol, "stroke-width": 1 }));
+      for (let i = 0; i < MG_BURST; i++) g.append(svgEl("rect", { x: 3 + i * 4, y: 2.5, width: 2.5, height: 5, fill: acol }));
+      g.append(svgEl("title", {}, `${loaded} dávek po ${MG_BURST} nábojích (${ammo} nábojů)`));
+      svg.append(g);
+      svg.append(svgEl("text", { x: x0 + tw + 1 + cwid + 2, y: yy + 8, "font-family": "Jersey", "font-size": 8, fill: dim ? "#64748b" : "#cbd5e1", "text-anchor": "start" }, lbl));
     }
   }
   y = 73;

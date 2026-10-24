@@ -147,6 +147,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.120 – Obchod: kulomet ukazuje munici jako „10× [zásobník] DÁVKA“ (zásobník = dávka 10 nábojů) místo pruhu s počtem nábojů.
 - v3.119 – Boti: lodě stejného týmu se plánují postupně a znají dráhy spoluhráčů (i odeslané rozkazy lidí), takže si nelétají do cesty; bez nepřítele v dohledu hledají opatrně (pomalu, dál od okraje, bouří a spoluhráčů). Panel HRÁČI: týmy odděleně s hlavičkou v barvě týmu, sestřelený hráč má ☠ a přeškrtnuté jméno, bez legendy. Samostatná bitva (bez série): po konci se všem vrátí výbava, munice, životy modulů, náklad, pilot i kredity do stavu před bitvou; v sérii zůstává dosavadní chování. Obchod s moduly: kategorie Zbraně / Štíty / Droidi / Technologie s barvami (energetické zbraně oranžově se značkou ⚡, projektilové červeně se značkou náboje), v dlaždici cena s mincí, munice v modulu a dvoubarevná závaží (šedá modul, žlutá munice), po najetí/podržení karta s detaily; stejné barvy na schématu lodi i v inventáři.
 - v3.118 – Herní obrazovka na telefonu/tabletu: rozložení lišty, HUD a panelů je vždy stejné jako na počítači, jen se celé zmenší podle šířky okna (do šířky 1280 px = 100 %, min. 50 %); dvousloupcová lišta zůstává jen pro telefon na výšku (pod 620 px).
 - v3.117 – Pozadí mapy: nová volba „Bez pozadí“ (jen hvězdy) je výchozí; galaxie a planety si zakladatel zapne
