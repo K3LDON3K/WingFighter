@@ -32,7 +32,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
+import { activeShield, cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
 
@@ -253,10 +253,14 @@ export function refreshShip(ship: Ship): void {
   ship.ammo = { torpedoes: ship.stats.torpedoes, mines: ship.stats.mines };
 }
 
-function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec, by?: string): void {
+/** Druh zranění: energetické (laser) energetický štít jen vybíjí, ale segmenty proniká; kinetické (projektily, srážky) segment zachytí celé, ale energetický štít částečně prorazí. */
+export type DamageKind = "energy" | "kinetic";
+
+function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec, by?: string, kind: DamageKind = "kinetic"): void {
   if (amount <= 0 || !ship.alive) return;
   let absorbed = 0;
   let segment: number | undefined;
+  let pierced = 0; // část, která prošla štítem do trupu i když štít ještě držel
   const stormed = !!creditCtx && inStorm(creditCtx.state, ship); // v bouři štíty nefungují
   if (stormed) {
     /* zásah jde rovnou do trupu */
@@ -264,10 +268,16 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec
     segment = hitSegment(ship, from);
     if (ship.segments[segment] > 0) {
       ship.segments[segment]--;
-      absorbed = amount;
+      if (kind === "energy") {
+        // laser se mezi poletujícími segmenty protáhne: část zranění projde do trupu
+        pierced = Math.round((amount * RULES.segmentPassPct) / 100);
+        absorbed = amount - pierced;
+      } else absorbed = amount;
     }
   } else if (from && ship.shieldType === "whole" && ship.shields > 0) {
-    absorbed = Math.min(ship.shields, Math.round((amount * ship.shieldEff) / 100));
+    // projektil pole prorazí: část jde do trupu vždy, zbytek odnese zásoba
+    pierced = kind === "kinetic" ? Math.round((amount * RULES.wholePiercePct) / 100) : 0;
+    absorbed = Math.min(ship.shields, Math.round(((amount - pierced) * ship.shieldEff) / 100));
     ship.shields -= absorbed;
     ship.shieldEff = Math.max(0, ship.shieldEff - RULES.wholeEffDrop);
   }
@@ -289,6 +299,8 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec
     hullAfter: Math.max(0, ship.hull),
     segmentsAfter: [...ship.segments] as Segments,
     effAfter: ship.shieldEff,
+    pierced: pierced > 0 ? pierced : undefined,
+    kind,
   });
   if (ship.hull <= 0) {
     ship.hull = 0;
@@ -847,7 +859,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     pending.set(target.id, { dmg: (prev?.dmg ?? 0) + damage, from: prev?.from ?? { x: aim.x, y: aim.y }, by: prev?.by ?? ship.ownerId });
     }
   }
-  for (const [id, { dmg, from, by }] of pending) applyDamage(shipById(state, id)!, dmg, events, from, by);
+  for (const [id, { dmg, from, by }] of pending) applyDamage(shipById(state, id)!, dmg, events, from, by, "energy");
 
   /* ---------- 1b. Kulomety (také před pohybem; bouře je neovlivňuje) ---------- */
   for (const ship of state.ships) {
@@ -1771,6 +1783,74 @@ export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: 
   if (st) st.scans++;
   state.revealTeams = [...new Set([...(state.revealTeams ?? []), ship.team])];
   return {};
+}
+
+/** Aktivní (funkční) modul štítu lodi. */
+export function activeShieldModule(ship: Ship): ModuleInstance | undefined {
+  return ship.shieldType === "none" ? undefined : activeShield(ship.loadout);
+}
+
+/** Kolik může dobití štítu ještě přidat (0 = štít je plný / není). Segmentový: volné body do maxima na segment. */
+export function shieldRechargeRoom(ship: Ship): number {
+  if (ship.shieldType === "whole") return Math.max(0, ship.stats.shields - ship.shields);
+  if (ship.shieldType === "segment") {
+    const cap = RULES.segmentHp * ship.stats.segmentModules;
+    return ship.segments.reduce((a, b) => a + Math.max(0, cap - b), 0);
+  }
+  return 0;
+}
+
+/** Proč nejde dobít štít technologií (undefined = jde). */
+export function shieldRechargeBlocked(state: GameState, ship: Ship): string | undefined {
+  if (ship.shieldType === "none" || !activeShieldModule(ship)) return "loď nemá funkční štít";
+  if (inStorm(state, ship)) return "v bouři štít nefunguje";
+  if (ship.shieldRechargedTurn === state.turn) return "štít už byl v tomto kole dobit";
+  if (ship.techPoints < RULES.rechargeTechCost) return `nedostatek technologie (${ship.techPoints}/${RULES.rechargeTechCost})`;
+  if (shieldRechargeRoom(ship) <= 0) return "štít je plný";
+  return undefined;
+}
+
+/**
+ * Dobití štítu technologií – provede se hned při plánování, nebere akci, 1× za kolo.
+ * Energetický: +rechargeWhole zásoby (do maxima). Segmentový: +rechargeSegments bodů rozdělených podle `segments`
+ * (součet ≤ limit, nad maximum segmentu se ořízne; bez zadání se body dají nejslabším segmentům).
+ */
+export function applyShieldRecharge(state: GameState, ship: Ship, segments?: number[]): { error?: string; event?: TurnEvent } {
+  const why = shieldRechargeBlocked(state, ship);
+  if (why) return { error: why };
+  const cost = RULES.rechargeTechCost;
+  let amount: number | undefined;
+  let added: Segments | undefined;
+  if (ship.shieldType === "whole") {
+    amount = Math.min(RULES.rechargeWhole, ship.stats.shields - ship.shields);
+    ship.shields += amount;
+  } else {
+    const cap = RULES.segmentHp * ship.stats.segmentModules;
+    let budget = RULES.rechargeSegments;
+    added = [0, 0, 0, 0];
+    const want = (segments ?? []).map((n) => Math.max(0, Math.floor(Number(n) || 0)));
+    for (let i = 0; i < 4 && budget > 0; i++) {
+      const add = Math.min(want[i] ?? 0, cap - ship.segments[i], budget);
+      if (add > 0) {
+        ship.segments[i] += add;
+        added[i] += add;
+        budget -= add;
+      }
+    }
+    // zbytek (nebo bez zadání): nejslabší segmenty
+    while (budget > 0) {
+      let best = -1;
+      for (let i = 0; i < 4; i++) if (ship.segments[i] < cap && (best < 0 || ship.segments[i] < ship.segments[best])) best = i;
+      if (best < 0) break;
+      ship.segments[best]++;
+      added[best]++;
+      budget--;
+    }
+    if (added.every((n) => n === 0)) return { error: "štít je plný" };
+  }
+  ship.techPoints -= cost;
+  ship.shieldRechargedTurn = state.turn;
+  return { event: { type: "shieldRecharge", shipId: ship.id, cost, techPoints: ship.techPoints, amount, segments: added, shieldsAfter: ship.shields, segmentsAfter: [...ship.segments] as Segments } };
 }
 
 /** Náhled kulometu: cíl (stejná pravidla jako vyhodnocení), šance zásahu projektilu a očekávané zranění. */

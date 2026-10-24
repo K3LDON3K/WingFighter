@@ -10,6 +10,7 @@ import {
   MAX_TEAMS_TDM,
   planBot,
   plannedPaths,
+  applyShieldRecharge,
   type Pose,
   resolveTurn,
   resultForTeam,
@@ -670,6 +671,24 @@ export class Hub {
         }
         return;
       }
+      case "rechargeShield": {
+        if (!room?.game) return;
+        const g = room.game;
+        if (g.state.status === "finished") return;
+        const ship = g.state.ships.find((x) => x.id === msg.shipId && x.ownerId === client.id && x.alive);
+        if (!ship) return this.error(client, "Dobití štítu: to není tvoje loď.");
+        const res = applyShieldRecharge(g.state, ship, Array.isArray(msg.segments) ? msg.segments.map(Number) : undefined);
+        if (res.error) return this.error(client, `Dobití štítu: ${res.error}.`);
+        g.pendingEvents.push(res.event!);
+        for (const m of room.members.values()) {
+          if (m.isBot) continue;
+          const c = this.clients.get(m.id);
+          if (!c) continue;
+          const t = teamOf(g, m.id);
+          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room) });
+        }
+        return;
+      }
       case "unready": {
         if (!room?.game) return;
         const m = room.members.get(client.id);
@@ -803,7 +822,16 @@ export class Hub {
       // bot nepodvádí: plánuje ze stavu svého týmu (mlha války), podle své obtížnosti
       const seen = stateForTeam(g.state, m.team, memoryFor(g, m.team));
       const allyPaths = pathsOf(m.team);
-      const orders = sanitizeOrders(g.state, m.id, planBot(seen, m.id, g.rng, m.botLevel ?? "kadet", { allyPaths }));
+      const planned = planBot(seen, m.id, g.rng, m.botLevel ?? "kadet", { allyPaths });
+      // dobití štítu technologií se provádí hned (jako u lidí), ne až při vyhodnocení
+      for (const o of planned) {
+        if (!o.rechargeShield) continue;
+        const ship = g.state.ships.find((x) => x.id === o.shipId && x.alive);
+        if (!ship) continue;
+        const res = applyShieldRecharge(g.state, ship, o.rechargeShield.segments);
+        if (res.event) g.pendingEvents.push(res.event);
+      }
+      const orders = sanitizeOrders(g.state, m.id, planned);
       g.orders.set(m.id, orders);
       for (const [id, p] of plannedPaths(g.state, orders)) allyPaths.set(id, p);
       m.ready = true;

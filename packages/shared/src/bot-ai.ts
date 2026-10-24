@@ -15,7 +15,7 @@ import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from ".
 import { listManeuvers, maneuverEnd, maneuverPath, makeManeuver } from "./maneuvers.ts";
 import { insideMap } from "./mapshape.ts";
 import { pointInStorm } from "./mapgen.ts";
-import { actionCost, aimPose, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, sectorCoverage, torpedoModule, validShieldAction } from "./resolve.ts";
+import { actionCost, aimPose, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, sectorCoverage, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
 import type { Rng } from "./rng.ts";
 import { laserHalfArc, moduleWorking, profileOf } from "./ships.ts";
 import type { BotLevel, GameState, Maneuver, Segments, Ship, ShipOrders, Shot } from "./types.ts";
@@ -255,6 +255,16 @@ function lookahead(state: GameState, ship: Ship, cands: Candidate[], enemies: Sh
 }
 
 /** Střelba: každému laseru/kulometu nejvýhodnější cíl (očekávané zranění), v pořadí od nejlepšího; vrací i užitky. */
+/**
+ * Kolik ze zranění daného druhu skutečně „bolí“ cíl: energetický štít lasery jen vybíjí (dokud má zásobu),
+ * ale projektil ho prorazí; segmenty projektil zachytí celý, laser jimi proniká. Vrací násobek 0.3–1.3.
+ */
+function shieldFactor(target: Ship, kind: "energy" | "kinetic"): number {
+  if (target.shieldType === "whole" && target.shields > 0) return kind === "kinetic" ? 0.6 + (0.4 * RULES.wholePiercePct) / 100 : 0.5;
+  if (target.shieldType === "segment" && target.segments.some((n) => n > 0)) return kind === "energy" ? 0.6 + (0.7 * RULES.segmentPassPct) / 100 : 0.45;
+  return 1;
+}
+
 function planShots(state: GameState, ship: Ship, enemies: Ship[]): { shot: Shot; value: number }[] {
   const out: { shot: Shot; value: number }[] = [];
   for (const mod of ship.loadout.modules) {
@@ -265,7 +275,7 @@ function planShots(state: GameState, ship: Ship, enemies: Ship[]): { shot: Shot;
         const odds = laserOdds(ship, e, mod.id);
         if (odds.coverage <= 0) continue;
         // zraněného nepřítele dorazit: bonus
-        const v = odds.expectedDamage * (e.hull <= odds.expectedDamage ? 1.6 : 1);
+        const v = odds.expectedDamage * (e.hull <= odds.expectedDamage ? 1.6 : 1) * shieldFactor(e, "energy");
         if (!best || v > best.v) best = { id: e.id, v };
       }
       if (best && best.v > 1) out.push({ shot: { moduleId: mod.id, targetId: best.id }, value: best.v });
@@ -274,7 +284,8 @@ function planShots(state: GameState, ship: Ship, enemies: Ship[]): { shot: Shot;
       for (const e of enemies) {
         const pv = mgPreview(state, ship, e.id, mod.id);
         if (!pv || pv.targetId !== e.id) continue;
-        if (!best || pv.expectedDamage > best.v) best = { id: e.id, v: pv.expectedDamage };
+        const v = pv.expectedDamage * shieldFactor(e, "kinetic");
+        if (!best || v > best.v) best = { id: e.id, v };
       }
       if (best && best.v > 1) out.push({ shot: { moduleId: mod.id, targetId: best.id }, value: best.v });
     }
@@ -287,6 +298,26 @@ function incomingNow(state: GameState, ship: Ship, enemies: Ship[]): number {
   let t = 0;
   for (const e of enemies) t += offenseAt(e, e, ship, ship);
   return t;
+}
+
+/** Kam dát body z dobití segmentového štítu: k největší hrozbě, jinak nejslabším segmentům. */
+function shieldRechargeSplit(ship: Ship, enemies: Ship[]): number[] {
+  const cap = RULES.segmentHp * ship.stats.segmentModules;
+  const threat = [0, 0, 0, 0];
+  for (const e of enemies) threat[hitSegment(ship, e)] += offenseAt(e, e, ship, ship) + 1;
+  const segs = [...ship.segments];
+  const add = [0, 0, 0, 0];
+  for (let k = 0; k < RULES.rechargeSegments; k++) {
+    let best = -1;
+    for (let i = 0; i < 4; i++) {
+      if (segs[i] >= cap) continue;
+      if (best < 0 || threat[i] > threat[best] || (threat[i] === threat[best] && segs[i] < segs[best])) best = i;
+    }
+    if (best < 0) break;
+    segs[best]++;
+    add[best]++;
+  }
+  return add;
 }
 
 /** Přerozdělení segmentů štítu směrem k největší hrozbě (součet zůstává). */
@@ -349,6 +380,12 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
     allyPaths.set(ship.id, maneuverPath(ship, chosen.man));
     const orders: ShipOrders = { shipId: ship.id, maneuverId: chosen.man.id, shots: [], preferredTargetId: enemies[0]?.id };
     if (overdrive) orders.droid = { overdrive: true };
+    // dobití štítu technologií (nebere akci): když je štít slabý a technologie zbývá; Eso si nechá rezervu na overdrive
+    if (!shieldRechargeBlocked(state, ship) && !overdrive) {
+      const low = ship.shieldType === "whole" ? ship.shields <= ship.stats.shields * 0.4 : ship.segments.reduce((a, b) => a + b, 0) <= 3;
+      const reserve = level === "eso" && droid ? DROID.overdriveCost : 0;
+      if (low && ship.techPoints - RULES.rechargeTechCost >= reserve) orders.rechargeShield = { segments: ship.shieldType === "segment" ? shieldRechargeSplit(ship, enemies) : undefined };
+    }
     const left = () => RULES.actionPoints - actionCost(ship, orders);
 
     // 2. nabídka akcí s užitkem; vezmou se nejlepší, co se vejdou
@@ -369,8 +406,8 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
     if (tmod && !inStormNow) {
       const lock = enemies.filter((e) => dist(ship, e) <= TORPEDO.lockRange && inArc(ship, e, Math.PI / 2));
       if (lock.length) {
-        const t = lock.reduce((a, b) => (a.hull < b.hull ? a : b));
-        opts.push({ value: TORPEDO.damage * 0.55, kind: "special", apply: () => (orders.special = { type: "torpedo", targetId: t.id, moduleId: tmod.id }) });
+        const t = lock.reduce((a, b) => (a.hull * shieldFactor(a, "kinetic") < b.hull * shieldFactor(b, "kinetic") ? a : b));
+        opts.push({ value: TORPEDO.damage * 0.55 * shieldFactor(t, "kinetic"), kind: "special", apply: () => (orders.special = { type: "torpedo", targetId: t.id, moduleId: tmod.id }) });
       } else if (level === "eso" && enemies.length) {
         // bod, kam nepřítel asi doletí (nejpravděpodobnější odhad), musí být v doletu
         const e = enemies.reduce((a, b) => (dist(ship, a) < dist(ship, b) ? a : b));

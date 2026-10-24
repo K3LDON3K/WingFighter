@@ -16,6 +16,8 @@ import {
   inStorm,
   SCANNER,
   scannerModule,
+  shieldRechargeBlocked,
+  shieldRechargeRoom,
   loadoutWeight,
   mgPreview,
   mineModule,
@@ -74,6 +76,10 @@ export interface PlanningCallbacks {
   /** Otevřít / zavřít podmenu zbraně s více moduly. */
   weaponToggle(shipId: string, type: "laser" | "mg"): void;
   droidToggle(shipId: string): void;
+  /** Dobití štítu technologií: nabídka, výběr segmentu (+1 / −1), provést hned. */
+  rechargeToggle(shipId: string): void;
+  rechargePick(shipId: string, seg: number): void;
+  recharge(shipId: string): void;
   scanPickTarget(shipId: string, on: boolean): void;
   scan(shipId: string, mode: "deep" | "cooldown"): void;
   /** Pozorovatel: tabulka skóre / opuštění hry. */
@@ -112,6 +118,8 @@ export interface PlanningModel {
   /** Otevřené podmenu zbraně (víc modulů stejného typu): "laser" | "mg". */
   weaponOpen?: "laser" | "mg" | null;
   droidOpen?: boolean;
+  rechargeOpen?: boolean;
+  rechargePick?: number[];
   scanPick?: boolean;
   /** Vysunutá nabídka nákladu (vyhodit / zvednout). */
   cargoOpen?: boolean;
@@ -264,7 +272,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const teamColor = TEAM_COLORS[ship.team];
   const stormed = inStorm(m.state, ship);
   const bubbleSize = 110;
-  const bubble = h("div", { class: "bubble-box", title: ship.shieldType === "whole" ? `Celolodní štít: zásoba ${ship.shields}/${ship.stats.shields}${RULES.shieldRecharge > 0 ? `, dobíjí se +${RULES.shieldRecharge} za kolo` : ""}${RULES.wholeEffDrop > 0 ? `, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : ""}` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Každý zásah ubere 1 bod a je pohlcen celý; při 0 jde zranění do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, bubbleSize, stormed));
+  const bubble = h("div", { class: "bubble-box", title: ship.shieldType === "whole" ? `Energetický štít: zásoba ${ship.shields}/${ship.stats.shields}${RULES.shieldRecharge > 0 ? `, dobíjí se +${RULES.shieldRecharge} za kolo` : ""}${RULES.wholeEffDrop > 0 ? `, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : ""}. Lasery pole jen vybíjejí; projektily prorazí ${RULES.wholePiercePct} % do trupu.` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Projektil zachytí segment celý za 1 bod; laser ubere 1 bod a ${RULES.segmentPassPct} % pronikne do trupu; při 0 jde vše do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, bubbleSize, stormed));
   const shieldBox = h("div", { class: "shield-box" }, bubble);
   /** Vysouvací editor štítu nad tlačítkem ŠTÍT (stejný styl jako skener). */
   let shieldPop: HTMLElement | null = null;
@@ -421,7 +429,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
     // skupina bez dostupných akcí se neukazuje; Loď = NÁKLAD (vyhodit / zvednout), Speciální = štít, skener, droid
     if (grp.label === "Loď" && ship.loadout.modules.length === 0) continue;
-    if (avail.length === 0 && grp.label !== "Loď" && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.loadout.modules.some((x) => x.type === "droid")))) continue;
+    if (avail.length === 0 && grp.label !== "Loď" && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.loadout.modules.some((x) => x.type === "droid") || ship.shieldType !== "none"))) continue;
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
@@ -647,6 +655,63 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
               h("button", { class: "px bb-weapon sm", disabled: locked || tech < SCANNER.deepCost, ...tipAttr({ ...actionTip("scan-deep", ship, o, man), ...(tech < SCANNER.deepCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(SCANNER.deepCost)),
             ),
           );
+        }
+        row.append(holder);
+      }
+      // Dobití štítu technologií: tlačítko s okénkem (energetický: jedno tlačítko; segmentový: výběr segmentů + potvrdit)
+      if (ship.shieldType !== "none") {
+        const tech = ship.techPoints;
+        const why = shieldRechargeBlocked(m.state, ship);
+        const room = shieldRechargeRoom(ship);
+        const pick = m.rechargePick ?? [0, 0, 0, 0];
+        const picked = pick.reduce((a, b) => a + b, 0);
+        const holder = h("div", { class: "scan-holder" });
+        holder.append(
+          h(
+            "button",
+            {
+              class: `px bb-weapon recharge-btn ${m.rechargeOpen && !why ? "on" : ""} ${stormed ? "stormed" : ""} ${why ? "cool" : ""}`,
+              disabled: locked || !!why,
+              ...tipAttr({ ...actionTip("recharge", ship, o, man), ...(why ? { warn: `Nelze: ${why}.` } : {}) }),
+              onclick: () => cb.rechargeToggle(ship.id),
+            },
+            icon("shield", "currentColor", 22),
+            h("span", { class: "lbl" }, label("Dobít štít")),
+            costPipsAll({ tech: RULES.rechargeTechCost }, false, `${RULES.rechargeTechCost} body technologie (nebere akci, 1× za kolo)`),
+            stormed ? h("span", { class: "sb" }, "⚡") : null,
+          ),
+        );
+        if (m.rechargeOpen && !why) {
+          if (ship.shieldType === "whole") {
+            const add = Math.min(RULES.rechargeWhole, room);
+            holder.append(
+              h(
+                "div",
+                { class: `scan-pop ${popClass(`recharge:${ship.id}`)}` },
+                h("button", { class: "px bb-weapon sm", disabled: locked, ...tipAttr({ icon: "shield", iconColor: "#60a5fa", title: "Dobít energetický štít", cost: { tech: RULES.rechargeTechCost }, fx: [{ icon: "shield", text: `+${add} zásoby (${ship.shields} → ${ship.shields + add} / ${ship.stats.shields})`, tone: "good" }, { icon: "clock", text: "proběhne hned", tone: "good" }], note: `technologie ${tech}/${ship.stats.techMax} · nebere akci · 1× za kolo` }), onclick: () => cb.recharge(ship.id) }, icon("shield", "currentColor", 22), h("span", { class: "lbl" }, label(`+${add}`)), costPipsAll({ tech: RULES.rechargeTechCost }, false, `${RULES.rechargeTechCost} body technologie`)),
+              ),
+            );
+          } else {
+            const cap = RULES.segmentHp * ship.stats.segmentModules;
+            const segBtn = (i: number) => {
+              const full = ship.segments[i] + pick[i] >= cap;
+              return h(
+                "button",
+                { class: `px bb-weapon sm ${pick[i] > 0 ? "on" : ""}`, disabled: locked || (full && pick[i] === 0) || (picked >= RULES.rechargeSegments && pick[i] === 0), title: `${SEGMENT_NAMES[i]}: ${ship.segments[i]}/${cap}${pick[i] ? ` (+${pick[i]})` : ""} – klik = přidat bod, klik znovu = ubrat`, onclick: () => cb.rechargePick(ship.id, i) },
+                h("span", { class: "lbl" }, label(SEGMENT_NAMES[i])),
+                h("span", { class: "seg-val" }, `${ship.segments[i]}${pick[i] ? `+${pick[i]}` : ""}/${cap}`),
+              );
+            };
+            holder.append(
+              h(
+                "div",
+                { class: `scan-pop recharge-pop ${popClass(`recharge:${ship.id}`)}` },
+                h("div", { class: "muted recharge-note" }, label(`rozděl ${RULES.rechargeSegments} ${RULES.rechargeSegments === 1 ? "bod" : RULES.rechargeSegments < 5 ? "body" : "bodů"} do segmentů (${picked}/${RULES.rechargeSegments})`)),
+                h("div", { class: "recharge-segs" }, segBtn(0), segBtn(1), segBtn(2), segBtn(3)),
+                h("button", { class: "px bb-weapon sm go", disabled: locked || picked === 0, ...tipAttr({ icon: "shield", iconColor: "#60a5fa", title: "Dobít segmentový štít", cost: { tech: RULES.rechargeTechCost }, fx: [{ icon: "shield", text: `+${picked} ${picked === 1 ? "bod" : "body"} do zvolených segmentů`, tone: "good" }, { icon: "clock", text: "proběhne hned", tone: "good" }], note: `technologie ${tech}/${ship.stats.techMax} · nebere akci · 1× za kolo${picked < RULES.rechargeSegments ? ` · nevyužité body propadnou` : ""}` }), onclick: () => cb.recharge(ship.id) }, icon("check", "currentColor", 22), h("span", { class: "lbl" }, label("Dobít")), costPipsAll({ tech: RULES.rechargeTechCost }, false, `${RULES.rechargeTechCost} body technologie`)),
+              ),
+            );
+          }
         }
         row.append(holder);
       }

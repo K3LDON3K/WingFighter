@@ -162,6 +162,9 @@ interface GameSession {
   scanOpen: boolean;
   droidOpen: boolean;
   scanPick: boolean;
+  /** Dobití štítu: vysunutá nabídka / zvolené body do segmentů. */
+  rechargeOpen: boolean;
+  rechargePick: number[];
   /** Vysunutá nabídka nákladu (vyhodit / zvednout). */
   cargoOpen: boolean;
   hoverId?: string;
@@ -339,6 +342,8 @@ function startGame(state: GameState) {
     scanOpen: false,
     droidOpen: false,
     scanPick: false,
+    rechargeOpen: false,
+    rechargePick: [0, 0, 0, 0],
     cargoOpen: false,
     mouse: null,
     icons: [],
@@ -372,6 +377,7 @@ function resetOrders() {
   game.minePick = null;
   game.cargoOpen = false;
   game.droidOpen = false;
+  game.rechargeOpen = false;
   game.scanOpen = false;
   game.scanPick = false;
   game.shieldEdit = false;
@@ -577,6 +583,7 @@ function submitOrders(force = false) {
   game.aimingShipId = null;
   closeShieldEdit(game, game.selectedShipId ?? null);
   game.droidOpen = false;
+  game.rechargeOpen = false;
   game.scanOpen = false;
   game.scanPick = false;
   game.cargoOpen = false;
@@ -1310,6 +1317,8 @@ function renderSide() {
       scanOpen: game.scanOpen,
       weaponOpen: game.weaponOpen,
       droidOpen: game.droidOpen,
+      rechargeOpen: game.rechargeOpen,
+      rechargePick: game.rechargePick,
       scanPick: game.scanPick,
       cargoOpen: game.cargoOpen,
       askConfirm: !game.skipConfirm,
@@ -1425,6 +1434,35 @@ function renderSide() {
       droidToggle: (id) => {
         game!.selectedShipId = id;
         game!.droidOpen = !game!.droidOpen;
+        game!.rechargeOpen = false;
+        renderSide();
+      },
+      rechargeToggle: (id) => {
+        game!.selectedShipId = id;
+        game!.rechargeOpen = !game!.rechargeOpen;
+        game!.rechargePick = [0, 0, 0, 0];
+        game!.droidOpen = false;
+        renderSide();
+      },
+      rechargePick: (id, seg) => {
+        game!.selectedShipId = id;
+        const sh = game!.state.ships.find((x) => x.id === id);
+        if (!sh) return;
+        const cap = RULES.segmentHp * sh.stats.segmentModules;
+        const pick = game!.rechargePick;
+        const total = pick.reduce((a, b) => a + b, 0);
+        if (pick[seg] > 0 && (total >= RULES.rechargeSegments || sh.segments[seg] + pick[seg] >= cap)) pick[seg]--; // klik znovu = ubrat
+        else if (total < RULES.rechargeSegments && sh.segments[seg] + pick[seg] < cap) pick[seg]++;
+        renderSide();
+      },
+      recharge: (id) => {
+        const sh = game!.state.ships.find((x) => x.id === id);
+        if (!sh) return;
+        const segs = sh.shieldType === "segment" ? game!.rechargePick : undefined;
+        net.send({ type: "rechargeShield", shipId: id, segments: segs?.some((n) => n > 0) ? segs : undefined });
+        sfx("click");
+        game!.rechargeOpen = false;
+        game!.rechargePick = [0, 0, 0, 0];
         renderSide();
       },
       weaponToggle: (id, type) => {

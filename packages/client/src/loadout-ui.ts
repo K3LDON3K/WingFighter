@@ -828,6 +828,15 @@ function moduleTip(t: ModuleType, why: string | null) {
     fx.push({ icon: "credits", text: `doplnění ${def.ammoPrice}/ks` });
   }
   fx.push({ icon: "hull", text: `životy ${def.hp}` });
+  if (t === "shield-whole") {
+    fx.push({ icon: "laser", text: "⚡ lasery jen vybíjejí", tone: "good" });
+    fx.push({ icon: "torpedo", text: `● projektily prorazí ${RULES.wholePiercePct} %`, tone: "bad" });
+    fx.push({ icon: "scan", text: `dobití: ${RULES.rechargeTechCost} tech → +${RULES.rechargeWhole}` });
+  } else if (t === "shield-segment") {
+    fx.push({ icon: "torpedo", text: "● projektil zachytí celý (1 bod)", tone: "good" });
+    fx.push({ icon: "laser", text: `⚡ laser pronikne ${RULES.segmentPassPct} %`, tone: "bad" });
+    fx.push({ icon: "scan", text: `dobití: ${RULES.rechargeTechCost} tech → +${RULES.rechargeSegments} body` });
+  }
   return tipAttr({
     icon: def.icon,
     iconColor: moduleColor(t),

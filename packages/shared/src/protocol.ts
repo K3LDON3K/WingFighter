@@ -85,6 +85,8 @@ export type ClientMessage =
   | { type: "submitOrders"; orders: ShipOrders[] }
   /** Skener – vyhodnotí se hned: sken lodi (1 náboj), hluboký sken (2 náboje), vynucený cooldown. */
   | { type: "scan"; shipId: string; moduleId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }
+  /** Dobití štítu technologií (hned, nebere akci). U segmentového: kolik bodů do kterého segmentu. */
+  | { type: "rechargeShield"; shipId: string; segments?: number[] }
   | { type: "unready" }
   | { type: "backToLobby" };
 

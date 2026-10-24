@@ -28,6 +28,8 @@ import {
   moduleCost,
   validateLoadout,
   applyScan,
+  applyShieldRecharge,
+  shieldRechargeBlocked,
   generateMap,
   newModule,
   actionCost,
@@ -330,7 +332,12 @@ describe("vyhodnocení kola", () => {
       if (dmg && dmg.type === "damage") {
         hits++;
         expect(dmg.segment).toBe(2); // záď
-        if ((dmg.absorbed ?? 0) > 0) expect(dmg.hullAfter).toBe(100);
+        // laser (energetický) segmenty proniká: 1 bod segmentu, segmentPassPct % zranění do trupu
+        if ((dmg.absorbed ?? 0) > 0) {
+          expect(dmg.kind).toBe("energy");
+          expect(dmg.pierced).toBe(Math.round((dmg.amount * RULES.segmentPassPct) / 100));
+          expect(dmg.absorbed).toBe(dmg.amount - dmg.pierced!);
+        }
       }
       r = fire(r.state);
     }
@@ -780,6 +787,106 @@ describe("natočení modulů", () => {
   });
 });
 
+describe("štíty × druh zbraně a dobití technologií", () => {
+  it("energetický štít: laser jen vybíjí (nic do trupu), torpédo prorazí wholePiercePct % i přes plný štít", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 700, 500, 0);
+    const t = g.ships[1];
+    t.shieldType = "whole";
+    t.shields = 80;
+    t.stats.shields = 80;
+    t.stats.agility = 0;
+    g.ships[0].stats.attack = 4;
+    const r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m2a0", fire: false }], createRng(3));
+    const dmg = r.events.find((e) => e.type === "damage" && e.shipId === "ship-p2-0");
+    expect(dmg && dmg.type === "damage" && dmg.kind === "energy" && dmg.absorbed === dmg.amount && !dmg.pierced).toBe(true);
+    expect(r.state.ships[1].hull).toBe(100);
+    // torpédo: přímý zásah 45 → 30 % (14) do trupu i při plné zásobě, zbytek do štítu
+    const g2 = game();
+    place(g2, "ship-p1-0", 500, 500, 0);
+    place(g2, "ship-p2-0", 900, 500, 0);
+    const t2 = g2.ships[1];
+    t2.shieldType = "whole";
+    t2.shields = 80;
+    t2.stats.shields = 80;
+    let r2 = resolveTurn(g2, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false, special: { type: "torpedo", targetId: "ship-p2-0" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(2));
+    for (let i = 0; i < 4 && !r2.events.some((e) => e.type === "torpedoHit"); i++) r2 = resolveTurn(r2.state, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(10 + i));
+    const td = r2.events.find((e) => e.type === "damage" && e.shipId === "ship-p2-0");
+    expect(td && td.type === "damage").toBe(true);
+    if (td && td.type === "damage") {
+      const pierce = Math.round((td.amount * RULES.wholePiercePct) / 100);
+      expect(td.kind).toBe("kinetic");
+      expect(td.pierced).toBe(pierce);
+      expect(td.hullAfter).toBe(100 - pierce);
+      expect(td.absorbed).toBe(td.amount - pierce);
+    }
+  });
+
+  it("segmentový štít: torpédo zachytí celé za 1 bod; laser ubere 1 bod a segmentPassPct % projde do trupu", () => {
+    const g = game();
+    place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 900, 500, 0);
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false, special: { type: "torpedo", targetId: "ship-p2-0" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(2));
+    for (let i = 0; i < 4 && !r.events.some((e) => e.type === "torpedoHit"); i++) r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(10 + i));
+    const td = r.events.find((e) => e.type === "damage" && e.shipId === "ship-p2-0");
+    expect(td && td.type === "damage" && td.kind === "kinetic" && td.absorbed === td.amount && !td.pierced).toBe(true);
+    expect(r.state.ships[1].hull).toBe(100);
+    expect(r.state.ships[1].segments.reduce((a, b) => a + b, 0)).toBe(7); // jeden bod pryč
+    // laser
+    const g2 = game();
+    place(g2, "ship-p1-0", 500, 500, 0);
+    place(g2, "ship-p2-0", 700, 500, 0);
+    g2.ships[1].stats.agility = 0;
+    g2.ships[0].stats.attack = 4;
+    const r2 = resolveTurn(g2, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: true }, { shipId: "ship-p2-0", maneuverId: "m2a0", fire: false }], createRng(3));
+    const ld = r2.events.find((e) => e.type === "damage" && e.shipId === "ship-p2-0");
+    expect(ld && ld.type === "damage").toBe(true);
+    if (ld && ld.type === "damage") {
+      const pierce = Math.round((ld.amount * RULES.segmentPassPct) / 100);
+      expect(ld.kind).toBe("energy");
+      expect(ld.pierced).toBe(pierce);
+      expect(ld.hullAfter).toBe(100 - pierce);
+      expect(ld.segmentsAfter![2]).toBe(1);
+    }
+  });
+
+  it("dobití štítu technologií: stojí body, 1× za kolo, nad maximum ne; segmentový podle zadání, energetický +zásoba", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    me.techPoints = 6;
+    expect(shieldRechargeBlocked(g, me)).toBe("štít je plný");
+    me.segments = [0, 1, 2, 2];
+    let res = applyShieldRecharge(g, me, [2, 0, 0, 0]);
+    expect(res.error).toBeUndefined();
+    expect(me.segments).toEqual([2, 1, 2, 2]);
+    expect(me.techPoints).toBe(6 - RULES.rechargeTechCost);
+    expect(res.event && res.event.type === "shieldRecharge" && res.event.segments).toEqual([2, 0, 0, 0]);
+    // podruhé v tom samém kole ne
+    expect(applyShieldRecharge(g, me, [0, 1, 0, 0]).error).toMatch(/v tomto kole/);
+    g.turn++;
+    // přes strop segmentu: zbytek jde nejslabšímu; bez zadání nejslabším
+    me.segments = [2, 0, 2, 1];
+    res = applyShieldRecharge(g, me, [5, 0, 0, 0]);
+    expect(res.error).toBeUndefined();
+    expect(me.segments).toEqual([2, 2, 2, 1]);
+    expect(me.techPoints).toBe(0);
+    g.turn++;
+    expect(applyShieldRecharge(g, me).error).toMatch(/technologie/);
+    // energetický
+    const w = g.ships[1];
+    w.shieldType = "whole";
+    w.stats.shields = 80;
+    w.shields = 60;
+    w.techPoints = 3;
+    res = applyShieldRecharge(g, w);
+    expect(res.error).toBeUndefined();
+    expect(w.shields).toBe(80); // +40, ale strop 80
+    expect(res.event && res.event.type === "shieldRecharge" && res.event.amount).toBe(20);
+    expect(w.techPoints).toBe(0);
+  });
+});
+
 describe("skener", () => {
   it("sken lodi stojí 1 bod technologie, hluboký sken 2 a odkryje mapu do konce kola; technologie se nedobíjí; průlet ocasem komety přidá body", () => {
     const g = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
@@ -902,10 +1009,11 @@ describe("kulomet", () => {
     g2.ships[1].shields = 50;
     g2.ships[1].stats.shields = 50;
     r = resolveTurn(g2, [{ shipId: me.id, maneuverId: "m1a0", fire: false, fireMg: true }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
-    // výchozí balanc: účinnost neklesá (wholeEffDrop 0) → dávka 10 × 3 = 30 pohltí zásoba, trup celý; pak dobití +5 (strop = max)
+    // výchozí balanc: účinnost neklesá (wholeEffDrop 0); projektil energetický štít prorazí: z každého zásahu (3) jde wholePiercePct % do trupu (zaokrouhleno = 1), zbytek (2) odnese zásoba; pak dobití +5
     expect(r.state.ships[1].shieldEff).toBe(100);
-    expect(r.state.ships[1].hull).toBe(100);
-    expect(r.state.ships[1].shields).toBe(Math.min(50, 50 - 30 + RULES.shieldRecharge));
+    const pierce = Math.round((3 * RULES.wholePiercePct) / 100);
+    expect(r.state.ships[1].hull).toBe(100 - 10 * pierce);
+    expect(r.state.ships[1].shields).toBe(Math.min(50, 50 - 10 * (3 - pierce) + RULES.shieldRecharge));
     // s poklesem účinnosti (ladění) klesá po každém projektilu zvlášť
     const g3 = structuredClone(g2);
     g3.tuning = { ...g3.tuning, wholeEffDrop: 10 };

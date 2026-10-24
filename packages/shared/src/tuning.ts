@@ -60,6 +60,11 @@ export interface Tuning {
   wholeEffDrop: number;
   segmentHp: number;
   segmentMax: number;
+  wholePiercePct: number;
+  segmentPassPct: number;
+  rechargeTechCost: number;
+  rechargeWhole: number;
+  rechargeSegments: number;
   // moduly: ceny a váhy
   priceLaser: number;
   priceTorpedo: number;
@@ -187,6 +192,11 @@ export const DEFAULT_TUNING: Tuning = {
   wholeEffDrop: 0,
   segmentHp: 2,
   segmentMax: 3,
+  wholePiercePct: 30,
+  segmentPassPct: 60,
+  rechargeTechCost: 3,
+  rechargeWhole: 40,
+  rechargeSegments: 2,
   priceLaser: 100,
   priceTorpedo: 150,
   priceMine: 100,
@@ -329,13 +339,18 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "weightMine", label: "Modul – váha (prázdný)", group: "Miny", min: 0, max: 20, step: 0.5 },
   { key: "weightPerMine", label: "Váha jedné miny", group: "Miny", min: 0, max: 10, step: 0.5 },
   // --- štíty ---
-  { key: "shields", label: "Celolodní – zásoba na modul", group: "Štíty", min: 0, max: 500, step: 10 },
-  { key: "shieldRecharge", label: "Celolodní – dobíjení za kolo", group: "Štíty", min: 0, max: 100, step: 5 },
-  { key: "wholeEffDrop", label: "Celolodní – pokles účinnosti za zásah %", group: "Štíty", min: 0, max: 50, step: 5 },
+  { key: "shields", label: "Energetický – zásoba na modul", group: "Štíty", min: 0, max: 500, step: 10 },
+  { key: "shieldRecharge", label: "Energetický – dobíjení za kolo", group: "Štíty", min: 0, max: 100, step: 5 },
+  { key: "wholeEffDrop", label: "Energetický – pokles účinnosti za zásah %", group: "Štíty", min: 0, max: 50, step: 5 },
+  { key: "wholePiercePct", label: "Energetický – průraz projektilů do trupu %", group: "Štíty", min: 0, max: 100, step: 5, hint: "torpédo, mina, kulomet, srážky: tolik % jde do trupu i přes plný štít; lasery štít jen vybíjejí" },
   { key: "segmentHp", label: "Segmentový – životy segmentu na modul", group: "Štíty", min: 0, max: 4, step: 1, hint: "projeví se u nových lodí" },
   { key: "segmentMax", label: "Segmentový – max životů (úprava štítu)", group: "Štíty", min: 1, max: 6, step: 1 },
+  { key: "segmentPassPct", label: "Segmentový – průnik energetických zbraní do trupu %", group: "Štíty", min: 0, max: 100, step: 5, hint: "laser ubere 1 bod segmentu a tolik % zranění projde do trupu; projektily segment zachytí celé" },
+  { key: "rechargeTechCost", label: "Dobití štítu – cena v bodech technologie", group: "Štíty", min: 1, max: 6, step: 1, hint: "nebere akci, 1× za kolo" },
+  { key: "rechargeWhole", label: "Dobití štítu – energetický +zásoba", group: "Štíty", min: 5, max: 100, step: 5 },
+  { key: "rechargeSegments", label: "Dobití štítu – segmentový +bodů", group: "Štíty", min: 1, max: 4, step: 1 },
   { key: "priceShieldSegment", label: "Segmentový – cena", group: "Štíty", min: 0, max: 2000, step: 10 },
-  { key: "priceShieldWhole", label: "Celolodní – cena", group: "Štíty", min: 0, max: 2000, step: 10 },
+  { key: "priceShieldWhole", label: "Energetický – cena", group: "Štíty", min: 0, max: 2000, step: 10 },
   { key: "weightShield", label: "Štít – váha modulu", group: "Štíty", min: 0, max: 20, step: 0.5 },
   // --- kulomet ---
   { key: "mgAmmo", label: "Nábojů na modul", group: "Kulomet", min: 10, max: 500, step: 10, hint: "projeví se u nových lodí; dávka spotřebuje tolik nábojů, kolik má projektilů" },
@@ -371,7 +386,7 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "cometReward", label: "Odměna za sestřelení", group: "Komety", min: 0, max: 500, step: 5 },
   { key: "cometTailLength", label: "Ocas – délka", group: "Komety", min: 0, max: 600, step: 10 },
   { key: "cometTailWidth", label: "Ocas – šířka", group: "Komety", min: 10, max: 200, step: 5 },
-  { key: "cometShieldPct", label: "Průlet ocasem – % štítu", group: "Komety", min: 0, max: 100, step: 5, hint: "celolodní: % maxima; segmentový: +1 bod náhodnému segmentu" },
+  { key: "cometShieldPct", label: "Průlet ocasem – % štítu", group: "Komety", min: 0, max: 100, step: 5, hint: "energetický: % maxima; segmentový: +1 bod náhodnému segmentu" },
   { key: "cometHullPct", label: "Průlet – % trupu (když je štít plný)", group: "Komety", min: 0, max: 100, step: 5 },
   { key: "cometBonusCredits", label: "Průlet – kredity (když není co doplnit)", group: "Komety", min: 0, max: 1000, step: 10 },
   { key: "cometNoShieldCredits", label: "Průlet bez štítového modulu – kredity", group: "Komety", min: 0, max: 1000, step: 10, hint: "loď bez štítu dostane navíc plný stres" },
@@ -459,6 +474,11 @@ export function applyTuning(t: Tuning): void {
   RULES.wholeEffDrop = t.wholeEffDrop;
   RULES.segmentHp = t.segmentHp;
   RULES.segmentMax = t.segmentMax;
+  RULES.wholePiercePct = t.wholePiercePct;
+  RULES.segmentPassPct = t.segmentPassPct;
+  RULES.rechargeTechCost = t.rechargeTechCost;
+  RULES.rechargeWhole = t.rechargeWhole;
+  RULES.rechargeSegments = t.rechargeSegments;
   LASER.range = t.laserRange;
   LASER.halfArc = (t.laserArcDeg * Math.PI) / 180;
   LASER.halfArcSide = (t.laserArcSideDeg * Math.PI) / 180;

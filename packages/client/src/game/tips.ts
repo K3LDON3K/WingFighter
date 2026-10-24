@@ -196,6 +196,19 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
         note: "nebere akci",
         ...w,
       };
+    case "recharge":
+      return {
+        icon: "shield",
+        iconColor: "#60a5fa",
+        title: "Dobít štít",
+        cost: { tech: RULES.rechargeTechCost },
+        fx: [
+          ship.shieldType === "whole" ? { icon: "shield", text: `energetický +${RULES.rechargeWhole} zásoby`, tone: "good" } : { icon: "shield", text: `segmentový +${RULES.rechargeSegments} body (kam zvolíš)`, tone: "good" },
+          { icon: "clock", text: "proběhne hned", tone: "good" },
+        ],
+        note: `technologie ${ship.techPoints}/${ship.stats.techMax} · nebere akci · 1× za kolo · v bouři nefunguje`,
+        ...w,
+      };
     case "droid":
       return {
         icon: "bot",

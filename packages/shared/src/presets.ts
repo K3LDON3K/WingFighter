@@ -35,7 +35,7 @@ export const LOADOUT_PRESETS: LoadoutPreset[] = [
   {
     id: "defender",
     name: "Obránce",
-    description: "Celolodní štít, lasery na přídi, miny na zádi, droid.",
+    description: "Energetický štít, lasery na přídi, miny na zádi, droid.",
     modules: [{ type: "shield-whole" }, { type: "laser", slot: "front" }, { type: "mine", slot: "back" }, { type: "droid" }],
   },
   {

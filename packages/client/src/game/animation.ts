@@ -60,7 +60,8 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
         const abs = e.absorbed ?? 0;
         const segName = ["předek", "pravobok", "záď", "levobok"];
         const where = e.segment !== undefined ? ` do ${segName[e.segment]}` : "";
-        lines.push(abs >= e.amount ? `  ${name(e.shipId)}: štít${where} pohltil ${e.amount}.` : `  ${name(e.shipId)} −${e.amount - abs} do trupu${where}${abs ? ` (štít ${abs})` : ""} → trup ${e.hullAfter}.`);
+        const pierce = e.pierced ? (e.kind === "energy" ? ` – laser pronikl segmenty (${e.pierced})` : ` – průraz štítu (${e.pierced})`) : "";
+        lines.push(abs >= e.amount ? `  ${name(e.shipId)}: štít${where} pohltil ${e.amount}.` : `  ${name(e.shipId)} −${e.amount - abs} do trupu${where}${abs ? ` (štít ${abs})` : ""}${pierce} → trup ${e.hullAfter}.`);
         break;
       }
       case "torpedoShot":
@@ -92,6 +93,12 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "droid":
         lines.push(`${name(e.shipId)}: droid – ${[e.overdrive ? "overdrive" : "", e.autopilot ? "autopilot" : ""].filter(Boolean).join(" + ")} (−${e.cost} technologie).`);
         break;
+      case "shieldRecharge": {
+        const segName = ["předek", "pravobok", "záď", "levobok"];
+        const what = e.amount !== undefined ? `+${e.amount} zásoby → ${e.shieldsAfter}` : `+${(e.segments ?? []).reduce((a, b) => a + b, 0)} bodů (${(e.segments ?? []).map((n, i) => (n ? `${segName[i]} +${n}` : "")).filter(Boolean).join(", ")})`;
+        lines.push(`${name(e.shipId)} dobil štít technologií: ${what} (−${e.cost} technologie, zbývá ${e.techPoints}).`);
+        break;
+      }
       case "scan":
         lines.push(e.mode === "ship" ? `${name(e.shipId)} skenoval ${e.targetId ? name(e.targetId) : "loď"}.` : e.mode === "deep" ? `${name(e.shipId)} provedl hluboký sken – mapa odkryta do konce kola.` : `${name(e.shipId)} vynutil cooldown skeneru.`);
         break;
@@ -279,6 +286,7 @@ export class TurnAnimation {
           break;
         case "scan":
         case "droid":
+        case "shieldRecharge":
           time = 0;
           break;
         case "action":

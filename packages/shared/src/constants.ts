@@ -39,10 +39,18 @@ export const RULES = {
   evadeStressCost: 1,
   evadePassStress: 1,
   evadeDamageReduction: 50,
-  /** Štíty: pokles účinnosti celolodního štítu za zásah (%), výchozí a max. životy segmentu. */
+  /** Štíty: pokles účinnosti energetického štítu za zásah (%), výchozí a max. životy segmentu. */
   wholeEffDrop: 0,
   segmentHp: 2,
   segmentMax: 3,
+  /** Energetický štít: kolik % zranění projektilem projde do trupu i přes plný štít (průraz). */
+  wholePiercePct: 30,
+  /** Segmentový štít: kolik % zranění energetickou zbraní projde segmenty do trupu (průnik). */
+  segmentPassPct: 60,
+  /** Dobití štítu technologií: cena v bodech, kolik dobije energetický štít, kolik bodů vrátí segmentovému. */
+  rechargeTechCost: 3,
+  rechargeWhole: 40,
+  rechargeSegments: 2,
   /** Ekonomika: odměna za sestřel, za přežité kolo, za sestřelený vyhozený modul (% ceny). */
   creditsPerKill: 200,
   creditsPerTurn: 10,

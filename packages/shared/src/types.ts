@@ -66,6 +66,8 @@ export interface ShipOrders {
   preferredTargetId?: string;
   /** Droid – pilot: funkce zapnuté pro toto kolo (platí se technologií při vyhodnocení). */
   droid?: DroidOrder;
+  /** Jen boti: přání dobít štít technologií (server provede hned při plánování; z rozkazu se odstraní). */
+  rechargeShield?: { segments?: number[] };
 }
 
 /** Výstřel z jednoho modulu v kole; `targetId` přebíjí `preferredTargetId` lodi. */
@@ -225,8 +227,10 @@ export interface Ship extends Pose {
   segments: Segments;
   /** Zásoba stresových bodů (červený manévr −1, nebezpečný −2, zelený +1). */
   stressPoints: number;
-  /** Body technologie (nedobíjí se; sken lodi 1, hluboký sken 2). */
+  /** Body technologie (nedobíjí se; sken lodi 1, hluboký sken 2, dobití štítu 3). */
   techPoints: number;
+  /** Kolo, ve kterém byl štít naposledy dobit technologií (1× za kolo). */
+  shieldRechargedTurn?: number;
   /** Rychlost posledního manévru (prudká změna o 2+ = červený manévr). */
   speed: number;
   tokens: { focus: number; evade: number };
@@ -517,6 +521,8 @@ export type TurnEvent =
   | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }
   /** Droid – pilot aktivoval funkce (technologie odečtena). */
   | { type: "droid"; shipId: string; overdrive: boolean; autopilot: boolean; cost: number; techPoints: number }
+  /** Dobití štítu technologií (hned při plánování): energetický +amount, segmentový +segments po segmentech. */
+  | { type: "shieldRecharge"; shipId: string; cost: number; techPoints: number; amount?: number; segments?: Segments; shieldsAfter: number; segmentsAfter: Segments }
   | { type: "action"; shipId: string; action: ActionOrder; ok: boolean; path?: Pose[] }
   | {
       type: "laser";
@@ -548,6 +554,9 @@ export type TurnEvent =
       segment?: number;
       segmentsAfter?: Segments;
       effAfter?: number;
+      /** Kolik prošlo štítem do trupu, i když štít držel (průraz projektilu / průnik laseru). */
+      pierced?: number;
+      kind?: "energy" | "kinetic";
     }
   | { type: "destroyed"; shipId: string; x: number; y: number }
   /** Okrajová bouře zranila loď (část kola strávená mimo ovál). */

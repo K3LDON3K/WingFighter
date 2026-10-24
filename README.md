@@ -71,7 +71,7 @@ Loď **Stíhač** má 4 malé sloty: příď, záď, levobok, pravobok. Příď 
 **velký** slot pro budoucí velké moduly. Moduly:
 **Lasery** (100 cr, váha 2), **Kulomet** (120, váha 1 + 0,02/náboj, 100 nábojů; dávka 10 × 3 zranění, dosah 150,
 výseč ±45°, šance zásahu podle vzdálenosti, funguje v bouři), **Torpédomet** (150, váha 1 + 1 za torpédo, 3 ks), **Miny** (100, váha 1 +
-0,5 za minu, 2 ks), **Segmentový štít** (120, váha 2), **Celolodní štít** (120, váha 2). Součet váhy snižuje
+0,5 za minu, 2 ks), **Segmentový štít** (120, váha 2), **Energetický štít** (120, váha 2). Součet váhy snižuje
 max. rychlost: každých 6 váhy = −1 (výchozí sestava má váhu 10 → rychlost max. 4, prázdná loď 5). Vystřelená
 munice loď odlehčí. Loď smí letět i bez modulů. Více modulů stejného typu = víc munice; při střelbě si vybereš,
 ze kterého modulu střílíš (jeden za akci). **Natočení:** lasery, torpédomet a miny míří na jednu ze 4 stran
@@ -89,16 +89,22 @@ má ve hře jako **kredity**; další dostane za sestřel (200) a za každé př
 (klik na trosky = cíl) za polovinu ceny. Nákupy mezi koly a vylepšení modulů přijdou později.
 
 ### Životy a štíty
-Trup 100. Jeden čistý zásah laseru = 15. Štít je modul (segmentový, nebo celolodní – nelze kombinovat):
-- **Segmentový** (výchozí) – čtyři segmenty (předek, pravobok, záď, levobok) po **2 bodech**. Každý zásah
-  (salva laserů, torpédo, výbuch, náraz) trefí segment podle směru, odkud přišel, ubere **1 bod** a je pohlcen
-  celý; segment na nule už nechrání a zranění jde do trupu. Akce **Úprava štítu** (1 akce) body přesune
-  (stejný součet, max. 3 na segment) – v panelu lodi –/+ u segmentů, odebrané body „v ruce“ je nutné rozmístit.
-- **Celolodní** – zásoba 50 kolem celé lodi; pohltí **účinnost %** zranění (začíná na 100 %), zbytek jde do
-  trupu, po každém zásahu účinnost klesne o 10 %.
-Štíty se zatím nedobíjejí (dobíjení přinesou moduly). V liště je loď s pixelovou bublinou štítu (barva podle
-síly: modrá / žlutá / červená) a tlačítka CENTROVAT (mapa na loď) a INVENTÁŘ (zatím ukázka). Na mapě má
-celolodní štít kruh obarvený podle síly, segmentový čtyři oblouky otáčející se s lodí.
+Trup 100. Jeden čistý zásah laseru = 15. Štít je modul (segmentový, nebo energetický – nelze kombinovat).
+Zbraně jsou dvojího druhu: **energetické** (lasery) a **projektilové** (torpédo, mina, kulomet; stejně se
+chovají i srážky a komety) – a každý štít má proti jednomu druhu slabinu:
+- **Segmentový (kinetický)** (výchozí) – čtyři poletující segmenty (předek, pravobok, záď, levobok) po
+  **2 bodech**. Zásah trefí segment podle směru, odkud přišel, a ubere **1 bod**. **Projektil** segment zachytí
+  celý (dávka kulometu = jeden zásah); **laser** je přesnější a mezi segmenty pronikne: 1 bod pryč a **60 %**
+  zranění jde do trupu. Segment na nule už nechrání. Akce **Úprava štítu** (1 akce) body přesune
+  (stejný součet, max. 3 na segment).
+- **Energetický** – zásoba 80 kolem celé lodi, každé kolo +5. **Laser** pole jen vybíjí – do trupu nejde nic,
+  dokud zásoba stačí. **Projektil** pole prorazí: **30 %** zranění jde do trupu vždy, zbytek odnese zásoba.
+- **Dobití technologií** – akce „Dobít štít“ ve skupině Speciální: 3 body technologie (nebere akci, 1× za kolo,
+  ne v bouři), provede se hned při plánování. Energetický +40 zásoby, segmentový +2 body do segmentů, které si
+  hráč zvolí. Technologie (6 bodů na bitvu) se tak dělí mezi skener, droida a štít.
+Všechna procenta a hodnoty jsou v menu ladění (sekce Štíty). V liště je loď s pixelovou bublinou štítu
+(barva podle síly); na mapě má energetický štít kruh obarvený podle síly, segmentový čtyři oblouky otáčející
+se s lodí.
 
 ### Zbraně
 - **Lasery** (1 akce) – střílí **na začátku kola ze startovní pozice**, výseč ±20° před přídí, dostřel 300
@@ -147,6 +153,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.121 – Štíty podle druhu zbraně: energetický (dřív celolodní) lasery jen vybíjejí, projektily (torpédo, mina, kulomet, srážky, komety) prorazí 30 % do trupu; segmentový (kinetický) projektil zachytí celý za 1 bod, laser ubere 1 bod a 60 % pronikne do trupu. Nová akce „Dobít štít“ za 3 body technologie (nebere akci, 1× za kolo, hned): energetický +40, segmentový +2 body do zvolených segmentů. Vše laditelné v sekci Štíty. Log hlásí průraz/průnik. Boti (Pilot, Eso) volí zbraň podle štítu cíle a dobíjejí štít, když je slabý. Popisy modulů a karta v obchodě doplněny.
 - v3.120 – Obchod: kulomet ukazuje munici jako „10× [zásobník] DÁVKA“ (zásobník = dávka 10 nábojů) místo pruhu s počtem nábojů.
 - v3.119 – Boti: lodě stejného týmu se plánují postupně a znají dráhy spoluhráčů (i odeslané rozkazy lidí), takže si nelétají do cesty; bez nepřítele v dohledu hledají opatrně (pomalu, dál od okraje, bouří a spoluhráčů). Panel HRÁČI: týmy odděleně s hlavičkou v barvě týmu, sestřelený hráč má ☠ a přeškrtnuté jméno, bez legendy. Samostatná bitva (bez série): po konci se všem vrátí výbava, munice, životy modulů, náklad, pilot i kredity do stavu před bitvou; v sérii zůstává dosavadní chování. Obchod s moduly: kategorie Zbraně / Štíty / Droidi / Technologie s barvami (energetické zbraně oranžově se značkou ⚡, projektilové červeně se značkou náboje), v dlaždici cena s mincí, munice v modulu a dvoubarevná závaží (šedá modul, žlutá munice), po najetí/podržení karta s detaily; stejné barvy na schématu lodi i v inventáři.
 - v3.118 – Herní obrazovka na telefonu/tabletu: rozložení lišty, HUD a panelů je vždy stejné jako na počítači, jen se celé zmenší podle šířky okna (do šířky 1280 px = 100 %, min. 50 %); dvousloupcová lišta zůstává jen pro telefon na výšku (pod 620 px).
