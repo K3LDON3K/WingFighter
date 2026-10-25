@@ -54,7 +54,7 @@ export interface Overlay {
   selectedShipId?: string;
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
-  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; laserArcs?: { x: number; y: number; heading: number; halfArc: number }[]; mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[] }[];
+  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[]; mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[] }[];
   /** Dohled vlastního týmu (fog of war). */
   vision?: { x: number; y: number; r: number }[];
   /** Kreslit slabý kruh dohledu kolem vlastních lodí. */
@@ -945,7 +945,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArcs?: { x: number; y: number; heading: number; halfArc: number }[], mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[]) {
+  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[], mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[]) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[ship.team];
     const pts = samplePath(maneuverPath(ship, man), 24);
@@ -971,7 +971,7 @@ export class Renderer {
     }
     ctx.restore();
     // výseče zbraní: každá z pozice svého modulu na trupu (lasery střílí ze startovní pozice, před pohybem)
-    for (const a of laserArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, color, LASER.range, a.halfArc);
+    for (const a of laserArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, color, a.range ?? LASER.range, a.halfArc);
     for (const a of mgArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, "#fbbf24", a.range, a.halfArc);
     ctx.save();
     ctx.strokeStyle = shade(color, 1.3);

@@ -25,6 +25,8 @@ import {
   TEAM_COLORS,
   TEAM_NAMES,
   TORPEDO,
+  torpedoLockRange,
+  torpedoPointRange,
   COMET,
   CARGO,
   inStorm,
@@ -854,8 +856,8 @@ function buildOverlay(view: ViewModel): Overlay {
       if (o.special?.type === "torpedo") {
         overlay.targetId = o.special.targetId;
         overlay.targetPoint = o.special.point;
-        overlay.rangeCircle = { radius: TORPEDO.lockRange, label: "torpédo: zaměření 320 · bod až 1200" };
-        overlay.rangeCircle2 = { radius: TORPEDO.pointRange };
+        overlay.rangeCircle = { radius: torpedoLockRange(ship), label: `torpédo: zaměření ${torpedoLockRange(ship)} · bod až ${torpedoPointRange(ship)}` };
+        overlay.rangeCircle2 = { radius: torpedoPointRange(ship) };
       } else {
         overlay.targetId = o.preferredTargetId;
         // náhled šance: aktivní střela (naposledy zvolený modul), jinak první
@@ -887,7 +889,7 @@ function buildOverlay(view: ViewModel): Overlay {
             overlay.laserOdds = { x: tgt.x, y: tgt.y, text: `${pct} %`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171", sub: odds.coverage < 1 ? `${cov} % v dosahu` : undefined };
             if (odds.coverage < 1) {
               const arc = laserArcOf(ship, laA.mod.id);
-              overlay.partialTarget = { id: tgt.id, x: arc.x, y: arc.y, heading: arc.heading, range: LASER.range, halfArc: arc.halfArc };
+              overlay.partialTarget = { id: tgt.id, x: arc.x, y: arc.y, heading: arc.heading, range: arc.range, halfArc: arc.halfArc };
             }
           }
         }
@@ -2082,7 +2084,7 @@ function bindInput(c: HTMLCanvasElement) {
       return;
     }
     if (hit && hit.team !== sel.team) {
-      if (o.special?.type === "torpedo" && dist(sel, hitPos(hit)) <= TORPEDO.lockRange) {
+      if (o.special?.type === "torpedo" && dist(sel, hitPos(hit)) <= torpedoLockRange(sel)) {
         g.orders.set(sel.id, { ...o, special: { type: "torpedo", targetId: hit.id }, preferredTargetId: hit.id });
         g.picking = null;
       } else {
@@ -2100,7 +2102,7 @@ function bindInput(c: HTMLCanvasElement) {
       return;
     }
     if (!hit && o.special?.type === "torpedo" && (g.picking === "torpedo" || !o.special.targetId)) {
-      if (dist(sel, w) <= TORPEDO.pointRange) {
+      if (dist(sel, w) <= torpedoPointRange(sel)) {
         g.orders.set(sel.id, { ...o, special: { type: "torpedo", point: { x: Math.round(w.x), y: Math.round(w.y) } } });
         g.picking = null;
         renderSide();

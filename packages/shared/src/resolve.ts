@@ -32,7 +32,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { activeShield, cargoCapacity, computeStats, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
+import { activeShield, cargoCapacity, computeStats, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
 
@@ -459,8 +459,8 @@ export function mgModule(ship: Ship, moduleId?: string) {
 }
 
 /** Šance zásahu jednoho projektilu kulometu podle vzdálenosti (lineárně blízko → hranice dosahu), úhyb cíle snižuje. */
-export function mgHitChance(d: number, targetEvading = false): number {
-  const t = clamp(d / Math.max(1, MG.range), 0, 1);
+export function mgHitChance(d: number, targetEvading = false, range = MG.range): number {
+  const t = clamp(d / Math.max(1, range), 0, 1);
   let p = (MG.hitNear + (MG.hitFar - MG.hitNear) * t) / 100;
   if (targetEvading) p *= 1 - RULES.evadeDamageReduction / 100;
   return clamp(p, 0, 1);
@@ -547,10 +547,10 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       if (!mod) special = undefined;
       else if (special.targetId) {
         const t = enemyTarget(state, ship, special.targetId);
-        special = t && dist(ship, t) <= TORPEDO.lockRange ? { type: "torpedo", targetId: t.id, moduleId: mod.id } : undefined;
+        special = t && dist(ship, t) <= torpedoLockRange(ship) ? { type: "torpedo", targetId: t.id, moduleId: mod.id } : undefined;
       } else if (special.point && Number.isFinite(special.point.x) && Number.isFinite(special.point.y)) {
         const p = { x: clamp(special.point.x, 0, state.width), y: clamp(special.point.y, 0, state.height) };
-        special = dist(ship, p) <= TORPEDO.pointRange ? { type: "torpedo", point: p, moduleId: mod.id } : undefined;
+        special = dist(ship, p) <= torpedoPointRange(ship) ? { type: "torpedo", point: p, moduleId: mod.id } : undefined;
       } else special = undefined;
     }
     if (special?.type === "mine") {
@@ -773,7 +773,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
 
     const deb = state.debris.find((d) => d.id === prefId);
     if (deb && !shotDebris.has(deb.id)) {
-      if (dist(aim, deb) <= LASER.range && inArc(aim, deb, arc) && !lineBlocked(state.asteroids, aim, deb) && !laserBlockedByStorm(state, ship, deb)) {
+      if (dist(aim, deb) <= laserRange(ship) && inArc(aim, deb, arc) && !lineBlocked(state.asteroids, aim, deb) && !laserBlockedByStorm(state, ship, deb)) {
         const rangeBand = clamp(Math.ceil(dist(aim, deb) / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, { attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0), defenseDice: rangeBand === 3 ? 1 : 0, attackerFocus: ship.tokens.focus > 0, attackerLock: false, defenderFocus: false, defenderEvade: false });
         const destroyed = outcome.damage > 0;
@@ -785,7 +785,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
     const com = cometById(prefId);
     if (com) {
-      if (dist(aim, com) <= LASER.range && inArc(aim, com, arc) && !lineBlocked(state.asteroids, aim, com) && !laserBlockedByStorm(state, ship, com)) {
+      if (dist(aim, com) <= laserRange(ship) && inArc(aim, com, arc) && !lineBlocked(state.asteroids, aim, com) && !laserBlockedByStorm(state, ship, com)) {
         const rangeBand = clamp(Math.ceil(dist(aim, com) / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, { attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0), defenseDice: rangeBand === 3 ? 1 : 0, attackerFocus: ship.tokens.focus > 0, attackerLock: false, defenderFocus: false, defenderEvade: false });
         const stL = statsOf(state, ship.ownerId);
@@ -799,7 +799,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
     const torp = torpedoById(state, prefId);
     if (torp && torp.team !== ship.team) {
-      if (dist(aim, torp) <= LASER.range && inArc(aim, torp, arc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, aim, torp) && !laserBlockedByStorm(state, ship, torp)) {
+      if (dist(aim, torp) <= laserRange(ship) && inArc(aim, torp, arc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, aim, torp) && !laserBlockedByStorm(state, ship, torp)) {
         const d = dist(aim, torp);
         const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, {
@@ -818,14 +818,14 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
 
     const candidates = state.ships.filter(
-      (e) => e.alive && e.team !== ship.team && sectorCoverage(aim, LASER.range, arc, e) > 0 && !lineBlocked(state.asteroids, aim, e) && !laserBlockedByStorm(state, ship, e),
+      (e) => e.alive && e.team !== ship.team && sectorCoverage(aim, laserRange(ship), arc, e) > 0 && !lineBlocked(state.asteroids, aim, e) && !laserBlockedByStorm(state, ship, e),
     );
     if (candidates.length === 0) continue;
     let target = candidates.find((c) => c.id === prefId);
     if (!target) target = candidates.reduce((best, c) => (dist(aim, c) < dist(aim, best) ? c : best));
     const d = dist(aim, target);
     const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
-    const coverage = sectorCoverage(aim, LASER.range, arc, target);
+    const coverage = sectorCoverage(aim, laserRange(ship), arc, target);
     const useLock = ship.lockTargetId === target.id;
     const outcome = resolveAttack(rng, {
       attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0),
@@ -871,8 +871,9 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     for (const { shot, mod } of shotsOfType(ship, o, "mg")) {
     if ((mod.ammo ?? 0) <= 0) continue;
     const aim = aimPose(ship, mod);
-    const inRange = (p: Vec) => dist(aim, p) <= MG.range && inArc(aim, p, MG.halfArc) && !lineBlocked(state.asteroids, aim, p);
-    const shipInRange = (e: Ship) => sectorCoverage(aim, MG.range, MG.halfArc, e) > 0 && !lineBlocked(state.asteroids, aim, e);
+    const mgR = mgRange(ship);
+    const inRange = (p: Vec) => dist(aim, p) <= mgR && inArc(aim, p, MG.halfArc) && !lineBlocked(state.asteroids, aim, p);
+    const shipInRange = (e: Ship) => sectorCoverage(aim, mgR, MG.halfArc, e) > 0 && !lineBlocked(state.asteroids, aim, e);
     // cíl: preferovaný (loď / torpédo / trosky), jinak nejbližší nepřátelská loď ve výseči
     let target: { kind: "ship" | "torpedo" | "debris" | "comet"; id: string; pos: Pose } | undefined;
     const pref = shotTargetId(o, shot);
@@ -896,7 +897,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     mod.ammo = (mod.ammo ?? 0) - shots;
     refreshShip(ship);
     const victimShip = target.kind === "ship" ? shipById(state, target.id) : undefined;
-    const p = mgHitChance(dist(aim, target.pos), !!victimShip && evading.has(victimShip.id)) * (victimShip ? sectorCoverage(aim, MG.range, MG.halfArc, victimShip) : 1);
+    const p = mgHitChance(dist(aim, target.pos), !!victimShip && evading.has(victimShip.id), mgR) * (victimShip ? sectorCoverage(aim, mgR, MG.halfArc, victimShip) : 1);
     let hits = 0;
     const spread: number[] = [];
     for (let i = 0; i < shots; i++) {
@@ -1695,7 +1696,7 @@ export function laserTarget(state: GameState, ship: Ship, preferredTargetId?: st
   const arc = laserHalfArc(lmod?.facing);
   if (inStorm(state, ship)) return undefined;
   const candidates = state.ships.filter(
-    (e) => e.alive && e.team !== ship.team && sectorCoverage(aim, LASER.range, arc, e) > 0 && !lineBlocked(state.asteroids, aim, e) && !laserBlockedByStorm(state, ship, e),
+    (e) => e.alive && e.team !== ship.team && sectorCoverage(aim, laserRange(ship), arc, e) > 0 && !lineBlocked(state.asteroids, aim, e) && !laserBlockedByStorm(state, ship, e),
   );
   if (candidates.length === 0) return undefined;
   return candidates.find((c) => c.id === preferredTargetId) ?? candidates.reduce((best, c) => (dist(aim, c) < dist(aim, best) ? c : best));
@@ -1708,7 +1709,7 @@ export function laserReach(state: GameState, ship: Ship, p: Vec, laserModuleId?:
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
   if (!cometOnMap(state, p)) return "ještě není na mapě";
-  if (dist(aim, p) > LASER.range) return "mimo dostřel";
+  if (dist(aim, p) > laserRange(ship)) return "mimo dostřel";
   if (!inArc(aim, p, laserHalfArc(lmod?.facing))) return "mimo výseč laseru";
   if (lineBlocked(state.asteroids, aim, p)) return "v cestě je asteroid";
   if (laserBlockedByStorm(state, ship, p)) return "cíl je v bouři";
@@ -1721,22 +1722,22 @@ export function laserReachShip(state: GameState, ship: Ship, target: Ship, laser
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
   const arc = laserHalfArc(lmod?.facing);
-  const cov = sectorCoverage(aim, LASER.range, arc, target);
+  const cov = sectorCoverage(aim, laserRange(ship), arc, target);
   if (cov > 0) {
     if (lineBlocked(state.asteroids, aim, target)) return "v cestě je asteroid";
     if (laserBlockedByStorm(state, ship, target)) return "cíl je v bouři";
     return null;
   }
   const d = Math.round(dist(aim, target) - target.stats.radius);
-  if (d > LASER.range) return `mimo dostřel (${d} / ${LASER.range})`;
+  if (d > laserRange(ship)) return `mimo dostřel (${d} / ${laserRange(ship)})`;
   const rel = Math.round((Math.abs(normalizeAngle(Math.atan2(target.y - aim.y, target.x - aim.x) - aim.heading)) * 180) / Math.PI);
   return `mimo výseč laseru (${rel}° od osy, výseč ±${Math.round((arc * 180) / Math.PI)}°)`;
 }
 
-export function laserArcOf(ship: Ship, laserModuleId?: string): { x: number; y: number; heading: number; halfArc: number } {
+export function laserArcOf(ship: Ship, laserModuleId?: string): { x: number; y: number; heading: number; halfArc: number; range: number } {
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
-  return { x: aim.x, y: aim.y, heading: aim.heading, halfArc: laserHalfArc(lmod?.facing) };
+  return { x: aim.x, y: aim.y, heading: aim.heading, halfArc: laserHalfArc(lmod?.facing), range: laserRange(ship) };
 }
 
 /** Šance laserů na zásah (aspoň jeden čistý zásah) a očekávané zranění proti danému cíli ze současných pozic. */
@@ -1744,7 +1745,7 @@ export function laserOdds(ship: Ship, target: Ship, laserModuleId?: string): { h
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
   const rangeBand = clamp(Math.ceil(dist(aim, target) / LASER.band), 1, 3);
-  const coverage = sectorCoverage(aim, LASER.range, laserHalfArc(lmod?.facing), target);
+  const coverage = sectorCoverage(aim, laserRange(ship), laserHalfArc(lmod?.facing), target);
   const odds = attackOdds({
     attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0),
     defenseDice: target.stats.agility + (rangeBand === 3 ? 1 : 0),
@@ -1860,8 +1861,9 @@ export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: stri
   const mod = ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m) && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m));
   if (!mod) return undefined;
   const aim = aimPose(ship, mod);
-  const inRange = (p: Vec) => dist(aim, p) <= MG.range && inArc(aim, p, MG.halfArc) && !lineBlocked(state.asteroids, aim, p);
-  const shipInRange = (e: Ship) => sectorCoverage(aim, MG.range, MG.halfArc, e) > 0 && !lineBlocked(state.asteroids, aim, e);
+  const mgR = mgRange(ship);
+  const inRange = (p: Vec) => dist(aim, p) <= mgR && inArc(aim, p, MG.halfArc) && !lineBlocked(state.asteroids, aim, p);
+  const shipInRange = (e: Ship) => sectorCoverage(aim, mgR, MG.halfArc, e) > 0 && !lineBlocked(state.asteroids, aim, e);
   let target: Vec & { id: string } | undefined;
   const ts = state.ships.find((x) => x.id === preferredTargetId && x.alive && x.team !== ship.team);
   const tt = state.torpedoes.find((x) => x.id === preferredTargetId && x.team !== ship.team);
@@ -1878,8 +1880,8 @@ export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: stri
   if (!target) return undefined;
   const shots = Math.min(MG.burst, mod.ammo ?? 0);
   const tShip = state.ships.find((x) => x.id === target!.id);
-  const coverage = tShip ? sectorCoverage(aim, MG.range, MG.halfArc, tShip) : 1;
-  const hitChance = mgHitChance(dist(aim, target)) * coverage;
+  const coverage = tShip ? sectorCoverage(aim, mgR, MG.halfArc, tShip) : 1;
+  const hitChance = mgHitChance(dist(aim, target), false, mgR) * coverage;
   return { targetId: target.id, x: target.x, y: target.y, hitChance, expectedDamage: hitChance * shots * MG.damage, shots, coverage };
 }
 
@@ -1887,5 +1889,5 @@ export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: stri
 export function mgArcOf(ship: Ship, mgModuleId?: string): { x: number; y: number; heading: number; halfArc: number; range: number } {
   const mod = ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m) && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m));
   const aim = aimPose(ship, mod);
-  return { x: aim.x, y: aim.y, heading: aim.heading, halfArc: MG.halfArc, range: MG.range };
+  return { x: aim.x, y: aim.y, heading: aim.heading, halfArc: MG.halfArc, range: mgRange(ship) };
 }

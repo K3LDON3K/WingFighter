@@ -17,7 +17,7 @@ import { insideMap } from "./mapshape.ts";
 import { pointInStorm } from "./mapgen.ts";
 import { actionCost, aimPose, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, sectorCoverage, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
 import type { Rng } from "./rng.ts";
-import { laserHalfArc, moduleWorking, profileOf } from "./ships.ts";
+import { laserHalfArc, laserRange, mgRange, moduleWorking, profileOf, torpedoLockRange, torpedoPointRange } from "./ships.ts";
 import type { BotLevel, GameState, Maneuver, Segments, Ship, ShipOrders, Shot } from "./types.ts";
 
 /** Předpokládané pozice nepřítele po tomto kole (s vahou). */
@@ -56,9 +56,9 @@ function offenseAt(me: Ship, mePose: Pose, enemy: Ship, pose: Pose): number {
       if (odds.coverage > 0) dmg += odds.expectedDamage;
     } else if (mod.type === "mg" && (mod.ammo ?? 0) > 0) {
       const aim = aimPose(shooter, mod);
-      const cov = sectorCoverage(aim, MG.range, MG.halfArc, target);
+      const cov = sectorCoverage(aim, mgRange(shooter), MG.halfArc, target);
       if (cov <= 0) continue;
-      dmg += Math.min(MG.burst, mod.ammo ?? 0) * MG.damage * mgHitChance(dist(aim, target)) * cov;
+      dmg += Math.min(MG.burst, mod.ammo ?? 0) * MG.damage * mgHitChance(dist(aim, target), false, mgRange(shooter)) * cov;
     }
   }
   return dmg;
@@ -176,7 +176,7 @@ function positionValue(state: GameState, ship: Ship, end: Pose, enemies: Ship[],
     v += off * finish * aggro.off - (level === "eso" ? 0.8 * thr + 0.2 * worstThr : thr) * 0.9 * aggro.def;
     const d = dist(end, gs[0].pose);
     if (d < 70) v -= 8;
-    else if (d > LASER.range * 1.6) v -= (d - LASER.range * 1.6) / 60;
+    else if (d > laserRange(ship) * 1.6) v -= (d - laserRange(ship) * 1.6) / 60;
   }
   if (enemies.length === 0) {
     // nikdo v dohledu: opatrný průzkum – ke středu mapy, ale pomalu, dál od okraje, bouří a spoluhráčů
@@ -404,7 +404,7 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
     // torpédo: Pilot jen se zámkem, Eso i na předvídaný bod
     const tmod = torpedoModule(ship);
     if (tmod && !inStormNow) {
-      const lock = enemies.filter((e) => dist(ship, e) <= TORPEDO.lockRange && inArc(ship, e, Math.PI / 2));
+      const lock = enemies.filter((e) => dist(ship, e) <= torpedoLockRange(ship) && inArc(ship, e, Math.PI / 2));
       if (lock.length) {
         const t = lock.reduce((a, b) => (a.hull * shieldFactor(a, "kinetic") < b.hull * shieldFactor(b, "kinetic") ? a : b));
         opts.push({ value: TORPEDO.damage * 0.55 * shieldFactor(t, "kinetic"), kind: "special", apply: () => (orders.special = { type: "torpedo", targetId: t.id, moduleId: tmod.id }) });
@@ -412,7 +412,7 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
         // bod, kam nepřítel asi doletí (nejpravděpodobnější odhad), musí být v doletu
         const e = enemies.reduce((a, b) => (dist(ship, a) < dist(ship, b) ? a : b));
         const g = guesses.get(e.id)?.[0]?.pose ?? e;
-        if (dist(ship, g) <= TORPEDO.pointRange && dist(ship, g) > TORPEDO.lockRange) opts.push({ value: TORPEDO.blastDamage * 0.35, kind: "special", apply: () => (orders.special = { type: "torpedo", point: { x: Math.round(g.x), y: Math.round(g.y) }, moduleId: tmod.id }) });
+        if (dist(ship, g) <= torpedoPointRange(ship) && dist(ship, g) > torpedoLockRange(ship)) opts.push({ value: TORPEDO.blastDamage * 0.35, kind: "special", apply: () => (orders.special = { type: "torpedo", point: { x: Math.round(g.x), y: Math.round(g.y) }, moduleId: tmod.id }) });
       }
     }
     // mina: nepřítel těsně za zádí

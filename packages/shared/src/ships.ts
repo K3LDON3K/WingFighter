@@ -1,6 +1,6 @@
 import { VISION_REF } from "./fog.ts";
 import { BATTLESHIP_PROFILE, FIGHTER_PROFILE } from "./maneuvers.ts";
-import { CARGO, LASER, RULES, TECH } from "./constants.ts";
+import { CARGO, LASER, MG, RULES, TECH, TORPEDO } from "./constants.ts";
 import type { Facing, GameSettings, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, PilotMods, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
 
 /**
@@ -36,7 +36,7 @@ export const HULLS: Record<string, HullDef> = {
   battleship: {
     id: "battleship",
     name: "Bitevník",
-    description: "Střední loď, asi 3× větší než stíhač. Šest slotů: příď, záď, přední a zadní levobok, přední a zadní pravobok. Příď + záď, oba levoboky i oba pravoboky jde spojit v jeden velký slot. Pomalejší (max. rychlost 4), otočka jen z rychlosti 2–3, větší trup a náklad. Stojí 2 lodní body.",
+    description: "Střední loď, asi 3× větší než stíhač. Dostřel všech zbraní o 25 % delší. Šest slotů: příď, záď, přední a zadní levobok, přední a zadní pravobok. Příď + záď, oba levoboky i oba pravoboky jde spojit v jeden velký slot. Pomalejší (max. rychlost 4), otočka jen z rychlosti 2–3, větší trup a náklad. Stojí 2 lodní body.",
     radius: 58,
     points: 2,
     // kolizní model podle spritu (50×40 px × 3): trup od zádi k přídi, špice, dvě gondoly na bocích
@@ -63,8 +63,26 @@ export const HULLS: Record<string, HullDef> = {
       { id: "right", name: "zadní pravobok", size: "small" },
     ],
     profile: BATTLESHIP_PROFILE,
+    rangeMul: 1.25,
   },
 };
+
+/** Dostřel zbraní podle trupu (bitevník má o 25 % delší). */
+export function rangeMul(ship: { loadout: { hullId: string } }): number {
+  return HULLS[ship.loadout.hullId]?.rangeMul ?? 1;
+}
+export function laserRange(ship: { loadout: { hullId: string } }): number {
+  return Math.round(LASER.range * rangeMul(ship));
+}
+export function mgRange(ship: { loadout: { hullId: string } }): number {
+  return Math.round(MG.range * rangeMul(ship));
+}
+export function torpedoLockRange(ship: { loadout: { hullId: string } }): number {
+  return Math.round(TORPEDO.lockRange * rangeMul(ship));
+}
+export function torpedoPointRange(ship: { loadout: { hullId: string } }): number {
+  return Math.round(TORPEDO.pointRange * rangeMul(ship));
+}
 
 const NO_MODS: PilotMods = { attack: 0, agility: 0, stressMax: 0, maxSpeed: 0, hullPct: 0 };
 /** Slovní popis modifikátorů pilota. */

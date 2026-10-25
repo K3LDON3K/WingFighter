@@ -30,6 +30,11 @@ import {
   applyScan,
   HULLS,
   hullLargePairs,
+  laserRange,
+  mgRange,
+  torpedoLockRange,
+  LASER,
+  MG,
   fleetPoints,
   modulePos,
   applyShieldRecharge,
@@ -905,6 +910,12 @@ describe("bitevník", () => {
     const pos = modulePos(ship, lo.modules[1]);
     expect(pos.y).toBeLessThan(-30);
     expect(modulePos(ship, { slot: "left" }).x).toBeLessThan(pos.x);
+    // delší dostřel o 25 % (lasery, kulomet, torpéda) a obratnější profil
+    expect(laserRange({ loadout: lo })).toBe(Math.round(LASER.range * 1.25));
+    expect(mgRange({ loadout: lo })).toBe(Math.round(MG.range * 1.25));
+    expect(torpedoLockRange({ loadout: lo })).toBe(Math.round(TORPEDO.lockRange * 1.25));
+    expect(laserRange({ loadout: { hullId: "fighter" } })).toBe(LASER.range);
+    expect(HULLS.battleship.profile.maxAngle[3]).toBeGreaterThanOrEqual(80);
     // velký modul jde i do spojeného levoboku; na stíhači jen příď + záď
     expect(hullLargePairs(HULLS.battleship).length).toBe(3);
     expect(hullLargePairs(HULLS.fighter)).toEqual([["front", "back"]]);

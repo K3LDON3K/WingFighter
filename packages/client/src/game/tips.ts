@@ -1,5 +1,5 @@
 /** Strukturované vysvětlivky tlačítek akcí (varianta B): název + cena, štítky efektů, poznámka. */
-import { CARGO, DROID, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO, cargoCapacity, effEvadeCost, effStressCost, loadoutWeight, type Maneuver, type Ship, type ShipOrders } from "@wingfighter/shared";
+import { CARGO, DROID, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO, cargoCapacity, laserRange, mgRange, torpedoLockRange, torpedoPointRange, effEvadeCost, effStressCost, loadoutWeight, type Maneuver, type Ship, type ShipOrders } from "@wingfighter/shared";
 import type { TipSpec } from "../tooltip.ts";
 
 const deg = (rad: number) => Math.round((rad * 180) / Math.PI);
@@ -62,7 +62,7 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
         cost: { actions: 1 },
         fx: [
           { icon: "clock", text: "na začátku kola, před pohybem" },
-          { icon: "target", text: `výseč ±${deg(LASER.halfArc)}° · dostřel ${LASER.range}` },
+          { icon: "target", text: `výseč ±${deg(LASER.halfArc)}° · dostřel ${laserRange(ship)}` },
           { icon: "eye", text: "cíl: označený, jinak nejbližší" },
           { icon: "hull", text: `${RULES.damagePerHit} za zásah`, tone: "bad" },
         ],
@@ -77,7 +77,7 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
         cost: { actions: 1 },
         fx: [
           { icon: "clock", text: "na začátku kola, před pohybem" },
-          { icon: "target", text: `výseč ±${deg(MG.halfArc)}° · dosah ${MG.range}` },
+          { icon: "target", text: `výseč ±${deg(MG.halfArc)}° · dosah ${mgRange(ship)}` },
           { icon: "mg", text: `dávka ${MG.burst} × ${MG.damage}`, tone: "bad" },
           { icon: "eye", text: "i torpéda, trosky, komety" },
         ],
@@ -91,8 +91,8 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
         title: "Torpédo",
         cost: { actions: 1 },
         fx: [
-          { icon: "target", text: `zaměření lodi do ${TORPEDO.lockRange}` },
-          { icon: "target", text: `nebo bod do ${TORPEDO.pointRange}` },
+          { icon: "target", text: `zaměření lodi do ${torpedoLockRange(ship)}` },
+          { icon: "target", text: `nebo bod do ${torpedoPointRange(ship)}` },
           { icon: "clock", text: `letí ${TORPEDO.lifeTurns} kol` },
           { icon: "hull", text: `${TORPEDO.damage} přímo · výbuch ${TORPEDO.blastDamage}`, tone: "bad" },
         ],

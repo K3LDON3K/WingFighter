@@ -6,7 +6,7 @@ import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from ".
 import { isRed, listManeuvers, maneuverEnd, maneuverPath, maneuverStress } from "./maneuvers.ts";
 import { circleHitsAsteroid } from "./asteroids.ts";
 import type { Rng } from "./rng.ts";
-import { profileOf } from "./ships.ts";
+import { laserRange, profileOf, torpedoLockRange } from "./ships.ts";
 import type { BotLevel, GameState, Ship, ShipOrders } from "./types.ts";
 import { planSmartBot, shipCollisionPenalty, type BotContext } from "./bot-ai.ts";
 
@@ -45,7 +45,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng, level: Bot
     const end = maneuverEnd(ship, best);
     allyPaths.set(ship.id, maneuverPath(ship, best));
     const nearest = enemies.length ? enemies.reduce((a, b) => (dist(ship, a) < dist(ship, b) ? a : b)) : undefined;
-    const willHaveTarget = enemies.some((e) => inArc(end, e, LASER.halfArc * 2) && dist(end, e) <= LASER.range);
+    const willHaveTarget = enemies.some((e) => inArc(end, e, LASER.halfArc * 2) && dist(end, e) <= laserRange(ship));
 
     const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, shots: [], preferredTargetId: nearest?.id };
     const left = () => RULES.actionPoints - actionCost(ship, orders);
@@ -55,7 +55,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng, level: Bot
       if (m) orders.shots!.push({ moduleId: m.id });
       return !!m;
     };
-    const torpTarget = enemies.find((e) => dist(ship, e) <= TORPEDO.lockRange);
+    const torpTarget = enemies.find((e) => dist(ship, e) <= torpedoLockRange(ship));
     if (left() > 0 && willHaveTarget) addLaser();
     if (left() > 0 && ship.ammo.torpedoes > 0 && torpTarget && rng.next() < 0.5) {
       orders.special = { type: "torpedo", targetId: torpTarget.id };
@@ -82,14 +82,14 @@ function scorePose(state: GameState, ship: Ship, end: Pose, enemies: Ship[]): nu
   for (const o of state.ships) if (o !== ship && o.alive && circlesOverlap(end, r + 12, o, o.stats.radius)) score -= 25;
   for (const e of enemies) {
     const d = dist(end, e);
-    if (d <= LASER.range && inArc(end, e, LASER.halfArc)) score += 12;
-    else if (d <= LASER.range && inArc(end, e, LASER.halfArc * 2.5)) score += 4;
+    if (d <= laserRange(ship) && inArc(end, e, LASER.halfArc)) score += 12;
+    else if (d <= laserRange(ship) && inArc(end, e, LASER.halfArc * 2.5)) score += 4;
     // nechceme být příliš blízko ani daleko
     if (d < 60) score -= 6;
     else if (d < 220) score += 3;
     else score -= d / 200;
     // nebýt v jejich výseči
-    if (inArc(e, end, LASER.halfArc) && d <= LASER.range) score -= 5;
+    if (inArc(e, end, LASER.halfArc) && d <= laserRange(e)) score -= 5;
   }
   for (const m of state.mines) if (circlesOverlap(end, r, m, m.radius + 20)) score -= 30;
   // nikdo v dohledu (mlha): letět ke středu mapy

@@ -16,7 +16,7 @@ export const FIGHTER_PROFILE: ManeuverProfile = {
 /** Profil bitevníku: pomalejší a těžkopádnější, otočka jen z rychlosti 2–3. */
 export const BATTLESHIP_PROFILE: ManeuverProfile = {
   maxSpeed: 4,
-  maxAngle: [0, 90, 80, 60, 40, 30],
+  maxAngle: [0, 90, 90, 80, 60, 50],
   koiogranSpeeds: [2, 3],
 };
 

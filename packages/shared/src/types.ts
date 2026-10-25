@@ -107,6 +107,8 @@ export interface HullDef {
   cargo: number;
   /** Pohybové možnosti lodi. */
   profile: ManeuverProfile;
+  /** Násobek dostřelu všech zbraní (bitevník 1,25). */
+  rangeMul?: number;
 }
 
 /** Modifikátory pilota (přičítají se ke statistikám lodi). */
