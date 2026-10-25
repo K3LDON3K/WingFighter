@@ -2,6 +2,7 @@ import { ICONS } from "../icons.ts";
 import type { Segments } from "@wingfighter/shared";
 import {
   shipCircles,
+  hitRadiusAt,
   COMET,
   LASER,
   MINE,
@@ -196,7 +197,7 @@ export class Renderer {
     const onScreen = (x: number, y: number, r: number) => x + r >= vx0 && x - r <= vx1 && y + r >= vy0 && y - r <= vy1;
     this.onScreen = onScreen;
     if (state.storms?.length && overlay.stormActive) drawStormBolts(ctx, state.storms, now);
-    for (const a of view.asteroids) if (onScreen(a.x, a.y, a.radius + 4)) this.drawAsteroid(a);
+    for (const a of view.asteroids) if (onScreen(a.x, a.y, a.radius + 4)) this.drawAsteroid(a, !!overlay.showHitboxes);
     for (const m of view.mines) if (onScreen(m.x, m.y, m.radius + 20)) this.drawMine(m, now);
     this.marks = [];
     for (const d of view.debris) if (onScreen(d.x, d.y, 60)) this.drawDebris(d, overlay, now);
@@ -257,6 +258,7 @@ export class Renderer {
       }
     }
     for (const s of view.ships) if (this.onScreen(s.x, s.y, s.radius + 120)) this.drawShip(s, overlay, now);
+    if (overlay.showHitboxes) this.drawHitboxes(view);
     if (overlay.targetPoint) this.drawPointMarker(overlay.targetPoint, "#fbbf24", 1, now);
     if (overlay.actionGhost && sel) {
       drawSprite(ctx, this.sprites.ship(sel.hullId, sel.team, TEAM_COLORS[sel.team]), overlay.actionGhost.x, overlay.actionGhost.y, overlay.actionGhost.heading, 0.3);
@@ -421,8 +423,67 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawAsteroid(a: Asteroid) {
+  /** Ladění: kolizní obrysy torpéd, min a komet (ocas = obdélník sběru bonusu). Lodě a asteroidy mají obrys u sebe. */
+  private drawHitboxes(view: ViewModel) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = "rgba(248,113,113,0.9)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    for (const t of view.torpedoes) {
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, TORPEDO.radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    for (const m of view.mines) {
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    for (const c of view.comets) {
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      // ocas: obdélník za jádrem (délka × šířka), kde se sbírá bonus
+      const f = { x: Math.cos(c.heading), y: Math.sin(c.heading) };
+      const n = { x: -f.y, y: f.x };
+      const w = COMET.tailWidth / 2;
+      const a0 = c.radius;
+      const a1 = c.radius + COMET.tailLength;
+      ctx.strokeStyle = "rgba(103,232,249,0.8)";
+      ctx.beginPath();
+      ctx.moveTo(c.x - f.x * a0 + n.x * w, c.y - f.y * a0 + n.y * w);
+      ctx.lineTo(c.x - f.x * a1 + n.x * w, c.y - f.y * a1 + n.y * w);
+      ctx.lineTo(c.x - f.x * a1 - n.x * w, c.y - f.y * a1 - n.y * w);
+      ctx.lineTo(c.x - f.x * a0 - n.x * w, c.y - f.y * a0 - n.y * w);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(248,113,113,0.9)";
+    }
+    ctx.restore();
+  }
+
+  private drawAsteroid(a: Asteroid, hitbox = false) {
     drawSprite(this.ctx, this.sprites.asteroid(a), a.x, a.y, 0);
+    if (!hitbox) return;
+    // ladění: kolizní obrys (o pár % menší než obrázek)
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = "rgba(248,113,113,0.9)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    const n = a.profile.length;
+    for (let i = 0; i <= n; i++) {
+      const ang = ((i % n) / n) * Math.PI * 2;
+      const r = hitRadiusAt(a, ang);
+      const x = a.x + Math.cos(ang) * r;
+      const y = a.y + Math.sin(ang) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 
   private drawMine(m: { x: number; y: number; radius: number; team: number; armed: boolean; timer?: number }, now: number) {

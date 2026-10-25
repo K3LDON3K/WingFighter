@@ -40,12 +40,19 @@ export function radiusAt(a: Asteroid, angle: number): number {
   return a.profile[i % n] * (1 - t) + a.profile[(i + 1) % n] * t;
 }
 
+/** Kolizní obrys asteroidu je o pár % menší než obrázek (jde ho těsně obletět); ladění. */
+export const ASTEROID_HIT_REF = { pct: 90 };
+/** Poloměr kolizního obrysu v daném směru. */
+export function hitRadiusAt(a: Asteroid, angle: number): number {
+  return (radiusAt(a, angle) * ASTEROID_HIT_REF.pct) / 100;
+}
+
 export function pointInAsteroid(a: Asteroid, p: Vec): boolean {
   const dx = p.x - a.x;
   const dy = p.y - a.y;
   const d = Math.hypot(dx, dy);
   if (d > a.radius) return false;
-  return d < radiusAt(a, Math.atan2(dy, dx));
+  return d < hitRadiusAt(a, Math.atan2(dy, dx));
 }
 
 /** Překrývá se kruh (loď, torpédo) s asteroidem? Testuje střed a body na obvodu kruhu. */

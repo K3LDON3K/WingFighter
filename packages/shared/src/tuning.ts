@@ -2,6 +2,7 @@
  * Ladicí parametry hry (balanc). Host je může měnit v lobby i během bitvy;
  * server je aplikuje před každým vyhodnocením, klient před vykreslením.
  */
+import { ASTEROID_HIT_REF } from "./asteroids.ts";
 import { CARGO, COMET, CRATER_RADIUS_REF, DROID, HACK, LASER, MG, MINE, REPAIR, RULES, SCANNER, STRESS, TECH, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
 import { HULLS, LASER_DICE, MODULE_HP_PCT, MODULES, STRESS_MAX_REF, WEIGHT } from "./ships.ts";
@@ -18,6 +19,7 @@ export interface Tuning {
   collisionShip: number;
   collisionAsteroid: number;
   crashCrater: number;
+  asteroidHitPct: number;
   repairHullPct: number;
   hackOrdnanceCost: number;
   hackModuleCost: number;
@@ -169,6 +171,7 @@ export const DEFAULT_TUNING: Tuning = {
   collisionShip: 15,
   collisionAsteroid: 15,
   crashCrater: 24,
+  asteroidHitPct: 90,
   repairHullPct: 25,
   hackOrdnanceCost: 2,
   hackModuleCost: 3,
@@ -329,6 +332,7 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "hackRepairCost", label: "Hacker – pasivní oprava (technologie)", group: "Akce a stres", min: 0, max: 6, step: 1 },
   { key: "hackRepairPct", label: "Hacker – pasivní oprava (% trupu za kolo)", group: "Akce a stres", min: 1, max: 25, step: 1 },
   { key: "hackRepairTurns", label: "Hacker – pasivní oprava (kol)", group: "Akce a stres", min: 1, max: 10, step: 1 },
+  { key: "asteroidHitPct", label: "Asteroid – kolizní obrys (% obrázku)", group: "Loď", min: 70, max: 100, step: 1, hint: "menší než 100 = asteroid jde těsně obletět (platí pro lodě, torpéda i lasery)" },
   { key: "crashCrater", label: "Díra po nárazu lodi – min. poloměr", group: "Loď", min: 0, max: 100, step: 2, hint: "náraz do asteroidu vykousne díru; větší loď dělá větší díru" },
   { key: "collisionEdge", label: "Náraz do okraje mapy", group: "Loď", min: 0, max: 100, step: 5 },
   { key: "craterRadius", label: "Kráter v asteroidu – poloměr", group: "Loď", min: 0, max: 150, step: 5 },
@@ -501,6 +505,7 @@ export function applyTuning(t: Tuning): void {
   RULES.collisionShip = t.collisionShip;
   RULES.collisionAsteroid = t.collisionAsteroid;
   RULES.crashCrater = t.crashCrater;
+  ASTEROID_HIT_REF.pct = t.asteroidHitPct;
   REPAIR.hullPct = t.repairHullPct;
   HACK.ordnanceCost = t.hackOrdnanceCost;
   HACK.moduleCost = t.hackModuleCost;
