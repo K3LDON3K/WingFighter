@@ -489,13 +489,25 @@ h3,
   font-size: 19px;
   text-shadow: 3px 3px #000;
 }
+/* záložky lodí letky na horní hraně panelu lodi: kompaktní, můžou přesahovat vedle do lišty */
 .ship-tabs {
   display: flex;
-  gap: 4px;
-  margin-left: auto;
+  gap: 3px;
+  margin-left: 6px;
+  flex: none;
 }
 .ship-tabs button {
-  padding: 3px 6px;
+  padding: 0 6px;
+  height: 16px;
+  line-height: 1;
+  font-size: 11px;
+  border-width: 2px;
+  min-width: 26px;
+  white-space: nowrap;
+}
+.ship-tabs button.on {
+  background: var(--accent);
+  color: #03111c;
 }
 .pips {
   display: inline-flex;
@@ -1554,6 +1566,8 @@ h3,
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
+  z-index: 3;
   font-size: 15px;
   font-weight: 700;
   background: var(--panel-2);
