@@ -1,7 +1,7 @@
 import { generateProfile } from "./asteroids.ts";
 import { MAP, RULES } from "./constants.ts";
 import type { Pose } from "./geometry.ts";
-import { computeStats, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf, shipNames, pilotList } from "./ships.ts";
+import { computeStats, HULLS, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf, shipNames, pilotList } from "./ships.ts";
 import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
 import { effectivePlacement, type Asteroid, type GameSettings, type GameState, type PlayerInfo, type Ship, type ShipLoadout, type Storm } from "./types.ts";
 import { generateMap, START_MARGIN } from "./mapgen.ts";
@@ -169,8 +169,16 @@ export function createGame(opts: CreateGameOptions): GameState {
   teams.forEach((team, zi) => {
     const zoneT = zones[zi];
     const members = players.filter((p) => p.team === team);
-    const total = members.reduce((s, p) => s + (p.loadouts?.length ?? 1), 0);
-    const spacing = 60;
+    /** Rozestupy podle velikosti lodí: sousední lodě dělí součet jejich poloměrů + mezera (bitevník vedle stíhače se nepřekrývá). */
+    const GAP = 36;
+    const offsetsFor = (radii: number[]): number[] => {
+      const out: number[] = [0];
+      for (let i = 1; i < radii.length; i++) out.push(out[i - 1] + radii[i - 1] + radii[i] + GAP);
+      const mid = (out[0] + out[out.length - 1]) / 2;
+      return out.map((o) => o - mid);
+    };
+    const teamRadii = members.flatMap((p) => p.loadouts!.map((l) => HULLS[l.hullId]?.radius ?? 16));
+    const teamOffsets = offsetsFor(teamRadii);
     let idx = 0;
     for (const p of members) {
       const zone = startAt ? startAt(p) : zoneT;
@@ -180,8 +188,9 @@ export function createGame(opts: CreateGameOptions): GameState {
       const fleet = p.loadouts!;
       const perPlayer = fleet.length;
       const names = shipNames(p.name, fleet);
+      const ownOffsets = offsetsFor(fleet.map((l) => HULLS[l.hullId]?.radius ?? 16));
       for (let k = 0; k < perPlayer; k++) {
-        const offset = startAt ? (k - (perPlayer - 1) / 2) * spacing : (idx - (total - 1) / 2) * spacing;
+        const offset = startAt ? ownOffsets[k] : teamOffsets[idx];
         const loadout = structuredClone(fleet[k]);
         const stats = computeStats(loadout);
         ships.push({

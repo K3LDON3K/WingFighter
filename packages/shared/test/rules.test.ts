@@ -40,6 +40,7 @@ import {
   applyShieldRecharge,
   shieldRechargeBlocked,
   generateMap,
+  DEFAULT_MAP,
   newModule,
   actionCost,
   defaultOrders,
@@ -910,6 +911,10 @@ describe("bitevník", () => {
     const pos = modulePos(ship, lo.modules[1]);
     expect(pos.y).toBeLessThan(-30);
     expect(modulePos(ship, { slot: "left" }).x).toBeLessThan(pos.x);
+    // startovní rozestupy podle velikosti: bitevník a stíhač v jedné letce se nepřekrývají
+    const g2 = createGame({ players: [{ id: "A", name: "A", team: 0, isBot: true, loadouts: [structuredClone(DEFAULT_LOADOUT), { hullId: "battleship", pilotId: "kadet", modules: [] }] }, { id: "B", name: "B", team: 1, isBot: true, loadouts: [structuredClone(DEFAULT_LOADOUT)] }], settings: { mode: "tdm", turnLimit: 40, shipPoints: 3, allowedModules: {}, botLoadout: "default", map: { ...DEFAULT_MAP, size: "small", seed: 5 } }, tuning: DEFAULT_TUNING });
+    const [s1, s2] = g2.ships.filter((s) => s.ownerId === "A");
+    expect(Math.hypot(s1.x - s2.x, s1.y - s2.y)).toBeGreaterThanOrEqual(s1.stats.radius + s2.stats.radius + 30);
     // delší dostřel o 25 % (lasery, kulomet, torpéda) a obratnější profil
     expect(laserRange({ loadout: lo })).toBe(Math.round(LASER.range * 1.25));
     expect(mgRange({ loadout: lo })).toBe(Math.round(MG.range * 1.25));
@@ -1539,7 +1544,7 @@ describe("umístění na mapě", () => {
     expect(b[0]).toBe(b[1]);
     expect(a[0]).not.toBe(b[0]);
     const sa = g.ships.filter((s) => s.team === 0);
-    expect(Math.hypot(sa[0].x - sa[1].x, sa[0].y - sa[1].y)).toBeCloseTo(60, 5);
+    expect(Math.hypot(sa[0].x - sa[1].x, sa[0].y - sa[1].y)).toBeCloseTo(16 + 16 + 36, 5);
     expect(sa[0].heading).toBe(sa[1].heading);
   });
   it("týmové ruční: bod určuje velitel (označený, jinak první člověk), ostatní volby se ignorují", () => {

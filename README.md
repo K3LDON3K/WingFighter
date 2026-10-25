@@ -153,6 +153,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.134 – Startovní rozestupy lodí podle velikosti: sousední lodě ve formaci dělí součet jejich poloměrů + 36 (stíhač–stíhač 68, bitevník–stíhač 110), takže se bitevník se stíhačem nepřekrývají.
 - v3.133 – Tažení v editoru výbavy: modul tažený do obchodu zčervená obchod s bannerem „PRODAT MODUL · +cena“, modul tažený z obchodu zezelená nákres lodi s bannerem „KOUPIT · −cena · pusť na volný slot“; při tažení se už neoznačuje text.
 - v3.132 – Letka: lodní body jsou strop, ne povinnost. Hráč začíná s jednou lodí; u záložek letky je „+ Stíhač“ / „+ Bitevník“ (jen trupy, které se vejdou do zbývajících bodů) a ✕ u lodi (moduly se prodají). Bitvu jde zahájit i s nevyužitými body. Boti body využijí celé a při ≥ 2 bodech mají 50% šanci na bitevník (náhodná výbava). Zakladatel může letku ručně vybaveného bota skládat stejně.
 - v3.131 – Bitevník: obratnější (úhly 90/90/80/60° podle rychlosti 1–4) a dostřel všech zbraní o 25 % delší (lasery 375, kulomet 188, torpédo zaměření 400 / bod 1500) – platí pro střelbu, náhled výsečí, kruhy dosahu, vysvětlivky i boty.
