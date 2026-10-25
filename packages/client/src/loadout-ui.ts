@@ -371,8 +371,13 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         document.body.classList.add("drag-on");
         (document.querySelector(".ptip") as HTMLElement | null)?.style.setProperty("display", "none");
         svgRoot?.classList.add("drag-on");
-        // volné sloty se nabídnou
+        // volné sloty se nabídnou; nákres lodi zezelená a nabídne nákup
         for (const s of targets()) svgRoot?.querySelector(`[data-slot="${s}"]`)?.classList.add("drop-free");
+        const diag = svgRoot?.closest(".lo-diagram") as HTMLElement | null;
+        if (diag) {
+          diag.classList.add("drop-buy");
+          diag.append(h("div", { class: "drop-banner buy" }, icon("credits", "#bbf7d0", 14), " ", label(targets().length ? `koupit · −${def.price} · pusť na volný slot` : "koupit – žádný volný slot")));
+        }
       }
       ghost!.style.left = `${e.clientX - 56}px`;
       ghost!.style.top = `${e.clientY - 49}px`;
@@ -392,6 +397,8 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       document.body.classList.remove("drag-on");
       svgRoot?.classList.remove("drag-on");
       svgRoot?.querySelectorAll(".drop-target, .drop-free").forEach((x) => x.classList.remove("drop-target", "drop-free"));
+      document.querySelectorAll(".lo-diagram.drop-buy").forEach((x) => x.classList.remove("drop-buy"));
+      document.querySelectorAll(".drop-banner").forEach((x) => x.remove());
       setTimeout(() => (dragMoved = false), 0);
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const slotEl = el?.closest?.("[data-slot]") as SVGGElement | null;
@@ -433,6 +440,12 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         grp.classList.add("dragging");
         svgRoot.classList.add("drag-on");
         document.body.classList.add("drag-on");
+        // obchod se zbarví červeně a nabídne prodej
+        const shopEl = svgRoot.closest(".loadout")?.querySelector(".lo-shop") as HTMLElement | null;
+        if (shopEl && !ro) {
+          shopEl.classList.add("drop-sell");
+          shopEl.append(h("div", { class: "drop-banner sell" }, icon("credits", "#fecaca", 14), " ", label(shop ? `prodat modul · +${moduleSellPrice(m)}` : "odebrat modul")));
+        }
         (document.querySelector(".ptip") as HTMLElement | null)?.style.setProperty("display", "none");
       }
       const p = toSvg(e.clientX, e.clientY);
@@ -462,6 +475,8 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       document.body.classList.remove("drag-on");
       svgRoot.querySelectorAll(".drop-target").forEach((x) => x.classList.remove("drop-target"));
       document.querySelectorAll(".fleet-tab.drop-target, .lo-shop.drop-target").forEach((x) => x.classList.remove("drop-target"));
+      document.querySelectorAll(".lo-shop.drop-sell").forEach((x) => x.classList.remove("drop-sell"));
+      document.querySelectorAll(".drop-banner").forEach((x) => x.remove());
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const slotEl = el?.closest?.("[data-slot]") as SVGGElement | null;
       const tabEl = el?.closest?.("[data-fleet-index]") as HTMLElement | null;
@@ -569,6 +584,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         // přetažení modulu do jiného slotu (prohodí se) nebo na záložku jiné lodi letky
         grp.addEventListener("pointerdown", (ev) => {
           if (ev.button !== 0) return;
+          ev.preventDefault(); // bez označování textu při tažení
           startDrag(ev, m, grp, box);
         });
       }
@@ -813,7 +829,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         }
       });
       if (pickType === t) btn.classList.add("picked");
-      if (!why || why === "všechny sloty obsazené") btn.addEventListener("pointerdown", (ev) => startShopDrag(ev, t, btn));
+      if (!why || why === "všechny sloty obsazené") btn.addEventListener("pointerdown", (ev) => { ev.preventDefault(); startShopDrag(ev, t, btn); });
       rows.get(MODULE_CATEGORY[t])!.append(btn);
     }
   }

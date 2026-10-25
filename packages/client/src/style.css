@@ -4984,3 +4984,54 @@ button.start-chip.on:hover:not(:disabled) {
   border-style: dashed;
   color: #7dd3fc;
 }
+
+/* ---- tažení: obchod = prodat (červeně), nákres lodi = koupit (zeleně) ---- */
+body.drag-on,
+body.drag-on * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+.lo-shop,
+.lo-diagram {
+  position: relative;
+}
+.lo-shop.drop-sell {
+  outline: 3px dashed #f87171;
+  outline-offset: 4px;
+  background: rgba(248, 113, 113, 0.1);
+}
+.lo-shop.drop-sell.drop-target {
+  background: rgba(248, 113, 113, 0.28);
+  outline-style: solid;
+}
+.lo-diagram.drop-buy {
+  outline: 3px dashed #4ade80;
+  outline-offset: 4px;
+  background: rgba(74, 222, 128, 0.08);
+}
+.drop-banner {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  padding: 6px 12px;
+  font-family: var(--ui);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 3px solid;
+  box-shadow: 0 0 0 2px #05070f;
+}
+.drop-banner.sell {
+  background: #7f1d1d;
+  color: #fecaca;
+  border-color: #fca5a5 #450a0a #450a0a #fca5a5;
+}
+.drop-banner.buy {
+  background: #14532d;
+  color: #bbf7d0;
+  border-color: #86efac #052e16 #052e16 #86efac;
+}
