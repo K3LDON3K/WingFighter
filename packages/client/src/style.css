@@ -5217,7 +5217,7 @@ body.drag-on * {
 
 /* ---- komunikace se stanicí: objednávka modulu ---- */
 .cargo-pop.comm-pop {
-  min-width: 320px;
+  min-width: 420px;
   background: #0c2a2e;
   border-color: #a5f3fc #164e63 #164e63 #a5f3fc;
 }
@@ -5234,6 +5234,7 @@ body.drag-on * {
   padding: 3px 8px;
   font-size: 11px;
   text-align: left;
+  white-space: nowrap;
   background: #0f172a;
   border-color: #64748b #0b1220 #0b1220 #64748b;
 }

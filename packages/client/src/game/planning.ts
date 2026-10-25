@@ -809,7 +809,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             const def = MODULES[t];
             const can = credits >= def.price;
             list.append(
-              h("button", { class: `px rmod ${cur === t ? "on" : ""}`, disabled: !can, title: can ? `${def.name}: objednat za ${def.price} kreditů` : `${def.name}: nedostatek kreditů (${def.price})`, onclick: () => cb.commOrder(ship.id, stnComm[0].id, t) }, icon(def.icon, moduleColor(t), 14), h("span", { class: "lbl" }, label(def.short)), h("span", { class: "rx" }, icon("credits", "#fbbf24", 10), ` ${def.price}`)),
+              h("button", { class: `px rmod ${cur === t ? "on" : ""}`, disabled: !can, title: can ? `${def.name}: objednat za ${def.price} kreditů` : `${def.name}: nedostatek kreditů (${def.price})`, onclick: () => cb.commOrder(ship.id, stnComm[0].id, t) }, icon(def.icon, moduleColor(t), 14), h("span", { class: "lbl" }, label(def.name)), h("span", { class: "rx" }, icon("credits", "#fbbf24", 10), ` ${def.price}`)),
             );
           }
           pop.append(list);
