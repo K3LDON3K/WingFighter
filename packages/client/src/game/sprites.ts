@@ -149,6 +149,97 @@ const FIGHTER_F3 = [
   "........................",
 ];
 /** Bitevník (C3: křižníkový trup, věžová nástavba, gondoly). 50×40, měřítko 3. */
+/** Vesmírná stanice 40×40 (×3): prstenec, čtyři ramena, náboj s okny, solární panely, doky. Funkční / rozbitá. */
+export const STATION_TEMPLATE = [
+  "........................................",
+  "...............DDDWWWDDD................",
+  "............DDDGGGWYWGGGDDD.............",
+  "..........DDGGGDDDWWWDDDGGGDD...........",
+  ".........DGGGDDD..DGD..DDDGGGD..........",
+  ".......DDGGDD.....DGD.....DDGGDD........",
+  "......DDGDD.......DGD.......DDGDD.......",
+  ".....DDGDD........DGD........DDGDD......",
+  ".....DGDD.........DGD.........DDGD......",
+  "....DGDD..........DGD..........DDGD.....",
+  "...DGGD..BSB......DGD.......BSB.DGGD....",
+  "...DGD....BSB.....DGD......BSB...DGD....",
+  "..DGGD.....BSB....DGD.....BSB....DGGD...",
+  "..DGD.......BSB..GGGGG...BSB......DGD...",
+  "..DGD..........GGGGGGGGG..........DGD...",
+  ".DGDD.........GGGDDDDDGGG.........DDGD..",
+  ".DGD..........GGDDDDYDDGG..........DGD..",
+  ".DGD.........GGDDYWWWDYDGG.........DGD..",
+  ".DGDDDDDDDDDDGGDDWWWWWDDGGDDDDDDDDDDGD..",
+  ".WWWGGGGGGGGGGGDDWWWWWDDGGGGGGGGGGGWWW..",
+  ".WYWDDDDDDDDDGGDYWWWWWDYGGDDDDDDDDDWYW..",
+  ".WWW.........GGDDDWWWDDDGG.........WWW..",
+  ".DGD..........GGDYDDDDYGG..........DGD..",
+  ".DGDD.........GGGDDDYDGGG.........DDGD..",
+  "..DGD..........GGGGGGGGG..........DGD...",
+  "..DGD............GGGGG............DGD...",
+  "..DGGD......BSB...DGD....BSB.....DGGD...",
+  "...DGD.....BSB....DGD.....BSB....DGD....",
+  "...DGGD...BSB.....DGD......BSB..DGGD....",
+  "....DGDD.BSB......DGD.......BSBDDGD.....",
+  ".....DGDD.........DGD.........DDGD......",
+  ".....DDGDD........DGD........DDGDD......",
+  "......DDGDD.......DGD.......DDGDD.......",
+  ".......DDGGDD.....DGD.....DDGGDD........",
+  ".........DGGGDDD..DGD..DDDGGGD..........",
+  "..........DDGGGDDDDWWWDDGGGDD...........",
+  "............DDDGGGGWYWGGDDD.............",
+  "...............DDDDWWWDD................",
+  "........................................",
+  "........................................",
+];
+export const STATION_BROKEN_TEMPLATE = [
+  "........................................",
+  "...............DDDDDDDDD................",
+  "............DDDGGGDRDGGGDDD.............",
+  "..........DDGGGDDDDDDDDDGGGDD...........",
+  ".........DGGGDDD..DGD..DDDGGGD..........",
+  ".......DDGGDD.....DGD.....DDGGDD........",
+  "......KDGDK.......DKD.......DDGDD.......",
+  ".....DDGDD........DGD........DDGDD......",
+  ".....DGDD.........DGD.........DDGD......",
+  "....DGDD..........DGD......ER..DDGD.....",
+  "...DGGD..KDK......DGD...........DGGD....",
+  "...DGD....KDK.....DGD............DGD....",
+  "..DGGD.....KDK....DGD............DGGD...",
+  "..DGD.......KDK..GGGEG...K........DGD...",
+  "..DGD..........GGGGGGGGG..........DGD...",
+  ".DGDD.........GGGDDDDDGGG.........DDGD..",
+  ".DGD..........GGDDDDKDDGG..........DGD..",
+  ".DGD.........GGDDKKKKDKDGG.........DGD..",
+  ".DGDDDDDDDDDDGGDDKKKKKDDGGDDDDDDDDDDGD..",
+  ".DDDGGGGGGGGGGGDDKKKKKDDGGGGGGGGGGGDDD..",
+  ".DRDDDDDDDDDDGGDKKKKKKDKGGDDDDDDDDDDRD..",
+  ".DDD.........GGDDDKKKDDDGE.........DDD..",
+  ".DGD..........GGDKDDDDKGG..........DGD..",
+  ".DGDD.........GGGDDDKDGGG.........DDGD..",
+  "..DGD..........GGGGGGGGG..........DGD...",
+  "..DGD............GGGGG............DGD...",
+  "..DGGD........K...DGD....KDK.....DGGD...",
+  "...DGD............DGD.....KDK....DGD....",
+  "...DGGD...........DGD......KDK..DGGD....",
+  "....DGDD.K...ER...DGD.......KDKDDGD.....",
+  ".....DGDD.........DGD.........DKGD......",
+  ".....DDGDD........DG..ER.....DDGDD......",
+  "......DDGDD.......D.........DDGDD.......",
+  ".......DDGGDD.............DDEGDD........",
+  ".........DGGGDDD..D....DDDGGGD..........",
+  "..........DDGGGDDDDD.DDDGGGDD...........",
+  "............DDDGGGGDRDGGDDD.............",
+  "...............DDDDDDDDD................",
+  "........................................",
+  "........................................",
+];
+const STATION_PALETTE: Record<string, string> = { G: "#9aa3ad", D: "#4b5563", K: "#1f2937", W: "#dbeafe", Y: "#fde68a", E: "#fb923c", B: "#60a5fa", S: "#38bdf8", R: "#f87171", T: "#2dd4bf", X: "#111827" };
+export function stationSprite(broken: boolean): Sprite {
+  const canvas = paint(broken ? STATION_BROKEN_TEMPLATE : STATION_TEMPLATE, STATION_PALETTE);
+  return { canvas, cx: 20, cy: 20, scale: 3 };
+}
+
 export const BATTLESHIP_TEMPLATE = [
   "..................................................",
   "..................................................",
@@ -368,6 +459,13 @@ export class SpriteCache {
   mine(color: string): Sprite {
     let s = this.mines.get(color);
     if (!s) this.mines.set(color, (s = mineSprite(color)));
+    return s;
+  }
+  private stations = new Map<string, Sprite>();
+  station(broken: boolean): Sprite {
+    const key = broken ? "broken" : "ok";
+    let s = this.stations.get(key);
+    if (!s) this.stations.set(key, (s = stationSprite(broken)));
     return s;
   }
   asteroid(a: Asteroid): Sprite {

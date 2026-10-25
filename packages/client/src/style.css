@@ -5214,3 +5214,42 @@ body.drag-on * {
 .repair-pop .snote.warn {
   color: #fbbf24;
 }
+
+/* ---- komunikace se stanicí: objednávka modulu ---- */
+.cargo-pop.comm-pop {
+  min-width: 320px;
+  background: #0c2a2e;
+  border-color: #a5f3fc #164e63 #164e63 #a5f3fc;
+}
+.comm-pop .comm-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  width: 100%;
+}
+.comm-pop .rmod {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  text-align: left;
+  background: #0f172a;
+  border-color: #64748b #0b1220 #0b1220 #64748b;
+}
+.comm-pop .rmod.on {
+  background: #a5f3fc;
+  color: #0b1020;
+}
+.comm-pop .rmod:hover:not(:disabled) {
+  background: #67e8f9;
+  color: #0b1020;
+}
+.comm-pop .rmod .rx {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--txt);
+  font-size: 11px;
+}

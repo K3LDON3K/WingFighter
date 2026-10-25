@@ -473,6 +473,15 @@ function roomView(m: LobbyModel, net: Net) {
         else s.append(svgEl("rect", { x: "15", y: "9", width: "7", height: "7", fill: "none", stroke: "#334155", "stroke-width": "2", "stroke-dasharray": "2 2" }));
         return s;
       };
+      const stationSvg = (lit: boolean) => {
+        const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+        const col = lit ? "#a5f3fc" : "#334155";
+        s.append(svgEl("circle", { cx: "13", cy: "13", r: "9", fill: "none", stroke: col, "stroke-width": "2" }));
+        s.append(svgEl("circle", { cx: "13", cy: "13", r: "3", fill: lit ? "#dbeafe" : "none", stroke: col, "stroke-width": "1.5" }));
+        s.append(svgEl("line", { x1: "4", y1: "13", x2: "22", y2: "13", stroke: col, "stroke-width": "1.5" }));
+        s.append(svgEl("line", { x1: "13", y1: "4", x2: "13", y2: "22", stroke: col, "stroke-width": "1.5" }));
+        return s;
+      };
       const COMET_LEVELS: MapSettings["comets"][] = ["none", "few", "medium", "many"];
       const AST_LEVELS: MapSettings["asteroids"][] = ["none", "few", "medium", "many"];
       /** Kameny: rozptýlené nebo ve shluku (pro políčka asteroidů a shluků). */
@@ -800,6 +809,7 @@ function roomView(m: LobbyModel, net: Net) {
             kv("Asteroidy", `${lvl(bm.asteroids, AST)}${bm.clusters ? " ve shlucích" : ""}`),
             kv("Bouře", bm.storms === 0 ? "žádné" : `${bm.storms} (${["malé", "střední", "velké"][["small", "medium", "large"].indexOf(bm.stormSize)] ?? bm.stormSize})`),
             kv("Komety", `${lvl(bm.comets ?? "none", COM)}${bm.cometsHitAsteroids ? " · naráží do asteroidů" : ""}`),
+            kv("Stanice", (bm.stations ?? 0) === 0 ? "žádná" : String(bm.stations)),
             kv("Pozadí", SKY_LABEL[bm.sky ?? "none"]),
             kv("Limit kol", b.turnLimit ? `${b.turnLimit} kol` : "bez limitu"),
             kv("Umístění", PLACEMENT_LABEL[pl]),
@@ -917,6 +927,11 @@ function roomView(m: LobbyModel, net: Net) {
                 "Komety přilétají na okraj mapy a letí přes ni rychleji než torpéda: náraz zraní loď, sestřel dává kredity, průlet ocasem doplní štít nebo technologii (los).",
               ),
               frow("", h("div", { class: "fpair" }, h("span", { class: "txt muted fsub" }, "komety naráží do asteroidů"), toggle(!!map.cometsHitAsteroids, (v) => setMap({ cometsHitAsteroids: v }))), "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím."),
+              frow(
+                "Stanice",
+                pips(2, map.stations ?? 0, "station", () => stationSvg(true), () => stationSvg(false), (k) => `${k} ${k === 1 ? "stanice" : "stanice"}`, (v) => setMap({ stations: v }), (map.stations ?? 0) === 0 ? "žádná" : (map.stations ?? 0) === 1 ? "1 stanice" : "2 stanice"),
+                "Vesmírné stanice na náhodném místě: překážka, neutrální. V okruhu sběru si loď (rychlost ≤ 2) tlačítkem NÁKLAD nabere náhodný modul ze zásoby. Funkční stanice (trup 2000, energetický štít) vyřizuje objednávky modulů (akce Komunikace v dohledu); po zničení je rozbitá.",
+              ),
               frow(
                 "Pozadí",
                 pipRow("size", map.sky ?? "none", SKY_CHOICES.map((k) => [k, SKY_LABEL[k] + (k === "random" ? " – motiv podle seedu (u série může mít každá bitva jiný)" : k === "none" ? " – jen hvězdy" : ""), (on: boolean) => skySvg(k, on)] as [SkyChoice, string, (on: boolean) => Node]), (v) => setMap({ sky: v }), SKY_LABEL[map.sky ?? "none"].toLowerCase()),

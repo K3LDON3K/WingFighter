@@ -10,14 +10,14 @@
  * skener a sbírá ocasy komet, když má vybitý štít.
  */
 import { circleHitsAsteroid } from "./asteroids.ts";
-import { DROID, LASER, MG, REPAIR, RULES, TORPEDO } from "./constants.ts";
+import { CARGO, DROID, LASER, MG, REPAIR, RULES, TORPEDO } from "./constants.ts";
 import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from "./geometry.ts";
 import { listManeuvers, maneuverEnd, maneuverPath, makeManeuver } from "./maneuvers.ts";
 import { insideMap } from "./mapshape.ts";
 import { pointInStorm } from "./mapgen.ts";
-import { actionCost, aimPose, ammoModules, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, repairBlocked, repairableModules, sectorHit, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
+import { actionCost, aimPose, ammoModules, obstacles, stationInPickupRange, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, repairBlocked, repairableModules, sectorHit, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
 import type { Rng } from "./rng.ts";
-import { laserHalfArc, laserRange, mgRange, moduleWorking, profileOf, torpedoLockRange, torpedoPointRange } from "./ships.ts";
+import { cargoCapacity, laserHalfArc, laserRange, mgRange, moduleWorking, MODULES, profileOf, torpedoLockRange, torpedoPointRange } from "./ships.ts";
 import type { BotLevel, GameState, Maneuver, RepairOrder, Segments, Ship, ShipOrders, Shot } from "./types.ts";
 
 /** Předpokládané pozice nepřítele po tomto kole (s vahou). */
@@ -139,9 +139,9 @@ function safety(state: GameState, ship: Ship, end: Pose, path: (t: number) => Po
   if (state.border && !insideMap(state, end, r)) s -= 300;
   for (const p of samplePath(path, 8)) {
     if (!insideMap(state, p, r + 4)) s -= 20;
-    for (const a of state.asteroids) if (circleHitsAsteroid(a, p, r + 2)) s -= 60;
+    for (const a of obstacles(state)) if (circleHitsAsteroid(a, p, r + 2)) s -= 60;
   }
-  for (const a of state.asteroids) if (circleHitsAsteroid(a, end, r + 12)) s -= 30;
+  for (const a of obstacles(state)) if (circleHitsAsteroid(a, end, r + 12)) s -= 30;
   for (const o of state.ships) if (o.id !== ship.id && o.alive && circlesOverlap(end, r + 14, o, o.stats.radius)) s -= 30;
   for (const m of state.mines) if (m.team !== ship.team && circlesOverlap(end, r, m, m.radius + 24)) s -= 45;
   if (state.storms?.length && pointInStorm(state.storms, end, r)) s -= ship.shieldType === "none" ? 2 : 14; // v bouři nefungují štíty ani lasery
@@ -442,6 +442,19 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
     if (mm) {
       const behind = enemies.find((e) => dist(ship, e) < 160 && Math.abs(bearingTo(ship, e)) > (2 * Math.PI) / 3);
       if (behind) opts.push({ value: 14, kind: "special", apply: () => (orders.special = { type: "mine", timer: 1 }) });
+    }
+    // stanice: nabrat modul (v okruhu sběru, rychlost ≤ 2, místo v nákladu); objednat modul (funkční stanice v dohledu, kredity, místo)
+    const cargoRoom = (ship.loadout.cargo ?? []).length < cargoCapacity(ship.loadout);
+    const stn = stationInPickupRange(state, ship);
+    if (stn && stn.stock > 0 && cargoRoom && chosen.man.speed <= CARGO.maxSpeed && !incoming) {
+      opts.push({ value: 12, kind: "action", apply: () => (orders.action = { type: "pickup", targetId: stn.id }) });
+    }
+    const credits = state.players.find((p) => p.id === ship.ownerId)?.credits ?? 0;
+    const stnOrder = (state.stations ?? []).find((x) => !x.broken && dist(ship, x) <= ship.stats.vision + x.radius && x.orderedTurn !== state.turn);
+    if (stnOrder && cargoRoom && !incoming && level !== "kadet") {
+      const allowed = state.settings.allowedModules ?? {};
+      const wish = (["laser", "shield-whole", "torpedo", "mg"] as const).find((t) => allowed[t] !== 0 && MODULES[t].price <= credits);
+      if (wish) opts.push({ value: 6, kind: "action", apply: () => (orders.action = { type: "comm", stationId: stnOrder.id, moduleType: wish }) });
     }
     opts.sort((a, b) => b.value - a.value);
     // manévr jiný než „rovně stejnou rychlostí“ stojí akci: vyplatí se jen, když je lepší než akce, o kterou tím přijdu

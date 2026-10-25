@@ -172,6 +172,7 @@ interface GameSession {
   repairKind: RepairOrder["kind"] | null;
   repairCargoId: string | null;
   hackOpen: boolean;
+  commOpen: boolean;
   hackKind: HackOrder["kind"] | null;
   hackSel: { kind: "mine" | "torpedo" | "ship"; id: string } | null;
   scanPick: boolean;
@@ -364,6 +365,7 @@ function startGame(state: GameState) {
     repairKind: null,
     repairCargoId: null,
     hackOpen: false,
+    commOpen: false,
     hackKind: null,
     hackSel: null,
     scanPick: false,
@@ -406,6 +408,7 @@ function resetOrders() {
   game.repairKind = null;
   game.repairCargoId = null;
   game.hackOpen = false;
+  game.commOpen = false;
   game.hackKind = null;
   game.hackSel = null;
   game.rechargeOpen = false;
@@ -618,6 +621,7 @@ function submitOrders(force = false) {
   game.repairKind = null;
   game.repairCargoId = null;
   game.hackOpen = false;
+  game.commOpen = false;
   game.hackKind = null;
   game.hackSel = null;
   game.rechargeOpen = false;
@@ -1399,6 +1403,7 @@ function renderSide() {
       repairKind: game.repairKind,
       repairCargoId: game.repairCargoId,
       hackOpen: game.hackOpen,
+      commOpen: game.commOpen,
       hackKind: game.hackKind,
       hackSel: game.hackSel,
       rechargeOpen: game.rechargeOpen,
@@ -1473,6 +1478,7 @@ function renderSide() {
         if (!o) return;
         g.orders.set(id, { ...o, action: undefined });
         g.cargoOpen = false;
+        g.commOpen = false;
         g.shieldEdit = false;
         g.jettisonPick = false;
         sfx("cancel");
@@ -1553,6 +1559,25 @@ function renderSide() {
       repairPickCargo: (id, moduleId) => {
         game!.selectedShipId = id;
         game!.repairCargoId = moduleId;
+        renderSide();
+      },
+      commToggle: (id) => {
+        const g = game!;
+        g.selectedShipId = id;
+        g.commOpen = !g.commOpen;
+        g.cargoOpen = false;
+        g.hackOpen = false;
+        g.droidOpen = false;
+        g.repairOpen = false;
+        renderSide();
+      },
+      commOrder: (id, stationId, moduleType) => {
+        const g = game!;
+        const o = g.orders.get(id);
+        if (!o) return;
+        g.orders.set(id, { ...o, action: { type: "comm", stationId, moduleType } });
+        g.commOpen = false;
+        sfx("click");
         renderSide();
       },
       hackToggle: (id) => {
@@ -1773,7 +1798,7 @@ let logOpen = false;
 /* ------------------------------------------------------------------ */
 
 interface Entity {
-  kind: "ship" | "torpedo" | "debris" | "comet" | "mine";
+  kind: "ship" | "torpedo" | "debris" | "comet" | "mine" | "station";
   id: string;
   team: number;
   ownerId?: string;
@@ -1805,6 +1830,10 @@ function entityAt(x: number, y: number): Entity | undefined {
   for (const c of view.comets) {
     const d = Math.hypot(c.x - x, c.y - y);
     if (d <= c.radius + 8 && (!best || d < best.d)) best = { e: { kind: "comet", id: c.id, team: -1 }, d };
+  }
+  for (const st of view.stations ?? []) {
+    const d = Math.hypot(st.x - x, st.y - y);
+    if (d <= st.radius + 8 && (!best || d < best.d)) best = { e: { kind: "station", id: st.id, team: -1 }, d };
   }
   return best?.e;
 }
@@ -2264,7 +2293,17 @@ function bindInput(c: HTMLCanvasElement) {
         g.orders.set(sel.id, { ...o, shots: next });
       } else g.orders.set(sel.id, { ...o, preferredTargetId: id });
     };
-    if (hit && (hit.kind === "debris" || hit.kind === "comet")) {
+    // stanice: klik = cíl laserů (funkční), nebo cíl zvednutí (nabrání modulu) při akci Zvednout
+    if (hit && hit.kind === "station") {
+      if (o.action?.type === "pickup") {
+        g.orders.set(sel.id, { ...o, action: { type: "pickup", targetId: hit.id } });
+        renderSide();
+        return;
+      }
+      const stn = g.state.stations?.find((x) => x.id === hit.id);
+      if (stn?.broken) return;
+    }
+    if (hit && (hit.kind === "debris" || hit.kind === "comet" || hit.kind === "station")) {
       const curShot = shotsOf(sel, o).find((sh) => sh.moduleId === g.activeShot);
       const cur = curShot ? curShot.targetId : o.preferredTargetId;
       setTarget(cur === hit.id ? undefined : hit.id);
@@ -2446,7 +2485,7 @@ function bindInput(c: HTMLCanvasElement) {
 
 function hitPos(hit: Entity): { x: number; y: number } {
   const view = game!.view;
-  const s = hit.kind === "ship" ? view.ships.find((x) => x.id === hit.id) : hit.kind === "torpedo" ? view.torpedoes.find((x) => x.id === hit.id) : hit.kind === "comet" ? view.comets.find((x) => x.id === hit.id) : view.debris.find((x) => x.id === hit.id);
+  const s = hit.kind === "ship" ? view.ships.find((x) => x.id === hit.id) : hit.kind === "torpedo" ? view.torpedoes.find((x) => x.id === hit.id) : hit.kind === "comet" ? view.comets.find((x) => x.id === hit.id) : hit.kind === "station" ? view.stations.find((x) => x.id === hit.id) : hit.kind === "mine" ? view.mines.find((x) => x.id === hit.id) : view.debris.find((x) => x.id === hit.id);
   return s ?? { x: 0, y: 0 };
 }
 

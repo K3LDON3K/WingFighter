@@ -37,6 +37,8 @@ export type ActionOrder =
   | { type: "jettison"; moduleId: string }
   /** Zvednutí nákladu (trosek) v dosahu kolem lodi do nákladového prostoru; před pohybem, rychlost ≤ limit. */
   | { type: "pickup"; targetId?: string }
+  /** Komunikace s funkční stanicí v dohledu: objednávka modulu (cena jako v obchodě); stanice ho vypustí jako trosky směrem k volajícímu. */
+  | { type: "comm"; stationId: string; moduleType: ModuleType }
   | { type: "barrelRoll"; side: Side };
 
 export type ShieldType = "whole" | "segment" | "none";
@@ -290,6 +292,26 @@ export type TorpedoPhase = "launch" | "lock" | "cruise";
  * Kometa: malý kámen letící vysokou rychlostí přímo přes mapu. Lze ji sestřelit zbraněmi; náraz zraní loď.
  * Za kometou je ocas – loď, která jím proletí, si doplní štít (každá loď jednou za kometu).
  */
+/**
+ * Vesmírná stanice: neutrální těleso (překážka, kryje střelbu). Funkční má trup a energetický štít; po zničení je rozbitá.
+ * V okruhu sběru si loď (rychlost ≤ 2) vezme náhodný modul ze zásoby; funkční stanici jde objednat modul (akce komunikace).
+ */
+export interface Station {
+  id: string;
+  x: number;
+  y: number;
+  radius: number;
+  hull: number;
+  maxHull: number;
+  shields: number;
+  maxShields: number;
+  broken: boolean;
+  /** Zbývající moduly k nabrání. */
+  stock: number;
+  /** Kolo, ve kterém stanice vyřídila objednávku (1 za kolo). */
+  orderedTurn?: number;
+}
+
 export interface Comet extends Pose {
   id: string;
   /** Ujetá vzdálenost za kolo. */
@@ -377,6 +399,8 @@ export interface MapSettings {
   symmetric: boolean;
   /** Komety: jak často přilétají (šance za kolo a limit – v ladění). */
   comets: "none" | "few" | "medium" | "many";
+  /** Vesmírné stanice na mapě (0–2). */
+  stations?: number;
   /** Komety naráží do asteroidů (zmizí a vykousnou kráter); jinak jimi proletí. */
   cometsHitAsteroids: boolean;
   /** Vzdálené pozadí (paralaxní vrstva, jen vizuální): motiv, nebo náhodný podle seedu. */
@@ -505,6 +529,7 @@ export interface GameState {
   height: number;
   asteroids: Asteroid[];
   storms: Storm[];
+  stations?: Station[];
   /** Šířka okrajové bouře kolem mapy (0 / chybí = bez ní). Za ní je tvrdý okraj – dotyk = zničení lodi. */
   border?: number;
   ships: Ship[];
@@ -544,7 +569,7 @@ export type TurnEvent =
   | { type: "jettison"; shipId: string; debris: Debris; dropped?: boolean; /** typ štítu lodi po vyhození (none = štít už nemá) */ shieldType?: ShieldType }
   /** Zvednutí nákladu: ok = zvednuto; jinak důvod (lost = předmět uchvátila jiná loď). */
   | { type: "pickup"; shipId: string; debrisId: string; x: number; y: number; ok: boolean; reason?: "lost" | "range" | "speed" | "full" | "gone"; winnerId?: string; module?: ModuleInstance }
-  | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" | "comet" | "tail" }
+  | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" | "comet" | "tail" | "station" }
   | { type: "moduleDamage"; shipId: string; moduleId: string; moduleType: ModuleType; damage: number; hp: number; maxHp: number; broken: boolean }
   /** Skener (vyhodnocuje se hned při plánování, ale zapisuje se do logu kola). */
   | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown" | "predict"; targetId?: string }
@@ -554,6 +579,11 @@ export type TurnEvent =
   /** Oběti: modul byl na toto kolo hacknut (hlásí se při vyhodnocení). */
   | { type: "hacked"; shipId: string; moduleId: string; moduleType: ModuleType }
   | { type: "autoRepair"; shipId: string; amount: number; hullAfter: number; turnsLeft: number }
+  /** Stanice: zásah (štít/trup), zničení (výbuch, odměna), nabrání modulu, objednávka (vypuštění modulu). */
+  | { type: "stationHit"; stationId: string; shooterId?: string; damage: number; absorbed: number; hullAfter: number; shieldsAfter: number; x: number; y: number; t?: number }
+  | { type: "stationDestroyed"; stationId: string; byId?: string; x: number; y: number; reward: number; t?: number }
+  | { type: "stationPickup"; shipId: string; stationId: string; ok: boolean; reason?: "range" | "speed" | "full" | "empty"; module?: ModuleInstance; stockLeft: number }
+  | { type: "stationOrder"; shipId: string; stationId: string; ok: boolean; reason?: "range" | "broken" | "credits" | "busy" | "module"; moduleType: ModuleType; price: number; debris?: Debris }
   | { type: "repair"; shipId: string; kind: RepairOrder["kind"]; cost: number; techPoints: number; moduleId?: string; moduleType?: ModuleType; amount?: number; slot?: SlotId; swappedType?: ModuleType; hullAfter?: number }
   /** Dobití štítu technologií (hned při plánování): energetický +amount, segmentový +segments po segmentech. */
   | { type: "shieldRecharge"; shipId: string; cost: number; techPoints: number; amount?: number; segments?: Segments; shieldsAfter: number; segmentsAfter: Segments }

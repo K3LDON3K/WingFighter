@@ -64,6 +64,19 @@ bod co nejdál od soupeřů. **Elektromagnetická bouře**: uvnitř nefungují �
 (nejde střílet z bouře, do bouře ani skrz ni), torpédo po vletu ohluchne a letí rovně, skener a dohled bouří
 neprojdou (dohled bouře neovlivňuje – loď v bouři je vidět).
 
+### Vesmírné stanice
+V nastavení mapy jde přidat **0–2 stanice** (náhodné místo dál od startů, bouří a asteroidů; na zrcadlené mapě
+zrcadlově). Stanice je neutrální překážka velikosti bitevníku (loď do ní naráží jako do asteroidu, kryje střelbu),
+pomalu se otáčí a je vidět vždy. **Funkční** stanice má trup 2000 a energetický štít 200 (dobíjí +20 za kolo;
+lasery štít jen vybíjejí, projektily prorazí 30 %); jde ji ostřelovat lasery (klik na stanici = cíl), torpédy,
+minami i narazit kometou. Při zničení vybuchne (60 zranění do 150), střelec dostane 100 kreditů, 1–2 moduly ze
+zásoby se vysypou jako trosky a stanice je dál **rozbitá** (tmavá, bez štítu). Kolem stanice je čárkovaný **okruh
+sběru**: loď, která v něm začíná kolo rychlostí ≤ 2, si přes NÁKLAD → Zvednout (klik na stanici) vezme za 1 akci
+**náhodný modul** (z povolených, bez droidů) do nákladu; zásoba je 3 moduly (rozbitá i funkční). Funkční stanice
+v dohledu nabízí akci **Komunikace** (skupina Speciální, 1 akce): objednáš konkrétní modul za cenu z obchodu
+(z kreditů ve hře), stanice ho na začátku kola vypustí jako trosky ~120 od svého okraje směrem k tobě – a zvednout
+ho může kdokoliv. Každá stanice vyřídí 1 objednávku za kolo. Boti stanice používají. Vše v ladění (sekce Stanice).
+
 ### Fog of war
 Každá loď vidí do vzdálenosti **960** (3 × zaměřovací dostřel torpéda); tým dohled sdílí. Server každému
 posílá jen to, co jeho tým vidí – cizí lodě, torpéda, miny, trosky, komety (jádro nebo kus ocasu v dohledu)
@@ -174,6 +187,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.147 – **Vesmírné stanice.** Nastavení mapy: 0–2 stanice (náhodné místo; náhled mapy je ukazuje). Pixel-art stanice (prstenec, čtyři ramena, náboj s okny, solární panely) se pomalu otáčí i při plánování; funkční má tyrkysový štít, lištu trupu po poškození a počet modulů; rozbitá je tmavá s dírami. Překážka jako asteroid (kryje střelbu, zastaví torpédo i kometu). Trup 2000, energetický štít 200 (+20/kolo), cíl laserů (klik), plošné výbuchy ji zraní; zničení = výbuch 60 do 150, +100 kreditů střelci, 1–2 moduly jako trosky, stanice zůstane rozbitá. Čárkovaný okruh sběru: NÁKLAD → Zvednout + klik na stanici (rychlost ≤ 2) = náhodný modul ze zásoby 3 (z povolených, bez droidů). Nová akce **Komunikace** (Speciální, 1 akce, funkční stanice v dohledu): objednávka modulu za cenu z obchodu, stanice ho vypustí jako trosky směrem k volajícímu (sebrat může kdokoliv), 1 objednávka na stanici za kolo. Boti nabírají i objednávají. Ladění: nová sekce Stanice (trup, štít, dobití, zásoba, okruh, výbuch, odměna). Log a efekty pro zásahy, zničení, nabrání i objednávky.
 - v3.146 – Torpéda v letu: u vlastních (i hacknutých) torpéd vede čára v barvě týmu k cíli – plná část s tečkou = dolet v tomto kole, čárkovaná = zbytek, šipka u cíle – a nad cílem jsou zaměřovací závorky s ikonkou torpéda jako při vlastním míření. S předpovědí skeneru (MANÉVRY) se stejně ukážou i cizí torpéda v dohledu (červená značka na jejich cíli). Hacknutá mina se přebarví do barvy týmu (platilo už dřív).
 - v3.145 – Asteroidy mají kolizní obrys o 10 % menší než obrázek (jde je těsně obletět; platí pro lodě, torpéda, komety i lasery) – ladění → Loď „Asteroid – kolizní obrys (% obrázku)“, výchozí 90. Přepínač v ladění „Zobrazit hitboxy“ teď kreslí kolizní obrysy všech objektů: lodě, asteroidy (zmenšený obrys), torpéda, miny (pole) a komety (jádro + ocas pro bonus).
 - v3.144 – **Nový modul Droid – hacker** (140 cr, váha 0,5, 15 HP, kategorie Droidi): hack miny/torpéda (2 body technologie) – mina přejde k tobě (volba odpočtu: start kola / 1 kolo / 2 kola / reakční), torpédu určíš nový cíl a dostane +2 kola života; hack modulu cizí lodi (3) – vybraný modul na toto kolo nefunguje (zbraň nevystřelí, štít nechrání, droid/skener nejde použít), oběť to zjistí až při vyhodnocení z logu; pasivní oprava trupu (4) – 4 kola po 5 % za kolo, jen když hacker funguje. Vše hned při plánování, bez limitu počtu, nebere akci, cíle v dohledu týmu, v bouři ne. Dlaždice HACKER s okénkem (MINA / TORPÉDO → klik na mapě, MODUL LODI → klik na loď → seznam modulů, PASIVNÍ OPRAVA). Ladění: ceny, % a počet kol. Oprava: zprávy o dobití štítu, droidovi a opraváři se dřív v logu nezobrazovaly (mlha války je zahazovala).

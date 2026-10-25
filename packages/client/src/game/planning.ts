@@ -58,6 +58,9 @@ import {
   hackBlocked,
   hackCost,
   type HackOrder,
+  type ModuleType,
+  MODULE_TYPES,
+  stationInPickupRange,
   type RepairOrder,
   type SlotId,
   TEAM_COLORS,
@@ -79,7 +82,7 @@ import { icon, label, segBar } from "../icons.ts";
 import { ACTIONS, actionAvailable } from "./actions.ts";
 import { SEGMENT_NAMES, shieldBubble, strengthColor } from "./shield-ui.ts";
 import { pilotBadge } from "../pilot-ui.ts";
-import { renderLoadout } from "../loadout-ui.ts";
+import { moduleColor, renderLoadout } from "../loadout-ui.ts";
 
 export interface PlanningCallbacks {
   select(shipId: string): void;
@@ -87,6 +90,9 @@ export interface PlanningCallbacks {
   chooseAction(shipId: string, actionId: string): void;
   /** Zrušit naplánovanou akci (křížek pod tlačítkem s podnabídkou). */
   cancelAction(shipId: string): void;
+  /** Komunikace se stanicí: okénko, objednávka modulu. */
+  commToggle(shipId: string): void;
+  commOrder(shipId: string, stationId: string, moduleType: ModuleType): void;
   aim(shipId: string): void;
   /** ✕ pod MANÉVR: při kreslení vrátí původní dráhu, jinak nastaví rovně stejnou rychlostí (zdarma). */
   cancelManeuver(shipId: string): void;
@@ -155,6 +161,7 @@ export interface PlanningModel {
   repairKind?: RepairOrder["kind"] | null;
   repairCargoId?: string | null;
   hackOpen?: boolean;
+  commOpen?: boolean;
   hackKind?: HackOrder["kind"] | null;
   /** Vybraný cíl hacku na mapě: mina / torpédo / cizí loď (id). */
   hackSel?: { kind: "mine" | "torpedo" | "ship"; id: string } | null;
@@ -753,10 +760,14 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           const tgt = wantId ? (m.state.debris ?? []).find((d) => d.id === wantId) : undefined;
           const sp = cur.speed;
           const near = (m.state.debris ?? []).some((d) => dist(ship, d) <= CARGO.range);
+          const stnNear = stationInPickupRange(m.state, ship);
+          const stnTgt = wantId ? (m.state.stations ?? []).find((x) => x.id === wantId) : undefined;
           pop.append(
             tgt
               ? h("div", { class: "jp-head ok" }, icon("check", "#4ade80", 12), label(`zvedne se: ${MODULES[tgt.type].name}`), h("span", { class: "muted" }, label(`· ${Math.round(dist(ship, tgt))} / ${CARGO.range}`)))
-              : h("div", { class: "jp-head warn" }, icon("cargo", "#fbbf24", 12), label(near ? "klikni na trosky v dosahu" : "v dosahu nejsou žádné trosky – akce se nevykoná")),
+              : stnTgt
+                ? h("div", { class: "jp-head ok" }, icon("check", "#4ade80", 12), label(`nabere se náhodný modul ze stanice`), h("span", { class: "muted" }, label(`· zásoba ${stnTgt.stock}${stnTgt.stock <= 0 ? " – prázdná!" : ""}`)))
+                : h("div", { class: "jp-head warn" }, icon("cargo", "#fbbf24", 12), label(near ? "klikni na trosky v dosahu" : stnNear ? "klikni na stanici = nabrat náhodný modul" : "v dosahu nejsou žádné trosky ani stanice – akce se nevykoná")),
             h("div", { class: `cargo-note ${sp > CARGO.maxSpeed ? "warn" : "muted"}` }, label(sp > CARGO.maxSpeed ? `rychlost ${sp} > ${CARGO.maxSpeed} – zpomal, jinak se nezvedne` : `dosah ${CARGO.range} · rychlost ${sp} ok · po střelbě, před pohybem`)),
           );
         } else pop.append(h("div", { class: "muted cargo-note" }, label(`náklad ${(ship.loadout.cargo ?? []).length}/${cargoCapacity(ship.loadout)}`)));
@@ -765,6 +776,47 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       row.append(holder);
     }
     if (grp.label === "Speciální") {
+      // Komunikace se stanicí: funkční stanice v dohledu → objednávka modulu (1 akce, cena jako v obchodě)
+      const stnComm = (m.state.stations ?? []).filter((x) => !x.broken && dist(ship, x) <= ship.stats.vision + x.radius);
+      if (stnComm.length) {
+        const commOn = o.action?.type === "comm";
+        const credits = m.state.players.find((p) => p.id === m.myId)?.credits ?? 0;
+        const allowed = m.state.settings.allowedModules ?? {};
+        const busy = stnComm.every((x) => x.orderedTurn === m.state.turn);
+        const holder = h("div", { class: `scan-holder ${m.commOpen ? "stack" : ""}` });
+        const cur = commOn ? (o.action as { moduleType: ModuleType }).moduleType : undefined;
+        holder.append(
+          h(
+            "button",
+            {
+              class: `px bb-weapon ${commOn ? "done" : ""} ${m.commOpen ? "on open" : ""} ${dotsFor("comm") ? "spent" : ""}`,
+              disabled: locked || busy,
+              ...tipAttr({ icon: "scan", iconColor: "#a5f3fc", title: "Komunikace se stanicí", cost: { actions: 1 }, fx: [{ icon: "credits", text: "objednáš modul za cenu z obchodu" }, { icon: "debris", text: "stanice ho vypustí jako trosky směrem k tobě – sebrat ho může kdokoliv" }], note: busy ? "stanice už tento kolo objednávku vyřídila" : `kredity ${credits} · 1 objednávka na stanici za kolo · funkční stanice v dohledu: ${stnComm.length}`, ...(busy ? { warn: "Nelze: linka obsazena." } : {}) }),
+              onclick: () => (commOn && !m.commOpen ? cb.cancelAction(ship.id) : cb.commToggle(ship.id)),
+            },
+            costPips(1, dotsFor("comm") ? "spent" : "red", "stojí 1 akci"),
+            icon("scan", "currentColor", 22),
+            h("span", { class: "lbl" }, label(commOn ? "Objednáno" : "Komunikace")),
+            commOn && !m.commOpen ? h("span", { class: "reset-strip" }, label(`${MODULES[cur!].short} ↺`)) : null,
+          ),
+        );
+        if (m.commOpen && !locked) {
+          const pop = h("div", { class: "cargo-pop comm-pop" });
+          pop.append(h("div", { class: "jp-head" }, icon("credits", "#fbbf24", 12), label(`kredity ${credits} · stanice vypustí modul k tobě na konci kola`)));
+          const list = h("div", { class: "comm-list" });
+          for (const t of MODULE_TYPES) {
+            if (allowed[t] === 0) continue;
+            const def = MODULES[t];
+            const can = credits >= def.price;
+            list.append(
+              h("button", { class: `px rmod ${cur === t ? "on" : ""}`, disabled: !can, title: can ? `${def.name}: objednat za ${def.price} kreditů` : `${def.name}: nedostatek kreditů (${def.price})`, onclick: () => cb.commOrder(ship.id, stnComm[0].id, t) }, icon(def.icon, moduleColor(t), 14), h("span", { class: "lbl" }, label(def.short)), h("span", { class: "rx" }, icon("credits", "#fbbf24", 10), ` ${def.price}`)),
+            );
+          }
+          pop.append(list);
+          holder.append(pop);
+        }
+        row.append(holder);
+      }
       const sc = scannerModule(ship.loadout);
       if (sc) {
         const tech = ship.techPoints;

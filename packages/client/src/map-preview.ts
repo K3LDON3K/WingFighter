@@ -81,6 +81,26 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
       ctx.fill();
     }
   }
+  // stanice: prstenec + okruh sběru
+  for (const st of gen.stations ?? []) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(165,243,252,0.35)";
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.arc(st.x * scale, st.y * scale, (60 + 170) * scale, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "#a5f3fc";
+    ctx.lineWidth = Math.max(1, 3 * scale * 4);
+    ctx.beginPath();
+    ctx.arc(st.x * scale, st.y * scale, Math.max(3, 50 * scale), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#dbeafe";
+    ctx.beginPath();
+    ctx.arc(st.x * scale, st.y * scale, Math.max(1.5, 14 * scale), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   // asteroidy
   for (const a of gen.asteroids) {
     ctx.fillStyle = "#8a7f6a";

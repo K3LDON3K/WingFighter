@@ -1,4 +1,4 @@
-import { asteroidDestroyed, carveCrater, circleHitsAsteroid, lineBlocked } from "./asteroids.ts";
+import { ASTEROID_SEGMENTS, asteroidDestroyed, carveCrater, circleHitsAsteroid, lineBlocked } from "./asteroids.ts";
 import {
   CARGO,
   COLLISION_SCATTER,
@@ -12,6 +12,7 @@ import {
   MG,
   RULES,
   SCANNER,
+  STATION,
   DROID,
   HACK,
   REPAIR,
@@ -34,7 +35,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { activeShield, allowedFacings, cargoCapacity, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleUsable, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
+import { activeShield, allowedFacings, cargoCapacity, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleUsable, moduleWorking, MODULES, MODULE_CATEGORY, MODULE_TYPES, newModule, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
 
@@ -51,7 +52,7 @@ export function inBorderStorm(state: Pick<GameState, "width" | "height" | "borde
 function laserBlockedByStorm(state: GameState, a: Vec, b: Vec): boolean {
   return (state.storms?.length ?? 0) > 0 && (inStorm(state, a) || inStorm(state, b) || lineCrossesStorm(state.storms, a, b));
 }
-import type { Difficulty, DroidOrder, HackOrder, ManeuverProfile, ModuleInstance, RepairOrder } from "./types.ts";
+import type { Difficulty, DroidOrder, HackOrder, ManeuverProfile, ModuleInstance, ModuleType, RepairOrder } from "./types.ts";
 
 /** Pozice lodi natočená podle směru modulu (výseč laserů, výlet torpéda). */
 /** Odkud a kam modul míří: z pozice slotu na trupu, ve směru natočení modulu. */
@@ -122,6 +123,7 @@ import type {
   PlayerStats,
   Segments,
   Ship,
+  Station,
   ShipOrders,
   Shot,
   Storm,
@@ -147,9 +149,72 @@ function isInsideMap(state: GameState, p: Vec, r: number): boolean {
   return insideMap(state, p, r);
 }
 
+/** Stanice jako kruhové „asteroidy“ pro geometrii (překážka, kryje střelbu); id = id stanice. */
+export function stationObstacles(state: Pick<GameState, "stations">): Asteroid[] {
+  return (state.stations ?? []).map((st) => ({ id: st.id, x: st.x, y: st.y, radius: st.radius, profile: new Array<number>(ASTEROID_SEGMENTS).fill(st.radius), version: 0, vx: 0, vy: 0, seed: 0 }));
+}
+/** Všechny pevné překážky: asteroidy + stanice. */
+export function obstacles(state: Pick<GameState, "asteroids" | "stations">): Asteroid[] {
+  return state.stations?.length ? [...state.asteroids, ...stationObstacles(state)] : state.asteroids;
+}
+export function isStationId(state: Pick<GameState, "stations">, id: string): boolean {
+  return !!state.stations?.some((st) => st.id === id);
+}
+
 function hitsAsteroid(state: GameState, p: Vec, r: number): Asteroid | undefined {
-  for (const a of state.asteroids) if (circleHitsAsteroid(a, p, r)) return a;
+  for (const a of obstacles(state)) if (circleHitsAsteroid(a, p, r)) return a;
   return undefined;
+}
+
+/**
+ * Zranění stanice: energetický štít (lasery jen vybíjejí, projektily prorazí % do trupu). Při zničení výbuch
+ * (zraní lodě v okruhu), odměna střelci a 1–2 moduly ze zásoby se vysypou jako trosky; stanice zůstane rozbitá.
+ */
+export function damageStation(state: GameState, st: Station, amount: number, kind: DamageKind, events: TurnEvent[], byId?: string, t?: number, hitShips?: (c: Vec, radius: number, damage: number, exceptOwnerId?: string) => void, rng?: Rng): void {
+  if (st.broken || amount <= 0) return;
+  let absorbed = 0;
+  let toHull = amount;
+  if (st.shields > 0) {
+    const pierced = kind === "kinetic" ? Math.round((amount * RULES.wholePiercePct) / 100) : 0;
+    absorbed = Math.min(st.shields, amount - pierced);
+    st.shields -= absorbed;
+    toHull = amount - absorbed;
+  }
+  st.hull = Math.max(0, st.hull - toHull);
+  events.push({ type: "stationHit", stationId: st.id, shooterId: byId, damage: amount, absorbed, hullAfter: st.hull, shieldsAfter: st.shields, x: st.x, y: st.y, t });
+  if (st.hull > 0) return;
+  st.broken = true;
+  st.shields = 0;
+  const shooter = byId ? shipById(state, byId) : undefined;
+  if (shooter) awardCredits(state, events, shooter.ownerId, STATION.reward, "station");
+  events.push({ type: "stationDestroyed", stationId: st.id, byId, x: st.x, y: st.y, reward: shooter ? STATION.reward : 0, t });
+  if (hitShips && STATION.blastDamage > 0) hitShips(st, STATION.blastRadius, STATION.blastDamage);
+  // vysypané moduly ze zásoby (1–2) kolem stanice
+  const drop = Math.min(st.stock, 1 + Math.floor((rng?.next() ?? 0.5) * 2));
+  for (let i = 0; i < drop; i++) {
+    const mod = randomStationModule(state, rng);
+    if (!mod) break;
+    st.stock--;
+    const ang = (rng?.next() ?? Math.random()) * Math.PI * 2;
+    const d = st.radius + 40 + (rng?.next() ?? 0.5) * 40;
+    const debris: Debris = { id: `debris-st-${st.id}-${state.turn}-${i}`, type: mod.type, x: clamp(st.x + Math.cos(ang) * d, 0, state.width), y: clamp(st.y + Math.sin(ang) * d, 0, state.height), team: -1, value: Math.round((MODULES[mod.type].price * RULES.debrisRewardPct) / 100), module: mod };
+    state.debris.push(debris);
+    events.push({ type: "jettison", shipId: "", debris, dropped: true });
+  }
+}
+
+/** Náhodný modul ze zásoby stanice: z povolených modulů hry, bez droidů. */
+export function randomStationModule(state: GameState, rng?: Rng): ModuleInstance | undefined {
+  const allowed = state.settings.allowedModules ?? {};
+  const types = MODULE_TYPES.filter((t) => allowed[t] !== 0 && MODULE_CATEGORY[t] !== "droid");
+  if (!types.length) return undefined;
+  const type = types[Math.floor((rng?.next() ?? Math.random()) * types.length)];
+  return newModule(type, "front", `st-${type}-${Math.floor((rng?.next() ?? Math.random()) * 1e6).toString(36)}`);
+}
+
+/** Stanice v okruhu sběru lodi (střed lodi uvnitř okruhu). */
+export function stationInPickupRange(state: GameState, p: Vec): Station | undefined {
+  return (state.stations ?? []).find((st) => dist(st, p) <= st.radius + STATION.pickupRange);
 }
 
 /** Který segment štítu zásah trefí: podle směru, odkud přišel (0 předek, 1 pravobok, 2 záď, 3 levobok). */
@@ -260,7 +325,7 @@ function dropModules(ship: Ship, events: TurnEvent[]): void {
 }
 
 /** Připíše hráči kredity a zapíše událost. */
-export function awardCredits(state: GameState, events: TurnEvent[], playerId: string | undefined, delta: number, reason: "kill" | "survive" | "debris" | "comet" | "tail"): void {
+export function awardCredits(state: GameState, events: TurnEvent[], playerId: string | undefined, delta: number, reason: "kill" | "survive" | "debris" | "comet" | "tail" | "station"): void {
   if (!playerId || delta <= 0) return;
   const p = state.players.find((x) => x.id === playerId);
   if (!p) return;
@@ -438,7 +503,7 @@ export function defaultOrders(ship: Ship): ShipOrders {
 }
 
 /** Rozpis akcí rozkazu (každá stojí 1 bod). */
-export type ActionId = "move" | "koiogran" | "laser" | "mg" | "torpedo" | "mine" | "evade" | "shield" | "jettison" | "pickup";
+export type ActionId = "move" | "koiogran" | "laser" | "mg" | "torpedo" | "mine" | "evade" | "shield" | "jettison" | "pickup" | "comm";
 
 export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: string }[] {
   const out: { id: ActionId; label: string }[] = [];
@@ -455,6 +520,7 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
   if (o.action?.type === "shield") out.push({ id: "shield", label: "úprava štítu" });
   if (o.action?.type === "jettison") out.push({ id: "jettison", label: "vyhození modulu" });
   if (o.action?.type === "pickup") out.push({ id: "pickup", label: "zvednutí nákladu" });
+  if (o.action?.type === "comm") out.push({ id: "comm", label: "komunikace se stanicí" });
   for (const sh of shotsOf(ship, o)) {
     const mod = ship.loadout.modules.find((x) => x.id === sh.moduleId);
     if (mod?.type === "mg") out.push({ id: "mg", label: "kulomet" });
@@ -566,7 +632,11 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       action = ship.loadout.modules.some((m) => m.id === wantedId) || (ship.loadout.cargo ?? []).some((m) => m.id === wantedId) ? { type: "jettison", moduleId: wantedId } : undefined;
     } else if (raw.action?.type === "pickup") {
       const tid = raw.action.targetId;
-      action = { type: "pickup", targetId: typeof tid === "string" && state.debris.some((d) => d.id === tid) ? tid : undefined };
+      action = { type: "pickup", targetId: typeof tid === "string" && (state.debris.some((d) => d.id === tid) || isStationId(state, tid)) ? tid : undefined };
+    } else if (raw.action?.type === "comm") {
+      const st = (state.stations ?? []).find((x) => x.id === (raw.action as { stationId?: string }).stationId);
+      const mt = (raw.action as { moduleType?: string }).moduleType;
+      if (st && typeof mt === "string" && MODULE_TYPES.includes(mt as ModuleType) && (state.settings.allowedModules ?? {})[mt as ModuleType] !== 0) action = { type: "comm", stationId: st.id, moduleType: mt as ModuleType };
     }
     let special = raw.special;
     if (special?.type === "torpedo") {
@@ -599,7 +669,7 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       const mod = ship.loadout.modules.find((m) => m.id === rs.moduleId);
       if (!mod || !moduleUsable(mod) || (mod.type !== "laser" && mod.type !== "mg") || (mod.type === "mg" && (mod.ammo ?? 0) <= 0)) continue;
       seen.add(mod.id);
-      const tid = typeof rs.targetId === "string" ? (enemyTarget(state, ship, rs.targetId)?.id ?? state.debris.find((d) => d.id === rs.targetId)?.id ?? (state.comets ?? []).find((c) => c.id === rs.targetId)?.id) : undefined;
+      const tid = typeof rs.targetId === "string" ? (enemyTarget(state, ship, rs.targetId)?.id ?? state.debris.find((d) => d.id === rs.targetId)?.id ?? (state.comets ?? []).find((c) => c.id === rs.targetId)?.id ?? (state.stations ?? []).find((x) => x.id === rs.targetId && !x.broken)?.id) : undefined;
       shots.push(tid ? { moduleId: mod.id, targetId: tid } : { moduleId: mod.id });
     }
     const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, shots, preferredTargetId, droid };
@@ -805,7 +875,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
 
     const deb = state.debris.find((d) => d.id === prefId);
     if (deb && !shotDebris.has(deb.id)) {
-      if (dist(aim, deb) <= laserRange(ship) && inArc(aim, deb, arc) && !lineBlocked(state.asteroids, aim, deb) && !laserBlockedByStorm(state, ship, deb)) {
+      if (dist(aim, deb) <= laserRange(ship) && inArc(aim, deb, arc) && !lineBlocked(obstacles(state), aim, deb) && !laserBlockedByStorm(state, ship, deb)) {
         const rangeBand = clamp(Math.ceil(dist(aim, deb) / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, { attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0), defenseDice: rangeBand === 3 ? 1 : 0, attackerFocus: ship.tokens.focus > 0, attackerLock: false, defenderFocus: false, defenderEvade: false });
         const destroyed = outcome.damage > 0;
@@ -817,7 +887,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
     const com = cometById(prefId);
     if (com) {
-      if (dist(aim, com) <= laserRange(ship) && inArc(aim, com, arc) && !lineBlocked(state.asteroids, aim, com) && !laserBlockedByStorm(state, ship, com)) {
+      if (dist(aim, com) <= laserRange(ship) && inArc(aim, com, arc) && !lineBlocked(obstacles(state), aim, com) && !laserBlockedByStorm(state, ship, com)) {
         const rangeBand = clamp(Math.ceil(dist(aim, com) / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, { attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0), defenseDice: rangeBand === 3 ? 1 : 0, attackerFocus: ship.tokens.focus > 0, attackerLock: false, defenderFocus: false, defenderEvade: false });
         const stL = statsOf(state, ship.ownerId);
@@ -829,9 +899,24 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       }
       continue;
     }
+    const stnT = (state.stations ?? []).find((x) => x.id === prefId && !x.broken);
+    if (stnT) {
+      if (dist(aim, stnT) <= laserRange(ship) + stnT.radius && inArc(aim, stnT, arc) && !lineBlocked(state.asteroids, aim, stnT) && !laserBlockedByStorm(state, ship, stnT)) {
+        const rangeBand = clamp(Math.ceil(Math.max(0, dist(aim, stnT) - stnT.radius) / LASER.band), 1, 3);
+        const outcome = resolveAttack(rng, { attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0), defenseDice: 0, attackerFocus: ship.tokens.focus > 0, attackerLock: false, defenderFocus: false, defenderEvade: false });
+        const stL = statsOf(state, ship.ownerId);
+        if (stL) {
+          stL.lasersFired++;
+          if (outcome.damage > 0) stL.laserHits++;
+        }
+        events.push({ type: "laser", shooterId: ship.id, targetId: stnT.id, from: { x: aim.x, y: aim.y, heading: aim.heading }, to: { x: stnT.x, y: stnT.y, heading: 0 }, attackDice: outcome.attackDice, defenseDice: outcome.defenseDice, hits: outcome.hits, evades: outcome.evades, damage: outcome.damage * RULES.damagePerHit, rangeBand });
+        damageStation(state, stnT, outcome.damage * RULES.damagePerHit, "energy", events, ship.id, 0, (cc, radius, damage) => applyHits(explode(cc, radius, damage, 0), 0, cc), rng);
+      }
+      continue;
+    }
     const torp = torpedoById(state, prefId);
     if (torp && torp.team !== ship.team) {
-      if (dist(aim, torp) <= laserRange(ship) && inArc(aim, torp, arc) && !shotTorpedoes.has(torp.id) && !lineBlocked(state.asteroids, aim, torp) && !laserBlockedByStorm(state, ship, torp)) {
+      if (dist(aim, torp) <= laserRange(ship) && inArc(aim, torp, arc) && !shotTorpedoes.has(torp.id) && !lineBlocked(obstacles(state), aim, torp) && !laserBlockedByStorm(state, ship, torp)) {
         const d = dist(aim, torp);
         const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
         const outcome = resolveAttack(rng, {
@@ -850,7 +935,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
 
     const candidates = state.ships.filter(
-      (e) => e.alive && e.team !== ship.team && sectorCoverage(aim, laserRange(ship), arc, e) > 0 && !lineBlocked(state.asteroids, aim, e) && !laserBlockedByStorm(state, ship, e),
+      (e) => e.alive && e.team !== ship.team && sectorCoverage(aim, laserRange(ship), arc, e) > 0 && !lineBlocked(obstacles(state), aim, e) && !laserBlockedByStorm(state, ship, e),
     );
     if (candidates.length === 0) continue;
     let target = candidates.find((c) => c.id === prefId);
@@ -904,8 +989,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if ((mod.ammo ?? 0) <= 0) continue;
     const aim = aimPose(ship, mod);
     const mgR = mgRange(ship);
-    const inRange = (p: Vec) => dist(aim, p) <= mgR && inArc(aim, p, MG.halfArc) && !lineBlocked(state.asteroids, aim, p);
-    const shipInRange = (e: Ship) => sectorCoverage(aim, mgR, MG.halfArc, e) > 0 && !lineBlocked(state.asteroids, aim, e);
+    const inRange = (p: Vec) => dist(aim, p) <= mgR && inArc(aim, p, MG.halfArc) && !lineBlocked(obstacles(state), aim, p);
+    const shipInRange = (e: Ship) => sectorCoverage(aim, mgR, MG.halfArc, e) > 0 && !lineBlocked(obstacles(state), aim, e);
     // cíl: preferovaný (loď / torpédo / trosky), jinak nejbližší nepřátelská loď ve výseči
     let target: { kind: "ship" | "torpedo" | "debris" | "comet"; id: string; pos: Pose } | undefined;
     const pref = shotTargetId(o, shot);
@@ -983,6 +1068,26 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       const inRange = state.debris.filter((d) => dist(ship, d) <= CARGO.range);
       const target = wantId ? inRange.find((d) => d.id === wantId) : inRange.sort((a, b) => dist(ship, a) - dist(ship, b))[0];
       const fail = (reason: "range" | "speed" | "full" | "gone", debrisId = wantId ?? "") => events.push({ type: "pickup", shipId: ship.id, debrisId, x: ship.x, y: ship.y, ok: false, reason });
+      // nabrání ze stanice: v okruhu sběru, rychlost ≤ 2, zásoba > 0 → náhodný modul do nákladu
+      if (wantId && isStationId(state, wantId)) {
+        const stn = state.stations!.find((x) => x.id === wantId)!;
+        const sfail = (reason: "range" | "speed" | "full" | "empty") => events.push({ type: "stationPickup", shipId: ship.id, stationId: stn.id, ok: false, reason, stockLeft: stn.stock });
+        if (held >= cap) sfail("full");
+        else if (speed > CARGO.maxSpeed) sfail("speed");
+        else if (dist(ship, stn) > stn.radius + STATION.pickupRange) sfail("range");
+        else if (stn.stock <= 0) sfail("empty");
+        else {
+          const mod = randomStationModule(state, rng);
+          if (!mod) sfail("empty");
+          else {
+            stn.stock--;
+            ship.loadout.cargo = [...(ship.loadout.cargo ?? []), mod];
+            refreshShip(ship);
+            events.push({ type: "stationPickup", shipId: ship.id, stationId: stn.id, ok: true, module: mod, stockLeft: stn.stock });
+          }
+        }
+        continue;
+      }
       if (held >= cap) {
         fail("full");
         continue;
@@ -1013,6 +1118,34 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       for (const l of list.slice(1)) events.push({ type: "pickup", shipId: l.ship.id, debrisId, x: deb.x, y: deb.y, ok: false, reason: "lost", winnerId: winner.ship.id });
     }
     state.debris = state.debris.filter((d) => !picked.has(d.id));
+  }
+
+  /* ---------- 1d. Komunikace se stanicí: objednávka modulu (před pohybem; stanice ho vypustí jako trosky směrem k volajícímu) ---------- */
+  for (const ship of state.ships) {
+    const o = orders.get(ship.id);
+    if (!ship.alive || o?.action?.type !== "comm") continue;
+    const stn = (state.stations ?? []).find((x) => x.id === (o.action as { stationId: string }).stationId);
+    const mt = (o.action as { moduleType: ModuleType }).moduleType;
+    const price = MODULES[mt]?.price ?? 0;
+    const player = state.players.find((x) => x.id === ship.ownerId);
+    const fail = (reason: "range" | "broken" | "credits" | "busy" | "module") => events.push({ type: "stationOrder", shipId: ship.id, stationId: stn?.id ?? "", ok: false, reason, moduleType: mt, price });
+    if (!stn || !MODULES[mt]) fail("module");
+    else if (stn.broken) fail("broken");
+    else if (dist(ship, stn) > ship.stats.vision + stn.radius) fail("range");
+    else if (stn.orderedTurn === turn) fail("busy");
+    else if ((player?.credits ?? 0) < price) fail("credits");
+    else {
+      player!.credits = (player!.credits ?? 0) - price;
+      events.push({ type: "credits", playerId: player!.id, delta: -price, total: player!.credits, reason: "station" });
+      stn.orderedTurn = turn;
+      const ang = Math.atan2(ship.y - stn.y, ship.x - stn.x);
+      const d = stn.radius + STATION.dropDist;
+      const mod = newModule(mt, "front", `order-${turn}-${ship.id}`);
+      const debris: Debris = { id: `debris-order-${turn}-${ship.id}`, type: mt, x: clamp(stn.x + Math.cos(ang) * d, 0, state.width), y: clamp(stn.y + Math.sin(ang) * d, 0, state.height), team: -1, value: Math.round((price * RULES.debrisRewardPct) / 100), module: mod };
+      state.debris.push(debris);
+      events.push({ type: "stationOrder", shipId: ship.id, stationId: stn.id, ok: true, moduleType: mt, price, debris });
+      events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
+    }
   }
 
 
@@ -1233,6 +1366,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       if (!s.alive || (exceptOwnerId && s.ownerId === exceptOwnerId)) continue;
       if (shipHitsCircle(posAt(shipMovers.get(s.id)!, k), s.stats.colliders, c, radius)) hits.push({ shipId: s.id, damage: scaleEvade(s, damage) });
     }
+    for (const st of state.stations ?? []) if (!st.broken && Math.hypot(st.x - c.x, st.y - c.y) <= st.radius + radius) damageStation(state, st, damage, "kinetic", events, exceptOwnerId ? state.ships.find((s) => s.ownerId === exceptOwnerId)?.id : undefined, k / MOVE_STEPS, undefined, rng);
     for (const a of state.asteroids) {
       if (removedAsteroids.has(a.id)) continue;
       if (Math.hypot(a.x - c.x, a.y - c.y) > a.radius + radius) continue;
@@ -1324,7 +1458,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
           hit = { with: "edge", heading: normalizeAngle(reflectAtEdge(state, p, p.heading) + scatter()) };
         } else {
           if (!outside) stillTouching(ship.id, "edge", false);
-          for (const a of state.asteroids) {
+          for (const a of obstacles(state)) {
             if (removedAsteroids.has(a.id)) continue;
             const ov = shipHitsAsteroid(a, p, cols);
             // úhybný manévr: asteroidem proletí (kromě posledního vzorku – nesmí v něm skončit, jinak dvojité zranění)
@@ -1391,10 +1525,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
             hit.with === "ship"
               ? posAt(shipMovers.get(hit.otherId!)!, k)
               : hit.with === "asteroid"
-                ? state.asteroids.find((a) => a.id === hit!.otherId)!
+                ? obstacles(state).find((a) => a.id === hit!.otherId)!
                 : { x: p.x + Math.cos(edgeNormal(state, p)) * 10, y: p.y + Math.sin(edgeNormal(state, p)) * 10 };
           const dbl = hit.with === "asteroid" && evading.has(ship.id) ? 2 : 1; // úhyb skončil v asteroidu
-          if (hit.with === "asteroid") {
+          if (hit.with === "asteroid" && !isStationId(state, hit.otherId!)) {
             // náraz vykousne do asteroidu díru v místě dotyku (na obrysu lodi směrem k asteroidu)
             const a = src as Asteroid;
             const ang = Math.atan2(a.y - p.y, a.x - p.x);
@@ -1405,7 +1539,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               events.push({ type: "asteroidHit", asteroidId: a.id, x: contact.x, y: contact.y, t, profile: [...a.profile], destroyed });
             }
             crashed.add(ship.id);
-          }
+          } else if (hit.with === "asteroid") crashed.add(ship.id); // stanice: stejný tvrdý náraz, bez díry
           applyDamage(ship, hit.with === "ship" ? RULES.collisionShip : hit.with === "asteroid" ? RULES.collisionAsteroid * dbl : RULES.collisionEdge, events, src);
           if (!ship.alive) m.frozenAt = k - 1;
           changed = true;
@@ -1467,6 +1601,13 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
           endComet(other, k, "comet");
           continue;
         }
+      }
+      // stanice zastaví kometu vždy (zranění jako náraz do lodi)
+      const stnHit = (state.stations ?? []).find((x) => circlesOverlap(cp, c.radius, x, x.radius));
+      if (stnHit) {
+        damageStation(state, stnHit, COMET.damage, "kinetic", events, undefined, k / MOVE_STEPS, (cc, radius, damage) => applyHits(explode(cc, radius, damage, k), k, cc), rng);
+        endComet(c, k, "asteroid");
+        continue;
       }
       if (cometHitAsteroids) {
         const a = state.asteroids.find((x) => !removedAsteroids.has(x.id) && circleHitsAsteroid(x, cp, c.radius));
@@ -1627,7 +1768,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   const spotFree = (self: Ship, p: Pose): boolean => {
     const cols = self.stats.colliders;
     if (!shipInsideMap(state.width, state.height, p, cols)) return false;
-    if (state.asteroids.some((a) => shipHitsAsteroid(a, p, cols))) return false;
+    if (obstacles(state).some((a) => shipHitsAsteroid(a, p, cols))) return false;
     for (const o of state.ships) {
       if (o !== self && o.alive && shipsOverlap(p, cols, o, o.stats.colliders)) return false;
     }
@@ -1704,6 +1845,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       events.push({ type: "autoRepair", shipId: ship.id, amount: Math.max(0, amount), hullAfter: ship.hull, turnsLeft: ship.autoRepair });
     }
   }
+  for (const stn of state.stations ?? []) if (!stn.broken) stn.shields = Math.min(stn.maxShields, stn.shields + STATION.shieldRegen);
   state.revealTeams = []; // hluboký sken platí jen do konce kola
   creditCtx = null;
   state.turn = turn + 1;
@@ -1764,7 +1906,7 @@ export function laserTarget(state: GameState, ship: Ship, preferredTargetId?: st
   const arc = laserHalfArc(lmod?.facing, ship.loadout.hullId);
   if (inStorm(state, ship)) return undefined;
   const candidates = state.ships.filter(
-    (e) => e.alive && e.team !== ship.team && sectorCoverage(aim, laserRange(ship), arc, e) > 0 && !lineBlocked(state.asteroids, aim, e) && !laserBlockedByStorm(state, ship, e),
+    (e) => e.alive && e.team !== ship.team && sectorCoverage(aim, laserRange(ship), arc, e) > 0 && !lineBlocked(obstacles(state), aim, e) && !laserBlockedByStorm(state, ship, e),
   );
   if (candidates.length === 0) return undefined;
   return candidates.find((c) => c.id === preferredTargetId) ?? candidates.reduce((best, c) => (dist(aim, c) < dist(aim, best) ? c : best));
@@ -1779,7 +1921,7 @@ export function laserReach(state: GameState, ship: Ship, p: Vec, laserModuleId?:
   if (!cometOnMap(state, p)) return "ještě není na mapě";
   if (dist(aim, p) > laserRange(ship)) return "mimo dostřel";
   if (!inArc(aim, p, laserHalfArc(lmod?.facing, ship.loadout.hullId))) return "mimo výseč laseru";
-  if (lineBlocked(state.asteroids, aim, p)) return "v cestě je asteroid";
+  if (lineBlocked(obstacles(state), aim, p)) return "v cestě je asteroid";
   if (laserBlockedByStorm(state, ship, p)) return "cíl je v bouři";
   return null;
 }
@@ -1792,7 +1934,7 @@ export function laserReachShip(state: GameState, ship: Ship, target: Ship, laser
   const arc = laserHalfArc(lmod?.facing, ship.loadout.hullId);
   const cov = sectorCoverage(aim, laserRange(ship), arc, target);
   if (cov > 0) {
-    if (lineBlocked(state.asteroids, aim, target)) return "v cestě je asteroid";
+    if (lineBlocked(obstacles(state), aim, target)) return "v cestě je asteroid";
     if (laserBlockedByStorm(state, ship, target)) return "cíl je v bouři";
     return null;
   }
@@ -2122,8 +2264,8 @@ export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: stri
   if (!mod) return undefined;
   const aim = aimPose(ship, mod);
   const mgR = mgRange(ship);
-  const inRange = (p: Vec) => dist(aim, p) <= mgR && inArc(aim, p, MG.halfArc) && !lineBlocked(state.asteroids, aim, p);
-  const shipInRange = (e: Ship) => sectorCoverage(aim, mgR, MG.halfArc, e) > 0 && !lineBlocked(state.asteroids, aim, e);
+  const inRange = (p: Vec) => dist(aim, p) <= mgR && inArc(aim, p, MG.halfArc) && !lineBlocked(obstacles(state), aim, p);
+  const shipInRange = (e: Ship) => sectorCoverage(aim, mgR, MG.halfArc, e) > 0 && !lineBlocked(obstacles(state), aim, e);
   let target: Vec & { id: string } | undefined;
   const ts = state.ships.find((x) => x.id === preferredTargetId && x.alive && x.team !== ship.team);
   const tt = state.torpedoes.find((x) => x.id === preferredTargetId && x.team !== ship.team);

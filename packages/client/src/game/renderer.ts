@@ -3,6 +3,8 @@ import type { Segments } from "@wingfighter/shared";
 import {
   shipCircles,
   hitRadiusAt,
+  ASTEROID_HIT_REF,
+  STATION,
   COMET,
   LASER,
   MINE,
@@ -26,7 +28,7 @@ import { segmentColor, strengthColor } from "./shield-ui.ts";
 import { drawBorderStorm, drawStormBolts, drawStormClouds, drawStormSparks } from "./storm-draw.ts";
 import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
-import type { ViewComet, ViewDebris, ViewModel, ViewShip } from "./view.ts";
+import type { ViewComet, ViewDebris, ViewModel, ViewShip, ViewStation } from "./view.ts";
 import { drawParallax } from "./parallax.ts";
 import { parallaxEnabled } from "../display.ts";
 
@@ -199,6 +201,7 @@ export class Renderer {
     const onScreen = (x: number, y: number, r: number) => x + r >= vx0 && x - r <= vx1 && y + r >= vy0 && y - r <= vy1;
     this.onScreen = onScreen;
     if (state.storms?.length && overlay.stormActive) drawStormBolts(ctx, state.storms, now);
+    for (const st of view.stations ?? []) if (onScreen(st.x, st.y, st.radius + STATION.pickupRange + 10)) this.drawStation(st, overlay, now);
     for (const a of view.asteroids) if (onScreen(a.x, a.y, a.radius + 4)) this.drawAsteroid(a, !!overlay.showHitboxes);
     for (const m of view.mines) if (onScreen(m.x, m.y, m.radius + 20)) this.drawMine(m, now);
     this.marks = [];
@@ -464,6 +467,71 @@ export class Renderer {
       ctx.strokeStyle = "rgba(248,113,113,0.9)";
     }
     ctx.restore();
+  }
+
+  /** Vesmírná stanice: pomalu se otáčí (i mimo přehrávání), funkční má tyrkysový štít; čárkovaný okruh sběru; lišta trupu po poškození. */
+  private drawStation(st: ViewStation, overlay: Overlay, now: number) {
+    const ctx = this.ctx;
+    // okruh sběru
+    ctx.save();
+    ctx.strokeStyle = "rgba(148,163,184,0.35)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.arc(st.x, st.y, st.radius + STATION.pickupRange, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    const heading = ((now / 24000) * Math.PI * 2) % (Math.PI * 2) * (st.broken ? 0.4 : 1);
+    drawSprite(ctx, this.sprites.station(st.broken), st.x, st.y, heading);
+    if (!st.broken && st.maxShields > 0) {
+      const f = st.shields / st.maxShields;
+      ctx.save();
+      ctx.strokeStyle = "#2dd4bf";
+      ctx.globalAlpha = 0.25 + 0.6 * f;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, st.radius + 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (overlay.showHitboxes) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(248,113,113,0.9)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, (st.radius * ASTEROID_HIT_REF.pct) / 100, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // popisek + stav
+    ctx.save();
+    ctx.font = "12px Jersey, ui-monospace, Menlo, monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = st.broken ? "#94a3b8" : "#a5f3fc";
+    ctx.fillText(st.broken ? "ROZBITÁ STANICE" : "STANICE", st.x, st.y - st.radius - 22);
+    if (!st.broken && st.hull < st.maxHull) {
+      ctx.fillStyle = "#0b1020";
+      ctx.fillRect(st.x - 30, st.y - st.radius - 18, 60, 5);
+      ctx.fillStyle = "#4ade80";
+      ctx.fillRect(st.x - 30, st.y - st.radius - 18, (60 * st.hull) / st.maxHull, 5);
+    }
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "11px Jersey, ui-monospace, Menlo, monospace";
+    ctx.fillText(`moduly ${st.stock}`, st.x, st.y + st.radius + 22);
+    ctx.restore();
+    const weapons = overlay.targetWeapons?.[st.id];
+    if (weapons?.length) this.marks.push({ x: st.x, y: st.y, r: st.radius, weapons });
+    else if (overlay.targetId === st.id || overlay.hoverId === st.id) {
+      ctx.save();
+      ctx.strokeStyle = overlay.targetId === st.id ? "#fbbf24" : "rgba(248,250,252,0.5)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, st.radius + 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   private drawAsteroid(a: Asteroid, hitbox = false) {

@@ -139,7 +139,7 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
         break;
       case "laser":
       case "mg":
-        if (visibleShip.has(e.shooterId) || visibleShip.has(e.targetId) || visibleTorp.has(e.targetId) || visibleComet.has(e.targetId)) events.push(e);
+        if (visibleShip.has(e.shooterId) || visibleShip.has(e.targetId) || visibleTorp.has(e.targetId) || visibleComet.has(e.targetId) || (result.state.stations ?? []).some((st) => st.id === e.targetId)) events.push(e);
         break;
       case "spawnComet":
         if (seenBy(eyes, e.comet, e.comet.radius)) {
@@ -172,7 +172,17 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
         if (visibleShip.has(e.shipId)) events.push(e);
         break;
       case "jettison":
+        if (visibleShip.has(e.shipId) || seenBy(eyes, e.debris, 20)) events.push(e);
+        break;
+      case "stationHit":
+      case "stationDestroyed":
+        events.push(e); // stanice jsou vidět vždy
+        break;
+      case "stationPickup":
         if (visibleShip.has(e.shipId)) events.push(e);
+        break;
+      case "stationOrder":
+        if (visibleShip.has(e.shipId) || (e.debris && seenBy(eyes, e.debris, 20))) events.push(e);
         break;
       case "pickup":
         if (visibleShip.has(e.shipId) || seenBy(eyes, e, 20)) events.push(e);

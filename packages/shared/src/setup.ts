@@ -1,9 +1,9 @@
 import { generateProfile } from "./asteroids.ts";
-import { MAP, RULES } from "./constants.ts";
+import { MAP, RULES, STATION } from "./constants.ts";
 import type { Pose } from "./geometry.ts";
 import { computeStats, HULLS, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf, shipNames, pilotList } from "./ships.ts";
 import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
-import { effectivePlacement, type Asteroid, type GameSettings, type GameState, type PlayerInfo, type Ship, type ShipLoadout, type Storm } from "./types.ts";
+import { effectivePlacement, type Asteroid, type GameSettings, type GameState, type PlayerInfo, type Ship, type ShipLoadout, type Station, type Storm } from "./types.ts";
 import { generateMap, START_MARGIN } from "./mapgen.ts";
 import { insideMap } from "./mapshape.ts";
 
@@ -89,6 +89,7 @@ export function createGame(opts: CreateGameOptions): GameState {
   let height = MAP.height;
   let asteroids: Asteroid[] = structuredClone(MAP_1_ASTEROIDS);
   let storms: Storm[] = [];
+  let stations: Station[] = [];
   let startAt: ((p: PlayerInfo) => Pose) | null = null;
   let teamPose: ((team: number) => Pose) | null = null;
   const poseOf = (st: { x: number; y: number; heading: number } | undefined): Pose => (st ? { x: st.x, y: st.y, heading: st.heading } : { x: START_MARGIN, y: height / 2, heading: 0 });
@@ -98,6 +99,7 @@ export function createGame(opts: CreateGameOptions): GameState {
     height = gen.height;
     asteroids = gen.asteroids;
     storms = gen.storms;
+    stations = gen.stations.map((p, i) => ({ id: `station-${i + 1}`, x: p.x, y: p.y, radius: STATION.radius, hull: STATION.hull, maxHull: STATION.hull, shields: STATION.shields, maxShields: STATION.shields, broken: false, stock: STATION.stock }));
     const placement = effectivePlacement(settings);
     const rnd = (n: number) => Math.floor(Math.random() * n);
     if (placement === "random") {
@@ -229,6 +231,7 @@ export function createGame(opts: CreateGameOptions): GameState {
     height,
     asteroids: asteroids.filter((a) => insideMap({ width, height }, a, a.radius)),
     storms,
+    stations,
     border: RULES.borderWidth > 0 ? RULES.borderWidth : undefined,
     ships,
     torpedoes: [],

@@ -127,6 +127,18 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "moduleDamage":
         lines.push(e.broken ? `🔧 ${name(e.shipId)}: modul ${MODULES[e.moduleType]?.name ?? e.moduleType} je zničen – přestal fungovat.` : `${name(e.shipId)}: modul ${MODULES[e.moduleType]?.name ?? e.moduleType} poškozen (−${e.damage}, zbývá ${e.hp}/${e.maxHp}).`);
         break;
+      case "stationPickup":
+        lines.push(e.ok ? `${name(e.shipId)} nabral ze stanice modul: ${e.module ? MODULES[e.module.type]?.name ?? e.module.type : "modul"} (ve stanici zbývá ${e.stockLeft}).` : `${name(e.shipId)} nenabral modul ze stanice – ${e.reason === "speed" ? `letěl rychleji než ${CARGO.maxSpeed}` : e.reason === "full" ? "nákladový prostor je plný" : e.reason === "empty" ? "zásoba stanice je prázdná" : "nebyl v okruhu sběru"}.`);
+        break;
+      case "stationOrder":
+        lines.push(e.ok ? `${name(e.shipId)} objednal ze stanice ${MODULES[e.moduleType]?.name ?? e.moduleType} za ${e.price} kreditů – stanice ho vypustila jako trosky.` : `${name(e.shipId)}: objednávka ze stanice selhala – ${e.reason === "broken" ? "stanice je rozbitá" : e.reason === "credits" ? "nedostatek kreditů" : e.reason === "busy" ? "linka obsazena (1 objednávka za kolo)" : e.reason === "range" ? "stanice není v dohledu" : "neplatný modul"}.`);
+        break;
+      case "stationHit":
+        lines.push(`${e.shooterId ? name(e.shooterId) + " zasáhl" : "Zásah"} stanici: −${e.damage}${e.absorbed ? ` (štít ${e.absorbed})` : ""}, trup ${e.hullAfter}, štít ${e.shieldsAfter}.`);
+        break;
+      case "stationDestroyed":
+        lines.push(`💥 Stanice zničena${e.byId ? ` (${name(e.byId)}${e.reward ? `, +${e.reward} kreditů` : ""})` : ""} – zůstává rozbitá.`);
+        break;
       case "pickup":
         lines.push(
           e.ok
@@ -284,10 +296,16 @@ export class TurnAnimation {
           time = e.dropped ? lastTime + 120 : 0;
           break;
         case "pickup":
+        case "stationPickup":
+        case "stationOrder":
           if (!movePassed) {
             time = preCount * LASER_GAP;
             preCount++;
           } else time = moveStart;
+          break;
+        case "stationHit":
+        case "stationDestroyed":
+          time = e.t ? moveStart + e.t * MOVE_DURATION : lastTime + 60;
           break;
         case "debrisShot":
           if (!movePassed) {
@@ -460,6 +478,46 @@ export class TurnAnimation {
           if (sh) v.effects.push({ kind: "drop", from: { x: e.x, y: e.y }, to: { x: sh.x, y: sh.y }, color: "#a7f3d0", start: now, duration: 500 });
           if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: "+NÁKLAD", color: "#a7f3d0", start: now + 400, duration: 1000 });
         } else if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: e.reason === "lost" ? "NÁKLAD UCHVÁCEN" : e.reason === "speed" ? "MOC RYCHLE" : "NÁKLAD NEZVEDNUT", color: "#fca5a5", start: now, duration: 1000 });
+        break;
+      }
+      case "stationPickup": {
+        const sh = v.ships.find((x) => x.id === e.shipId);
+        const st = v.stations?.find((x) => x.id === e.stationId);
+        if (sh && e.ok) {
+          if (st) v.effects.push({ kind: "drop", from: { x: st.x, y: st.y }, to: { x: sh.x, y: sh.y }, color: "#a7f3d0", start: now, duration: 600 });
+          v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: "+MODUL ZE STANICE", color: "#a7f3d0", start: now + 400, duration: 1000 });
+          if (st) st.stock = e.stockLeft;
+        } else if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: e.reason === "speed" ? "MOC RYCHLE" : e.reason === "empty" ? "STANICE PRÁZDNÁ" : e.reason === "full" ? "NÁKLAD PLNÝ" : "MIMO OKRUH", color: "#fca5a5", start: now, duration: 1000 });
+        break;
+      }
+      case "stationOrder": {
+        const sh = v.ships.find((x) => x.id === e.shipId);
+        const st = v.stations?.find((x) => x.id === e.stationId);
+        if (e.ok && e.debris) {
+          v.debris.push({ ...e.debris });
+          if (st) v.effects.push({ kind: "drop", from: { x: st.x, y: st.y }, to: { x: e.debris.x, y: e.debris.y }, color: "#fde68a", start: now, duration: 600 });
+          if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: `OBJEDNÁNO −${e.price}`, color: "#fde68a", start: now, duration: 1000 });
+        } else if (sh) v.effects.push({ kind: "text", x: sh.x, y: sh.y, text: e.reason === "busy" ? "LINKA OBSAZENA" : e.reason === "credits" ? "MÁLO KREDITŮ" : "OBJEDNÁVKA SELHALA", color: "#fca5a5", start: now, duration: 1000 });
+        break;
+      }
+      case "stationHit": {
+        const st = v.stations?.find((x) => x.id === e.stationId);
+        if (st) {
+          st.hull = e.hullAfter;
+          st.shields = e.shieldsAfter;
+          v.effects.push({ kind: "text", x: st.x, y: st.y - 30, text: `−${e.damage}`, color: e.absorbed ? "#67e8f9" : "#fdba74", start: now, duration: 800 });
+        }
+        break;
+      }
+      case "stationDestroyed": {
+        const st = v.stations?.find((x) => x.id === e.stationId);
+        if (st) {
+          st.broken = true;
+          st.shields = 0;
+          st.hull = 0;
+          v.effects.push({ kind: "explosion", x: st.x, y: st.y, size: 150, start: now, duration: 900, color: "#fb923c" });
+          v.effects.push({ kind: "text", x: st.x, y: st.y - 40, text: "STANICE ZNIČENA", color: "#f87171", start: now + 200, duration: 1600 });
+        }
         break;
       }
       case "debrisShot": {

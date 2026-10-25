@@ -28,6 +28,8 @@ export interface GeneratedMap {
   storms: Storm[];
   /** Startovní body po obvodu (pozice + kurz do středu). */
   starts: { x: number; y: number; heading: number }[];
+  /** Vesmírné stanice (pozice; stav doplní createGame). */
+  stations: { x: number; y: number }[];
 }
 
 export function sanitizeMapSettings(raw: unknown, base: MapSettings = DEFAULT_MAP): MapSettings {
@@ -43,6 +45,7 @@ export function sanitizeMapSettings(raw: unknown, base: MapSettings = DEFAULT_MA
   if (typeof r.symmetric === "boolean") out.symmetric = r.symmetric;
   if (r.comets === "none" || r.comets === "few" || r.comets === "medium" || r.comets === "many") out.comets = r.comets;
   if (typeof r.cometsHitAsteroids === "boolean") out.cometsHitAsteroids = r.cometsHitAsteroids;
+  if (typeof r.stations === "number" && Number.isFinite(r.stations)) out.stations = Math.max(0, Math.min(2, Math.round(r.stations)));
   if (r.sky === "random" || r.sky === "none" || (typeof r.sky === "string" && (SKY_THEMES as string[]).includes(r.sky))) out.sky = r.sky as MapSettings["sky"];
   return out;
 }
@@ -156,5 +159,25 @@ export function generateMap(settings: MapSettings): GeneratedMap {
     if (cleaned.some((a) => Math.hypot(a.x - p.x, a.y - p.y) < a.radius + 60)) continue;
     starts.push({ ...p, heading: Math.atan2(height / 2 - p.y, width / 2 - p.x) });
   }
-  return { width, height, asteroids: cleaned, storms, starts };
+  // vesmírné stanice: náhodně v mapě, dál od startů, bouří, asteroidů i od sebe
+  const stations: GeneratedMap["stations"] = [];
+  const want = Math.max(0, Math.min(2, settings.stations ?? 0));
+  const wantGen = settings.symmetric ? Math.ceil(want / 2) : want;
+  guard = 0;
+  while (stations.length < wantGen && guard < 3000) {
+    guard++;
+    const x = Math.round(inner.x0 + 100 + rng.next() * Math.max(1, genW - inner.x0 - 200));
+    const y = Math.round(inner.y0 + 100 + rng.next() * Math.max(1, inner.y1 - inner.y0 - 200));
+    const p = { x, y };
+    if (!insideMap(box, p, START_STATION_PAD)) continue;
+    if (pointInStorm(storms, p, STATION_R + 80)) continue;
+    if (cleaned.some((a) => Math.hypot(a.x - x, a.y - y) < a.radius + STATION_R + 60)) continue;
+    if (starts.some((st) => Math.hypot(st.x - x, st.y - y) < 420)) continue;
+    if (stations.some((st) => Math.hypot(st.x - x, st.y - y) < Math.min(width, height) * 0.4)) continue;
+    stations.push(p);
+  }
+  if (settings.symmetric) for (const st of [...stations]) if (stations.length < want) stations.push({ x: width - st.x, y: st.y });
+  return { width, height, asteroids: cleaned, storms, starts, stations };
 }
+const STATION_R = 60;
+const START_STATION_PAD = 260;

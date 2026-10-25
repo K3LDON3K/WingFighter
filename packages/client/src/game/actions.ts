@@ -1,4 +1,4 @@
-import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, profileFor, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders, shotsOf, shotsOfType } from "@wingfighter/shared";
+import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, profileFor, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders, shotsOf, shotsOfType, stationInPickupRange } from "@wingfighter/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -160,7 +160,8 @@ ACTIONS.push({
   apply: (o, ship, s) => {
     if (o.action?.type === "pickup") return { action: undefined };
     const near = (s.debris ?? []).filter((d) => dist(ship, d) <= CARGO.range).sort((a, b) => dist(ship, a) - dist(ship, b))[0];
-    return { action: { type: "pickup", targetId: near?.id } };
+    const stn = !near ? stationInPickupRange(s, ship) : undefined;
+    return { action: { type: "pickup", targetId: near?.id ?? (stn && stn.stock > 0 ? stn.id : undefined) } };
   },
 });
 

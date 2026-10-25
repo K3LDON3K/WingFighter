@@ -42,6 +42,8 @@ import {
   applyShieldRecharge,
   applyRepair,
   applyHack,
+  damageStation,
+  STATION,
   hackBlocked,
   HACK,
   repairBlocked,
@@ -1511,6 +1513,80 @@ describe("droid – hacker", () => {
     expect(m3.autoRepair).toBe(0);
     const rr = resolveTurn(st, [{ shipId: me3.id, maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(3));
     expect(rr.events.some((e) => e.type === "autoRepair")).toBe(false);
+  });
+});
+
+describe("vesmírná stanice", () => {
+  const mkStation = (x: number, y: number) => ({ id: "st1", x, y, radius: STATION.radius, hull: STATION.hull, maxHull: STATION.hull, shields: STATION.shields, maxShields: STATION.shields, broken: false, stock: STATION.stock });
+  it("mapa umí 0–2 stanice; stanice je překážka a zastaví torpédo", () => {
+    const gen = generateMap({ ...DEFAULT_MAP, stations: 2, seed: 3 });
+    expect(gen.stations).toHaveLength(2);
+    expect(generateMap({ ...DEFAULT_MAP, stations: 0 }).stations).toHaveLength(0);
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    g.stations = [mkStation(500 + MOVE_UNIT * 2 + 50, 500)];
+    const r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m3a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.events.some((e) => e.type === "collision" && e.shipId === me.id && e.otherId === "st1")).toBe(true);
+    expect(r.state.stations![0].hull).toBe(STATION.hull); // náraz lodi stanici nezraní
+  });
+  it("laser zraní stanici (štít vybíjí energie), zničení → rozbitá, výbuch, odměna a trosky", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    g.stations = [mkStation(700, 500)];
+    const r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: false, shots: [{ moduleId: me.loadout.modules.find((m) => m.type === "laser")!.id, targetId: "st1" }] }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(2));
+    const hit = r.events.find((e) => e.type === "stationHit");
+    if (hit && hit.type === "stationHit") {
+      expect(hit.hullAfter).toBe(STATION.hull); // energie: jen štít
+      expect(hit.shieldsAfter).toBeLessThan(STATION.shields);
+    }
+    // štít se dobíjí
+    expect(r.state.stations![0].shields).toBeLessThanOrEqual(STATION.shields);
+    // zničení přímo
+    const g2 = game();
+    const me2 = place(g2, "ship-p1-0", 500, 500, 0);
+    place(g2, "ship-p2-0", 1500, 1200, 0);
+    g2.stations = [mkStation(700, 500)];
+    const ev: typeof r.events = [];
+    damageStation(g2, g2.stations[0], 5000, "kinetic", ev, me2.id, 0, undefined, createRng(1));
+    expect(g2.stations[0].broken).toBe(true);
+    expect(ev.some((e) => e.type === "stationDestroyed")).toBe(true);
+    expect(g2.players.find((p) => p.id === me2.ownerId)!.credits).toBeGreaterThanOrEqual(STATION.reward);
+    expect(g2.debris.length).toBeGreaterThanOrEqual(1);
+    expect(g2.stations[0].stock).toBeLessThan(STATION.stock);
+  });
+  it("nabrání modulu ze stanice (okruh, rychlost ≤ 2, zásoba) a objednávka (kredity, 1 za kolo, trosky směrem k lodi)", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    g.stations = [mkStation(500 + STATION.radius + 100, 500)];
+    let r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: false, action: { type: "pickup", targetId: "st1" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    const pk = r.events.find((e) => e.type === "stationPickup");
+    expect(pk && pk.type === "stationPickup" && pk.ok).toBe(true);
+    expect(r.state.ships[0].loadout.cargo?.length).toBe(1);
+    expect(r.state.stations![0].stock).toBe(STATION.stock - 1);
+    // moc rychle
+    r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m3a0", fire: false, action: { type: "pickup", targetId: "st1" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.events.some((e) => e.type === "stationPickup" && !e.ok && e.reason === "speed")).toBe(true);
+    // objednávka
+    const g3 = game();
+    const me3 = place(g3, "ship-p1-0", 500, 500, 0);
+    place(g3, "ship-p2-0", 1500, 1200, 0);
+    g3.stations = [mkStation(900, 500)];
+    const pl = g3.players.find((p) => p.id === me3.ownerId)!;
+    pl.credits = 1000;
+    r = resolveTurn(g3, [{ shipId: me3.id, maneuverId: "m1a0", fire: false, action: { type: "comm", stationId: "st1", moduleType: "laser" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    const od = r.events.find((e) => e.type === "stationOrder");
+    expect(od && od.type === "stationOrder" && od.ok).toBe(true);
+    expect(r.state.players.find((p) => p.id === me3.ownerId)!.credits).toBe(1000 - MODULES.laser.price + RULES.creditsPerTurn);
+    const deb = r.state.debris.find((d) => d.id.startsWith("debris-order"));
+    expect(deb?.type).toBe("laser");
+    expect(deb!.x).toBeLessThan(900); // směrem k volajícímu (vlevo od stanice)
+    // málo kreditů
+    pl.credits = 10;
+    r = resolveTurn(g3, [{ shipId: me3.id, maneuverId: "m1a0", fire: false, action: { type: "comm", stationId: "st1", moduleType: "laser" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.events.some((e) => e.type === "stationOrder" && !e.ok && e.reason === "credits")).toBe(true);
   });
 });
 

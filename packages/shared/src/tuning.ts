@@ -3,7 +3,7 @@
  * server je aplikuje před každým vyhodnocením, klient před vykreslením.
  */
 import { ASTEROID_HIT_REF } from "./asteroids.ts";
-import { CARGO, COMET, CRATER_RADIUS_REF, DROID, HACK, LASER, MG, MINE, REPAIR, RULES, SCANNER, STRESS, TECH, TORPEDO } from "./constants.ts";
+import { CARGO, COMET, CRATER_RADIUS_REF, DROID, HACK, LASER, MG, MINE, REPAIR, RULES, SCANNER, STATION, STRESS, TECH, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
 import { HULLS, LASER_DICE, MODULE_HP_PCT, MODULES, STRESS_MAX_REF, WEIGHT } from "./ships.ts";
 import { BATTLESHIP_PROFILE, FIGHTER_PROFILE } from "./maneuvers.ts";
@@ -20,6 +20,13 @@ export interface Tuning {
   collisionAsteroid: number;
   crashCrater: number;
   asteroidHitPct: number;
+  stationHull: number;
+  stationShields: number;
+  stationShieldRegen: number;
+  stationStock: number;
+  stationPickupRange: number;
+  stationBlastDamage: number;
+  stationReward: number;
   repairHullPct: number;
   hackOrdnanceCost: number;
   hackModuleCost: number;
@@ -172,6 +179,13 @@ export const DEFAULT_TUNING: Tuning = {
   collisionAsteroid: 15,
   crashCrater: 24,
   asteroidHitPct: 90,
+  stationHull: 2000,
+  stationShields: 200,
+  stationShieldRegen: 20,
+  stationStock: 3,
+  stationPickupRange: 170,
+  stationBlastDamage: 60,
+  stationReward: 100,
   repairHullPct: 25,
   hackOrdnanceCost: 2,
   hackModuleCost: 3,
@@ -333,6 +347,13 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "hackRepairPct", label: "Hacker – pasivní oprava (% trupu za kolo)", group: "Akce a stres", min: 1, max: 25, step: 1 },
   { key: "hackRepairTurns", label: "Hacker – pasivní oprava (kol)", group: "Akce a stres", min: 1, max: 10, step: 1 },
   { key: "asteroidHitPct", label: "Asteroid – kolizní obrys (% obrázku)", group: "Loď", min: 70, max: 100, step: 1, hint: "menší než 100 = asteroid jde těsně obletět (platí pro lodě, torpéda i lasery)" },
+  { key: "stationHull", label: "Stanice – trup", group: "Stanice", min: 100, max: 10000, step: 100 },
+  { key: "stationShields", label: "Stanice – energetický štít", group: "Stanice", min: 0, max: 1000, step: 10 },
+  { key: "stationShieldRegen", label: "Stanice – dobití štítu za kolo", group: "Stanice", min: 0, max: 200, step: 5 },
+  { key: "stationStock", label: "Stanice – zásoba modulů k nabrání", group: "Stanice", min: 0, max: 10, step: 1, hint: "náhodný modul z povolených (bez droidů), loď rychlostí ≤ 2 v okruhu sběru, 1 akce" },
+  { key: "stationPickupRange", label: "Stanice – okruh sběru", group: "Stanice", min: 80, max: 400, step: 10 },
+  { key: "stationBlastDamage", label: "Stanice – výbuch při zničení (zranění do 150)", group: "Stanice", min: 0, max: 300, step: 10 },
+  { key: "stationReward", label: "Stanice – odměna za zničení (kredity)", group: "Stanice", min: 0, max: 500, step: 10 },
   { key: "crashCrater", label: "Díra po nárazu lodi – min. poloměr", group: "Loď", min: 0, max: 100, step: 2, hint: "náraz do asteroidu vykousne díru; větší loď dělá větší díru" },
   { key: "collisionEdge", label: "Náraz do okraje mapy", group: "Loď", min: 0, max: 100, step: 5 },
   { key: "craterRadius", label: "Kráter v asteroidu – poloměr", group: "Loď", min: 0, max: 150, step: 5 },
@@ -506,6 +527,13 @@ export function applyTuning(t: Tuning): void {
   RULES.collisionAsteroid = t.collisionAsteroid;
   RULES.crashCrater = t.crashCrater;
   ASTEROID_HIT_REF.pct = t.asteroidHitPct;
+  STATION.hull = t.stationHull;
+  STATION.shields = t.stationShields;
+  STATION.shieldRegen = t.stationShieldRegen;
+  STATION.stock = t.stationStock;
+  STATION.pickupRange = t.stationPickupRange;
+  STATION.blastDamage = t.stationBlastDamage;
+  STATION.reward = t.stationReward;
   REPAIR.hullPct = t.repairHullPct;
   HACK.ordnanceCost = t.hackOrdnanceCost;
   HACK.moduleCost = t.hackModuleCost;

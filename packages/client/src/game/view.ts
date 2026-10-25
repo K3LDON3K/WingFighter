@@ -38,6 +38,19 @@ export interface ViewTorpedo extends Pose {
   lost?: boolean;
 }
 
+export interface ViewStation {
+  id: string;
+  x: number;
+  y: number;
+  radius: number;
+  hull: number;
+  maxHull: number;
+  shields: number;
+  maxShields: number;
+  broken: boolean;
+  stock: number;
+}
+
 export interface ViewMine {
   id: string;
   team: number;
@@ -80,6 +93,7 @@ export interface ViewModel {
   debris: ViewDebris[];
   comets: ViewComet[];
   mines: ViewMine[];
+  stations: ViewStation[];
   asteroids: Asteroid[];
   effects: Effect[];
 }
@@ -129,6 +143,7 @@ export function viewFromState(state: GameState): ViewModel {
     debris: (state.debris ?? []).map((d) => ({ ...d })),
     comets: (state.comets ?? []).map(cometToView),
     mines: state.mines.map(mineToView),
+    stations: (state.stations ?? []).map((st) => ({ ...st })),
     asteroids: structuredClone(state.asteroids),
     effects: [],
   };
