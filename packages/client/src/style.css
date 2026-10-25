@@ -4938,3 +4938,22 @@ button.start-chip.on:hover:not(:disabled) {
   font-family: var(--txt);
   font-size: 16px;
 }
+.lo-shop.drop-target {
+  outline: 3px dashed #f87171;
+  outline-offset: 4px;
+  background: rgba(248, 113, 113, 0.08);
+}
+.shop-ghost {
+  position: fixed;
+  z-index: 1002;
+  pointer-events: none;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 6px #fbbf24);
+}
+.lo-hexbuy {
+  touch-action: none;
+}
+.lo-svg .lo-g.drop-free polygon {
+  stroke: #fbbf24 !important;
+  stroke-dasharray: 6 4;
+}

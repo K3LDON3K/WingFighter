@@ -200,6 +200,19 @@ export function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Recor
   return el;
 }
 
+/** Miniatura trupu (pixelový sprite otočený přídí nahoru) do dlaždic výběru lodi. */
+export function hullThumb(hullId: string, color: string, size = 36, team = 1): SVGSVGElement {
+  const tpl = hullId === "battleship" ? BATTLESHIP_TEMPLATE : fighterTemplate(team).template;
+  const w = tpl[0].length;
+  const hgt = tpl.length;
+  const svg = svgEl("svg", { viewBox: `0 0 ${hgt} ${w}`, width: size, height: size, class: "hull-thumb", "shape-rendering": "crispEdges" });
+  const pal: Record<string, string> = { P: color, S: shade(color, 0.72), L: shade(color, 1.35), G: "#9aa3ad", D: "#4b5563", K: "#1f2937", W: "#dbeafe", E: "#fb923c", Y: "#fde68a" };
+  const g = svgEl("g", { transform: `translate(0, ${w}) rotate(-90)` });
+  tpl.forEach((row, y) => [...row].forEach((c, x) => pal[c] && g.append(svgEl("rect", { x, y, width: 1, height: 1, fill: pal[c] }))));
+  svg.append(g);
+  return svg;
+}
+
 /** Změna trupu: moduly ve slotech, které nový trup nemá, se přesunou do volných slotů; co se nevejde, se prodá (odebere). */
 function switchHull(loadout: ShipLoadout, hullId: string): ShipLoadout {
   const hull = HULLS[hullId];
@@ -336,6 +349,69 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     if (MODULES[other.type].size === "large") return "velký modul nejde prohodit s malým";
     return { ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? refacing(x, other.slot) : x.id === other.id ? refacing(x, m.slot) : x)) };
   };
+  /** Přetažení modulu z obchodu do volného slotu = koupit rovnou tam. */
+  const startShopDrag = (ev: PointerEvent, t: ModuleType, btn: HTMLElement) => {
+    if (ev.button !== 0) return;
+    const def = MODULES[t];
+    const start = { x: ev.clientX, y: ev.clientY };
+    let ghost: HTMLElement | null = null;
+    const svgRoot = svg;
+    const targets = () => {
+      const freeNow = freeSlots(loadout);
+      if (def.size !== "large") return freeNow;
+      return hullLargePairs(hull).filter((p) => p.every((s) => freeNow.includes(s))).flat();
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!dragMoved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) return;
+      if (!dragMoved) {
+        dragMoved = true;
+        ghost = btn.cloneNode(true) as HTMLElement;
+        ghost.classList.add("shop-ghost");
+        document.body.append(ghost);
+        document.body.classList.add("drag-on");
+        (document.querySelector(".ptip") as HTMLElement | null)?.style.setProperty("display", "none");
+        svgRoot?.classList.add("drag-on");
+        // volné sloty se nabídnou
+        for (const s of targets()) svgRoot?.querySelector(`[data-slot="${s}"]`)?.classList.add("drop-free");
+      }
+      ghost!.style.left = `${e.clientX - 56}px`;
+      ghost!.style.top = `${e.clientY - 49}px`;
+      ghost!.style.display = "none";
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      ghost!.style.display = "";
+      svgRoot?.querySelectorAll(".drop-target").forEach((x) => x.classList.remove("drop-target"));
+      const slotEl = el?.closest?.("[data-slot]") as SVGGElement | null;
+      if (slotEl && targets().includes(slotEl.getAttribute("data-slot") as SlotId)) slotEl.classList.add("drop-target");
+    };
+    const onUp = (e: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      if (!dragMoved) return;
+      ghost?.remove();
+      document.body.classList.remove("drag-on");
+      svgRoot?.classList.remove("drag-on");
+      svgRoot?.querySelectorAll(".drop-target, .drop-free").forEach((x) => x.classList.remove("drop-target", "drop-free"));
+      setTimeout(() => (dragMoved = false), 0);
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const slotEl = el?.closest?.("[data-slot]") as SVGGElement | null;
+      if (!slotEl) return;
+      const slot = slotEl.getAttribute("data-slot") as SlotId;
+      if (!targets().includes(slot)) {
+        showTip("slot je obsazený – pusť modul na volný slot");
+        return;
+      }
+      const why = buyWhy(t);
+      if (why) {
+        showTip(`Nelze koupit: ${why}`);
+        return;
+      }
+      add(t, slot);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
   const startDrag = (ev: PointerEvent, m: ModuleInstance, grp: SVGGElement, box: Box) => {
     const svgRoot = grp.ownerSVGElement!;
     const start = { x: ev.clientX, y: ev.clientY };
@@ -369,8 +445,11 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       document.querySelectorAll(".fleet-tab.drop-target").forEach((x) => x.classList.remove("drop-target"));
       const slotEl = el?.closest?.("[data-slot]") as SVGGElement | null;
       const tabEl = el?.closest?.("[data-fleet-index]") as HTMLElement | null;
+      const shopHit = el?.closest?.(".lo-shop") as HTMLElement | null;
+      document.querySelectorAll(".lo-shop.drop-target").forEach((x) => x.classList.remove("drop-target"));
       if (slotEl && slotEl !== grp && slotEl.ownerSVGElement === svgRoot) slotEl.classList.add("drop-target");
       else if (tabEl && !tabEl.classList.contains("on") && opts.onMoveToShip) tabEl.classList.add("drop-target");
+      else if (shopHit && !ro) shopHit.classList.add("drop-target");
     };
     const onUp = (e: PointerEvent) => {
       window.removeEventListener("pointermove", onMove);
@@ -382,11 +461,18 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       svgRoot.classList.remove("drag-on");
       document.body.classList.remove("drag-on");
       svgRoot.querySelectorAll(".drop-target").forEach((x) => x.classList.remove("drop-target"));
-      document.querySelectorAll(".fleet-tab.drop-target").forEach((x) => x.classList.remove("drop-target"));
+      document.querySelectorAll(".fleet-tab.drop-target, .lo-shop.drop-target").forEach((x) => x.classList.remove("drop-target"));
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const slotEl = el?.closest?.("[data-slot]") as SVGGElement | null;
       const tabEl = el?.closest?.("[data-fleet-index]") as HTMLElement | null;
+      const shopHit = el?.closest?.(".lo-shop") as HTMLElement | null;
       setTimeout(() => (dragMoved = false), 0);
+      if (shopHit && !ro) {
+        // přetažení do obchodu = prodat / odebrat
+        modPop = null;
+        remove(m.id);
+        return;
+      }
       if (slotEl && slotEl !== grp && slotEl.ownerSVGElement === svgRoot) {
         const target = slotEl.getAttribute("data-slot") as SlotId;
         if (occupiedSlots(m).includes(target)) return;
@@ -727,6 +813,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         }
       });
       if (pickType === t) btn.classList.add("picked");
+      if (!why || why === "všechny sloty obsazené") btn.addEventListener("pointerdown", (ev) => startShopDrag(ev, t, btn));
       rows.get(MODULE_CATEGORY[t])!.append(btn);
     }
   }
@@ -760,7 +847,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       return h(
         "button",
         { class: `pk-tile hull ${on ? "on" : ""}`, disabled: !canPick || !opts.hullChoices, title: `${x.name}\n${x.description}\nLodní body: ${x.points} · trup ${x.hull} · sloty: ${x.slots.map((sl) => sl.name).join(", ")} · náklad ${x.cargo}`, onclick: () => ((pickerOpen = null), change(switchHull(loadout, x.id))) },
-        h("span", { class: "pk-pic" }, icon("ship", on ? "#7dd3fc" : "#64748b", 28)),
+        h("span", { class: "pk-pic" }, hullThumb(x.id, on ? "#3b82f6" : "#64748b", 40, opts.team ?? 1)),
         h("span", { class: "pk-name" }, label(x.name)),
         h("span", { class: "pk-sub" }, `${x.points} ${x.points === 1 ? "bod" : "body"}`),
       );
