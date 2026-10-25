@@ -44,8 +44,8 @@ export interface IconSpot {
 }
 
 /** Barvy a ikonky zbraní pro značku cíle (stejné jako v liště akcí). */
-const WEAPON_COLOR: Record<string, string> = { laser: "#f87171", mg: "#fde047", torpedo: "#fb923c", mine: "#fbbf24" };
-const WEAPON_ICON: Record<string, string> = { laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine" };
+const WEAPON_COLOR: Record<string, string> = { laser: "#f87171", mg: "#fde047", torpedo: "#fb923c", mine: "#fbbf24", "torpedo-in": "#fb923c", "torpedo-enemy": "#f87171" };
+const WEAPON_ICON: Record<string, string> = { laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", "torpedo-in": "torpedo", "torpedo-enemy": "torpedo" };
 
 export interface Overlay {
   /** Ladění: vykreslit kolizní kruhy lodí. */
@@ -93,6 +93,8 @@ export interface Overlay {
   cometPredict?: boolean;
   /** Předpověď skeneru: naplánované manévry nepřátelských botů (čárkovaná dráha + duch). */
   botPlans?: { ship: ViewShip; maneuver: Maneuver }[];
+  /** Torpéda v letu: čára k cíli (vlastní vždy, cizí s předpovědí skeneru), `reach` = dolet v tomto kole. */
+  torpedoLines?: { from: { x: number; y: number }; to: { x: number; y: number }; color: string; reach: number; enemy: boolean }[];
   /** Průběh přehrávání kola 0..1 (undefined = plánování, nic se nehýbe). */
   animating?: number;
   /** Vlastní lodě (ocas komety, který už využily, se kreslí vybledle). */
@@ -227,6 +229,7 @@ export class Renderer {
     }
     for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArcs, p.mgArcs);
     for (const p of overlay.botPlans ?? []) this.drawBotPlan(p.ship, p.maneuver);
+    for (const l of overlay.torpedoLines ?? []) this.drawTorpedoLine(l);
 
     for (const t of view.torpedoes) {
       // plamen motoru
@@ -1059,6 +1062,47 @@ export class Renderer {
       this.drawPixelIcon("turn", bx, by, s, "#0b1020");
       ctx.restore();
     }
+  }
+
+  /** Torpédo v letu: čárkovaná čára k cíli se šipkou, plná část = dolet v tomto kole (tečka na konci). */
+  private drawTorpedoLine(l: { from: { x: number; y: number }; to: { x: number; y: number }; color: string; reach: number; enemy: boolean }) {
+    const ctx = this.ctx;
+    const dx = l.to.x - l.from.x;
+    const dy = l.to.y - l.from.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1) return;
+    const ux = dx / d;
+    const uy = dy / d;
+    const reach = Math.min(l.reach, d);
+    ctx.save();
+    ctx.strokeStyle = l.color;
+    ctx.globalAlpha = l.enemy ? 0.75 : 0.9;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(l.from.x, l.from.y);
+    ctx.lineTo(l.to.x, l.to.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // dolet v tomto kole: plná čára + tečka
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(l.from.x, l.from.y);
+    ctx.lineTo(l.from.x + ux * reach, l.from.y + uy * reach);
+    ctx.stroke();
+    ctx.fillStyle = l.color;
+    ctx.beginPath();
+    ctx.arc(l.from.x + ux * reach, l.from.y + uy * reach, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // šipka u cíle
+    const tip = { x: l.to.x - ux * 14, y: l.to.y - uy * 14 };
+    ctx.beginPath();
+    ctx.moveTo(tip.x + ux * 10, tip.y + uy * 10);
+    ctx.lineTo(tip.x - uy * 5, tip.y + ux * 5);
+    ctx.lineTo(tip.x + uy * 5, tip.y - ux * 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   /** Předpověď skeneru: čárkovaná dráha v barvě nepřítele, tečky po dílech, průsvitný duch na konci. */

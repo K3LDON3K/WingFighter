@@ -981,6 +981,34 @@ function buildOverlay(view: ViewModel): Overlay {
       }
     }
   }
+  // torpéda v letu: vlastní (i hacknutá) vždy, cizí jen s předpovědí skeneru – čára k cíli, předpokládaný dolet v tomto kole a značka na cíli
+  const predict = botPredictActive(g.state, playerId);
+  const lines: NonNullable<Overlay["torpedoLines"]> = [];
+  for (const t of g.state.torpedoes) {
+    const own = t.team === me?.team;
+    if (!own && !predict) continue;
+    if (t.lost) continue;
+    const tv = view.torpedoes.find((x) => x.id === t.id);
+    if (!tv) continue;
+    let to: { x: number; y: number } | undefined;
+    let targetId: string | undefined;
+    if (t.targetId) {
+      const ts = view.ships.find((x) => x.id === t.targetId) ?? view.torpedoes.find((x) => x.id === t.targetId);
+      if (ts) {
+        to = { x: ts.x, y: ts.y };
+        targetId = t.targetId;
+      }
+    } else if (t.targetPoint) to = t.targetPoint;
+    if (!to) continue;
+    lines.push({ from: { x: tv.x, y: tv.y }, to, color: TEAM_COLORS[t.team], reach: t.speed, enemy: !own });
+    if (targetId) {
+      overlay.targetWeapons ??= {};
+      const tag = own ? "torpedo-in" : "torpedo-enemy";
+      const list = (overlay.targetWeapons[targetId] ??= []);
+      if (!list.includes(tag)) list.push(tag);
+    }
+  }
+  if (lines.length) overlay.torpedoLines = lines;
   overlay.icons = g.icons;
   return overlay;
 }
