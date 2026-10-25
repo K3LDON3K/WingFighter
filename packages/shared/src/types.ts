@@ -7,7 +7,7 @@ export type Side = "left" | "right";
 /** zelený = odstraní stres · bílý · červený = stres, bez akce · nebezpečný = červený + 1 zranění */
 export type Difficulty = "green" | "white" | "red" | "danger";
 
-/** Manévr = rychlost (1–5) + změna kurzu ve stupních (po 15°, záporné = vlevo), případně otočka o 180°. */
+/** Manévr = rychlost (1–5) + změna kurzu ve stupních (po 10°, záporné = vlevo), případně otočka o 180°. */
 export interface Maneuver {
   /** Stabilní identifikátor, např. "m3a-30" nebo "k3a-30" (otočka 180° na konci křivky). */
   id: string;

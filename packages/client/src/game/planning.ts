@@ -138,14 +138,15 @@ export function shieldInHand(ship: { segments: Segments }, o: ShipOrders): numbe
   return sum(ship.segments) - sum(o.action.segments);
 }
 
-export const DIFFICULTY_COLOR: Record<Difficulty, string> = { green: "#4ade80", white: "#e2e8f0", red: "#f87171", danger: "#fb923c" };
+/** Barvy náročnosti: zelený, bílý, oranžový („red“ = stres), červený (nebezpečný = stres + zranění). */
+export const DIFFICULTY_COLOR: Record<Difficulty, string> = { green: "#4ade80", white: "#e2e8f0", red: "#fb923c", danger: "#f87171" };
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   green: "zelený – vrátí 1 stresový bod",
   white: "bílý – bez vlivu",
-  red: "červený – stojí 1 stresový bod",
+  red: "oranžový – stojí 1 stresový bod",
   danger: `NEBEZPEČNÝ – stojí 2 body a ${STRESS.dangerHullPercent} % trupu`,
 };
-const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: "bílý", red: "červený", danger: "nebezpečný" };
+const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: "bílý", red: "oranžový", danger: "nebezpečný (červený)" };
 /** Kategorie akcí v liště: zbraně · pohyb · speciální. */
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
@@ -470,7 +471,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     "div",
     { class: "res-row" },
     resGroup("Akce", apips, `Akce: ${RULES.actionPoints - acts.length}/${RULES.actionPoints} volné. Dobíjí se každé kolo.`),
-    resGroup("Stres", spips, `Stresové body ${ship.stressPoints}/${ship.stats.stressMax}: červený manévr −1, nebezpečný −2, zelený +1.`),
+    resGroup("Stres", spips, `Stresové body ${ship.stressPoints}/${ship.stats.stressMax}: oranžový manévr −1, nebezpečný (červený) −2, zelený +1.`),
     resGroup(inStormNow ? "Technologie ⚡ bouře" : "Technologie", tpips, `Technologie ${ship.techPoints}/${ship.stats.techMax}: body na celou bitvu, nedobíjí se (průlet ocasem komety +${COMET.tailTech}). Sken lodi ${SCANNER.shipCost}, hluboký sken ${SCANNER.deepCost}.${inStormNow ? "\nV bouři je technologie deaktivovaná – skener nefunguje." : ""}`, inStormNow ? "storm" : ""),
   );
   /** Kolik akcí tlačítko právě stojí (tečky): otočka 2, manévr 1 (jen když se liší od rovně stejnou rychlostí), ostatní 1. */
@@ -602,7 +603,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
                     : cb.chooseAction(ship.id, a.id),
           },
           (() => {
-            // cena ve všech surovinách: otočka 2 akce + stres červeného manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
+            // cena ve všech surovinách: otočka 2 akce + stres oranžového manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
             const manStress = a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : 0;
             const c = { actions: a.id === "koiogran" ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];

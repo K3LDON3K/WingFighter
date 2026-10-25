@@ -996,7 +996,7 @@ function renderLeaderboard(s: GameState): HTMLElement {
   const table = h(
     "table",
     { class: "lb" },
-    h("thead", {}, h("tr", {}, th("#"), th("hráč"), th("sestřely"), th("poškození", "Uděleno / utrženo (trup i štít)"), th("kredity", "Vydělané kredity (bez startovního rozpočtu)"), th("manévry", "zelený / bílý / červený / nebezpečný · otočky"), th("lasery", "zásahy / salvy"), th("kulomet", "zásahy / projektily"), th("torp.", "vystřelená torpéda"), th("miny"), th("skeny"), th("komety", "sestřelené komety / průlety ocasem"))),
+    h("thead", {}, h("tr", {}, th("#"), th("hráč"), th("sestřely"), th("poškození", "Uděleno / utrženo (trup i štít)"), th("kredity", "Vydělané kredity (bez startovního rozpočtu)"), th("manévry", "zelený / bílý / oranžový / nebezpečný (červený) · otočky"), th("lasery", "zásahy / salvy"), th("kulomet", "zásahy / projektily"), th("torp.", "vystřelená torpéda"), th("miny"), th("skeny"), th("komety", "sestřelené komety / průlety ocasem"))),
     h(
       "tbody",
       {},
@@ -1010,7 +1010,7 @@ function renderLeaderboard(s: GameState): HTMLElement {
           td(st!.kills, "num"),
           td(`${st!.damageDealt} / ${st!.damageTaken}`, "num"),
           td(st!.creditsEarned, "num"),
-          h("td", { class: "num man" }, h("span", { style: "color:#4ade80" }, String(m.green)), " / ", h("span", {}, String(m.white)), " / ", h("span", { style: "color:#f87171" }, String(m.red)), " / ", h("span", { style: "color:#fb923c" }, String(m.danger)), m.koiogran ? h("span", { class: "muted" }, ` · ⟲${m.koiogran}`) : null),
+          h("td", { class: "num man" }, h("span", { style: "color:#4ade80" }, String(m.green)), " / ", h("span", {}, String(m.white)), " / ", h("span", { style: "color:#fb923c" }, String(m.red)), " / ", h("span", { style: "color:#f87171" }, String(m.danger)), m.koiogran ? h("span", { class: "muted" }, ` · ⟲${m.koiogran}`) : null),
           td(`${st!.laserHits} / ${st!.lasersFired}`, "num"),
           td(`${st!.mgHits ?? 0} / ${st!.mgShots ?? 0}`, "num"),
           td(st!.torpedoesFired, "num"),

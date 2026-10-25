@@ -3,13 +3,13 @@ import { makePath, type Pose } from "./geometry.ts";
 import type { Difficulty, Maneuver, ManeuverProfile } from "./types.ts";
 
 /** Krok směru ve stupních. */
-export const ANGLE_STEP = 15;
+export const ANGLE_STEP = 10;
 export const MAX_ANGLE = 90;
 
 /** Profil stíhače – co motor dovolí. Index pole = rychlost. */
 export const FIGHTER_PROFILE: ManeuverProfile = {
   maxSpeed: 5,
-  maxAngle: [0, 90, 90, 90, 60, 45],
+  maxAngle: [0, 90, 90, 90, 60, 40],
   /** Otočka 180° jde od rychlosti 2 (při libovolném úhlu, který rychlost dovolí). */
   koiogranSpeeds: [2, 3, 4, 5],
 };
@@ -31,14 +31,14 @@ export function parseManeuverId(id: string): { speed: number; angle: number; koi
 /** Je úhel "ostrý" (sám o sobě červený)? */
 export function isSharp(speed: number, angle: number, koiogran = false): boolean {
   const a = Math.abs(angle);
-  return koiogran || a >= 75 || (speed >= 4 && a >= 45);
+  return koiogran || a >= 70 || (speed >= 4 && a >= 40);
 }
 
 /**
  * Náročnost křivky podle rychlosti, úhlu a změny rychlosti oproti minulému kolu; null = loď to nezvládne.
- * zelený = mírný (odstraní stres), červený = prudký (stres, bez akce),
- * nebezpečný = změna rychlosti o 2+ spolu s ostrým úhlem (jako červený + 1 zranění).
- * Otočka (koiogran) na konci křivky: jde od rychlosti 2; výsledek je červený (nebezpečná křivka zůstává nebezpečná),
+ * zelený = mírný (odstraní stres), oranžový („red“) = prudký (stres),
+ * nebezpečný (červený) = změna rychlosti o 2+ spolu s ostrým úhlem (jako oranžový + zranění).
+ * Otočka (koiogran) na konci křivky: jde od rychlosti 2; výsledek je oranžový (nebezpečná křivka zůstává nebezpečná),
  * stres viz `maneuverStress`.
  */
 export function classifyManeuver(profile: ManeuverProfile, speed: number, angle: number, koiogran: boolean, prevSpeed: number): Difficulty | null {
@@ -59,7 +59,7 @@ export function classifyCurve(profile: ManeuverProfile, speed: number, angle: nu
   const sharp = isSharp(speed, angle, false);
   if (bigChange && sharp) return "danger";
   if (bigChange || sharp) return "red";
-  if ((speed <= 2 && a <= 45) || (speed === 3 && a === 0)) return "green";
+  if ((speed <= 2 && a <= 40) || (speed === 3 && a === 0)) return "green";
   return "white";
 }
 

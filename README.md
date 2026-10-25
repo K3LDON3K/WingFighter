@@ -29,15 +29,15 @@ Stejný příkaz funguje jako **dedikovaný server** na jakémkoli stroji s Node
   a úhybný manévr platí od úplného začátku kola (ještě před lasery).
 
 ### Manévry
-Manévr = **rychlost 1–5** + **změna kurzu** (po 15°, max ±90°; čím rychleji, tím menší povolený úhel)
+Manévr = **rychlost 1–5** + **změna kurzu** (po 10°, max ±90°; rychlost 4 max ±60°, rychlost 5 max ±40°)
 nebo **otočka o 180°** (rychlost 3–4). Nastavuje se jen myší: **klik na vlastní loď** zapne kreslení dráhy
 (směr podle polohy myši, rychlost podle vzdálenosti; kolečko nebo klávesy 1–5 rychlost zamknou, K = otočka),
 **další klik potvrdí** a loď se pustí. Kolem lodi jsou tečky dosažitelných pozic obarvené podle náročnosti.
 Bez označení loď poletí tak, jak má nakresleno (výchozí = stejná rychlost rovně).
 
 **Stresové body** (3 na loď, vidí je všichni): bílý manévr nic, **zelený** (mírný) vrátí 1 bod,
-**červený** (ostrý úhel ≥75°, při rychlosti 4+ už ≥45°, *nebo* změna rychlosti o 2+) stojí 1 bod,
-**nebezpečný** (změna rychlosti o 2+ *a* ostrý úhel) stojí 2 body a 5 % trupu. Bez bodů manévr nejde vybrat.
+**oranžový** (ostrý úhel ≥70°, při rychlosti 4+ už ≥40°, *nebo* změna rychlosti o 2+) stojí 1 bod,
+**nebezpečný – červený** (změna rychlosti o 2+ *a* ostrý úhel) stojí 2 body a 5 % trupu. Bez bodů manévr nejde vybrat.
 Akce po pohybu zůstává vždy povolená.
 
 Lodě nikdy nestojí: při srážce s lodí, asteroidem nebo okrajem mapy je loď **odmrštěna** novým (náhodně
@@ -153,6 +153,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.123 – Manévry: krok kurzu 10° (dřív 15°; limity úhlu 90/90/90/60/40° podle rychlosti, ostrý úhel od 70°, při rychlosti 4+ od 40°, zelený do 40°). Barvy náročnosti vyměněny: prudký manévr se stresem je **oranžový**, nebezpečný (stres + zranění) **červený** – v tečkách kolem lodi, v panelu i ve statistikách.
 - v3.122 – Jedno tlačítko ŠTÍT místo dvou: okénko má záložky PŘESUNOUT (1 akce, −/+ jako dosud, dole ↺ reset) a DOBÍT (3 technologie – žluté + u segmentů, potvrzení druhým klikem na záložku DOBÍT n/2). Energetický štít má jen záložku DOBÍT s ukazatelem zásoby (modrá = teď, žlutá = co přibude). Okénko jde otevřít i bez volné akce (jen dobití); klik na hotový ŠTÍT ho znovu otevře místo resetu.
 - v3.121 – Štíty podle druhu zbraně: energetický (dřív celolodní) lasery jen vybíjejí, projektily (torpédo, mina, kulomet, srážky, komety) prorazí 30 % do trupu; segmentový (kinetický) projektil zachytí celý za 1 bod, laser ubere 1 bod a 60 % pronikne do trupu. Nová akce „Dobít štít“ za 3 body technologie (nebere akci, 1× za kolo, hned): energetický +40, segmentový +2 body do zvolených segmentů. Vše laditelné v sekci Štíty. Log hlásí průraz/průnik. Boti (Pilot, Eso) volí zbraň podle štítu cíle a dobíjejí štít, když je slabý. Popisy modulů a karta v obchodě doplněny.
 - v3.120 – Obchod: kulomet ukazuje munici jako „10× [zásobník] DÁVKA“ (zásobník = dávka 10 nábojů) místo pruhu s počtem nábojů.

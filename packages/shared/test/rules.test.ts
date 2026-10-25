@@ -131,11 +131,11 @@ describe("manévry", () => {
     expect(Math.abs(end.heading)).toBeCloseTo(Math.PI);
   });
   it("náročnost: mírný = zelený, ostrý = červený, změna rychlosti o 2 = červený, obojí = nebezpečný", () => {
-    expect(classifyManeuver(P, 2, 15, false, 2)).toBe("green");
-    expect(classifyManeuver(P, 3, 45, false, 2)).toBe("white");
+    expect(classifyManeuver(P, 2, 10, false, 2)).toBe("green");
+    expect(classifyManeuver(P, 3, 40, false, 2)).toBe("white");
     expect(classifyManeuver(P, 3, 90, false, 2)).toBe("red");
     expect(classifyManeuver(P, 4, 0, false, 2)).toBe("red");
-    expect(classifyManeuver(P, 4, 45, false, 2)).toBe("danger");
+    expect(classifyManeuver(P, 4, 40, false, 2)).toBe("danger");
     expect(classifyManeuver(P, 5, 60, false, 5)).toBeNull(); // nad limit úhlu
     expect(classifyManeuver(P, 3, 0, true, 3)).toBe("red");
     // otočka na červené křivce (změna rychlosti o 2, rovně) zůstává červená, stojí ale 2 stres
@@ -268,12 +268,12 @@ describe("vyhodnocení kola", () => {
     expect(r.state.ships[0].stressPoints).toBe(2);
     expect(r.state.ships[0].speed).toBe(1); // po otočce −2
     // z rychlosti 3 na 5 s ostrým úhlem = nebezpečný: −2 body + 5 % trupu
-    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m5a45", fire: false }], createRng(1));
+    r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m5a40", fire: false }], createRng(1));
     expect(r.state.ships[0].stressPoints).toBe(0);
     expect(r.events.some((e) => e.type === "damage" && e.shipId === "ship-p1-0" && e.amount === 5)).toBe(true);
     // bez bodů: červený manévr sanitizace nahradí
-    const fixed = sanitizeOrders(r.state, "p1", [{ shipId: "ship-p1-0", maneuverId: "m5a45", fire: true }]);
-    expect(fixed[0].maneuverId).not.toBe("m5a45");
+    const fixed = sanitizeOrders(r.state, "p1", [{ shipId: "ship-p1-0", maneuverId: "m5a40", fire: true }]);
+    expect(fixed[0].maneuverId).not.toBe("m5a40");
     // zelený manévr vrátí bod
     r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m4a0", fire: false }], createRng(1)); // bílý
     r = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m3a0", fire: false }], createRng(1)); // zelený
@@ -374,7 +374,7 @@ describe("vyhodnocení kola", () => {
     const ship = g.ships[0];
     expect(actionCost(ship, { shipId: ship.id, maneuverId: "m2a0", fire: false })).toBe(0);
     expect(actionCost(ship, { shipId: ship.id, maneuverId: "m3a0", fire: false })).toBe(1);
-    expect(actionCost(ship, { shipId: ship.id, maneuverId: "m2a15", fire: true })).toBe(2);
+    expect(actionCost(ship, { shipId: ship.id, maneuverId: "m2a10", fire: true })).toBe(2);
     expect(actionCost(ship, { shipId: ship.id, maneuverId: "k3", fire: false })).toBe(2); // změna rychlosti + otočka
     const fixed = sanitizeOrders(g, "p1", [{ shipId: ship.id, maneuverId: "m3a30", fire: true, special: { type: "torpedo", targetId: "ship-p2-0" } }]);
     expect(actionCost(ship, fixed[0])).toBe(2);
@@ -625,7 +625,7 @@ describe("vyhodnocení kola", () => {
       g,
       [
         { shipId: "ship-p1-0", maneuverId: "m4a0", fire: false, action: { type: "evade" } },
-        { shipId: "ship-p2-0", maneuverId: "m3a15", fire: false, special: { type: "torpedo", targetId: "ship-p1-0" } },
+        { shipId: "ship-p2-0", maneuverId: "m3a10", fire: false, special: { type: "torpedo", targetId: "ship-p1-0" } },
       ],
       createRng(1),
     );
@@ -1594,24 +1594,24 @@ describe("otočka na konci křivky", () => {
   const P = FIGHTER_PROFILE;
   it("jde od rychlosti 2 s libovolným povoleným úhlem; id a parsování", () => {
     expect(makeManeuver(P, 1, 0, true, 1)).toBeNull();
-    const k = makeManeuver(P, 3, -45, true, 3)!;
-    expect(k.id).toBe("k3a-45");
-    expect(parseManeuverId("k3a-45")).toEqual({ speed: 3, angle: -45, koiogran: true });
+    const k = makeManeuver(P, 3, -40, true, 3)!;
+    expect(k.id).toBe("k3a-40");
+    expect(parseManeuverId("k3a-40")).toEqual({ speed: 3, angle: -40, koiogran: true });
     expect(parseManeuverId("k3")).toEqual({ speed: 3, angle: 0, koiogran: true });
-    expect(makeManeuver(P, 5, 60, true, 5)).toBeNull(); // rychlost 5 dovolí jen ±45°
-    expect(makeManeuver(P, 5, 45, true, 5)).not.toBeNull();
+    expect(makeManeuver(P, 5, 60, true, 5)).toBeNull(); // rychlost 5 dovolí jen ±40°
+    expect(makeManeuver(P, 5, 40, true, 5)).not.toBeNull();
   });
   it("stres: zelená/bílá křivka 1, červená 2, nebezpečná 3 (a zůstává nebezpečná)", () => {
-    const g = makeManeuver(P, 2, 15, true, 2)!; // křivka zelená
+    const g = makeManeuver(P, 2, 10, true, 2)!; // křivka zelená
     expect(g.base).toBe("green");
     expect(g.difficulty).toBe("red");
     expect(maneuverStress(g)).toBe(STRESS.costRed);
-    const w = makeManeuver(P, 4, 15, true, 4)!; // bílá
+    const w = makeManeuver(P, 4, 10, true, 4)!; // bílá
     expect(maneuverStress(w)).toBe(STRESS.costRed);
-    const r = makeManeuver(P, 4, 45, true, 4)!; // červená (rychlost 4, 45°)
+    const r = makeManeuver(P, 4, 40, true, 4)!; // oranžová (rychlost 4, 40°)
     expect(r.base).toBe("red");
     expect(maneuverStress(r)).toBe(STRESS.costRed + 1);
-    const d = makeManeuver(P, 4, 45, true, 2)!; // nebezpečná (změna o 2 + ostrý)
+    const d = makeManeuver(P, 4, 40, true, 2)!; // nebezpečná (změna o 2 + ostrý)
     expect(d.difficulty).toBe("danger");
     expect(maneuverStress(d)).toBe(STRESS.costDanger + 1);
     expect(effStressCost(d, { droid: { overdrive: true } })).toBe(0);

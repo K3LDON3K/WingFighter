@@ -120,7 +120,7 @@ export const ACTIONS: ActionOption[] = [
     id: "koiogran",
     glyph: "⟲",
     label: "Otočka 180° (2 akce)",
-    description: `Na konci nakreslené křivky (nebo rovné dráhy) se loď otočí o 180°; její rychlost pak klesne o ${RULES.koiogranSpeedDrop}. Jde od rychlosti 2. Stojí obě akce kola. Stres: 1 na zelené/bílé křivce, 2 na červené, 3 na nebezpečné (ta navíc zraní trup). Zapni před kreslením, nebo až po něm – duch v cíli se otočí.`,
+    description: `Na konci nakreslené křivky (nebo rovné dráhy) se loď otočí o 180°; její rychlost pak klesne o ${RULES.koiogranSpeedDrop}. Jde od rychlosti 2. Stojí obě akce kola. Stres: 1 na zelené/bílé křivce, 2 na oranžové, 3 na nebezpečné – červené (ta navíc zraní trup). Zapni před kreslením, nebo až po něm – duch v cíli se otočí.`,
     disabled: (ship, _s, o) => {
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.koiogran) return null;

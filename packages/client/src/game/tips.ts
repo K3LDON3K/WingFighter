@@ -20,7 +20,7 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
           { icon: "ship", text: "tažení z lodi = směr a rychlost" },
           { icon: "speed", text: "kolečko / 1–5 = rychlost" },
           { icon: "tick", text: "klik / mezerník = potvrdit", tone: "good" },
-          { icon: "stress", text: `červený −${STRESS.costRed} · nebezpečný −${STRESS.costDanger} stres` + (over ? " (overdrive: 0)" : "") },
+          { icon: "stress", text: `oranžový −${STRESS.costRed} · nebezpečný (červený) −${STRESS.costDanger} stres` + (over ? " (overdrive: 0)" : "") },
         ],
         note: "rovně stejnou rychlostí zdarma",
         ...w,
@@ -35,7 +35,7 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
         fx: [
           { icon: "ship", text: "na konci křivky se otočí o 180°" },
           { icon: "speed", text: `rychlost −${RULES.koiogranSpeedDrop} po otočce`, tone: "bad" },
-          { icon: "stress", text: over ? "overdrive: bez stresu" : `stres: zelená/bílá ${STRESS.costRed} · červená ${STRESS.costRed + 1} · nebezpečná ${STRESS.costDanger + 1}`, tone: over ? "good" : undefined },
+          { icon: "stress", text: over ? "overdrive: bez stresu" : `stres: zelená/bílá ${STRESS.costRed} · oranžová ${STRESS.costRed + 1} · nebezpečná ${STRESS.costDanger + 1}`, tone: over ? "good" : undefined },
         ],
         note: "od rychlosti 2 · zapni před kreslením i po něm",
         ...w,
