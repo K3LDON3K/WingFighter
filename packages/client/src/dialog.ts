@@ -38,3 +38,33 @@ export function confirmDialog(opts: { title: string; text: Node | string; ok: st
   });
   document.body.append(wrap);
 }
+
+/** Informační okno (nápověda): nadpis, libovolný obsah, jediné tlačítko Zavřít (Esc / klik vedle). */
+export function infoDialog(opts: { title: string; body: Node; wide?: boolean }): void {
+  document.querySelector(".app-confirm")?.remove();
+  const wrap = h("div", { class: "confirm-wrap app-confirm", style: "position:fixed" });
+  const close = () => {
+    wrap.remove();
+    window.removeEventListener("keydown", onKey, true);
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" && e.key !== "Enter") return;
+    close();
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  window.addEventListener("keydown", onKey, true);
+  wrap.append(
+    h(
+      "div",
+      { class: `pnl confirm info ${opts.wide ? "wide" : ""}` },
+      h("div", { class: "ctl" }, label(opts.title)),
+      h("div", { class: "ctx txt ibody" }, opts.body),
+      h("div", { class: "cbtns" }, h("button", { class: "px cb", onclick: close }, label("zavřít"), h("span", { class: "k" }, "ESC"))),
+    ),
+  );
+  wrap.addEventListener("pointerdown", (e) => {
+    if (e.target === wrap) close();
+  });
+  document.body.append(wrap);
+}

@@ -24,6 +24,11 @@ import {
   mineSideOf,
   MODULES,
   profileOf,
+  WEIGHT,
+  FIGHTER_PROFILE,
+  MOVE_UNIT,
+  MAX_ANGLE,
+  ANGLE_STEP,
   laserTarget,
   laserReach,
   parseManeuverId,
@@ -52,6 +57,7 @@ import {
 import { clear, h } from "../dom.ts";
 import { actionTip } from "./tips.ts";
 import { tipAttr } from "../tooltip.ts";
+import { infoDialog } from "../dialog.ts";
 import { icon, label, segBar } from "../icons.ts";
 import { ACTIONS, actionAvailable } from "./actions.ts";
 import { SEGMENT_NAMES, shieldBubble, strengthColor } from "./shield-ui.ts";
@@ -190,6 +196,36 @@ let openPops = new Set<string>();
 const popsNow = new Set<string>();
 const popClass = (key: string) => (popsNow.add(key), openPops.has(key) ? "noanim" : "");
 
+/** Obsah nápovědy k manévrům (rychlosti, úhly, barvy, stres, akce). */
+function maneuverHelp(ship: Ship): HTMLElement {
+  const prof = profileOf(ship.loadout);
+  const sw = (col: string) => h("i", { class: "hswatch", style: `background:${col}` });
+  const li = (...c: (Node | string)[]) => h("li", {}, ...c);
+  const limits = [1, 2, 3, 4, 5].map((s) => `${s}: ±${FIGHTER_PROFILE.maxAngle[s]}°`).join(" · ");
+  return h(
+    "div",
+    { class: "mhelp" },
+    h("h4", {}, label("Dráha")),
+    h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 1–5 rychlost zamknou, K = otočka, mezerník potvrdí.")),
+    h("h4", {}, label("Rychlost")),
+    h("ul", {}, li(`1–5; tvoje loď teď max. ${prof.maxSpeed} (váha výbavy: každých ${WEIGHT.perSpeed} váhy = −1; overdrive droida váhu ignoruje).`), li(`Otočka o 180° jde jen z rychlosti ${prof.koiogranSpeeds.length ? `${Math.min(...prof.koiogranSpeeds)}–${Math.max(...prof.koiogranSpeeds)}` : "–"}, stojí 2 akce (s overdrivem 1) a po ní rychlost klesne o ${RULES.koiogranSpeedDrop}.`)),
+    h("h4", {}, label("Úhel")),
+    h("ul", {}, li(`Krok ${ANGLE_STEP}°, max. ±${MAX_ANGLE}°. Čím rychleji, tím míň: ${limits}.`)),
+    h("h4", {}, label("Barvy (náročnost)")),
+    h(
+      "ul",
+      { class: "hcolors" },
+      li(sw(DIFFICULTY_COLOR.green), h("b", {}, "zelený"), ` – mírný: rychlost 1–2 do 40°, nebo rychlost 3 rovně. Vrátí +${STRESS.regenGreen} stres (autopilot droida +${DROID.autopilotRegen}).`),
+      li(sw(DIFFICULTY_COLOR.white), h("b", {}, "bílý"), " – vše ostatní, co není ostré. Nic nestojí."),
+      li(sw(DIFFICULTY_COLOR.red), h("b", {}, "oranžový"), ` – ostrý úhel (od 70°, při rychlosti 4+ od 40°) nebo změna rychlosti o 2+. Stojí ${STRESS.costRed} stres.`),
+      li(sw(DIFFICULTY_COLOR.danger), h("b", {}, "nebezpečný (červený)"), ` – ostrý úhel a zároveň změna rychlosti o 2+. Stojí ${STRESS.costDanger} stres a ${STRESS.dangerHullPercent} % trupu.`),
+      li(h("span", { class: "man-koi" }, "⟲"), h("b", {}, "otočka"), " – vždy aspoň oranžová: 1 stres na zelené/bílé křivce, 2 na oranžové, 3 na nebezpečné."),
+    ),
+    h("h4", {}, label("Stres a akce")),
+    h("ul", {}, li(`Stresové body ${ship.stressPoints}/${ship.stats.stressMax}: bez dostatku se manévr vůbec nenabídne.`), li("Rovně stejnou rychlostí je zdarma; jakákoli změna rychlosti nebo úhlu stojí 1 akci „úprava pohybu“ (akce na kolo: 2)."), li("Dráha nehlídá překážky: srážka s lodí, asteroidem, kometou nebo okrajem = 15 zranění a odmrštění; bouře vypne štíty a lasery.")),
+  );
+}
+
 /** Panel „Manévr“ (náhled nakreslené dráhy: směr, rychlost, úhel, náročnost). */
 function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLElement {
   const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
@@ -197,7 +233,7 @@ function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLEle
   return h(
     "div",
     { class: "pnl bb-maneuver" },
-    h("div", { class: "ttl" }, label("Manévr")),
+    h("div", { class: "ttl man-ttl" }, label("Manévr"), h("button", { class: "px tiny qbtn", title: "Nápověda: rychlosti, úhly a barvy manévrů", onclick: () => infoDialog({ title: "Manévry – nápověda", body: maneuverHelp(ship), wide: true }) }, "?")),
     h(
       "div",
       { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] : "Neplatný manévr" },

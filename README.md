@@ -153,6 +153,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.124 – Panel Manévr má otazník: otevře nápovědu s pravidly dráhy, rychlostí (včetně aktuálního maxima lodi), úhlů, barev náročnosti, stresu a akcí.
 - v3.123 – Manévry: krok kurzu 10° (dřív 15°; limity úhlu 90/90/90/60/40° podle rychlosti, ostrý úhel od 70°, při rychlosti 4+ od 40°, zelený do 40°). Barvy náročnosti vyměněny: prudký manévr se stresem je **oranžový**, nebezpečný (stres + zranění) **červený** – v tečkách kolem lodi, v panelu i ve statistikách.
 - v3.122 – Jedno tlačítko ŠTÍT místo dvou: okénko má záložky PŘESUNOUT (1 akce, −/+ jako dosud, dole ↺ reset) a DOBÍT (3 technologie – žluté + u segmentů, potvrzení druhým klikem na záložku DOBÍT n/2). Energetický štít má jen záložku DOBÍT s ukazatelem zásoby (modrá = teď, žlutá = co přibude). Okénko jde otevřít i bez volné akce (jen dobití); klik na hotový ŠTÍT ho znovu otevře místo resetu.
 - v3.121 – Štíty podle druhu zbraně: energetický (dřív celolodní) lasery jen vybíjejí, projektily (torpédo, mina, kulomet, srážky, komety) prorazí 30 % do trupu; segmentový (kinetický) projektil zachytí celý za 1 bod, laser ubere 1 bod a 60 % pronikne do trupu. Nová akce „Dobít štít“ za 3 body technologie (nebere akci, 1× za kolo, hned): energetický +40, segmentový +2 body do zvolených segmentů. Vše laditelné v sekci Štíty. Log hlásí průraz/průnik. Boti (Pilot, Eso) volí zbraň podle štítu cíle a dobíjejí štít, když je slabý. Popisy modulů a karta v obchodě doplněny.
