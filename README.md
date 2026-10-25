@@ -167,6 +167,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.143 – Výbava: v pruhu „Váha a rychlost“ jsou přímo moduly – každý zabírá šířku podle své váhy (barva kategorie, ikona a zkratka), munice jako žlutě šrafovaná část bloku, modul z nákladu průhlednější; bublina ukáže „modul 1 + munice 3 (3 × 1) = 4“. Pod bloky zůstává barevná linka podle výsledné max. rychlosti, žluté značky prahů rychlosti zůstávají.
 - v3.142 – **Mlha války přesně po hranici dohledu.** Cizí lodě se už neposílají 160 jednotek před hranicí (nevplouvají, objeví se až v dohledu – i jejich jmenovky), komety jen když je v dohledu jádro nebo kus ocasu, bouře jen když je v dohledu aspoň část mraku; torpéda, miny a trosky byly jen v dohledu už dřív. Paměť asteroidů zůstává.
 - v3.141 – Komety mají náhodnou rychlost: každá nová kometa dostane 80–120 % základní rychlosti (zaokrouhleno na 10); rozptyl je v ladění → Komety „Rozptyl rychlosti (± %)“. Bublina komety na mapě ukazuje její skutečnou rychlost.
 - v3.140 – Bitevník má **10 bodů technologie** (stíhač dál 6 ze sekce Skener); nový parametr ladění → Loď „Bitevník – body technologie“. Popis trupu doplněn.

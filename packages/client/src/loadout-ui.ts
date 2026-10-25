@@ -906,99 +906,50 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     h("span", { title: `Součet váhy modulů (včetně munice). Každých ${WEIGHT.perSpeed} váhy = −1 max. rychlost` }, icon("weight", "#94a3b8", 10), ` ${weight}`),
     h("span", { title: "Maximální rychlost lodi s touto výbavou" }, icon("speed", "#94a3b8", 10), ` ${maxSpeed}`),
   );
-  /* --- pruh váhy a rychlosti: dílky po 0,5, barva podle výsledné max. rychlosti, žluté značky = prahy --- */
+  /* --- pruh váhy a rychlosti: dílky po 0,5 (barva podle výsledné max. rychlosti) a v něm moduly – každý zabírá
+         šířku podle váhy (barva kategorie, munice žlutě šrafovaně); žluté značky = prahy rychlosti --- */
   const weightBar = (() => {
     const per = Math.max(0.1, WEIGHT.perSpeed);
     const base = (HULLS[loadout.hullId] ?? HULLS.fighter).profile.maxSpeed + (PILOTS[loadout.pilotId]?.mods.maxSpeed ?? 0);
     const maxW = per * (base - 1) + per; // až do rychlosti 1
     const step = Math.max(0.5, Math.ceil((maxW / 24) * 2) / 2); // nejvýš ~24 dílků
-    const bar = h("div", { class: "wbar" });
+    const fmt = (n: number) => (Math.round(n * 100) / 100).toString().replace(".", ",");
+    const cells = h("div", { class: "wcells" });
     for (let w = 0; w < maxW - 1e-9; w += step) {
       const sp = Math.max(1, base - Math.floor(w / per));
-      const edge = w > 0 && Math.abs((w / per) % 1) < 1e-9;
-      if (edge) bar.append(h("i", { class: "wedge", title: `od váhy ${w}: max. rychlost ${sp}` }));
-      bar.append(h("i", { class: `wseg ${w < weight ? (sp >= base - 1 ? "g" : sp >= base - 2 ? "y" : "r") : ""}`, title: `váha ${w}–${w + step}: max. rychlost ${sp}` }));
+      cells.append(h("i", { class: `wseg ${w < weight ? (sp >= base - 1 ? "g" : sp >= base - 2 ? "y" : "r") : ""}`, title: `váha ${w}–${w + step}: max. rychlost ${sp}` }));
     }
-    const over = weight >= maxW ? h("span", { class: "wover" }, "+") : null;
-    /* návrh: moduly přímo v pruhu – každý zabírá šířku podle váhy (modul plně, munice šrafovaně) */
-    const wvar = (window as unknown as { __wbarVariant?: string }).__wbarVariant as "A" | "B" | undefined;
-    const fmt = (n: number) => (Math.round(n * 100) / 100).toString().replace(".", ",");
-    const modStrip = (() => {
-      if (!wvar) return null;
-      const items: ModuleInstance[] = [...loadout.modules, ...(loadout.cargo ?? [])];
-      const strip = h("div", { class: `wmods ${wvar === "A" ? "inbar" : ""}` });
-      let acc = 0;
-      for (const m of items) {
-        const def = MODULES[m.type];
-        const wm = def.weight;
-        const wa = (def.ammoWeight ?? 0) * (m.ammo ?? 0);
-        const col = moduleColor(m.type);
-        const inCargo = (loadout.cargo ?? []).includes(m);
-        const block = h("span", { class: `wmod ${inCargo ? "cargo" : ""}`, style: `left:${(acc / maxW) * 100}%;width:${((wm + wa) / maxW) * 100}%;--c:${col}`, title: `${def.name}${inCargo ? " (náklad)" : ""}: modul ${fmt(wm)}${wa ? ` + munice ${fmt(wa)}` : ""} = ${fmt(wm + wa)}` });
-        block.append(h("i", { class: "wm-mod", style: `width:${(wm / (wm + wa)) * 100}%` }));
-        if (wa > 0) block.append(h("i", { class: "wm-ammo", style: `width:${(wa / (wm + wa)) * 100}%` }));
-        const lbl = h("span", { class: "wm-lbl" }, icon(def.icon, "#0b1020", 9), (wm + wa) / maxW > 0.11 ? label(def.short) : "");
-        block.append(lbl);
-        strip.append(block);
-        acc += wm + wa;
-      }
-      // prahy rychlosti i ve stripu
-      for (let w = per; w < maxW - 1e-9; w += per) strip.append(h("i", { class: "wm-edge", style: `left:${(w / maxW) * 100}%` }));
-      return strip;
-    })();
-    const legend = wvar ? h("span", { class: "txt muted wtxt" }, h("i", { class: "wleg mod" }), ` modul `, h("i", { class: "wleg ammo" }), ` munice · šířka = váha`) : null;
-    return h(
-      "div",
-      { class: `lo-wbar ${wvar ? `wv${wvar}` : ""}` },
-      h("span", { class: "wlbl" }, label("Váha a rychlost")),
-      wvar ? h("div", { class: "wrow" }, h("div", { class: "wstack" }, bar, modStrip), over) : h("div", { class: "wrow" }, bar, over),
-      h("span", { class: "txt muted wtxt" }, `váha ${weight} → max. rychlost ${maxSpeed} · každých ${per} váhy = −1 rychlost`),
-      legend,
-    );
-  })();
-  /* --- seznam modulů s váhou: modul (šedá) a munice (žlutá) zvlášť; varianty A (tabulka) / B (pruhy) --- */
-  const weightList = (() => {
-    const variant = (window as unknown as { __wlistVariant?: string }).__wlistVariant as "A" | "B" | undefined;
-    if (!variant) return null; // zatím jen návrh (čeká na schválení)
-    const fmt = (n: number) => (Math.round(n * 100) / 100).toString().replace(".", ",");
-    const rows: { m: ModuleInstance; cargo: boolean }[] = [...loadout.modules.map((m) => ({ m, cargo: false })), ...(loadout.cargo ?? []).map((m) => ({ m, cargo: true }))];
-    if (!rows.length) return null;
-    const maxRow = Math.max(0.5, ...rows.map(({ m }) => moduleWeight(m)));
-    let sumMod = 0;
-    let sumAmmo = 0;
-    const list = h("div", { class: `lo-wlist v${variant}` });
-    for (const { m, cargo } of rows) {
+    const mods = h("div", { class: "wmods" });
+    let acc = 0;
+    const items: { m: ModuleInstance; cargo: boolean }[] = [...loadout.modules.map((m) => ({ m, cargo: false })), ...(loadout.cargo ?? []).map((m) => ({ m, cargo: true }))];
+    for (const { m, cargo } of items) {
       const def = MODULES[m.type];
       const wm = def.weight;
       const wa = (def.ammoWeight ?? 0) * (m.ammo ?? 0);
-      sumMod += wm;
-      sumAmmo += wa;
+      const tot = wm + wa;
+      if (tot <= 0) continue;
       const col = moduleColor(m.type);
-      const slotName = cargo ? "náklad" : (hull.slots.find((x) => x.id === m.slot)?.name ?? m.slot);
-      const ammoTxt = def.ammo ? ` (${m.ammo ?? 0}×${fmt(def.ammoWeight ?? 0)})` : "";
-      const row = h("div", { class: `wl-row ${cargo ? "cargo" : ""}`, title: `${def.name} – ${slotName}: modul ${fmt(wm)}${def.ammo ? `, munice ${fmt(wa)}${ammoTxt}` : ""} = ${fmt(wm + wa)}` });
-      row.append(h("span", { class: "wl-name", style: `color:${col}` }, icon(def.icon, col, 11), label(def.name)), h("span", { class: "wl-slot muted" }, label(slotName)));
-      if (variant === "A") {
-        row.append(
-          h("span", { class: "wl-num mod" }, icon("weight", "#94a3b8", 10), ` ${fmt(wm)}`),
-          def.ammo ? h("span", { class: "wl-num ammo" }, icon("weight", "#fbbf24", 10), ` ${fmt(wa)}`) : h("span", { class: "wl-num ammo muted" }, "–"),
-          h("span", { class: "wl-num tot" }, `= ${fmt(wm + wa)}`),
-        );
-      } else {
-        const bar = h("span", { class: "wl-bar" });
-        bar.append(h("i", { class: "mod", style: `width:${(wm / maxRow) * 100}%` }));
-        if (wa > 0) bar.append(h("i", { class: "ammo", style: `width:${(wa / maxRow) * 100}%` }));
-        row.append(bar, h("span", { class: "wl-num mod" }, fmt(wm)), h("span", { class: "wl-num ammo" }, wa > 0 ? `+${fmt(wa)}` : ""), h("span", { class: "wl-num tot" }, `= ${fmt(wm + wa)}`));
-      }
-      list.append(row);
+      const block = h("span", { class: `wmod ${cargo ? "cargo" : ""}`, style: `left:${(acc / maxW) * 100}%;width:${(Math.min(tot, Math.max(0, maxW - acc)) / maxW) * 100}%;--c:${col}`, title: `${def.name}${cargo ? " (náklad)" : ""}: modul ${fmt(wm)}${wa ? ` + munice ${fmt(wa)} (${m.ammo ?? 0} × ${fmt(def.ammoWeight ?? 0)})` : ""} = ${fmt(tot)}` });
+      block.append(h("i", { class: "wm-mod", style: `width:${(wm / tot) * 100}%` }));
+      if (wa > 0) block.append(h("i", { class: "wm-ammo", style: `width:${(wa / tot) * 100}%` }));
+      block.append(h("span", { class: "wm-lbl" }, icon(def.icon, "#0b1020", 9), tot / maxW > 0.11 ? label(def.short) : ""));
+      mods.append(block);
+      acc += tot;
     }
-    const foot = h("div", { class: "wl-foot" }, h("span", { class: "wl-name muted" }, label("celkem")), h("span", { class: "wl-slot" }), variant === "B" ? h("span", { class: "wl-legend" }, h("i", { class: "mod" }), label("modul"), h("i", { class: "ammo" }), label("munice")) : null, variant === "A" ? h("span", { class: "wl-num mod" }, icon("weight", "#94a3b8", 10), ` ${fmt(sumMod)}`) : h("span", { class: "wl-num mod" }, fmt(sumMod)), variant === "A" ? h("span", { class: "wl-num ammo" }, icon("weight", "#fbbf24", 10), ` ${fmt(sumAmmo)}`) : h("span", { class: "wl-num ammo" }, `+${fmt(sumAmmo)}`), h("span", { class: "wl-num tot" }, `= ${fmt(sumMod + sumAmmo)}`));
-    list.append(foot);
-    return h("div", { class: "lo-wlist-wrap" }, h("span", { class: "wlbl" }, label("Moduly a váha")), list);
+    const track = h("div", { class: "wtrack" }, cells, mods);
+    for (let w = per; w < maxW - 1e-9; w += per) track.append(h("i", { class: "wedge", style: `left:${(w / maxW) * 100}%`, title: `od váhy ${w}: max. rychlost ${Math.max(1, base - Math.floor(w / per))}` }));
+    const over = weight >= maxW ? h("span", { class: "wover", title: `váha ${weight} přesahuje pruh (${maxW})` }, "+") : null;
+    return h(
+      "div",
+      { class: "lo-wbar" },
+      h("span", { class: "wlbl" }, label("Váha a rychlost")),
+      h("div", { class: "wrow" }, track, over),
+      h("span", { class: "txt muted wtxt" }, `váha ${weight} → max. rychlost ${maxSpeed} · každých ${per} váhy = −1 rychlost · `, h("i", { class: "wleg ammo" }), ` munice`),
+    );
   })();
   const hint = !ro && (pickSlot || pickType) ? h("div", { class: "lo-pickhint txt" }, pickSlot ? `Slot „${hull.slots.find((x) => x.id === pickSlot)?.name ?? pickSlot}“ vybraný – klikni na modul v obchodě (Esc = zrušit).` : `${MODULES[pickType!].name}: klikni na volný slot v nákresu, kam ho dát (nebo znovu na modul = zrušit).`) : null;
   // rozvržení B: vlevo loď + piloti pod sebou, uprostřed nákres s pruhem váhy, vpravo souhrn a obchod
-  const mid = h("div", { class: "lo-mid-col" }, diagram, weightBar, weightList, hint);
+  const mid = h("div", { class: "lo-mid-col" }, diagram, weightBar, hint);
   const right = h("div", { class: "lo-right-col" }, summary, ro ? null : shopEl);
   const root = h("div", { class: `loadout ${opts.compact ? "compact" : ""} ${opts.hideHead ? "nohead" : ""}` }, opts.hideHead ? null : head, mid, right);
   rootRef = root;

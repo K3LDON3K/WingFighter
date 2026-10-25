@@ -4033,35 +4033,45 @@ button.start-chip.on:hover:not(:disabled) {
   align-items: center;
   gap: 4px;
 }
-.lo-wbar .wbar {
+.lo-wbar .wtrack {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 18px;
+}
+.lo-wbar .wcells {
+  position: absolute;
+  inset: 0;
   display: flex;
   gap: 2px;
-  align-items: center;
 }
-.lo-wbar .wbar i {
-  display: block;
-  height: 12px;
+.lo-wbar .wcells i.wseg {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
   border: 1px solid #0a0e1c;
-}
-.lo-wbar .wbar i.wseg {
-  width: 10px;
-  flex: 0 0 10px;
   background: #1e293b;
 }
-.lo-wbar .wbar i.wseg.g {
+.lo-wbar .wcells i.wseg.g {
   background: #4ade80;
 }
-.lo-wbar .wbar i.wseg.y {
+.lo-wbar .wcells i.wseg.y {
   background: #fbbf24;
 }
-.lo-wbar .wbar i.wseg.r {
+.lo-wbar .wcells i.wseg.r {
   background: #f87171;
 }
-.lo-wbar .wbar i.wedge {
+.lo-wbar .wtrack .wedge {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
   width: 3px;
-  flex: 0 0 3px;
+  margin-left: -1px;
   background: #fbbf24;
-  border-color: #78350f;
+  border: 1px solid #78350f;
+  box-sizing: border-box;
+  pointer-events: none;
 }
 .lo-wbar .wover {
   color: #f87171;
@@ -5130,142 +5140,16 @@ body.drag-on * {
   justify-content: center;
 }
 
-/* ---- výbava: seznam modulů s váhou (modul šedě, munice žlutě) ---- */
-.lo-wlist-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin: 8px 0 2px;
-}
-.lo-wlist-wrap .wlbl {
-  font-size: 11px;
-  color: #64748b;
-  letter-spacing: 1px;
-}
-.lo-wlist {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-family: var(--txt);
-  font-size: 12px;
-}
-.lo-wlist .wl-row,
-.lo-wlist .wl-foot {
-  display: grid;
-  grid-template-columns: 118px 72px minmax(60px, 1fr) 34px 38px 44px;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 6px;
-  background: #0b1222;
-  border: 1px solid #1e293b;
-}
-.lo-wlist.vA .wl-row,
-.lo-wlist.vA .wl-foot {
-  grid-template-columns: 118px 1fr 58px 58px 54px;
-}
-.lo-wlist .wl-row.cargo {
-  opacity: 0.75;
-  border-style: dashed;
-}
-.lo-wlist .wl-foot {
-  background: transparent;
-  border-color: transparent;
-  border-top: 1px solid #334155;
-  margin-top: 2px;
-  color: #e2e8f0;
-}
-.lo-wlist .wl-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-family: var(--px);
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.lo-wlist .wl-slot {
-  font-size: 11px;
-  white-space: nowrap;
-}
-.lo-wlist .wl-num {
-  text-align: right;
-  white-space: nowrap;
-  display: inline-flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 3px;
-}
-.lo-wlist .wl-num.mod {
-  color: #cbd5e1;
-}
-.lo-wlist .wl-num.ammo {
-  color: #fbbf24;
-}
-.lo-wlist .wl-num.tot {
-  color: #f8fafc;
-}
-.lo-wlist .wl-bar {
-  display: flex;
-  min-width: 60px;
-  height: 8px;
-  background: #111827;
-  border: 1px solid #1f2937;
-}
-.lo-wlist .wl-bar i,
-.lo-wlist .wl-legend i {
-  display: block;
-  height: 100%;
-}
-.lo-wlist .wl-bar i.mod,
-.lo-wlist .wl-legend i.mod {
-  background: #94a3b8;
-}
-.lo-wlist .wl-bar i.ammo,
-.lo-wlist .wl-legend i.ammo {
-  background: #fbbf24;
-}
-.lo-wlist .wl-legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 10px;
-  color: #64748b;
-}
-.lo-wlist .wl-legend i {
-  width: 10px;
-  height: 8px;
-}
-
-/* ---- návrh: moduly přímo v pruhu váhy ---- */
-.lo-wbar .wstack {
-  position: relative;
-  display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-  flex-direction: column;
-  align-items: stretch;
-}
+/* ---- moduly přímo v pruhu váhy ---- */
 .lo-wbar .wmods {
-  position: relative;
-  height: 18px;
-  width: auto;
-  align-self: stretch;
-  margin-top: 2px;
-}
-.lo-wbar .wmods.inbar {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   height: 14px;
-  margin: 0;
   pointer-events: none;
 }
-.lo-wbar.wvA .wbar i {
-  height: 14px;
-}
-.lo-wbar .wmods.inbar .wmod {
+.lo-wbar .wmods .wmod {
   pointer-events: auto;
 }
 .lo-wbar .wmod {
@@ -5303,19 +5187,6 @@ body.drag-on * {
   letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
-}
-.lo-wbar .wmods .wm-edge {
-  position: absolute;
-  top: -2px;
-  bottom: -2px;
-  width: 3px;
-  margin-left: -1px;
-  background: #fbbf24;
-  border: 1px solid #78350f;
-  pointer-events: none;
-}
-.lo-wbar .wmods.inbar .wm-edge {
-  display: none;
 }
 .lo-wbar .wleg {
   display: inline-block;
