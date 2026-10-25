@@ -36,7 +36,7 @@ export const HULLS: Record<string, HullDef> = {
   battleship: {
     id: "battleship",
     name: "Bitevník",
-    description: "Střední loď, asi 3× větší než stíhač. Dostřel všech zbraní o 25 % delší. Šest slotů: příď, záď, přední a zadní levobok, přední a zadní pravobok. Příď + záď, oba levoboky i oba pravoboky jde spojit v jeden velký slot. Pomalejší (max. rychlost 4), otočka jen z rychlosti 2–3, větší trup a náklad. Stojí 2 lodní body.",
+    description: "Střední loď, asi 3× větší než stíhač. Dostřel všech zbraní o 25 % delší, lasery mají do všech směrů stejnou výseč (±20°). Šest slotů: příď, záď, přední a zadní levobok, přední a zadní pravobok. Příď + záď, oba levoboky i oba pravoboky jde spojit v jeden velký slot. Pomalejší (max. rychlost 4), otočka jen z rychlosti 2–3, větší trup a náklad. Stojí 2 lodní body.",
     radius: 58,
     points: 2,
     // kolizní model podle spritu (50×40 px × 3): trup od zádi k přídi, špice, dvě gondoly na bocích
@@ -64,6 +64,7 @@ export const HULLS: Record<string, HullDef> = {
     ],
     profile: BATTLESHIP_PROFILE,
     rangeMul: 1.25,
+    sameArcs: true,
   },
 };
 
@@ -236,7 +237,8 @@ export function facingAngle(f: Facing | undefined): number {
 }
 
 /** Poloviční výseč laserů podle natočení modulu. */
-export function laserHalfArc(f: Facing | undefined): number {
+export function laserHalfArc(f: Facing | undefined, hullId?: string): number {
+  if (hullId && HULLS[hullId]?.sameArcs) return LASER.halfArc; // bitevník: stejná výseč do všech směrů
   return f === "back" ? LASER.halfArcBack : f === "left" || f === "right" ? LASER.halfArcSide : LASER.halfArc;
 }
 

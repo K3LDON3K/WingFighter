@@ -422,21 +422,20 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   const startDrag = (ev: PointerEvent, m: ModuleInstance, grp: SVGGElement, box: Box) => {
     const svgRoot = grp.ownerSVGElement!;
     const start = { x: ev.clientX, y: ev.clientY };
-    let ghost: SVGGElement | null = null;
+    let ghost: SVGSVGElement | null = null;
     dragMoved = false;
-    const toSvg = (cx: number, cy: number) => {
-      const r = svgRoot.getBoundingClientRect();
-      const vb = svgRoot.viewBox.baseVal;
-      return { x: ((cx - r.left) / r.width) * vb.width, y: ((cy - r.top) / r.height) * vb.height };
-    };
+    // duch = samostatné SVG nad celou stránkou (uvnitř nákresu by ho ořízl okraj a zmizel by pod obchodem)
+    const r0 = svgRoot.getBoundingClientRect();
+    const pxScale = r0.width / svgRoot.viewBox.baseVal.width;
+    const gw = (box.w + 16) * pxScale;
+    const gh = (box.h + 16) * pxScale;
     const onMove = (e: PointerEvent) => {
       if (!dragMoved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) return;
       if (!dragMoved) {
         dragMoved = true;
-        ghost = grp.cloneNode(true) as SVGGElement;
-        ghost.classList.add("drag-ghost");
-        ghost.style.pointerEvents = "none";
-        svgRoot.append(ghost);
+        ghost = svgEl("svg", { viewBox: `${box.x - 8} ${box.y - 8} ${box.w + 16} ${box.h + 16}`, width: gw, height: gh, class: "drag-ghost-html" });
+        ghost.append(grp.cloneNode(true) as SVGGElement);
+        document.body.append(ghost);
         grp.classList.add("dragging");
         svgRoot.classList.add("drag-on");
         document.body.classList.add("drag-on");
@@ -448,8 +447,8 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         }
         (document.querySelector(".ptip") as HTMLElement | null)?.style.setProperty("display", "none");
       }
-      const p = toSvg(e.clientX, e.clientY);
-      ghost!.setAttribute("transform", `translate(${p.x - (box.x + box.w / 2)}, ${p.y - (box.y + box.h / 2)})`);
+      ghost!.style.left = `${e.clientX - gw / 2}px`;
+      ghost!.style.top = `${e.clientY - gh / 2}px`;
       // zvýraznit cíl pod kurzorem
       ghost!.style.display = "none";
       const el = document.elementFromPoint(e.clientX, e.clientY);

@@ -109,6 +109,8 @@ export interface HullDef {
   profile: ManeuverProfile;
   /** Násobek dostřelu všech zbraní (bitevník 1,25). */
   rangeMul?: number;
+  /** Lasery mají do všech směrů stejnou výseč jako dopředu (bitevník). */
+  sameArcs?: boolean;
 }
 
 /** Modifikátory pilota (přičítají se ke statistikám lodi). */

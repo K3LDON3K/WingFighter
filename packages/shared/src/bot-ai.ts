@@ -15,7 +15,7 @@ import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from ".
 import { listManeuvers, maneuverEnd, maneuverPath, makeManeuver } from "./maneuvers.ts";
 import { insideMap } from "./mapshape.ts";
 import { pointInStorm } from "./mapgen.ts";
-import { actionCost, aimPose, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, sectorCoverage, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
+import { actionCost, aimPose, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, sectorHit, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
 import type { Rng } from "./rng.ts";
 import { laserHalfArc, laserRange, mgRange, moduleWorking, profileOf, torpedoLockRange, torpedoPointRange } from "./ships.ts";
 import type { BotLevel, GameState, Maneuver, Segments, Ship, ShipOrders, Shot } from "./types.ts";
@@ -56,9 +56,10 @@ function offenseAt(me: Ship, mePose: Pose, enemy: Ship, pose: Pose): number {
       if (odds.coverage > 0) dmg += odds.expectedDamage;
     } else if (mod.type === "mg" && (mod.ammo ?? 0) > 0) {
       const aim = aimPose(shooter, mod);
-      const cov = sectorCoverage(aim, mgRange(shooter), MG.halfArc, target);
+      const ha = sectorHit(aim, mgRange(shooter), MG.halfArc, target);
+      const cov = ha.coverage;
       if (cov <= 0) continue;
-      dmg += Math.min(MG.burst, mod.ammo ?? 0) * MG.damage * mgHitChance(dist(aim, target), false, mgRange(shooter)) * cov;
+      dmg += Math.min(MG.burst, mod.ammo ?? 0) * MG.damage * mgHitChance(ha.meanDist, false, mgRange(shooter)) * cov;
     }
   }
   return dmg;

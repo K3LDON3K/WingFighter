@@ -153,6 +153,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.135 – Pásmo dostřelu laserů podle zasažené plochy: nejbližší pásmo, ve kterém leží aspoň pětina trupu ve výseči (dřív podle středu cíle) – u bitevníku s přídí zblízka platí bonus +1 kostka; vzorkování trupu je úměrné ploše. Kulomet počítá šanci z průměrné vzdálenosti zasažené části. Náhled střelby ukazuje pásmo („pásmo 1 · +1 kostka“). Bitevník: lasery mají do všech směrů stejnou výseč ±20°. Duch taženého modulu je nad celou stránkou (nezmizí pod obchodem).
 - v3.134 – Startovní rozestupy lodí podle velikosti: sousední lodě ve formaci dělí součet jejich poloměrů + 36 (stíhač–stíhač 68, bitevník–stíhač 110), takže se bitevník se stíhačem nepřekrývají.
 - v3.133 – Tažení v editoru výbavy: modul tažený do obchodu zčervená obchod s bannerem „PRODAT MODUL · +cena“, modul tažený z obchodu zezelená nákres lodi s bannerem „KOUPIT · −cena · pusť na volný slot“; při tažení se už neoznačuje text.
 - v3.132 – Letka: lodní body jsou strop, ne povinnost. Hráč začíná s jednou lodí; u záložek letky je „+ Stíhač“ / „+ Bitevník“ (jen trupy, které se vejdou do zbývajících bodů) a ✕ u lodi (moduly se prodají). Bitvu jde zahájit i s nevyužitými body. Boti body využijí celé a při ≥ 2 bodech mají 50% šanci na bitevník (náhodná výbava). Zakladatel může letku ručně vybaveného bota skládat stejně.

@@ -886,7 +886,8 @@ function buildOverlay(view: ViewModel): Overlay {
             const pct = Math.round(odds.hitChance * 100);
             overlay.targetId = tgt.id;
             const cov = Math.round(odds.coverage * 100);
-            overlay.laserOdds = { x: tgt.x, y: tgt.y, text: `${pct} %`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171", sub: odds.coverage < 1 ? `${cov} % v dosahu` : undefined };
+            const bandTxt = odds.rangeBand === 1 ? "pásmo 1 · +1 kostka" : odds.rangeBand === 3 ? "pásmo 3 · obránce +1" : "pásmo 2";
+            overlay.laserOdds = { x: tgt.x, y: tgt.y, text: `${pct} %`, color: pct >= 60 ? "#4ade80" : pct >= 35 ? "#fbbf24" : "#f87171", sub: odds.coverage < 1 ? `${cov} % v dosahu · ${bandTxt}` : bandTxt };
             if (odds.coverage < 1) {
               const arc = laserArcOf(ship, laA.mod.id);
               overlay.partialTarget = { id: tgt.id, x: arc.x, y: arc.y, heading: arc.heading, range: arc.range, halfArc: arc.halfArc };

@@ -911,6 +911,15 @@ describe("bitevník", () => {
     const pos = modulePos(ship, lo.modules[1]);
     expect(pos.y).toBeLessThan(-30);
     expect(modulePos(ship, { slot: "left" }).x).toBeLessThan(pos.x);
+    // pásmo dostřelu podle zasažené plochy: příď bitevníku v pásmu 1 (střed až v pásmu 2) → bonus zblízka
+    const gB = game();
+    const shooter = place(gB, "ship-p1-0", 500, 500, 0);
+    const big = place(gB, "ship-p2-0", 600, 500, Math.PI); // střed ~104 od laseru (pásmo 2), přední část trupu do 100 (pásmo 1)
+    big.loadout = { ...big.loadout, hullId: "battleship" };
+    big.stats = computeStats(big.loadout);
+    const o1 = laserOdds(shooter, big);
+    expect(Math.ceil(104 / LASER.band)).toBe(2);
+    expect(o1.rangeBand).toBe(1);
     // startovní rozestupy podle velikosti: bitevník a stíhač v jedné letce se nepřekrývají
     const g2 = createGame({ players: [{ id: "A", name: "A", team: 0, isBot: true, loadouts: [structuredClone(DEFAULT_LOADOUT), { hullId: "battleship", pilotId: "kadet", modules: [] }] }, { id: "B", name: "B", team: 1, isBot: true, loadouts: [structuredClone(DEFAULT_LOADOUT)] }], settings: { mode: "tdm", turnLimit: 40, shipPoints: 3, allowedModules: {}, botLoadout: "default", map: { ...DEFAULT_MAP, size: "small", seed: 5 } }, tuning: DEFAULT_TUNING });
     const [s1, s2] = g2.ships.filter((s) => s.ownerId === "A");

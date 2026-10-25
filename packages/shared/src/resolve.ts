@@ -63,11 +63,23 @@ export function aimPose(ship: Pose, mod: ModuleInstance | undefined): Pose {
  * v dostřelu i v úhlu výseče. Cíl jde zaměřit, jakmile je podíl > 0; šance na zásah se jím násobí.
  */
 export function sectorCoverage(aim: Pose, range: number, halfArc: number, target: Ship): number {
+  return sectorHit(aim, range, halfArc, target).coverage;
+}
+
+/**
+ * Zasažená plocha cíle ve výseči: podíl (coverage), průměrná vzdálenost zasažených bodů (meanDist)
+ * a pásmo dostřelu podle plochy: nejbližší pásmo, ve kterém leží aspoň pětina zasažené plochy
+ * (jinak pásmo s největší plochou). U velké lodi tak bonus zblízka platí, když je v blízkém pásmu kus trupu, ne jen pixel.
+ */
+export function sectorHit(aim: Pose, range: number, halfArc: number, target: Ship): { coverage: number; meanDist: number; band: number } {
   const circles = shipCircles(target, target.stats.colliders ?? [{ x: 0, y: 0, r: target.stats.radius }]);
-  const N = 5; // mřížka (2N+1)² bodů na kruh
+  const STEP = 3; // mřížka s pevným krokem (jednotky) – počet bodů odpovídá ploše, velký trup váží víc než špice
   let inside = 0;
   let total = 0;
+  let sumDist = 0;
+  const perBand = [0, 0, 0, 0];
   for (const c of circles) {
+    const N = Math.max(2, Math.ceil(c.r / STEP));
     for (let i = -N; i <= N; i++)
       for (let j = -N; j <= N; j++) {
         const dx = (i / N) * c.r;
@@ -75,10 +87,20 @@ export function sectorCoverage(aim: Pose, range: number, halfArc: number, target
         if (dx * dx + dy * dy > c.r * c.r) continue;
         total++;
         const p = { x: c.x + dx, y: c.y + dy };
-        if (dist(aim, p) <= range && inArc(aim, p, halfArc)) inside++;
+        const d = dist(aim, p);
+        if (d <= range && inArc(aim, p, halfArc)) {
+          inside++;
+          sumDist += d;
+          perBand[clamp(Math.ceil(d / LASER.band), 1, 3)]++;
+        }
       }
   }
-  return total ? inside / total : 0;
+  const dCenter = dist(aim, target);
+  if (!inside) return { coverage: 0, meanDist: dCenter, band: clamp(Math.ceil(dCenter / LASER.band), 1, 3) };
+  let band = 0;
+  for (let b = 1; b <= 3; b++) if (perBand[b] >= inside / 5) { band = b; break; }
+  if (!band) band = perBand.indexOf(Math.max(perBand[1], perBand[2], perBand[3]));
+  return { coverage: inside / total, meanDist: sumDist / inside, band };
 }
 import type { Rng } from "./rng.ts";
 import { applyTuning } from "./tuning.ts";
@@ -769,7 +791,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     for (const { shot, mod: lmod } of shotsOfType(ship, o, "laser")) {
     const prefId = shotTargetId(o, shot);
     const aim = aimPose(ship, lmod);
-    const arc = laserHalfArc(lmod.facing);
+    const arc = laserHalfArc(lmod.facing, ship.loadout.hullId);
 
     const deb = state.debris.find((d) => d.id === prefId);
     if (deb && !shotDebris.has(deb.id)) {
@@ -823,9 +845,9 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (candidates.length === 0) continue;
     let target = candidates.find((c) => c.id === prefId);
     if (!target) target = candidates.reduce((best, c) => (dist(aim, c) < dist(aim, best) ? c : best));
-    const d = dist(aim, target);
-    const rangeBand = clamp(Math.ceil(d / LASER.band), 1, 3);
-    const coverage = sectorCoverage(aim, laserRange(ship), arc, target);
+    const hitArea = sectorHit(aim, laserRange(ship), arc, target);
+    const rangeBand = hitArea.band;
+    const coverage = hitArea.coverage;
     const useLock = ship.lockTargetId === target.id;
     const outcome = resolveAttack(rng, {
       attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0),
@@ -897,7 +919,9 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     mod.ammo = (mod.ammo ?? 0) - shots;
     refreshShip(ship);
     const victimShip = target.kind === "ship" ? shipById(state, target.id) : undefined;
-    const p = mgHitChance(dist(aim, target.pos), !!victimShip && evading.has(victimShip.id), mgR) * (victimShip ? sectorCoverage(aim, mgR, MG.halfArc, victimShip) : 1);
+    // kulomet: šance podle průměrné vzdálenosti zasažené části trupu (ne středu) × podíl trupu ve výseči
+    const hitArea = victimShip ? sectorHit(aim, mgR, MG.halfArc, victimShip) : undefined;
+    const p = mgHitChance(hitArea ? hitArea.meanDist : dist(aim, target.pos), !!victimShip && evading.has(victimShip.id), mgR) * (hitArea ? hitArea.coverage : 1);
     let hits = 0;
     const spread: number[] = [];
     for (let i = 0; i < shots; i++) {
@@ -1693,7 +1717,7 @@ export function checkVictory(state: GameState): GameResult | null {
 export function laserTarget(state: GameState, ship: Ship, preferredTargetId?: string, laserModuleId?: string): Ship | undefined {
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
-  const arc = laserHalfArc(lmod?.facing);
+  const arc = laserHalfArc(lmod?.facing, ship.loadout.hullId);
   if (inStorm(state, ship)) return undefined;
   const candidates = state.ships.filter(
     (e) => e.alive && e.team !== ship.team && sectorCoverage(aim, laserRange(ship), arc, e) > 0 && !lineBlocked(state.asteroids, aim, e) && !laserBlockedByStorm(state, ship, e),
@@ -1710,7 +1734,7 @@ export function laserReach(state: GameState, ship: Ship, p: Vec, laserModuleId?:
   const aim = aimPose(ship, lmod);
   if (!cometOnMap(state, p)) return "ještě není na mapě";
   if (dist(aim, p) > laserRange(ship)) return "mimo dostřel";
-  if (!inArc(aim, p, laserHalfArc(lmod?.facing))) return "mimo výseč laseru";
+  if (!inArc(aim, p, laserHalfArc(lmod?.facing, ship.loadout.hullId))) return "mimo výseč laseru";
   if (lineBlocked(state.asteroids, aim, p)) return "v cestě je asteroid";
   if (laserBlockedByStorm(state, ship, p)) return "cíl je v bouři";
   return null;
@@ -1721,7 +1745,7 @@ export function laserReachShip(state: GameState, ship: Ship, target: Ship, laser
   if (inStorm(state, ship)) return "loď je v bouři – lasery nefungují";
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
-  const arc = laserHalfArc(lmod?.facing);
+  const arc = laserHalfArc(lmod?.facing, ship.loadout.hullId);
   const cov = sectorCoverage(aim, laserRange(ship), arc, target);
   if (cov > 0) {
     if (lineBlocked(state.asteroids, aim, target)) return "v cestě je asteroid";
@@ -1737,15 +1761,16 @@ export function laserReachShip(state: GameState, ship: Ship, target: Ship, laser
 export function laserArcOf(ship: Ship, laserModuleId?: string): { x: number; y: number; heading: number; halfArc: number; range: number } {
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
-  return { x: aim.x, y: aim.y, heading: aim.heading, halfArc: laserHalfArc(lmod?.facing), range: laserRange(ship) };
+  return { x: aim.x, y: aim.y, heading: aim.heading, halfArc: laserHalfArc(lmod?.facing, ship.loadout.hullId), range: laserRange(ship) };
 }
 
 /** Šance laserů na zásah (aspoň jeden čistý zásah) a očekávané zranění proti danému cíli ze současných pozic. */
 export function laserOdds(ship: Ship, target: Ship, laserModuleId?: string): { hitChance: number; expectedDamage: number; rangeBand: number; coverage: number } {
   const lmod = laserModule(ship, laserModuleId);
   const aim = aimPose(ship, lmod);
-  const rangeBand = clamp(Math.ceil(dist(aim, target) / LASER.band), 1, 3);
-  const coverage = sectorCoverage(aim, laserRange(ship), laserHalfArc(lmod?.facing), target);
+  const hitArea = sectorHit(aim, laserRange(ship), laserHalfArc(lmod?.facing, ship.loadout.hullId), target);
+  const rangeBand = hitArea.band;
+  const coverage = hitArea.coverage;
   const odds = attackOdds({
     attackDice: ship.stats.attack + (rangeBand === 1 ? 1 : 0),
     defenseDice: target.stats.agility + (rangeBand === 3 ? 1 : 0),
@@ -1880,8 +1905,9 @@ export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: stri
   if (!target) return undefined;
   const shots = Math.min(MG.burst, mod.ammo ?? 0);
   const tShip = state.ships.find((x) => x.id === target!.id);
-  const coverage = tShip ? sectorCoverage(aim, mgR, MG.halfArc, tShip) : 1;
-  const hitChance = mgHitChance(dist(aim, target), false, mgR) * coverage;
+  const hitArea = tShip ? sectorHit(aim, mgR, MG.halfArc, tShip) : undefined;
+  const coverage = hitArea ? hitArea.coverage : 1;
+  const hitChance = mgHitChance(hitArea ? hitArea.meanDist : dist(aim, target), false, mgR) * coverage;
   return { targetId: target.id, x: target.x, y: target.y, hitChance, expectedDamage: hitChance * shots * MG.damage, shots, coverage };
 }
 

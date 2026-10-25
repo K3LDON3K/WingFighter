@@ -5035,3 +5035,11 @@ body.drag-on * {
   color: #bbf7d0;
   border-color: #86efac #052e16 #052e16 #86efac;
 }
+.drag-ghost-html {
+  position: fixed;
+  z-index: 1002;
+  pointer-events: none;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 6px #fbbf24);
+  overflow: visible;
+}
