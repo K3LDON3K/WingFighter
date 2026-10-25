@@ -77,6 +77,9 @@ export type ClientMessage =
   | { type: "setBotLevel"; botId: string; level: BotLevel }
   | { type: "removeBot"; botId: string }
   | { type: "setSettings"; settings: Partial<GameSettings> }
+  /** Letka: přidat prázdnou loď daného trupu (musí se vejít do lodních bodů) / odebrat loď (moduly se prodají). */
+  | { type: "addShip"; hullId: string; botId?: string }
+  | { type: "removeShip"; index: number; botId?: string }
   /** Přesun modulu mezi loděmi letky (bez prodeje): do prvního volného slotu cílové lodi. */
   | { type: "moveModule"; fromIndex: number; toIndex: number; moduleId: string; botId?: string }
   | { type: "setTuning"; tuning: Partial<Tuning> }

@@ -257,11 +257,9 @@ class Room {
     };
   }
 
-  /** Nová letka hráče: první loď výchozí sestava, další prázdné stíhače (podle lodních bodů). */
+  /** Nová letka hráče: jedna loď s výchozí sestavou; další si hráč přidá sám (lodní body jsou strop). */
   newFleet(): ShipLoadout[] {
-    const out: ShipLoadout[] = [structuredClone(DEFAULT_LOADOUT)];
-    while (fleetPoints(out) < this.settings.shipPoints) out.push(emptyLoadout());
-    return out;
+    return [structuredClone(DEFAULT_LOADOUT)];
   }
 
   /**
@@ -276,16 +274,14 @@ class Room {
       if (j < 0) break;
       out.splice(j, 1);
     }
-    if (fleetPoints(out) > this.settings.shipPoints) return `příliš mnoho lodních bodů (${fleetPoints(out)}/${this.settings.shipPoints}) – nejdřív prodej výbavu ostatních lodí letky`;
-    while (fleetPoints(out) < this.settings.shipPoints) out.push(emptyLoadout());
+    if (fleetPoints(out) > this.settings.shipPoints) return `příliš mnoho lodních bodů (${fleetPoints(out)}/${this.settings.shipPoints}) – nejdřív odeber nebo prodej jinou loď letky`;
     return out;
   }
 
-  /** Po změně lodních bodů: letky členů doplnit prázdnými loděmi, nebo oříznout (moduly se prodají). */
+  /** Po snížení lodních bodů: letky členů oříznout (moduly odebraných lodí se prodají). */
   resizeFleets(): void {
     for (const m of this.members.values()) {
       if (m.isBot) continue;
-      while (fleetPoints(m.loadouts) < this.settings.shipPoints) m.loadouts.push(emptyLoadout());
       while (fleetPoints(m.loadouts) > this.settings.shipPoints && m.loadouts.length > 1) {
         const gone = m.loadouts.pop()!;
         m.spent -= [...gone.modules, ...(gone.cargo ?? [])].reduce((s, mod) => s + moduleSellPrice(mod), 0);
@@ -518,6 +514,38 @@ export class Hub {
           m.loadouts = fit;
           m.lobbyReady = false;
         }
+        this.broadcastRoom(room);
+        return;
+      }
+      case "addShip": {
+        if (!room || room.game) return;
+        const targetId = msg.botId ?? client.id;
+        const m = room.members.get(targetId);
+        if (!m) return;
+        if (msg.botId && (room.hostId !== client.id || !m.isBot)) return;
+        const hull = HULLS[String(msg.hullId)];
+        if (!hull) return this.error(client, "Neznámý trup.");
+        if (room.settings.allowedHulls?.[hull.id] === 0) return this.error(client, `${hull.name}: v této hře zakázán.`);
+        if (fleetPoints(m.loadouts) + hull.points > room.settings.shipPoints) return this.error(client, `${hull.name} se nevejde do lodních bodů (${fleetPoints(m.loadouts)} + ${hull.points} > ${room.settings.shipPoints}).`);
+        m.loadouts.push(emptyLoadout(hull.id));
+        if (m.isBot) m.manualLoadout = true;
+        else m.lobbyReady = false;
+        this.broadcastRoom(room);
+        return;
+      }
+      case "removeShip": {
+        if (!room || room.game) return;
+        const targetId = msg.botId ?? client.id;
+        const m = room.members.get(targetId);
+        if (!m) return;
+        if (msg.botId && (room.hostId !== client.id || !m.isBot)) return;
+        if (m.loadouts.length <= 1) return this.error(client, "Letka musí mít aspoň jednu loď.");
+        const idx = clampInt(msg.index, 0, m.loadouts.length - 1);
+        const [gone] = m.loadouts.splice(idx, 1);
+        // moduly odebrané lodi se prodají (bot má výbavu zdarma)
+        if (!m.isBot) m.spent -= [...gone.modules, ...(gone.cargo ?? [])].reduce((s, mod) => s + moduleSellPrice(mod), 0);
+        if (m.isBot) m.manualLoadout = true;
+        else m.lobbyReady = false;
         this.broadcastRoom(room);
         return;
       }
@@ -825,7 +853,7 @@ export class Hub {
     const out: ShipLoadout[] = [];
     while (fleetPoints(out) < room.settings.shipPoints) {
       const k = out.length;
-      const lo = this.botLoadout(room);
+      const lo = this.botLoadout(room, room.settings.shipPoints - fleetPoints(out));
       // id modulů musí být v letce unikátní
       lo.modules = lo.modules.map((m) => ({ ...m, id: `s${k}-${m.id}` }));
       out.push(lo);
@@ -833,10 +861,14 @@ export class Hub {
     return out;
   }
 
-  private botLoadout(room: Room): ShipLoadout {
+  private botLoadout(room: Room, pointsLeft = 1): ShipLoadout {
     applyTuning(room.tuning);
     const allowed = room.settings.allowedModules;
-    if (room.settings.botLoadout === "random") return randomLoadout(Math.random, allowed, room.tuning.startBudget);
+    if (room.settings.botLoadout === "random") {
+      // s dostatkem bodů má bot šanci na bitevník (pokud je povolený)
+      const hull = pointsLeft >= HULLS.battleship.points && room.settings.allowedHulls?.battleship !== 0 && Math.random() < 0.5 ? "battleship" : "fighter";
+      return randomLoadout(Math.random, allowed, room.tuning.startBudget, hull);
+    }
     // výchozí sestava ořezaná o zakázané moduly a rozpočet
     const lo = structuredClone(DEFAULT_LOADOUT);
     lo.modules = lo.modules.filter((m) => (allowed[m.type] ?? 99) > 0);

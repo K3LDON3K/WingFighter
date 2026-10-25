@@ -446,7 +446,7 @@ export function shipNames(playerName: string, loadouts: ShipLoadout[]): string[]
 export function validateFleet(loadouts: ShipLoadout[], settings: Pick<GameSettings, "shipPoints" | "allowedModules" | "allowedHulls" | "allowedPilots">, perShipBudget?: number): string | null {
   if (loadouts.length === 0) return "letka je prázdná";
   const pts = fleetPoints(loadouts);
-  if (pts !== settings.shipPoints) return pts < settings.shipPoints ? `využij všechny lodní body (${pts}/${settings.shipPoints})` : `příliš mnoho lodních bodů (${pts}/${settings.shipPoints})`;
+  if (pts > settings.shipPoints) return `příliš mnoho lodních bodů (${pts}/${settings.shipPoints})`;
   const ids = new Set<string>();
   const pilotsUsed = new Set<string>();
   for (const l of loadouts) {
@@ -624,8 +624,8 @@ export function hullOf(loadout: ShipLoadout): HullDef {
 }
 
 /** Náhodná sestava v rámci povolených počtů a rozpočtu (pro boty). */
-export function randomLoadout(rng: () => number, allowed: Partial<Record<ModuleType, number>>, budget: number): ShipLoadout {
-  const lo: ShipLoadout = { hullId: "fighter", pilotId: "kadet", modules: [] };
+export function randomLoadout(rng: () => number, allowed: Partial<Record<ModuleType, number>>, budget: number, hullId = "fighter"): ShipLoadout {
+  const lo: ShipLoadout = { hullId: HULLS[hullId] ? hullId : "fighter", pilotId: "kadet", modules: [] };
   const order = [...MODULE_TYPES].sort(() => rng() - 0.5);
   let spent = 0;
   // nejdřív zbraň (pokud na ni rozpočet stačí) – bot beze zbraně by jen čekal na smrt

@@ -153,6 +153,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.132 – Letka: lodní body jsou strop, ne povinnost. Hráč začíná s jednou lodí; u záložek letky je „+ Stíhač“ / „+ Bitevník“ (jen trupy, které se vejdou do zbývajících bodů) a ✕ u lodi (moduly se prodají). Bitvu jde zahájit i s nevyužitými body. Boti body využijí celé a při ≥ 2 bodech mají 50% šanci na bitevník (náhodná výbava). Zakladatel může letku ručně vybaveného bota skládat stejně.
 - v3.131 – Bitevník: obratnější (úhly 90/90/80/60° podle rychlosti 1–4) a dostřel všech zbraní o 25 % delší (lasery 375, kulomet 188, torpédo zaměření 400 / bod 1500) – platí pro střelbu, náhled výsečí, kruhy dosahu, vysvětlivky i boty.
 - v3.130 – Štít bitevníku se na mapě kreslí jako elipsa protažená ve směru letu (energetický i segmentový, včetně záblesků zásahu); stíhač má dál kruh.
 - v3.129 – Záložky lodí letky na horní hraně panelu lodi jsou kompaktní (ikonka trupu + číslo, pilot ve vysvětlivce) a nelámou se; při více lodích přesahují doprava přes lištu.

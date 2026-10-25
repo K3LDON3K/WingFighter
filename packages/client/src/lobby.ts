@@ -318,7 +318,7 @@ function roomView(m: LobbyModel, net: Net) {
           return h(
             "div",
             { class: "bot-editor" },
-            fleet.length > 1 ? fleetTabs(fleet, t, (i) => ((botTab = i), rerender())) : null,
+            fleet.length > 1 || settings.shipPoints > 1 ? fleetTabs(fleet, t, (i) => ((botTab = i), rerender()), { botId: p.id, onRemoved: () => (botTab = 0) }) : null,
             renderLoadout({ loadout: fleet[t], team: p.team, budget, allowed: room.settings.allowedModules, compact: true, onMoveToShip: (moduleId, toIndex) => net.send({ type: "moveModule", botId: p.id, fromIndex: t, toIndex, moduleId }), hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (lo) => net.send({ type: "setLoadout", loadout: lo, botId: p.id, index: t }) }),
           );
         })()
@@ -327,8 +327,11 @@ function roomView(m: LobbyModel, net: Net) {
   const allowedHullIds = () => Object.keys(HULLS).filter((id) => settings.allowedHulls?.[id] !== 0);
   const allowedPilotIds = () => Object.keys(PILOTS).filter((id) => settings.allowedPilots?.[id] !== 0);
   /** Záložky lodí letky: „LOĎ 1 · Stíhač · Kadet“. */
-  const fleetTabs = (fleet: ShipLoadout[], active: number, onPick: (i: number) => void) =>
-    h(
+  /** Záložky lodí letky + tlačítko „+ loď“ (trupy, které se vejdou do zbývajících bodů) a ✕ u lodi (moduly se prodají). */
+  const fleetTabs = (fleet: ShipLoadout[], active: number, onPick: (i: number) => void, edit?: { botId?: string; onRemoved?: (i: number) => void }) => {
+    const left = settings.shipPoints - fleetPoints(fleet);
+    const addable = edit ? allowedHullIds().filter((id) => HULLS[id].points <= left) : [];
+    return h(
       "div",
       { class: "fleet-tabs" },
       ...fleet.map((l, i) =>
@@ -338,9 +341,16 @@ function roomView(m: LobbyModel, net: Net) {
           icon(l.hullId === "battleship" ? "battleship" : "ship", i === active ? "#7dd3fc" : "#64748b", 12),
           h("span", { class: "ft-n" }, label(`Loď ${i + 1}`)),
           h("span", { class: "ft-sub txt" }, `${HULLS[l.hullId]?.name ?? l.hullId} · ${PILOTS[l.pilotId]?.name ?? l.pilotId}`),
+          edit && fleet.length > 1
+            ? h("span", { class: "ft-x", title: "Odebrat loď z letky (moduly se prodají)", onclick: (ev) => { ev.stopPropagation(); if (!confirm(`Odebrat loď ${i + 1} z letky? Její moduly se prodají.`)) return; net.send({ type: "removeShip", index: i, botId: edit.botId }); edit.onRemoved?.(i); } }, "✕")
+            : null,
         ),
       ),
+      ...(edit && addable.length
+        ? addable.map((id) => h("button", { class: "fleet-tab ft-add", title: `${HULLS[id].name}: přidat do letky (${HULLS[id].points} ${HULLS[id].points === 1 ? "bod" : "body"} z ${left} volných)`, onclick: () => net.send({ type: "addShip", hullId: id, botId: edit.botId }) }, "+ ", icon(id === "battleship" ? "battleship" : "ship", "#7dd3fc", 12), " ", label(HULLS[id].name)))
+        : []),
     );
+  };
 
   return h(
     "div",
@@ -385,7 +395,7 @@ function roomView(m: LobbyModel, net: Net) {
             return h(
               "div",
               {},
-              fleet.length > 1 || settings.shipPoints > 1 ? h("div", { class: "row", style: "align-items:center;gap:10px" }, fleetTabs(fleet, t, (i) => ((fleetTab = i), rerender())), h("span", { class: "txt muted", style: "font-size:13px" }, `lodní body ${pts}/${settings.shipPoints} · jedna peněženka pro celou letku`)) : null,
+              fleet.length > 1 || settings.shipPoints > 1 ? h("div", { class: "row", style: "align-items:center;gap:10px" }, fleetTabs(fleet, t, (i) => ((fleetTab = i), rerender()), { onRemoved: () => (fleetTab = 0) }), h("span", { class: "txt muted", style: "font-size:13px" }, `lodní body ${pts}/${settings.shipPoints}${pts < settings.shipPoints ? " · můžeš přidat loď" : ""} · jedna peněženka pro celou letku`)) : null,
               (() => {
                 const wallet = me.credits ?? budget;
                 const btns = LOADOUT_PRESETS.map((ps) => {
@@ -975,7 +985,7 @@ function roomView(m: LobbyModel, net: Net) {
                   );
                 }),
               ),
-              h("div", { class: "txt muted mt-foot" }, "Hráč skládá letku z povolených trupů tak, aby využil přesně své lodní body."),
+              h("div", { class: "txt muted mt-foot" }, "Hráč skládá letku z povolených trupů až do výše svých lodních bodů (nemusí je využít všechny)."),
             ),
             section(
               "Dostupní piloti",

@@ -4971,3 +4971,16 @@ button.start-chip.on:hover:not(:disabled) {
   stroke: #fbbf24 !important;
   stroke-dasharray: 6 4;
 }
+.fleet-tab .ft-x {
+  margin-left: 6px;
+  color: #f87171;
+  font-size: 12px;
+  cursor: pointer;
+}
+.fleet-tab .ft-x:hover {
+  color: #fecaca;
+}
+.fleet-tab.ft-add {
+  border-style: dashed;
+  color: #7dd3fc;
+}
