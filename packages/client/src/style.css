@@ -4045,6 +4045,7 @@ button.start-chip.on:hover:not(:disabled) {
 }
 .lo-wbar .wbar i.wseg {
   width: 10px;
+  flex: 0 0 10px;
   background: #1e293b;
 }
 .lo-wbar .wbar i.wseg.g {
@@ -4058,6 +4059,7 @@ button.start-chip.on:hover:not(:disabled) {
 }
 .lo-wbar .wbar i.wedge {
   width: 3px;
+  flex: 0 0 3px;
   background: #fbbf24;
   border-color: #78350f;
 }
@@ -5233,4 +5235,95 @@ body.drag-on * {
 .lo-wlist .wl-legend i {
   width: 10px;
   height: 8px;
+}
+
+/* ---- návrh: moduly přímo v pruhu váhy ---- */
+.lo-wbar .wstack {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+}
+.lo-wbar .wmods {
+  position: relative;
+  height: 18px;
+  width: auto;
+  align-self: stretch;
+  margin-top: 2px;
+}
+.lo-wbar .wmods.inbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 14px;
+  margin: 0;
+  pointer-events: none;
+}
+.lo-wbar.wvA .wbar i {
+  height: 14px;
+}
+.lo-wbar .wmods.inbar .wmod {
+  pointer-events: auto;
+}
+.lo-wbar .wmod {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  box-sizing: border-box;
+  border: 1px solid #0a0e1c;
+  overflow: hidden;
+}
+.lo-wbar .wmod.cargo {
+  opacity: 0.6;
+}
+.lo-wbar .wmod i {
+  display: block;
+  height: 100%;
+}
+.lo-wbar .wmod .wm-mod {
+  background: var(--c);
+}
+.lo-wbar .wmod .wm-ammo {
+  background: repeating-linear-gradient(135deg, #fbbf24 0 3px, var(--c) 3px 6px);
+}
+.lo-wbar .wmod .wm-lbl {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-family: var(--px);
+  font-size: 8px;
+  color: #0b1020;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.lo-wbar .wmods .wm-edge {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 3px;
+  margin-left: -1px;
+  background: #fbbf24;
+  border: 1px solid #78350f;
+  pointer-events: none;
+}
+.lo-wbar .wmods.inbar .wm-edge {
+  display: none;
+}
+.lo-wbar .wleg {
+  display: inline-block;
+  width: 10px;
+  height: 8px;
+  vertical-align: middle;
+  background: #94a3b8;
+}
+.lo-wbar .wleg.ammo {
+  background: repeating-linear-gradient(135deg, #fbbf24 0 3px, #94a3b8 3px 6px);
 }

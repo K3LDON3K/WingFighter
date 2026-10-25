@@ -1401,6 +1401,28 @@ describe("droid – opravář", () => {
   });
 });
 
+describe("mlha války – přesně hranice dohledu", () => {
+  it("cizí loď, kometa i bouře se posílají jen v dohledu (bez okraje); vlastní vždy", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    const foe = place(g, "ship-p2-0", 500 + me.stats.vision + foe0r() + 50, 500, Math.PI);
+    g.storms = [{ id: "s1", blobs: [{ x: 500 + me.stats.vision + 300, y: 500, r: 100 }] }, { id: "s2", blobs: [{ x: 700, y: 500, r: 100 }] }];
+    g.comets = [{ id: "far", x: 500 + me.stats.vision + 400, y: 900, heading: 0, speed: 300, hull: 10, maxHull: 10, radius: 20, tailUsed: [] }, { id: "tail", x: 500 + me.stats.vision + 120, y: 500, heading: 0, speed: 300, hull: 10, maxHull: 10, radius: 20, tailUsed: [] }];
+    let seen = stateForTeam(g, 0, new Map());
+    expect(seen.ships.some((s) => s.id === foe.id)).toBe(false);
+    expect(seen.storms.map((s) => s.id)).toEqual(["s2"]);
+    // ocas komety „tail“ (za jádrem směrem doleva) zasahuje do dohledu → kometa se posílá; „far“ ne
+    expect(seen.comets.map((c) => c.id)).toEqual(["tail"]);
+    // o kousek blíž → nepřítel v dohledu
+    foe.x = 500 + me.stats.vision + foe.stats.radius - 1;
+    seen = stateForTeam(g, 0, new Map());
+    expect(seen.ships.some((s) => s.id === foe.id)).toBe(true);
+    function foe0r() {
+      return g.ships[1].stats.radius;
+    }
+  });
+});
+
 describe("náklad", () => {
   it("zvednutí trosek: dosah, rychlost ≤ 2, kapacita; přetahování vyhrává pomalejší a bližší; náklad váží a jde vyhodit", () => {
     const g = game();

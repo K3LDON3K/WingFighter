@@ -36,8 +36,14 @@ export function seenBy(eyes: Eye[], p: Vec, radius = 0): boolean {
   return false;
 }
 
-/** O kolik za hranici dohledu se ještě posílají lodě a komety (plynulé vplutí do dohledu; na mapě jsou ztlumené mlhou). */
-export const VISION_MARGIN = 160;
+/** Kometa je vidět, když je v dohledu jádro nebo kus ocasu (ocas táhne za jádrem). */
+export function cometSeen(eyes: Eye[], c: { x: number; y: number; heading: number; radius: number }): boolean {
+  if (seenBy(eyes, c, c.radius)) return true;
+  const bx = -Math.cos(c.heading);
+  const by = -Math.sin(c.heading);
+  for (let d = c.radius; d <= c.radius + COMET.tailLength; d += 30) if (seenBy(eyes, { x: c.x + bx * d, y: c.y + by * d }, COMET.tailWidth / 2)) return true;
+  return false;
+}
 
 /** Stav tak, jak ho vidí daný tým. Aktualizuje paměť asteroidů. */
 /** Tým bez živé lodi je pozorovatel – vidí celou mapu. */
@@ -56,12 +62,13 @@ export function stateForTeam(state: GameState, team: number, memory: AsteroidMem
   for (const [id, a] of memory) if (!live.has(id) && seenBy(eyes, a, a.radius)) memory.delete(id);
   return {
     ...state,
-    // lodě a komety posíláme už kousek za hranicí dohledu, aby do něj „vplouvaly“ a neobjevily se naráz
-    ships: state.ships.filter((s) => s.team === team || !s.alive || seenBy(eyes, s, s.stats.radius + VISION_MARGIN)),
+    // cizí lodě přesně podle hranice dohledu (vraky se posílají vždy kvůli panelu hráčů; klient je mimo dohled nekreslí)
+    ships: state.ships.filter((s) => s.team === team || !s.alive || seenBy(eyes, s, s.stats.radius)),
     torpedoes: state.torpedoes.filter((t) => t.team === team || seenBy(eyes, t, TORPEDO.radius)),
     mines: state.mines.filter((m) => m.team === team || seenBy(eyes, m, m.radius)),
     debris: (state.debris ?? []).filter((d) => seenBy(eyes, d, 12)),
-    comets: (state.comets ?? []).filter((c) => seenBy(eyes, c, c.radius + COMET.tailLength / 2 + VISION_MARGIN)),
+    comets: (state.comets ?? []).filter((c) => cometSeen(eyes, c)),
+    storms: (state.storms ?? []).filter((st) => st.blobs.some((b) => seenBy(eyes, b, b.r))),
     asteroids: [...memory.values()].map((a) => structuredClone(a)),
   };
 }
@@ -91,8 +98,8 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
     const own = p.kind === "ship" ? shipTeam(p.id) === team : torpTeam(p.id) === team;
     if (own || pathVisible(p)) (p.kind === "ship" ? visibleShip : visibleTorp).add(p.id);
   }
-  for (const c of result.state.comets ?? []) if (seenBy(eyes, c, c.radius + VISION_MARGIN)) visibleComet.add(c.id);
-  for (const s of result.state.ships) if (s.team === team || seenBy(eyes, s, s.stats.radius + VISION_MARGIN)) visibleShip.add(s.id);
+  for (const c of result.state.comets ?? []) if (cometSeen(eyes, c)) visibleComet.add(c.id);
+  for (const s of result.state.ships) if (s.team === team || seenBy(eyes, s, s.stats.radius)) visibleShip.add(s.id);
   for (const t of result.state.torpedoes) if (t.team === team || seenBy(eyes, t, TORPEDO.radius)) visibleTorp.add(t.id);
 
   const events: TurnEvent[] = [];

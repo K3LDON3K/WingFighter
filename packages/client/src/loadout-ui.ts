@@ -920,12 +920,40 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       bar.append(h("i", { class: `wseg ${w < weight ? (sp >= base - 1 ? "g" : sp >= base - 2 ? "y" : "r") : ""}`, title: `váha ${w}–${w + step}: max. rychlost ${sp}` }));
     }
     const over = weight >= maxW ? h("span", { class: "wover" }, "+") : null;
+    /* návrh: moduly přímo v pruhu – každý zabírá šířku podle váhy (modul plně, munice šrafovaně) */
+    const wvar = (window as unknown as { __wbarVariant?: string }).__wbarVariant as "A" | "B" | undefined;
+    const fmt = (n: number) => (Math.round(n * 100) / 100).toString().replace(".", ",");
+    const modStrip = (() => {
+      if (!wvar) return null;
+      const items: ModuleInstance[] = [...loadout.modules, ...(loadout.cargo ?? [])];
+      const strip = h("div", { class: `wmods ${wvar === "A" ? "inbar" : ""}` });
+      let acc = 0;
+      for (const m of items) {
+        const def = MODULES[m.type];
+        const wm = def.weight;
+        const wa = (def.ammoWeight ?? 0) * (m.ammo ?? 0);
+        const col = moduleColor(m.type);
+        const inCargo = (loadout.cargo ?? []).includes(m);
+        const block = h("span", { class: `wmod ${inCargo ? "cargo" : ""}`, style: `left:${(acc / maxW) * 100}%;width:${((wm + wa) / maxW) * 100}%;--c:${col}`, title: `${def.name}${inCargo ? " (náklad)" : ""}: modul ${fmt(wm)}${wa ? ` + munice ${fmt(wa)}` : ""} = ${fmt(wm + wa)}` });
+        block.append(h("i", { class: "wm-mod", style: `width:${(wm / (wm + wa)) * 100}%` }));
+        if (wa > 0) block.append(h("i", { class: "wm-ammo", style: `width:${(wa / (wm + wa)) * 100}%` }));
+        const lbl = h("span", { class: "wm-lbl" }, icon(def.icon, "#0b1020", 9), (wm + wa) / maxW > 0.11 ? label(def.short) : "");
+        block.append(lbl);
+        strip.append(block);
+        acc += wm + wa;
+      }
+      // prahy rychlosti i ve stripu
+      for (let w = per; w < maxW - 1e-9; w += per) strip.append(h("i", { class: "wm-edge", style: `left:${(w / maxW) * 100}%` }));
+      return strip;
+    })();
+    const legend = wvar ? h("span", { class: "txt muted wtxt" }, h("i", { class: "wleg mod" }), ` modul `, h("i", { class: "wleg ammo" }), ` munice · šířka = váha`) : null;
     return h(
       "div",
-      { class: "lo-wbar" },
+      { class: `lo-wbar ${wvar ? `wv${wvar}` : ""}` },
       h("span", { class: "wlbl" }, label("Váha a rychlost")),
-      h("div", { class: "wrow" }, bar, over),
+      wvar ? h("div", { class: "wrow" }, h("div", { class: "wstack" }, bar, modStrip), over) : h("div", { class: "wrow" }, bar, over),
       h("span", { class: "txt muted wtxt" }, `váha ${weight} → max. rychlost ${maxSpeed} · každých ${per} váhy = −1 rychlost`),
+      legend,
     );
   })();
   /* --- seznam modulů s váhou: modul (šedá) a munice (žlutá) zvlášť; varianty A (tabulka) / B (pruhy) --- */

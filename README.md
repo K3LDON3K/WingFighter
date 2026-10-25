@@ -66,8 +66,10 @@ neprojdou (dohled bouře neovlivňuje – loď v bouři je vidět).
 
 ### Fog of war
 Každá loď vidí do vzdálenosti **960** (3 × zaměřovací dostřel torpéda); tým dohled sdílí. Server každému
-posílá jen to, co jeho tým vidí (lodě, torpéda, miny). Asteroid, který tým jednou spatřil, zůstává v jeho
-paměti v podobě, v jaké ho naposledy viděl – poškození mimo dohled se neprojeví, dokud ho zase neuvidí.
+posílá jen to, co jeho tým vidí – cizí lodě, torpéda, miny, trosky, komety (jádro nebo kus ocasu v dohledu)
+i bouře (aspoň část mraku v dohledu), vše přesně po hranici dohledu, bez okraje. Asteroid, který tým jednou
+spatřil, zůstává v jeho paměti v podobě, v jaké ho naposledy viděl – poškození mimo dohled se neprojeví, dokud
+ho zase neuvidí. Hluboký sken odkryje mapu do 2000 jen do konce kola.
 
 ### Výbava lodi (inventář)
 Loď **Stíhač** má 4 malé sloty: příď, záď, levobok, pravobok. Příď a záď jsou pod sebou a lze je spojit v jeden
@@ -165,6 +167,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.142 – **Mlha války přesně po hranici dohledu.** Cizí lodě se už neposílají 160 jednotek před hranicí (nevplouvají, objeví se až v dohledu – i jejich jmenovky), komety jen když je v dohledu jádro nebo kus ocasu, bouře jen když je v dohledu aspoň část mraku; torpéda, miny a trosky byly jen v dohledu už dřív. Paměť asteroidů zůstává.
 - v3.141 – Komety mají náhodnou rychlost: každá nová kometa dostane 80–120 % základní rychlosti (zaokrouhleno na 10); rozptyl je v ladění → Komety „Rozptyl rychlosti (± %)“. Bublina komety na mapě ukazuje její skutečnou rychlost.
 - v3.140 – Bitevník má **10 bodů technologie** (stíhač dál 6 ze sekce Skener); nový parametr ladění → Loď „Bitevník – body technologie“. Popis trupu doplněn.
 - v3.139 – **Ocas komety: los.** Průlet ocasem už nedává technologii a štít zároveň – náhodně (výchozí 50 %, ladění → Komety „šance na technologii“) buď +2 body technologie, nebo část štítu jako dřív (plný štít → trup → kredity; bez štítového modulu reset stresu + kredity). Když vylosované není kam dát (plná technologie / plný štít), dostaneš to druhé. Nápověda v bublině komety a v panelu technologie.
