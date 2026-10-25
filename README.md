@@ -153,6 +153,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.130 – Štít bitevníku se na mapě kreslí jako elipsa protažená ve směru letu (energetický i segmentový, včetně záblesků zásahu); stíhač má dál kruh.
 - v3.129 – Záložky lodí letky na horní hraně panelu lodi jsou kompaktní (ikonka trupu + číslo, pilot ve vysvětlivce) a nelámou se; při více lodích přesahují doprava přes lištu.
 - v3.128 – Editor výbavy: přetažení nainstalovaného modulu do obchodu = prodat (odebrat); přetažení modulu z obchodu do volného slotu = koupit rovnou tam (volné sloty se při tažení nabídnou). Dlaždice výběru lodi (nastavení hry i editor) ukazují pixelovou miniaturu trupu místo společné ikonky.
 - v3.127 – Editor výbavy: nainstalované moduly jde **přetáhnout** myší/prstem do jiného slotu (volný = přesun, obsazený = prohození; velký modul do volné dvojice), natočení se při přesunu zachová, nebo se upraví na povolené. Přetažením na záložku jiné lodi letky se modul přesune tam (do prvního volného slotu) bez prodeje a nákupu – zůstává munice i životy. Během tažení se nezobrazují vysvětlivky.

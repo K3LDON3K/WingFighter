@@ -697,12 +697,19 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** Štít na mapě: celolodní = kruh obarvený podle síly; segmentový = 4 oblouky otáčející se s lodí. */
-  private drawShield(s: ViewShip, now: number, planned?: Segments) {
+  /** Tvar štítu: stíhač kruh, bitevník elipsa protažená ve směru letu (otáčí se s lodí). */
+  private shieldShape(s: ViewShip): { rx: number; ry: number } {
     const GAP = SHIELD_GAP;
+    if (s.hullId === "battleship") return { rx: s.radius + GAP + 24, ry: s.radius + GAP - 6 };
+    return { rx: s.radius + GAP, ry: s.radius + GAP };
+  }
+
+  /** Štít na mapě: energetický = elipsa/kruh obarvený podle síly; segmentový = 4 oblouky otáčející se s lodí. */
+  private drawShield(s: ViewShip, now: number, planned?: Segments) {
     const ctx = this.ctx;
     // loď bez štítu (žádný funkční modul štítu): nic nekreslit
     if (s.shieldType === "none") return;
+    const { rx, ry } = this.shieldShape(s);
     if (this.stormsRef && pointInStorm(this.stormsRef, s)) {
       // v bouři štít nefunguje: jen slabý fialový tečkovaný obrys tam, kde býval
       ctx.save();
@@ -710,7 +717,7 @@ export class Renderer {
       ctx.lineWidth = 1.5;
       ctx.setLineDash([2, 6]);
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.radius + GAP, 0, Math.PI * 2);
+      ctx.ellipse(s.x, s.y, rx, ry, s.heading, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
       return;
@@ -723,7 +730,7 @@ export class Renderer {
       ctx.globalAlpha = 0.1 + 0.1 * frac;
       ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.radius + GAP, 0, Math.PI * 2);
+      ctx.ellipse(s.x, s.y, rx, ry, s.heading, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 0.45 + 0.35 * frac;
       ctx.strokeStyle = col;
@@ -734,16 +741,16 @@ export class Renderer {
       ctx.restore();
       return;
     }
-    const r = s.radius + GAP;
     const half = (40 * Math.PI) / 180;
     ctx.save();
     ctx.lineWidth = 3;
     const segs = planned ?? s.segments;
     for (let i = 0; i < 4; i++) {
       const hp = segs[i] ?? 0;
-      const mid = s.heading + (i * Math.PI) / 2;
+      // oblouky v souřadnicích lodi (elipsa se otáčí s lodí): předek 0, pravobok 90°, záď 180°, levobok 270°
+      const mid = (i * Math.PI) / 2;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, r, mid - half, mid + half);
+      ctx.ellipse(s.x, s.y, rx, ry, s.heading, mid - half, mid + half);
       if (hp <= 0) {
         ctx.strokeStyle = "rgba(239,68,68,0.35)";
         ctx.setLineDash([2, 4]);
@@ -1175,14 +1182,15 @@ export class Renderer {
       case "segmentHit": {
         const s = view.ships.find((x) => x.id === e.shipId);
         if (!s) return;
-        const mid = s.heading + (e.segment * Math.PI) / 2;
+        const mid = (e.segment * Math.PI) / 2;
         const half = (40 * Math.PI) / 180;
+        const sh = this.shieldShape(s);
         ctx.save();
         ctx.globalAlpha = 1 - t;
         ctx.strokeStyle = "#f8fafc";
         ctx.lineWidth = 5 + 6 * t;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.radius + SHIELD_GAP + 4 * t, mid - half, mid + half);
+        ctx.ellipse(s.x, s.y, sh.rx + 4 * t, sh.ry + 4 * t, s.heading, mid - half, mid + half);
         ctx.stroke();
         ctx.restore();
         break;
@@ -1195,7 +1203,10 @@ export class Renderer {
         ctx.strokeStyle = "#93c5fd";
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, s.radius + SHIELD_GAP, 0, Math.PI * 2);
+        {
+          const sh = this.shieldShape(s);
+          ctx.ellipse(s.x, s.y, sh.rx, sh.ry, s.heading, 0, Math.PI * 2);
+        }
         ctx.stroke();
         ctx.restore();
         break;
