@@ -18,7 +18,8 @@ import {
   freeSlots,
   hasFacing,
   HULLS,
-  LARGE_SLOTS,
+  hullLargePairs,
+  hullOf,
   loadoutWeight,
   maxSpeedFor,
   MODULE_TYPES,
@@ -93,9 +94,9 @@ const SLOT_BOX: Record<SlotId, Box> = {
   back: { x: 190, y: FY + HH, w: HW, h: HH },
   left: { x: 190 - HW * 0.75, y: FY + HH + HH / 2, w: HW, h: HH },
   right: { x: 190 + HW * 0.75, y: FY + HH + HH / 2, w: HW, h: HH },
-  // gondoly (bitevník): vně boků, o půl hexu níž
-  podLeft: { x: 190 - HW * 1.5, y: FY + 2 * HH, w: HW, h: HH },
-  podRight: { x: 190 + HW * 1.5, y: FY + 2 * HH, w: HW, h: HH },
+  // bitevník: přední levobok / pravobok – v plástvi přímo nad zadním levobokem / pravobokem
+  podLeft: { x: 190 - HW * 0.75, y: FY + HH / 2, w: HW, h: HH },
+  podRight: { x: 190 + HW * 0.75, y: FY + HH / 2, w: HW, h: HH },
 };
 /** Nákres trupu pod pláství: šablona, měřítko a umístění (stíhač 16×14 po 24 px, bitevník 50×40 po 7 px). */
 function hullDiagram(hullId: string, team = 0): { template: string[]; s: number; x0: number; y0: number } {
@@ -260,7 +261,9 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   const add = (type: ModuleType, into?: SlotId | null) => {
     const def = MODULES[type];
     const want = into ?? pickSlot;
-    const slot = def.size === "large" ? (LARGE_SLOTS.every((sl) => freeSlots(loadout).includes(sl)) ? LARGE_SLOTS[0] : null) : want && freeSlots(loadout).includes(want) ? want : firstFreeSlot();
+    const freeNow = freeSlots(loadout);
+    const pairs = hullLargePairs(hullOf(loadout)).filter((p) => p.every((sl) => freeNow.includes(sl)));
+    const slot = def.size === "large" ? ((want && pairs.find((p) => p.includes(want))) ?? pairs[0])?.[0] ?? null : want && freeNow.includes(want) ? want : firstFreeSlot();
     if (!slot) return;
     clearLoadoutPick();
     change({ ...loadout, modules: [...loadout.modules, newModule(type, slot)] });
@@ -382,11 +385,12 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         grp.classList.add("slot-hot");
         grp.append(svgEl("polygon", { points: pts, fill: "rgba(125,211,252,0.14)", stroke: "#7dd3fc", "stroke-width": 3, "stroke-dasharray": "6 4" }));
         grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 8, "font-family": "Jersey, ui-monospace, monospace", "font-size": 24, fill: "#7dd3fc", "text-anchor": "middle" }, "+"));
-        grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 22, "font-family": "Jersey, ui-monospace, monospace", "font-size": 11, fill: "#7dd3fc", "text-anchor": "middle" }, name.toUpperCase()));
+        grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 22, "font-family": "Jersey, ui-monospace, monospace", "font-size": name.length > 9 ? 9 : 11, fill: "#7dd3fc", "text-anchor": "middle" }, name.toUpperCase()));
         grp.append(svgEl("title", {}, `${name}: sem umístit ${MODULES[pickType!].name}`));
       } else {
         grp.append(svgEl("polygon", { points: pts, fill: "rgba(5,7,15,0.55)", stroke: ro ? "#7dd3fc" : "#7dd3fc", "stroke-width": 3, "stroke-dasharray": "6 4" }));
-        grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4, "font-family": "Jersey, ui-monospace, monospace", "font-size": 15, fill: "#7dd3fc", "text-anchor": "middle" }, name.toUpperCase()));
+        const nw = name.toUpperCase().split(" ");
+        nw.forEach((w, i) => grp.append(svgEl("text", { x: box.x + box.w / 2, y: box.y + box.h / 2 + 4 + (i - (nw.length - 1) / 2) * 15, "font-family": "Jersey, ui-monospace, monospace", "font-size": 15, fill: "#7dd3fc", "text-anchor": "middle" }, w)));
         grp.append(svgEl("title", {}, ro ? `${name}: volný malý slot` : `${name}: volný slot – klik = vybrat, pak modul v obchodě`));
       }
       if (!ro && !selectable) {
@@ -406,7 +410,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   /** Okénko modulu: životy + oprava, munice + dokoupení, natočení, prodej / odebrání. */
   const modulePopup = (m: ModuleInstance): HTMLElement => {
     const def = MODULES[m.type];
-    const box = SLOT_BOX[def.size === "large" ? "front" : m.slot];
+    const box = SLOT_BOX[m.slot];
     const broken = moduleBroken(m);
     const col = moduleColor(m.type);
     const hp = moduleHp(m);
@@ -504,18 +508,18 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     pop.addEventListener("click", (ev) => ev.stopPropagation());
     return pop;
   };
-  if (LARGE_SLOTS.every((sl) => free.includes(sl))) {
-    const f = SLOT_BOX.front;
-    const b = SLOT_BOX.back;
+  // volné dvojice pro velký modul: žlutý rámeček kolem obou hexů
+  for (const pair of hullLargePairs(hull)) {
+    if (!pair.every((sl) => free.includes(sl))) continue;
+    const f = SLOT_BOX[pair[0]];
+    const b = SLOT_BOX[pair[1]];
     svg.append(svgEl("rect", { x: f.x - 8, y: f.y - 8, width: f.w + 16, height: b.y + b.h - f.y + 16, fill: "none", stroke: "#fbbf24", "stroke-width": 2, "stroke-dasharray": "3 5" }));
-    svg.append(svgEl("text", { x: f.x + f.w / 2, y: f.y - 14, "font-family": "Jersey", "font-size": 12, fill: "#fbbf24", "text-anchor": "middle" }, "1 VELKY"));
+    if (pair[0] === "front") svg.append(svgEl("text", { x: f.x + f.w / 2, y: f.y - 14, "font-family": "Jersey", "font-size": 12, fill: "#fbbf24", "text-anchor": "middle" }, "1 VELKY"));
   }
   for (const m of loadout.modules) {
     const occ = occupiedSlots(m);
-    if (MODULES[m.type].size === "large") {
-      slotBox("front", SLOT_BOX.front, m);
-      slotBox("back", SLOT_BOX.back, m);
-    } else slotBox(m.slot, SLOT_BOX[m.slot], m);
+    if (MODULES[m.type].size === "large") for (const sl of occ) slotBox(sl, SLOT_BOX[sl], m);
+    else slotBox(m.slot, SLOT_BOX[m.slot], m);
     occ.forEach((sl) => drawn.add(sl));
   }
   for (const sl of hull.slots) if (!drawn.has(sl.id)) slotBox(sl.id, SLOT_BOX[sl.id]);

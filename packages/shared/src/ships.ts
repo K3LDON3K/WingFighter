@@ -36,7 +36,7 @@ export const HULLS: Record<string, HullDef> = {
   battleship: {
     id: "battleship",
     name: "Bitevník",
-    description: "Střední loď, asi 3× větší než stíhač. Šest malých slotů: příď, záď, levobok, pravobok a levá a pravá gondola. Pomalejší (max. rychlost 4), otočka jen z rychlosti 2–3, větší trup a náklad. Stojí 2 lodní body.",
+    description: "Střední loď, asi 3× větší než stíhač. Šest slotů: příď, záď, přední a zadní levobok, přední a zadní pravobok. Příď + záď, oba levoboky i oba pravoboky jde spojit v jeden velký slot. Pomalejší (max. rychlost 4), otočka jen z rychlosti 2–3, větší trup a náklad. Stojí 2 lodní body.",
     radius: 58,
     points: 2,
     // kolizní model podle spritu (50×40 px × 3): trup od zádi k přídi, špice, dvě gondoly na bocích
@@ -57,10 +57,10 @@ export const HULLS: Record<string, HullDef> = {
     slots: [
       { id: "front", name: "příď", size: "small" },
       { id: "back", name: "záď", size: "small" },
-      { id: "left", name: "levobok", size: "small" },
-      { id: "right", name: "pravobok", size: "small" },
-      { id: "podLeft", name: "levá gondola", size: "small" },
-      { id: "podRight", name: "pravá gondola", size: "small" },
+      { id: "podLeft", name: "přední levobok", size: "small" },
+      { id: "left", name: "zadní levobok", size: "small" },
+      { id: "podRight", name: "přední pravobok", size: "small" },
+      { id: "right", name: "zadní pravobok", size: "small" },
     ],
     profile: BATTLESHIP_PROFILE,
   },
@@ -199,7 +199,7 @@ export function defaultFacing(type: ModuleType, slot: SlotId): Facing | undefine
 /** Poloha slotu na trupu v souřadnicích lodi (x dopředu, y doprava) – odtud zbraň střílí a měří dosah. */
 const SLOT_OFFSETS: Record<string, Partial<Record<SlotId, { x: number; y: number }>>> = {
   fighter: { front: { x: 14, y: 0 }, back: { x: -12, y: 0 }, left: { x: -4, y: -12 }, right: { x: -4, y: 12 } },
-  battleship: { front: { x: 52, y: 0 }, back: { x: -48, y: 0 }, left: { x: 0, y: -16 }, right: { x: 0, y: 16 }, podLeft: { x: -30, y: -36 }, podRight: { x: -30, y: 36 } },
+  battleship: { front: { x: 52, y: 0 }, back: { x: -48, y: 0 }, podLeft: { x: -14, y: -36 }, left: { x: -44, y: -20 }, podRight: { x: -14, y: 36 }, right: { x: -44, y: 20 } },
 };
 /** Poloha slotu vůči středu lodi (+x příď, +y pravobok) podle trupu. */
 export function slotOffset(slot: SlotId | undefined, hullId = "fighter"): { x: number; y: number } {
@@ -334,8 +334,22 @@ export function applyLoadoutTrade(prev: ShipLoadout, next: ShipLoadout): { loado
   return { loadout: { ...next, modules, cargo: cargo.length ? cargo : undefined }, cost };
 }
 
-/** Velký modul zabírá příď + záď (zapisuje se do slotu "front"). */
+/** Velký modul zabírá dvojici slotů (zapisuje se do prvního z dvojice): příď + záď, přední + zadní levobok, přední + zadní pravobok. */
 export const LARGE_SLOTS: [SlotId, SlotId] = ["front", "back"];
+export const LARGE_PAIRS: [SlotId, SlotId][] = [
+  ["front", "back"],
+  ["podLeft", "left"],
+  ["podRight", "right"],
+];
+/** Dvojice pro velký modul zapsaný do slotu `slot` (slot musí být první z dvojice). */
+export function largePair(slot: SlotId): [SlotId, SlotId] | undefined {
+  return LARGE_PAIRS.find((p) => p[0] === slot);
+}
+/** Dvojice slotů, které trup umí spojit pro velký modul. */
+export function hullLargePairs(hull: HullDef): [SlotId, SlotId][] {
+  const ids = new Set(hull.slots.map((s) => s.id));
+  return LARGE_PAIRS.filter((p) => ids.has(p[0]) && ids.has(p[1]));
+}
 
 /** Kolik malých modulů slot pojme (každý slot 1). */
 export function slotCapacity(hull: HullDef, slot: SlotId): number {
@@ -344,7 +358,7 @@ export function slotCapacity(hull: HullDef, slot: SlotId): number {
 
 /** Které sloty modul obsazuje. */
 export function occupiedSlots(m: ModuleInstance): SlotId[] {
-  return MODULES[m.type]?.size === "large" ? [...LARGE_SLOTS] : [m.slot];
+  return MODULES[m.type]?.size === "large" ? [...(largePair(m.slot) ?? LARGE_SLOTS)] : [m.slot];
 }
 
 /** Volné sloty sestavy (v pořadí příď, záď, levobok, pravobok). */
@@ -490,7 +504,7 @@ export function validateLoadout(loadout: ShipLoadout, limits?: { allowed?: Parti
     if (ids.has(m.id)) return "duplicitní modul";
     ids.add(m.id);
     if (!hull.slots.some((s) => s.id === m.slot)) return `neznámý slot ${m.slot}`;
-    if (def.size === "large" && m.slot !== LARGE_SLOTS[0]) return "velký modul patří do spojeného slotu příď + záď";
+    if (def.size === "large" && !hullLargePairs(hull).some((p) => p[0] === m.slot)) return "velký modul patří do spojené dvojice slotů (příď + záď, nebo přední + zadní bok)";
     if (m.type === "mine" && m.slot === "front") return "miny nelze uložit na příď";
     if (hasFacing(m.type)) {
       if (!m.facing || !allowedFacings(m.type, m.slot).includes(m.facing)) return `${def.name}: neplatné natočení`;

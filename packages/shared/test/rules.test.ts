@@ -29,6 +29,7 @@ import {
   validateLoadout,
   applyScan,
   HULLS,
+  hullLargePairs,
   fleetPoints,
   modulePos,
   applyShieldRecharge,
@@ -895,15 +896,18 @@ describe("bitevník", () => {
     const lo = { hullId: "battleship", pilotId: "kadet", modules: [newModule("laser", "front", "a"), newModule("torpedo", "podLeft", "b"), newModule("mg", "podRight", "c"), newModule("shield-whole", "back", "d")] };
     expect(validateLoadout(lo, { allowed: {} })).toBeNull();
     expect(fleetPoints([lo])).toBe(2);
-    expect(HULLS.battleship.slots.map((s) => s.id)).toEqual(["front", "back", "left", "right", "podLeft", "podRight"]);
+    expect(HULLS.battleship.slots.map((s) => s.id)).toEqual(["front", "back", "podLeft", "left", "podRight", "right"]);
     expect(listManeuvers(profileOf(lo), 2).every((m) => m.speed <= 4)).toBe(true);
     expect(listManeuvers(profileOf(lo), 2).some((m) => m.koiogran && m.speed === 3)).toBe(true);
     expect(listManeuvers(profileOf(lo), 2).some((m) => m.koiogran && m.speed === 4)).toBe(false);
-    // gondola na levoboku: modul je vlevo a vzadu
+    // přední levobok: modul je vlevo, zadní levobok ještě víc vzadu
     const ship = { x: 0, y: 0, heading: 0, loadout: lo };
     const pos = modulePos(ship, lo.modules[1]);
     expect(pos.y).toBeLessThan(-30);
-    expect(pos.x).toBeLessThan(0);
+    expect(modulePos(ship, { slot: "left" }).x).toBeLessThan(pos.x);
+    // velký modul jde i do spojeného levoboku; na stíhači jen příď + záď
+    expect(hullLargePairs(HULLS.battleship).length).toBe(3);
+    expect(hullLargePairs(HULLS.fighter)).toEqual([["front", "back"]]);
     // stíhač nemá gondoly
     expect(validateLoadout({ hullId: "fighter", pilotId: "kadet", modules: [newModule("laser", "podLeft", "x")] }, { allowed: {} })).not.toBeNull();
   });
