@@ -986,8 +986,8 @@ describe("skener", () => {
     expect(g2.ships[0].techPoints).toBe(1);
     expect(applyScan(g2, g2.ships[0], "sc", "deep").error).toMatch(/technologie/);
     expect(applyScan(g2, g2.ships[0], "sc", "cooldown").error).toBeDefined();
-    // průlet ocasem komety: +COMET.tailTech (do stropu)
-    const g3 = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100 } });
+    // průlet ocasem komety: los štít / technologie – při plném štítu přehodí na technologii (+COMET.tailTech do stropu)
+    const g3 = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, cometTailTechChance: 0 } });
     g3.asteroids = [];
     g3.ships[0].techPoints = 1;
     place(g3, "ship-p1-0", 500, 500, 0);
@@ -998,6 +998,23 @@ describe("skener", () => {
     const tech = r3.events.find((e) => e.type === "cometTail" && e.effect === "tech");
     expect(tech && tech.type === "cometTail" && tech.amount).toBe(COMET.tailTech);
     expect(r3.state.ships[0].techPoints).toBe(1 + COMET.tailTech);
+    expect(r3.events.some((e) => e.type === "cometTail" && e.effect !== "tech")).toBe(false);
+    // šance 100 % na technologii, ale plná technologie → štít (poškozený)
+    const g4 = createGame({ players, settings: { mode: "tdm", turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" }, tuning: { ...DEFAULT_TUNING, weightPerSpeed: 100, cometTailTechChance: 100 } });
+    g4.asteroids = [];
+    g4.ships[0].techPoints = g4.ships[0].stats.techMax;
+    g4.ships[0].segments = [0, 0, 0, 0];
+    place(g4, "ship-p1-0", 500, 500, 0);
+    place(g4, "ship-p2-0", 2000, 1200, Math.PI);
+    g4.comets = [{ id: "c1", x: 600, y: 500, heading: 0, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: COMET.radius, tailUsed: [], entered: true }];
+    const r4 = resolveTurn(g4, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r4.events.some((e) => e.type === "cometTail" && e.effect === "tech")).toBe(false);
+    expect(r4.events.some((e) => e.type === "cometTail" && e.effect === "segment")).toBe(true);
+    // 100 % a technologie má místo → jen technologie, štít se nedobije
+    g4.ships[0].techPoints = 0;
+    const r5 = resolveTurn(g4, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r5.events.some((e) => e.type === "cometTail" && e.effect === "tech")).toBe(true);
+    expect(r5.events.some((e) => e.type === "cometTail" && e.effect === "segment")).toBe(false);
   });
 });
 

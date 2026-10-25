@@ -1124,11 +1124,17 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (st) st.cometTails = (st.cometTails ?? 0) + 1;
     const push = (effect: "shield" | "segment" | "hull" | "credits" | "stress" | "tech", amount: number, segment?: number) =>
       events.push({ type: "cometTail", cometId: c.id, shipId: ship.id, t: k / MOVE_STEPS, x: p.x, y: p.y, effect, amount, segment });
-    // technologie: průlet ocasem přidá body (do stropu)
-    const techAdd = Math.min(COMET.tailTech, Math.max(0, ship.stats.techMax - ship.techPoints));
-    if (techAdd > 0) {
+    // los: buď část štítu, nebo technologie; když vylosované není kam dát, přehodí se na druhé
+    const techRoom = Math.max(0, ship.stats.techMax - ship.techPoints);
+    const shieldRoom = ship.shieldType === "whole" ? ship.shields < ship.stats.shields : ship.shieldType === "segment" ? ship.segments.some((v) => v < RULES.segmentHp * ship.stats.segmentModules) : false;
+    let giveTech = rng.next() < COMET.tailTechChance / 100;
+    if (giveTech && techRoom <= 0 && shieldRoom) giveTech = false;
+    if (!giveTech && !shieldRoom && techRoom > 0) giveTech = true;
+    if (giveTech && techRoom > 0) {
+      const techAdd = Math.min(COMET.tailTech, techRoom);
       ship.techPoints += techAdd;
       push("tech", techAdd);
+      return;
     }
     const hullHeal = () => {
       if (ship.hull < ship.stats.hull) {

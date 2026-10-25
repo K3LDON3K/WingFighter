@@ -1245,7 +1245,7 @@ function renderTooltip() {
   }
   const why = a && sel ? a.disabled(sel, game.state, game.orders.get(sel.id)!) : "";
   const html = hoverComet
-    ? `<b>Kometa</b>Odolnost ${hoverComet.hull}/${hoverComet.maxHull}, rychlost ${hoverComet.speed}/kolo. Náraz zraní loď (−${COMET.damage}) a odmrští ji. Sestřelení: +${COMET.reward} CR.<div class="ok">Průlet ocasem (tyrkysová zóna za kometou) doplní štít (${COMET.shieldPct} % / +1 segment) – každá loď jednou za kometu.</div>`
+    ? `<b>Kometa</b>Odolnost ${hoverComet.hull}/${hoverComet.maxHull}, rychlost ${hoverComet.speed}/kolo. Náraz zraní loď (−${COMET.damage}) a odmrští ji. Sestřelení: +${COMET.reward} CR.<div class="ok">Průlet ocasem (tyrkysová zóna za kometou): los – buď doplní štít (${COMET.shieldPct} % / +1 segment; plný štít → trup → kredity), nebo +${COMET.tailTech} technologie (${COMET.tailTechChance} %). Když vylosované není kam dát, dostaneš to druhé. Každá loď jednou za kometu.</div>`
     : `<b>${a!.label}</b>${a!.description}${why ? `<div class="warn">Nelze: ${why}.</div>` : ""}`;
   if (tooltipEl.innerHTML !== html) tooltipEl.innerHTML = html;
   tooltipEl.style.display = "block";

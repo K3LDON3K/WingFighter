@@ -123,6 +123,7 @@ export interface Tuning {
   cometBonusCredits: number;
   cometNoShieldCredits: number;
   cometTailTech: number;
+  cometTailTechChance: number;
   cometChanceFew: number;
   cometChanceMedium: number;
   cometChanceMany: number;
@@ -257,6 +258,7 @@ export const DEFAULT_TUNING: Tuning = {
   cometBonusCredits: 50,
   cometNoShieldCredits: 100,
   cometTailTech: 2,
+  cometTailTechChance: 50,
   cometChanceFew: 25,
   cometChanceMedium: 50,
   cometChanceMany: 100,
@@ -409,7 +411,8 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "cometHullPct", label: "Průlet – % trupu (když je štít plný)", group: "Komety", min: 0, max: 100, step: 5 },
   { key: "cometBonusCredits", label: "Průlet – kredity (když není co doplnit)", group: "Komety", min: 0, max: 1000, step: 10 },
   { key: "cometNoShieldCredits", label: "Průlet bez štítového modulu – kredity", group: "Komety", min: 0, max: 1000, step: 10, hint: "loď bez štítu dostane navíc plný stres" },
-  { key: "cometTailTech", label: "Průlet ocasem – body technologie", group: "Komety", min: 0, max: 6, step: 1, hint: "přičte se vždy (max. do stropu technologie)" },
+  { key: "cometTailTech", label: "Průlet ocasem – body technologie", group: "Komety", min: 0, max: 6, step: 1, hint: "los: buď štít (resp. trup/kredity), nebo tolik bodů technologie (do stropu); když vylosované není kam dát, dostane druhé" },
+  { key: "cometTailTechChance", label: "Průlet ocasem – šance na technologii (%)", group: "Komety", min: 0, max: 100, step: 5, hint: "zbytek = štít (plný štít → trup → kredity)" },
   { key: "cometCollide", label: "Naráží do asteroidů i do sebe", group: "Komety", min: 0, max: 1, step: 1, bool: true, hint: "zapnuto: kometa se roztříští o asteroid (vykousne kráter) a dvě komety se při srážce zničí navzájem; doplňuje volbu v nastavení mapy" },
   { key: "cometChanceFew", label: "Málo – šance za kolo %", group: "Komety", min: 0, max: 100, step: 5 },
   { key: "cometMaxFew", label: "Málo – max. na mapě", group: "Komety", min: 1, max: 20, step: 1 },
@@ -564,6 +567,7 @@ export function applyTuning(t: Tuning): void {
   COMET.bonusCredits = t.cometBonusCredits;
   COMET.noShieldCredits = t.cometNoShieldCredits;
   COMET.tailTech = t.cometTailTech;
+  COMET.tailTechChance = t.cometTailTechChance;
   COMET.chance = { few: t.cometChanceFew, medium: t.cometChanceMedium, many: t.cometChanceMany };
   COMET.max = { few: t.cometMaxFew, medium: t.cometMaxMedium, many: t.cometMaxMany };
   COMET.collide = t.cometCollide > 0;

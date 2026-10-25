@@ -914,7 +914,7 @@ function roomView(m: LobbyModel, net: Net) {
               frow(
                 "Komety",
                 pips(3, Math.max(0, COMET_LEVELS.indexOf(map.comets ?? "none")), "comet", () => cometSvg(true), () => cometSvg(false), (k) => ["málo", "středně", "hodně"][k - 1], (v) => setMap({ comets: COMET_LEVELS[v] }), ["žádné", "málo", "středně", "hodně"][Math.max(0, COMET_LEVELS.indexOf(map.comets ?? "none"))]),
-                "Komety přilétají na okraj mapy a letí přes ni rychleji než torpéda: náraz zraní loď, sestřel dává kredity, průlet ocasem doplní štít.",
+                "Komety přilétají na okraj mapy a letí přes ni rychleji než torpéda: náraz zraní loď, sestřel dává kredity, průlet ocasem doplní štít nebo technologii (los).",
               ),
               frow("", h("div", { class: "fpair" }, h("span", { class: "txt muted fsub" }, "komety naráží do asteroidů"), toggle(!!map.cometsHitAsteroids, (v) => setMap({ cometsHitAsteroids: v }))), "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím."),
               frow(

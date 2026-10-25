@@ -123,8 +123,9 @@ export const COMET = {
   bonusCredits: 50,
   /** Loď bez štítového modulu: reset stresu + kredity. */
   noShieldCredits: 100,
-  /** Průlet ocasem přidá body technologie (ladění). */
+  /** Průlet ocasem: los – buď část štítu (resp. trup/kredity), nebo body technologie (ladění: kolik a s jakou šancí v %). */
   tailTech: 2,
+  tailTechChance: 50,
   /** Šance (%) na novou kometu za kolo a max. počet komet na mapě podle nastavení mapy. */
   chance: { few: 25, medium: 50, many: 100 } as Record<"few" | "medium" | "many", number>,
   max: { few: 2, medium: 4, many: 6 } as Record<"few" | "medium" | "many", number>,
