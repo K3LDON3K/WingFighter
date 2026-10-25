@@ -83,7 +83,8 @@ export interface DroidOrder {
 }
 
 /** Sloty stíhače. */
-export type SlotId = "front" | "back" | "left" | "right";
+/** Sloty: stíhač příď/záď/levobok/pravobok; bitevník navíc levá a pravá gondola. */
+export type SlotId = "front" | "back" | "left" | "right" | "podLeft" | "podRight";
 export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg" | "droid";
 
 /** Trup lodi – nese moduly ve slotech. */
@@ -156,7 +157,7 @@ export interface ModuleDef {
 }
 
 /** Směr, kam modul míří (vůči lodi). */
-export type Facing = SlotId;
+export type Facing = "front" | "back" | "left" | "right";
 
 /** Modul osazený v lodi. */
 export interface ModuleInstance {

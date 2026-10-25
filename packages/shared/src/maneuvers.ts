@@ -6,12 +6,18 @@ import type { Difficulty, Maneuver, ManeuverProfile } from "./types.ts";
 export const ANGLE_STEP = 10;
 export const MAX_ANGLE = 90;
 
-/** Profil stíhače – co motor dovolí. Index pole = rychlost. */
+/** Profil stíhače – co motor dovolí. Index pole = rychlost. (maxSpeed ladí `applyTuning`.) */
 export const FIGHTER_PROFILE: ManeuverProfile = {
   maxSpeed: 5,
   maxAngle: [0, 90, 90, 90, 60, 40],
   /** Otočka 180° jde od rychlosti 2 (při libovolném úhlu, který rychlost dovolí). */
   koiogranSpeeds: [2, 3, 4, 5],
+};
+/** Profil bitevníku: pomalejší a těžkopádnější, otočka jen z rychlosti 2–3. */
+export const BATTLESHIP_PROFILE: ManeuverProfile = {
+  maxSpeed: 4,
+  maxAngle: [0, 90, 80, 60, 40, 30],
+  koiogranSpeeds: [2, 3],
 };
 
 export function maneuverId(speed: number, angle: number, koiogran = false): string {
@@ -51,7 +57,7 @@ export function classifyManeuver(profile: ManeuverProfile, speed: number, angle:
 
 /** Náročnost samotné křivky (bez otočky). */
 export function classifyCurve(profile: ManeuverProfile, speed: number, angle: number, prevSpeed: number): Difficulty | null {
-  if (!Number.isInteger(speed) || speed < 1 || speed > profile.maxSpeed) return null;
+  if (!Number.isInteger(speed) || speed < 1 || speed > profile.maxSpeed || speed >= profile.maxAngle.length) return null;
   if (!Number.isInteger(angle) || angle % ANGLE_STEP !== 0) return null;
   if (Math.abs(angle) > profile.maxAngle[speed]) return null;
   const a = Math.abs(angle);

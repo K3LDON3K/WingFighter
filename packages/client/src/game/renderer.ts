@@ -256,7 +256,7 @@ export class Renderer {
     for (const s of view.ships) if (this.onScreen(s.x, s.y, s.radius + 120)) this.drawShip(s, overlay, now);
     if (overlay.targetPoint) this.drawPointMarker(overlay.targetPoint, "#fbbf24", 1, now);
     if (overlay.actionGhost && sel) {
-      drawSprite(ctx, this.sprites.fighter(TEAM_COLORS[sel.team]), overlay.actionGhost.x, overlay.actionGhost.y, overlay.actionGhost.heading, 0.3);
+      drawSprite(ctx, this.sprites.ship(sel.hullId, sel.team, TEAM_COLORS[sel.team]), overlay.actionGhost.x, overlay.actionGhost.y, overlay.actionGhost.heading, 0.3);
     }
     for (const e of view.effects) this.drawEffect(e, view, now);
     for (const mk of this.marks) this.drawTargetMark(mk.x, mk.y, mk.r, mk.weapons);
@@ -813,8 +813,8 @@ export class Renderer {
       ctx.rotate(-s.heading);
       // bledé kopie (motion blur) za lodí
       const f2 = forward(s.heading);
-      for (let i = 1; i <= 2; i++) drawSprite(ctx, this.sprites.fighter(color), -f2.x * i * 9, -f2.y * i * 9, s.heading, 0.12);
-      drawSprite(ctx, this.sprites.fighter(color), 0, 0, s.heading, 0.55);
+      for (let i = 1; i <= 2; i++) drawSprite(ctx, this.sprites.ship(s.hullId, s.team, color), -f2.x * i * 9, -f2.y * i * 9, s.heading, 0.12);
+      drawSprite(ctx, this.sprites.ship(s.hullId, s.team, color), 0, 0, s.heading, 0.55);
       ctx.restore();
       ctx.save();
       ctx.strokeStyle = "#7dd3fc";
@@ -833,7 +833,7 @@ export class Renderer {
         ctx.fillRect(s.x + Math.cos(a) * rr - 1, s.y + Math.sin(a) * rr - 1, 2, 2);
       }
       ctx.restore();
-    } else drawSprite(ctx, this.sprites.fighter(color), s.x, s.y, s.heading);
+    } else drawSprite(ctx, this.sprites.ship(s.hullId, s.team, color), s.x, s.y, s.heading);
     const pt = overlay.partialTarget;
     if (pt && pt.id === s.id) {
       // část cíle mimo výseč laseru/kulometu ztlumíme (evenodd: čtverec kolem lodi minus výseč)
@@ -850,7 +850,7 @@ export class Renderer {
       ctx.restore();
     }
     // vybraná vlastní loď: pulzující bílý překryv siluety (varianta A)
-    if (selected && s.alive) drawSprite(ctx, this.sprites.fighterSilhouette(), s.x, s.y, s.heading, 0.3 + 0.2 * Math.sin(now / 260));
+    if (selected && s.alive) drawSprite(ctx, this.sprites.shipSilhouette(s.hullId, s.team), s.x, s.y, s.heading, 0.3 + 0.2 * Math.sin(now / 260));
     if (this.stormsRef && pointInStorm(this.stormsRef, s)) drawStormSparks(ctx, s.x, s.y, s.radius, now);
 
     ctx.save();
@@ -974,7 +974,7 @@ export class Renderer {
     ctx.arc(end.x, end.y, ship.radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-    drawSprite(ctx, this.sprites.fighter(color), end.x, end.y, end.heading, 0.45);
+    drawSprite(ctx, this.sprites.ship(ship.hullId, ship.team, color), end.x, end.y, end.heading, 0.45);
     if (man.koiogran) {
       // otočka: žlutý odznak s ikonou ⟲ vedle otočeného ducha (vpravo nahoře)
       const s = 1.4;

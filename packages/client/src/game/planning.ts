@@ -201,14 +201,15 @@ function maneuverHelp(ship: Ship): HTMLElement {
   const prof = profileOf(ship.loadout);
   const sw = (col: string) => h("i", { class: "hswatch", style: `background:${col}` });
   const li = (...c: (Node | string)[]) => h("li", {}, ...c);
-  const limits = [1, 2, 3, 4, 5].map((s) => `${s}: ±${FIGHTER_PROFILE.maxAngle[s]}°`).join(" · ");
+  const hullProf = HULLS[ship.loadout.hullId]?.profile ?? FIGHTER_PROFILE;
+  const limits = Array.from({ length: hullProf.maxSpeed }, (_, i) => i + 1).map((s) => `${s}: ±${hullProf.maxAngle[s]}°`).join(" · ");
   return h(
     "div",
     { class: "mhelp" },
     h("h4", {}, label("Dráha")),
     h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 1–5 rychlost zamknou, K = otočka, mezerník potvrdí.")),
     h("h4", {}, label("Rychlost")),
-    h("ul", {}, li(`1–5; tvoje loď teď max. ${prof.maxSpeed} (váha výbavy: každých ${WEIGHT.perSpeed} váhy = −1; overdrive droida váhu ignoruje).`), li(`Otočka o 180° jde jen z rychlosti ${prof.koiogranSpeeds.length ? `${Math.min(...prof.koiogranSpeeds)}–${Math.max(...prof.koiogranSpeeds)}` : "–"}, stojí 2 akce (s overdrivem 1) a po ní rychlost klesne o ${RULES.koiogranSpeedDrop}.`)),
+    h("ul", {}, li(`${HULLS[ship.loadout.hullId]?.name ?? "Loď"}: 1–${hullProf.maxSpeed}; tvoje loď teď max. ${prof.maxSpeed} (váha výbavy: každých ${WEIGHT.perSpeed} váhy = −1; overdrive droida váhu ignoruje).`), li(`Otočka o 180° jde jen z rychlosti ${prof.koiogranSpeeds.length ? `${Math.min(...prof.koiogranSpeeds)}–${Math.max(...prof.koiogranSpeeds)}` : "–"}, stojí 2 akce (s overdrivem 1) a po ní rychlost klesne o ${RULES.koiogranSpeedDrop}.`)),
     h("h4", {}, label("Úhel")),
     h("ul", {}, li(`Krok ${ANGLE_STEP}°, max. ±${MAX_ANGLE}°. Čím rychleji, tím míň: ${limits}.`)),
     h("h4", {}, label("Barvy (náročnost)")),
@@ -443,7 +444,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       "div",
       { class: "jettison-pop" },
       h("div", { class: "jp-head" }, icon("debris", "#7dd3fc", 12), label(chosen ? `vyhodit: ${MODULES[chosen.type].name}` : "klikni na modul, který vyhodíš")),
-      renderLoadout({ loadout: ship.loadout, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.setOrders(ship.id, { action: { type: "jettison", moduleId: id } }) }),
+      renderLoadout({ loadout: ship.loadout, team: ship.team, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.setOrders(ship.id, { action: { type: "jettison", moduleId: id } }) }),
     );
   }
 
@@ -711,7 +712,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             chosen
               ? h("div", { class: "jp-head ok" }, icon("check", "#4ade80", 12), label(`vyhodí se: ${MODULES[chosen.type].name}`), h("span", { class: "muted" }, label("· na začátku kola · jiný modul = klik")))
               : h("div", { class: "jp-head warn" }, icon("debris", "#fbbf24", 12), label("klikni na modul, který vyhodíš")),
-            renderLoadout({ loadout: ship.loadout, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.jettisonChosen(ship.id, id) }),
+            renderLoadout({ loadout: ship.loadout, team: ship.team, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.jettisonChosen(ship.id, id) }),
           );
         } else if (pickOn) {
           const wantId = o.action?.type === "pickup" ? o.action.targetId : undefined;

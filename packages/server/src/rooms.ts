@@ -258,6 +258,23 @@ class Room {
     return out;
   }
 
+  /**
+   * Letka po změně trupu jedné lodi (idx): větší trup vytlačí prázdné lodě od konce, menší doplní prázdné stíhače.
+   * Vrací upravenou letku, nebo text chyby, když se body nevejdou ani po odebrání prázdných lodí.
+   */
+  fitFleet(loadouts: ShipLoadout[], idx: number): ShipLoadout[] | string {
+    const out = loadouts.map((l) => l);
+    while (fleetPoints(out) > this.settings.shipPoints) {
+      let j = -1;
+      for (let i = out.length - 1; i >= 0; i--) if (i !== idx && out[i].modules.length === 0 && !(out[i].cargo?.length)) { j = i; break; }
+      if (j < 0) break;
+      out.splice(j, 1);
+    }
+    if (fleetPoints(out) > this.settings.shipPoints) return `příliš mnoho lodních bodů (${fleetPoints(out)}/${this.settings.shipPoints}) – nejdřív prodej výbavu ostatních lodí letky`;
+    while (fleetPoints(out) < this.settings.shipPoints) out.push(emptyLoadout());
+    return out;
+  }
+
   /** Po změně lodních bodů: letky členů doplnit prázdnými loděmi, nebo oříznout (moduly se prodají). */
   resizeFleets(): void {
     for (const m of this.members.values()) {
@@ -470,7 +487,11 @@ export class Hub {
           // bot: výbava zdarma (jen platnost a rozpočet)
           const err = validateLoadout(lo, { allowed: room.settings.allowedModules, budget: room.tuning.startBudget });
           if (err) return this.error(client, `Výbava: ${err}.`);
-          m.loadouts[idx] = normalizeShields(lo);
+          const next = [...m.loadouts];
+          next[idx] = normalizeShields(lo);
+          const fit = room.fitFleet(next, idx);
+          if (typeof fit === "string") return this.error(client, `Letka: ${fit}.`);
+          m.loadouts = fit;
           m.manualLoadout = true;
         } else {
           // hráč: změna je obchod – nákup, prodej, dokoupení munice z kreditů (jedna peněženka pro celou letku)
@@ -483,8 +504,12 @@ export class Hub {
           const pilot = PILOTS[trade.loadout.pilotId];
           if (pilot?.unique && m.loadouts.some((l, i) => i !== idx && l.pilotId === pilot.id)) return this.error(client, `${pilot.name} může být v letce jen jednou.`);
           if (trade.cost > room.walletOf(m)) return this.error(client, `Nedostatek kreditů (potřeba ${trade.cost}, máš ${room.walletOf(m)}).`);
+          const next = [...m.loadouts];
+          next[idx] = trade.loadout;
+          const fit = room.fitFleet(next, idx);
+          if (typeof fit === "string") return this.error(client, `Letka: ${fit}.`);
           m.spent += trade.cost;
-          m.loadouts[idx] = trade.loadout;
+          m.loadouts = fit;
           m.lobbyReady = false;
         }
         this.broadcastRoom(room);

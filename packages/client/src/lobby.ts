@@ -319,7 +319,7 @@ function roomView(m: LobbyModel, net: Net) {
             "div",
             { class: "bot-editor" },
             fleet.length > 1 ? fleetTabs(fleet, t, (i) => ((botTab = i), rerender())) : null,
-            renderLoadout({ loadout: fleet[t], budget, allowed: room.settings.allowedModules, compact: true, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (lo) => net.send({ type: "setLoadout", loadout: lo, botId: p.id, index: t }) }),
+            renderLoadout({ loadout: fleet[t], team: p.team, budget, allowed: room.settings.allowedModules, compact: true, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (lo) => net.send({ type: "setLoadout", loadout: lo, botId: p.id, index: t }) }),
           );
         })()
       : null;
@@ -397,7 +397,7 @@ function roomView(m: LobbyModel, net: Net) {
                 });
                 return h("div", { class: "row preset-row", style: "align-items:center;gap:6px;flex-wrap:wrap" }, h("span", { class: "txt muted", style: "font-size:13px" }, "Sada:"), ...btns, h("span", { class: "txt muted", style: "font-size:12px" }, "rychlý start – pak si výbavu uprav; co se do kreditů nevejde, sada vynechá"));
               })(),
-              renderLoadout({ loadout: lo, budget, wallet: me.credits ?? budget, showCargo: !!lo.cargo?.length, allowed: room.settings.allowedModules, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (nl) => net.send({ type: "setLoadout", loadout: nl, index: t }) }),
+              renderLoadout({ loadout: lo, team: me.team, budget, wallet: me.credits ?? budget, showCargo: !!lo.cargo?.length, allowed: room.settings.allowedModules, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (nl) => net.send({ type: "setLoadout", loadout: nl, index: t }) }),
             );
           })(),
         )
@@ -806,7 +806,7 @@ function roomView(m: LobbyModel, net: Net) {
             h("div", { class: "fsec-h", style: "margin-top:8px" }, label("Pravidla")),
             kv("Herní mód", settings.mode === "tdm" ? `týmový deathmatch · ${settings.teams ?? 2} týmy` : "deathmatch · každý sám"),
             kv("Startovní kredity", `${budget} CR`),
-            kv("Lodní body na hráče", `${settings.shipPoints} (stíhač = 1)`),
+            kv("Lodní body na hráče", `${settings.shipPoints} (stíhač = 1, bitevník = 2)`),
             kv("Výbava botů", { default: "výchozí", random: "náhodná", manual: "ruční (host)" }[settings.botLoadout] ?? settings.botLoadout),
             series ? kv("Série", `${battles.length} bitev · body výhra 3 / remíza 1 / prohra 0`) : null,
             h("div", { class: "fsec-h", style: "margin-top:8px" }, label("Lodě, piloti a moduly")),
@@ -946,7 +946,7 @@ function roomView(m: LobbyModel, net: Net) {
               ),
               frow(
                 "Lodní body na hráče",
-                pips(3, settings.shipPoints, "size", () => icon("ship", "#7dd3fc", 18), () => icon("ship", "#334155", 18), (k) => `${k} lodní body`, (v) => set({ shipPoints: Math.max(1, v) }), `${settings.shipPoints} ${settings.shipPoints === 1 ? "bod" : "body"} · stíhač = 1`),
+                pips(3, settings.shipPoints, "size", () => icon("ship", "#7dd3fc", 18), () => icon("ship", "#334155", 18), (k) => `${k} lodní body`, (v) => set({ shipPoints: Math.max(1, v) }), `${settings.shipPoints} ${settings.shipPoints === 1 ? "bod" : "body"} · stíhač = 1, bitevník = 2`),
                 "Každý hráč musí body využít přesně: stíhač stojí 1 bod (větší lodě víc). Všechny lodě hráče mají jednu peněženku.",
               ),
               frow(

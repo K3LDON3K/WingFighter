@@ -951,7 +951,7 @@ function showScanResult(ship: Ship) {
       { class: "pnl scan-card" },
       h("div", { class: "bb-head" }, icon("scan", "#7dd3fc", 14), h("span", { class: "ttl" }, label(`Sken: ${ship.name}`)), h("button", { class: "px tiny", style: "margin-left:auto", onclick: () => wrap.remove() }, "✕")),
       h("div", { class: "txt muted" }, `${HULLS[lo.hullId]?.name ?? lo.hullId} · pilot ${PILOTS[lo.pilotId]?.name ?? lo.pilotId} · trup ${ship.hull}/${ship.stats.hull}${ship.shieldType === "whole" ? ` · štít ${ship.shields}` : ship.shieldType === "segment" ? ` · segmenty ${ship.segments.join("/")}` : ""}`),
-      renderLoadout({ loadout: lo, readonly: true, hideHead: true, budget: game.state.tuning.startBudget, allowed: game.state.settings.allowedModules, compact: true }),
+      renderLoadout({ loadout: lo, readonly: true, hideHead: true, budget: game.state.tuning.startBudget, allowed: game.state.settings.allowedModules, compact: true, team: ship.team }),
       h("div", { class: "txt muted", style: "margin-top:6px" }, "Platí jen teď – po zavření je nutné skenovat znovu."),
     ),
   );
@@ -1543,6 +1543,7 @@ function renderSide() {
             wrap.append(
               renderLoadout({
                 loadout: sh.loadout,
+                team: sh.team,
                 readonly: true,
                 hideHead: true,
                 budget: g.state.tuning.startBudget,
@@ -1581,7 +1582,7 @@ function renderSide() {
           } else {
             wrap.append(
               h("div", { class: "txt muted" }, `${sh.name} · kredity ${me?.credits ?? 0}.${chosen ? ` Na začátku kola vyhodí ${MODULES[chosen.type].name}.` : ""}`),
-              renderLoadout({ loadout: sh.loadout, readonly: true, hideHead: true, budget: g.state.tuning.startBudget, allowed: g.state.settings.allowedModules, compact: true, showCargo: true, selectedId: chosenId }),
+              renderLoadout({ loadout: sh.loadout, team: sh.team, readonly: true, hideHead: true, budget: g.state.tuning.startBudget, allowed: g.state.settings.allowedModules, compact: true, showCargo: true, selectedId: chosenId }),
             );
             if (!g.submitted && g.state.status !== "finished" && sh.ownerId === playerId)
               wrap.append(h("div", { class: "row", style: "margin-top:8px" }, h("button", { class: "px", onclick: () => (chosen ? ((g.jettisonPick = true), renderSide()) : chooseIcon(sh.id, "jettison")) }, icon("debris", "currentColor", 10), " ", label(chosen ? "změnit vyhození" : "vyhodit modul (1 akce)"))));

@@ -5,6 +5,7 @@
 import { CARGO, COMET, CRATER_RADIUS_REF, DROID, LASER, MG, MINE, RULES, SCANNER, STRESS, TECH, TORPEDO } from "./constants.ts";
 import { VISION_REF } from "./fog.ts";
 import { HULLS, LASER_DICE, MODULE_HP_PCT, MODULES, STRESS_MAX_REF, WEIGHT } from "./ships.ts";
+import { BATTLESHIP_PROFILE, FIGHTER_PROFILE } from "./maneuvers.ts";
 
 export interface Tuning {
   // zranění
@@ -25,6 +26,10 @@ export interface Tuning {
   shieldRecharge: number;
   laserDice: number;
   agility: number;
+  maxSpeedFighter: number;
+  hullBattleship: number;
+  agilityBattleship: number;
+  maxSpeedBattleship: number;
   torpedoAmmo: number;
   mineAmmo: number;
   vision: number;
@@ -161,6 +166,10 @@ export const DEFAULT_TUNING: Tuning = {
   shieldRecharge: 5,
   laserDice: 2,
   agility: 3,
+  maxSpeedFighter: 5,
+  hullBattleship: 200,
+  agilityBattleship: 2,
+  maxSpeedBattleship: 4,
   torpedoAmmo: 3,
   mineAmmo: 2,
   vision: 960,
@@ -283,8 +292,12 @@ export interface TuningField {
 /** Popis polí pro UI (pořadí = pořadí v menu). */
 export const TUNING_FIELDS: TuningField[] = [
   // --- loď ---
-  { key: "hull", label: "Trup lodi", group: "Loď", min: 10, max: 1000, step: 10 },
-  { key: "agility", label: "Obratnost (kostky obrany)", group: "Loď", min: 0, max: 6, step: 1 },
+  { key: "hull", label: "Stíhač – trup", group: "Loď", min: 10, max: 1000, step: 10 },
+  { key: "agility", label: "Stíhač – obratnost (kostky obrany)", group: "Loď", min: 0, max: 6, step: 1 },
+  { key: "maxSpeedFighter", label: "Stíhač – max. rychlost", group: "Loď", min: 1, max: 5, step: 1, hint: "bez váhy výbavy; váha ubírá" },
+  { key: "hullBattleship", label: "Bitevník – trup", group: "Loď", min: 50, max: 1000, step: 10 },
+  { key: "agilityBattleship", label: "Bitevník – obratnost (kostky obrany)", group: "Loď", min: 0, max: 6, step: 1 },
+  { key: "maxSpeedBattleship", label: "Bitevník – max. rychlost", group: "Loď", min: 1, max: 5, step: 1 },
   { key: "vision", label: "Dohled (fog of war)", group: "Loď", min: 100, max: 4000, step: 50 },
   { key: "weightPerSpeed", label: "Váha na −1 max. rychlosti", group: "Loď", min: 1, max: 30, step: 1, hint: "součet váhy modulů / tato hodnota = o kolik klesne max. rychlost" },
   { key: "collisionShip", label: "Náraz loď–loď", group: "Loď", min: 0, max: 100, step: 5 },
@@ -487,6 +500,10 @@ export function applyTuning(t: Tuning): void {
   VISION_REF.value = t.vision;
   HULLS.fighter.hull = t.hull;
   HULLS.fighter.agility = t.agility;
+  FIGHTER_PROFILE.maxSpeed = t.maxSpeedFighter;
+  HULLS.battleship.hull = t.hullBattleship;
+  HULLS.battleship.agility = t.agilityBattleship;
+  BATTLESHIP_PROFILE.maxSpeed = t.maxSpeedBattleship;
   LASER_DICE.value = t.laserDice;
   MODULES["shield-whole"].shields = t.shields;
   MODULES.torpedo.ammo = t.torpedoAmmo;

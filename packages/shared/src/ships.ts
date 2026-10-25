@@ -1,5 +1,5 @@
 import { VISION_REF } from "./fog.ts";
-import { FIGHTER_PROFILE } from "./maneuvers.ts";
+import { BATTLESHIP_PROFILE, FIGHTER_PROFILE } from "./maneuvers.ts";
 import { CARGO, LASER, RULES, TECH } from "./constants.ts";
 import type { Facing, GameSettings, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, PilotMods, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
 
@@ -32,6 +32,37 @@ export const HULLS: Record<string, HullDef> = {
       { id: "right", name: "pravobok", size: "small" },
     ],
     profile: FIGHTER_PROFILE,
+  },
+  battleship: {
+    id: "battleship",
+    name: "Bitevník",
+    description: "Střední loď, asi 3× větší než stíhač. Šest malých slotů: příď, záď, levobok, pravobok a levá a pravá gondola. Pomalejší (max. rychlost 4), otočka jen z rychlosti 2–3, větší trup a náklad. Stojí 2 lodní body.",
+    radius: 58,
+    points: 2,
+    // kolizní model podle spritu (50×40 px × 3): trup od zádi k přídi, špice, dvě gondoly na bocích
+    colliders: [
+      { x: -45, y: 0, r: 16 },
+      { x: -18, y: 0, r: 18 },
+      { x: 12, y: 0, r: 17 },
+      { x: 42, y: 0, r: 12 },
+      { x: 64, y: 0, r: 6 },
+      { x: -42, y: -36, r: 11 },
+      { x: -18, y: -36, r: 11 },
+      { x: -42, y: 36, r: 11 },
+      { x: -18, y: 36, r: 11 },
+    ],
+    hull: 200,
+    agility: 2,
+    cargo: 2,
+    slots: [
+      { id: "front", name: "příď", size: "small" },
+      { id: "back", name: "záď", size: "small" },
+      { id: "left", name: "levobok", size: "small" },
+      { id: "right", name: "pravobok", size: "small" },
+      { id: "podLeft", name: "levá gondola", size: "small" },
+      { id: "podRight", name: "pravá gondola", size: "small" },
+    ],
+    profile: BATTLESHIP_PROFILE,
   },
 };
 
@@ -143,31 +174,40 @@ export function hasFacing(type: ModuleType): boolean {
   return type === "laser" || type === "torpedo" || type === "mine" || type === "mg";
 }
 
-const OPPOSITE: Record<SlotId, SlotId> = { front: "back", back: "front", left: "right", right: "left" };
+/** Strana lodi, na které slot leží (gondoly = bok). */
+export function slotSide(slot: SlotId): Facing {
+  return slot === "podLeft" ? "left" : slot === "podRight" ? "right" : slot;
+}
+const OPPOSITE: Record<Facing, Facing> = { front: "back", back: "front", left: "right", right: "left" };
 export const FACINGS: Facing[] = ["front", "right", "back", "left"];
 export const FACING_NAMES: Record<Facing, string> = { front: "dopředu", right: "doprava", back: "dozadu", left: "doleva" };
 
 /** Povolené směry modulu ve slotu: všechny kromě „do středu“; miny nesmí dopředu. */
 export function allowedFacings(type: ModuleType, slot: SlotId): Facing[] {
   if (!hasFacing(type)) return [];
-  return FACINGS.filter((f) => f !== OPPOSITE[slot] && !(type === "mine" && f === "front"));
+  return FACINGS.filter((f) => f !== OPPOSITE[slotSide(slot)] && !(type === "mine" && f === "front"));
 }
 
 /** Výchozí směr modulu ve slotu (ven ze slotu; miny na boku do boku). */
 export function defaultFacing(type: ModuleType, slot: SlotId): Facing | undefined {
   if (!hasFacing(type)) return undefined;
-  const pref: Facing[] = type === "mine" ? [slot, "back"] : ["front", slot];
+  const pref: Facing[] = type === "mine" ? [slotSide(slot), "back"] : ["front", slotSide(slot)];
   return pref.find((f) => allowedFacings(type, slot).includes(f)) ?? allowedFacings(type, slot)[0];
 }
 
 /** Úhel směru modulu vůči kurzu lodi. */
 /** Poloha slotu na trupu v souřadnicích lodi (x dopředu, y doprava) – odtud zbraň střílí a měří dosah. */
-export function slotOffset(slot: SlotId | undefined): { x: number; y: number } {
-  return slot === "front" ? { x: 14, y: 0 } : slot === "back" ? { x: -12, y: 0 } : slot === "left" ? { x: -4, y: -12 } : slot === "right" ? { x: -4, y: 12 } : { x: 0, y: 0 };
+const SLOT_OFFSETS: Record<string, Partial<Record<SlotId, { x: number; y: number }>>> = {
+  fighter: { front: { x: 14, y: 0 }, back: { x: -12, y: 0 }, left: { x: -4, y: -12 }, right: { x: -4, y: 12 } },
+  battleship: { front: { x: 52, y: 0 }, back: { x: -48, y: 0 }, left: { x: 0, y: -16 }, right: { x: 0, y: 16 }, podLeft: { x: -30, y: -36 }, podRight: { x: -30, y: 36 } },
+};
+/** Poloha slotu vůči středu lodi (+x příď, +y pravobok) podle trupu. */
+export function slotOffset(slot: SlotId | undefined, hullId = "fighter"): { x: number; y: number } {
+  return (slot && (SLOT_OFFSETS[hullId] ?? SLOT_OFFSETS.fighter)[slot]) ?? { x: 0, y: 0 };
 }
 /** Světová pozice modulu na lodi. */
-export function modulePos(ship: { x: number; y: number; heading: number }, mod: { slot?: SlotId } | undefined): { x: number; y: number } {
-  const o = slotOffset(mod?.slot);
+export function modulePos(ship: { x: number; y: number; heading: number; loadout?: { hullId: string } }, mod: { slot?: SlotId } | undefined): { x: number; y: number } {
+  const o = slotOffset(mod?.slot, ship.loadout?.hullId);
   const c = Math.cos(ship.heading);
   const s = Math.sin(ship.heading);
   return { x: ship.x + o.x * c - o.y * s, y: ship.y + o.x * s + o.y * c };

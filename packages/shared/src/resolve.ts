@@ -88,6 +88,7 @@ import type {
   Comet,
   Debris,
   SlotId,
+  Facing,
   GameResult,
   GameState,
   Maneuver,
@@ -190,8 +191,9 @@ function damageModule(ship: Ship, hullDamage: number, events: TurnEvent[], from?
   if (working.length === 0) return;
   let target: ModuleInstance | undefined;
   if (from) {
-    const slot: SlotId = (["front", "right", "back", "left"] as SlotId[])[hitSegment(ship, from)];
-    target = working.find((m) => occupiedSlots(m).includes(slot));
+    const side: Facing = (["front", "right", "back", "left"] as Facing[])[hitSegment(ship, from)];
+    const sideSlots: SlotId[] = side === "left" ? ["left", "podLeft"] : side === "right" ? ["right", "podRight"] : [side];
+    target = working.find((m) => occupiedSlots(m).some((s) => sideSlots.includes(s)));
     if (!target) return; // na zasažené straně nic není
   } else target = working[Math.floor(creditCtx.rng.next() * working.length)];
   const hp = Math.max(0, moduleHp(target) - dmg);

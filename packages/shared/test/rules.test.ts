@@ -28,6 +28,9 @@ import {
   moduleCost,
   validateLoadout,
   applyScan,
+  HULLS,
+  fleetPoints,
+  modulePos,
   applyShieldRecharge,
   shieldRechargeBlocked,
   generateMap,
@@ -884,6 +887,25 @@ describe("štíty × druh zbraně a dobití technologií", () => {
     expect(w.shields).toBe(80); // +40, ale strop 80
     expect(res.event && res.event.type === "shieldRecharge" && res.event.amount).toBe(20);
     expect(w.techPoints).toBe(0);
+  });
+});
+
+describe("bitevník", () => {
+  it("šest slotů včetně gondol, 2 lodní body, max. rychlost 4, moduly dál od středu", () => {
+    const lo = { hullId: "battleship", pilotId: "kadet", modules: [newModule("laser", "front", "a"), newModule("torpedo", "podLeft", "b"), newModule("mg", "podRight", "c"), newModule("shield-whole", "back", "d")] };
+    expect(validateLoadout(lo, { allowed: {} })).toBeNull();
+    expect(fleetPoints([lo])).toBe(2);
+    expect(HULLS.battleship.slots.map((s) => s.id)).toEqual(["front", "back", "left", "right", "podLeft", "podRight"]);
+    expect(listManeuvers(profileOf(lo), 2).every((m) => m.speed <= 4)).toBe(true);
+    expect(listManeuvers(profileOf(lo), 2).some((m) => m.koiogran && m.speed === 3)).toBe(true);
+    expect(listManeuvers(profileOf(lo), 2).some((m) => m.koiogran && m.speed === 4)).toBe(false);
+    // gondola na levoboku: modul je vlevo a vzadu
+    const ship = { x: 0, y: 0, heading: 0, loadout: lo };
+    const pos = modulePos(ship, lo.modules[1]);
+    expect(pos.y).toBeLessThan(-30);
+    expect(pos.x).toBeLessThan(0);
+    // stíhač nemá gondoly
+    expect(validateLoadout({ hullId: "fighter", pilotId: "kadet", modules: [newModule("laser", "podLeft", "x")] }, { allowed: {} })).not.toBeNull();
   });
 });
 

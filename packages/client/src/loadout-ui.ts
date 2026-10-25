@@ -1,6 +1,7 @@
 import { type ModuleDef } from "@wingfighter/shared";
 import {
   moduleBroken,
+  TEAM_COLORS,
   moduleHp,
   type PilotDef,
   type PilotMods,
@@ -12,6 +13,7 @@ import {
   cargoCapacity,
   moduleWeight,
   allowedFacings,
+  defaultFacing,
   FACING_NAMES,
   freeSlots,
   hasFacing,
@@ -44,6 +46,7 @@ import {
 } from "@wingfighter/shared";
 import { h } from "./dom.ts";
 import { tipAttr } from "./tooltip.ts";
+import { BATTLESHIP_TEMPLATE, fighterTemplate, shade } from "./game/sprites.ts";
 /** Dávka kulometu (nábojů na jeden výstřel) – dílek munice v dlaždici. */
 const MG_BURST = 10;
 import { icon, label } from "./icons.ts";
@@ -73,22 +76,34 @@ export interface LoadoutEditorOptions {
   pilotChoices?: string[];
   /** Piloti už použití v jiných lodích letky (unikátní nejdou vybrat podruhé). */
   pilotsTaken?: string[];
+  /** Tým hráče (barva a varianta spritu v nákresu). */
+  team?: number;
 }
 
 const NS = "http://www.w3.org/2000/svg";
-const FIGHTER = ["..GG............", "..GPG...........", "..GPPG..........", "EEDPPPG.........", "..GPPPPGGG......", "...GPPPPPPGGGG..", "EEDDPWWPPPPPPPGG", "EEDDPWWPPPPPPPGG", "...GPPPPPPGGGG..", "..GPPPPGGG......", "EEDPPPG.........", "..GPPG..........", "..GPG...........", "..GG............"];
 /** Nákres lodi: 24 px na pixel šablony, čtyři hexagonové sloty v plástvi (příď nad zádí, boky na šikmých stěnách zádi). */
 const DIAG = { w: 480, h: 412, s: 24, x0: 72, y0: 14 };
 const HEX_R = 50;
 const HW = 2 * HEX_R;
 const HH = Math.sqrt(3) * HEX_R;
 const FY = 112;
-const SLOT_BOX: Record<SlotId, { x: number; y: number; w: number; h: number }> = {
+type Box = { x: number; y: number; w: number; h: number };
+const SLOT_BOX: Record<SlotId, Box> = {
   front: { x: 190, y: FY, w: HW, h: HH },
   back: { x: 190, y: FY + HH, w: HW, h: HH },
   left: { x: 190 - HW * 0.75, y: FY + HH + HH / 2, w: HW, h: HH },
   right: { x: 190 + HW * 0.75, y: FY + HH + HH / 2, w: HW, h: HH },
+  // gondoly (bitevník): vně boků, o půl hexu níž
+  podLeft: { x: 190 - HW * 1.5, y: FY + 2 * HH, w: HW, h: HH },
+  podRight: { x: 190 + HW * 1.5, y: FY + 2 * HH, w: HW, h: HH },
 };
+/** Nákres trupu pod pláství: šablona, měřítko a umístění (stíhač 16×14 po 24 px, bitevník 50×40 po 7 px). */
+function hullDiagram(hullId: string, team = 0): { template: string[]; s: number; x0: number; y0: number } {
+  if (hullId === "battleship") return { template: BATTLESHIP_TEMPLATE, s: 7, x0: 100, y0: 30 };
+  const { template, scale } = fighterTemplate(team);
+  const s = scale === 2 ? 16 : 24; // nové šablony 24×20 po 16 px = stejná velikost jako původní 16×14 po 24 px
+  return { template, s, x0: scale === 2 ? 80 : 72, y0: scale === 2 ? 14 : 14 };
+}
 function hexPoints(b: { x: number; y: number; w: number; h: number }): string {
   const cx = b.x + b.w / 2;
   const cy = b.y + b.h / 2;
@@ -181,6 +196,24 @@ export function svgEl<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Recor
   return el;
 }
 
+/** Změna trupu: moduly ve slotech, které nový trup nemá, se přesunou do volných slotů; co se nevejde, se prodá (odebere). */
+function switchHull(loadout: ShipLoadout, hullId: string): ShipLoadout {
+  const hull = HULLS[hullId];
+  if (!hull) return loadout;
+  const ids = new Set(hull.slots.map((s) => s.id));
+  const kept: ModuleInstance[] = [];
+  const homeless: ModuleInstance[] = [];
+  for (const m of loadout.modules) (ids.has(m.slot) ? kept : homeless).push(m);
+  const out: ShipLoadout = { ...loadout, hullId, modules: kept };
+  for (const m of homeless) {
+    const free = freeSlots(out)[0];
+    if (!free) break;
+    const slot = free;
+    out.modules = [...out.modules, { ...m, slot, facing: hasFacing(m.type) ? (allowedFacings(m.type, slot).includes(m.facing ?? "front") ? m.facing : defaultFacing(m.type, slot)) : undefined }];
+  }
+  return out;
+}
+
 /** Výběr slotu / modulu v editoru: nejdřív slot a pak modul z obchodu, nebo naopak. Esc / klik vedle = zrušit. */
 let pickSlot: SlotId | null = null;
 let pickType: ModuleType | null = null;
@@ -249,9 +282,11 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
   /* --- nákres lodi s hexagonovými sloty --- */
   const scale = opts.compact ? 0.62 : 1;
   const svg = svgEl("svg", { viewBox: `0 0 ${DIAG.w} ${DIAG.h}`, width: Math.round(DIAG.w * scale), height: Math.round(DIAG.h * scale), class: "lo-svg" });
-  const g = svgEl("g", { transform: `translate(${DIAG.x0}, ${DIAG.y0 + 16 * DIAG.s}) rotate(-90) scale(${DIAG.s})`, "shape-rendering": "crispEdges" });
-  const pal: Record<string, string> = { P: "#3b82f6", G: "#9aa3ad", D: "#4b5563", W: "#dbeafe", E: "#fb923c" };
-  FIGHTER.forEach((row, y) => [...row].forEach((c, x) => pal[c] && g.append(svgEl("rect", { x, y, width: 1, height: 1, fill: pal[c] }))));
+  const hd = hullDiagram(loadout.hullId, opts.team ?? 0);
+  const g = svgEl("g", { transform: `translate(${hd.x0}, ${hd.y0 + hd.template[0].length * hd.s}) rotate(-90) scale(${hd.s})`, "shape-rendering": "crispEdges" });
+  const teamCol = TEAM_COLORS[opts.team ?? 0] ?? "#3b82f6";
+  const pal: Record<string, string> = { P: teamCol, S: shade(teamCol, 0.72), L: shade(teamCol, 1.35), G: "#9aa3ad", D: "#4b5563", K: "#1f2937", W: "#dbeafe", E: "#fb923c", Y: "#fde68a" };
+  hd.template.forEach((row, y) => [...row].forEach((c, x) => pal[c] && g.append(svgEl("rect", { x, y, width: 1, height: 1, fill: pal[c] }))));
   svg.append(g);
   const free = freeSlots(loadout);
   const drawn = new Set<string>();
@@ -604,7 +639,7 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const on = x.id === loadout.hullId;
       return h(
         "button",
-        { class: `pk-tile hull ${on ? "on" : ""}`, disabled: !canPick || !opts.hullChoices, title: `${x.name}\n${x.description}\nLodní body: ${x.points} · trup ${x.hull} · sloty: ${x.slots.map((sl) => sl.name).join(", ")} · náklad ${x.cargo}`, onclick: () => ((pickerOpen = null), change({ ...loadout, hullId: x.id })) },
+        { class: `pk-tile hull ${on ? "on" : ""}`, disabled: !canPick || !opts.hullChoices, title: `${x.name}\n${x.description}\nLodní body: ${x.points} · trup ${x.hull} · sloty: ${x.slots.map((sl) => sl.name).join(", ")} · náklad ${x.cargo}`, onclick: () => ((pickerOpen = null), change(switchHull(loadout, x.id))) },
         h("span", { class: "pk-pic" }, icon("ship", on ? "#7dd3fc" : "#64748b", 28)),
         h("span", { class: "pk-name" }, label(x.name)),
         h("span", { class: "pk-sub" }, `${x.points} ${x.points === 1 ? "bod" : "body"}`),
