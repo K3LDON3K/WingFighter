@@ -1177,6 +1177,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (m.deflections >= MAX_DEFLECTIONS) m.frozenAt = k - 1;
   };
   const scatter = () => (rng.next() * 2 - 1) * COLLISION_SCATTER;
+  /** Lodě, které narazily do asteroidu nebo do nich narazila kometa: po tahu rychlost 1 a nulový stres. */
+  const crashed = new Set<string>();
 
   // Překážky, kterých se loď dotýká (po srážce), ji neblokují, dokud se od nich neodlepí.
   const touching = new Map<string, Set<string>>();
@@ -1319,7 +1321,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               continue;
             }
             if (ov && !stillTouching(ship.id, a.id, true)) {
-              hit = { with: "asteroid", otherId: a.id, heading: normalizeAngle(Math.atan2(p.y - a.y, p.x - a.x) + scatter()) };
+              // náraz do asteroidu: loď se otočí náhodným směrem (viz crash níže)
+              hit = { with: "asteroid", otherId: a.id, heading: normalizeAngle(rng.next() * Math.PI * 2) };
               break;
             }
             if (!ov) stillTouching(ship.id, a.id, false);
@@ -1375,6 +1378,18 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
                 ? state.asteroids.find((a) => a.id === hit!.otherId)!
                 : { x: p.x + Math.cos(edgeNormal(state, p)) * 10, y: p.y + Math.sin(edgeNormal(state, p)) * 10 };
           const dbl = hit.with === "asteroid" && evading.has(ship.id) ? 2 : 1; // úhyb skončil v asteroidu
+          if (hit.with === "asteroid") {
+            // náraz vykousne do asteroidu díru v místě dotyku (na obrysu lodi směrem k asteroidu)
+            const a = src as Asteroid;
+            const ang = Math.atan2(a.y - p.y, a.x - p.x);
+            const contact: Vec = { x: p.x + Math.cos(ang) * ship.stats.radius, y: p.y + Math.sin(ang) * ship.stats.radius };
+            if (carveCrater(a, contact, Math.max(RULES.crashCrater, ship.stats.radius))) {
+              const destroyed = asteroidDestroyed(a);
+              if (destroyed) removedAsteroids.add(a.id);
+              events.push({ type: "asteroidHit", asteroidId: a.id, x: contact.x, y: contact.y, t, profile: [...a.profile], destroyed });
+            }
+            crashed.add(ship.id);
+          }
           applyDamage(ship, hit.with === "ship" ? RULES.collisionShip : hit.with === "asteroid" ? RULES.collisionAsteroid * dbl : RULES.collisionEdge, events, src);
           if (!ship.alive) m.frozenAt = k - 1;
           changed = true;
@@ -1408,10 +1423,11 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
           }
           continue;
         }
-        const away = Math.atan2(sp.y - cp.y, sp.x - cp.x);
         if (sm.frozenAt === null) {
-          const h = normalizeAngle(away + scatter());
+          // náraz komety: loď se otočí náhodným směrem, zpomalí na 1 a ztratí stres (viz crash níže)
+          const h = normalizeAngle(rng.next() * Math.PI * 2);
           deflect(sm, k, h);
+          crashed.add(s.id);
           events.push({ type: "collision", shipId: s.id, with: "comet", otherId: c.id, t: k / MOVE_STEPS, newHeading: h });
         }
         const dmg = evading.has(s.id) ? COMET.damage * 2 : COMET.damage; // úhyb skončil v kometě = dvojité zranění
@@ -1561,6 +1577,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const man = maneuverOf.get(ship.id)!;
     const od = orders.get(ship.id);
     ship.speed = man.koiogran ? Math.max(1, man.speed - RULES.koiogranSpeedDrop) : man.speed;
+    if (crashed.has(ship.id)) ship.speed = 1;
     const cost = effStressCost(man, od);
     const stM = statsOf(state, ship.ownerId);
     if (stM) {
@@ -1568,7 +1585,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       if (man.koiogran) stM.maneuvers.koiogran++;
     }
     const before = ship.stressPoints;
-    ship.stressPoints = clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
+    ship.stressPoints = crashed.has(ship.id) ? 0 : clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
     if (man.difficulty === "danger" && !od?.droid?.overdrive) applyDamage(ship, Math.max(1, Math.round((ship.stats.hull * STRESS.dangerHullPercent) / 100)), events);
   }

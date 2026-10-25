@@ -17,6 +17,7 @@ export interface Tuning {
   mineRadius: number;
   collisionShip: number;
   collisionAsteroid: number;
+  crashCrater: number;
   collisionEdge: number;
   dangerHullPercent: number;
   craterRadius: number;
@@ -158,6 +159,7 @@ export const DEFAULT_TUNING: Tuning = {
   mineRadius: 70,
   collisionShip: 15,
   collisionAsteroid: 15,
+  crashCrater: 24,
   collisionEdge: 15,
   dangerHullPercent: 5,
   craterRadius: 45,
@@ -302,6 +304,7 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "weightPerSpeed", label: "Váha na −1 max. rychlosti", group: "Loď", min: 1, max: 30, step: 1, hint: "součet váhy modulů / tato hodnota = o kolik klesne max. rychlost" },
   { key: "collisionShip", label: "Náraz loď–loď", group: "Loď", min: 0, max: 100, step: 5 },
   { key: "collisionAsteroid", label: "Náraz do asteroidu", group: "Loď", min: 0, max: 100, step: 5 },
+  { key: "crashCrater", label: "Díra po nárazu lodi – min. poloměr", group: "Loď", min: 0, max: 100, step: 2, hint: "náraz do asteroidu vykousne díru; větší loď dělá větší díru" },
   { key: "collisionEdge", label: "Náraz do okraje mapy", group: "Loď", min: 0, max: 100, step: 5 },
   { key: "craterRadius", label: "Kráter v asteroidu – poloměr", group: "Loď", min: 0, max: 150, step: 5 },
   // --- akce a stres ---
@@ -470,6 +473,7 @@ export function applyTuning(t: Tuning): void {
   MINE.radius = t.mineRadius;
   RULES.collisionShip = t.collisionShip;
   RULES.collisionAsteroid = t.collisionAsteroid;
+  RULES.crashCrater = t.crashCrater;
   RULES.collisionEdge = t.collisionEdge;
   STRESS.dangerHullPercent = t.dangerHullPercent;
   STRESS.max = t.stressMax;

@@ -442,7 +442,7 @@ describe("vyhodnocení kola", () => {
   it("torpédo vystřelené na bod tam vybuchne, zraní lodě v okolí a vykousne kráter do asteroidu", () => {
     const g = game({ asteroids: [ast("a", 1000, 560, 40)] });
     place(g, "ship-p1-0", 500, 500, 0);
-    place(g, "ship-p2-0", 1040, 440, Math.PI / 2); // bude u bodu výbuchu, mimo dráhu torpéda
+    place(g, "ship-p2-0", 1040, 440, Math.PI); // bude u bodu výbuchu, mimo dráhu torpéda i asteroid
     let r = resolveTurn(
       g,
       [
@@ -1264,6 +1264,42 @@ describe("úhyb skrz asteroid a kometu", () => {
     r = resolveTurn(g3, [{ shipId: me3.id, maneuverId: "m3a0", fire: false, action: { type: "evade" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
     expect(r.events.some((e) => e.type === "evadeThrough" && e.with === "comet")).toBe(true);
     expect(r.events.some((e) => e.type === "cometGone" && e.reason === "ship")).toBe(false);
+  });
+});
+
+describe("náraz do asteroidu / komety", () => {
+  it("náraz do asteroidu vykousne díru, loď skončí rychlostí 1, bez stresu a otočená náhodně", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    me.speed = 3;
+    me.stressPoints = 3;
+    g.asteroids = [ast("a1", 500 + MOVE_UNIT * 2 + 40, 500, 90)];
+    const before = [...g.asteroids[0].profile];
+    const r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m3a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m3a0", fire: false }], createRng(7));
+    expect(r.events.some((e) => e.type === "collision" && e.shipId === me.id && e.with === "asteroid")).toBe(true);
+    const hitEv = r.events.find((e) => e.type === "asteroidHit" && e.asteroidId === "a1");
+    expect(hitEv).toBeDefined();
+    const a = r.state.asteroids.find((x) => x.id === "a1")!;
+    expect(a.profile.some((v, i) => v < before[i])).toBe(true);
+    const s = r.state.ships.find((x) => x.id === me.id)!;
+    expect(s.speed).toBe(1);
+    expect(s.stressPoints).toBe(0);
+    // náhodný směr: jiné semínko → jiný směr
+    const r2 = resolveTurn(g, [{ shipId: me.id, maneuverId: "m3a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m3a0", fire: false }], createRng(8));
+    expect(r2.state.ships.find((x) => x.id === me.id)!.heading).not.toBeCloseTo(s.heading, 3);
+  });
+  it("kometa do lodi: rychlost 1 a nulový stres", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    me.stressPoints = 2;
+    g.comets = [{ id: "c1", x: 640, y: 500, heading: Math.PI, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: COMET.radius, tailUsed: [] }];
+    const r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m3a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r.events.some((e) => e.type === "cometGone" && e.reason === "ship")).toBe(true);
+    const s = r.state.ships.find((x) => x.id === me.id)!;
+    expect(s.speed).toBe(1);
+    expect(s.stressPoints).toBe(0);
   });
 });
 

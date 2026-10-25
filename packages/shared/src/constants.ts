@@ -29,6 +29,8 @@ export const RULES = {
   /** Zranění za náraz. */
   collisionShip: 15,
   collisionAsteroid: 15,
+  /** Min. poloměr díry, kterou loď vykousne nárazem do asteroidu (větší loď = větší díra). */
+  crashCrater: 24,
   collisionEdge: 15,
   shieldRecharge: 5,
   /** Počet akcí na kolo. */

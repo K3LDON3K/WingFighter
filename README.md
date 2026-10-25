@@ -40,8 +40,11 @@ Bez označení loď poletí tak, jak má nakresleno (výchozí = stejná rychlos
 **nebezpečný – červený** (změna rychlosti o 2+ *a* ostrý úhel) stojí 2 body a 5 % trupu. Bez bodů manévr nejde vybrat.
 Akce po pohybu zůstává vždy povolená.
 
-Lodě nikdy nestojí: při srážce s lodí, asteroidem nebo okrajem mapy je loď **odmrštěna** novým (náhodně
+Lodě nikdy nestojí: při srážce s lodí nebo okrajem mapy je loď **odmrštěna** novým (náhodně
 odchýleným) směrem, dostane 15 zranění, ztratí akci a doletí zbytek pohybu tím směrem.
+**Náraz do asteroidu** (nebo komety do lodi) je tvrdší: loď vykousne do asteroidu díru (velikost podle lodi,
+min. poloměr v ladění), otočí se **zcela náhodným směrem**, po kole má **rychlost 1** a **nulový stres**
+(náraz ji „probere“); zranění 15 zůstává.
 
 ### Akce – 2 na kolo
 Každá stojí 1 bod: **úprava pohybu** (jiná rychlost nebo směr než „stejnou rychlostí rovně“), **otočka 180°**
@@ -153,6 +156,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.136 – **Náraz do asteroidu / kometa do lodi:** loď vykousne do asteroidu díru v místě dotyku (poloměr = větší z „Díra po nárazu lodi“ v ladění a poloměru lodi – bitevník dělá větší díru), otočí se do zcela náhodného směru (ne jen odmrštění od asteroidu), po kole má rychlost 1 a všechny stresové body jsou odebrány. Totéž (rychlost 1, nulový stres, náhodný směr) při nárazu komety do lodi. Zranění 15 zůstává.
 - v3.135 – Pásmo dostřelu laserů podle zasažené plochy: nejbližší pásmo, ve kterém leží aspoň pětina trupu ve výseči (dřív podle středu cíle) – u bitevníku s přídí zblízka platí bonus +1 kostka; vzorkování trupu je úměrné ploše. Kulomet počítá šanci z průměrné vzdálenosti zasažené části. Náhled střelby ukazuje pásmo („pásmo 1 · +1 kostka“). Bitevník: lasery mají do všech směrů stejnou výseč ±20°. Duch taženého modulu je nad celou stránkou (nezmizí pod obchodem).
 - v3.134 – Startovní rozestupy lodí podle velikosti: sousední lodě ve formaci dělí součet jejich poloměrů + 36 (stíhač–stíhač 68, bitevník–stíhač 110), takže se bitevník se stíhačem nepřekrývají.
 - v3.133 – Tažení v editoru výbavy: modul tažený do obchodu zčervená obchod s bannerem „PRODAT MODUL · +cena“, modul tažený z obchodu zezelená nákres lodi s bannerem „KOUPIT · −cena · pusť na volný slot“; při tažení se už neoznačuje text.
