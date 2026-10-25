@@ -45,6 +45,7 @@ function tipFor(target: Element | null): { el: Element; text: string; html?: str
 }
 
 function show(el: Element, text: string, x: number, y: number, html?: string) {
+  if (document.body.classList.contains("drag-on")) return; // během přetahování modulu bez vysvětlivek
   const t = ensureEl();
   current = el;
   t.textContent = "";

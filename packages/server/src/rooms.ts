@@ -35,6 +35,12 @@ import {
   DEFAULT_LOADOUT,
   MODULE_TYPES,
   MODULES,
+  hullLargePairs,
+  freeSlots,
+  hasFacing,
+  allowedFacings,
+  defaultFacing,
+  type ModuleInstance,
   randomLoadout,
   refillLoadout,
   validateLoadout,
@@ -512,6 +518,33 @@ export class Hub {
           m.loadouts = fit;
           m.lobbyReady = false;
         }
+        this.broadcastRoom(room);
+        return;
+      }
+      case "moveModule": {
+        if (!room || room.game) return;
+        const targetId = msg.botId ?? client.id;
+        const m = room.members.get(targetId);
+        if (!m) return;
+        if (msg.botId && (room.hostId !== client.id || !m.isBot)) return;
+        const from = clampInt(msg.fromIndex, 0, m.loadouts.length - 1);
+        const to = clampInt(msg.toIndex, 0, m.loadouts.length - 1);
+        if (from === to) return;
+        const src = m.loadouts[from];
+        const dst = m.loadouts[to];
+        const mod = src.modules.find((x) => x.id === msg.moduleId);
+        if (!mod) return this.error(client, "Přesun: modul nenalezen.");
+        const def = MODULES[mod.type];
+        const slot = def.size === "large" ? hullLargePairs(HULLS[dst.hullId]).find((p) => p.every((s) => freeSlots(dst).includes(s)))?.[0] : freeSlots(dst)[0];
+        if (!slot) return this.error(client, `Přesun: loď ${to + 1} nemá volný slot.`);
+        const moved: ModuleInstance = { ...mod, slot, facing: hasFacing(mod.type) ? (mod.facing && allowedFacings(mod.type, slot).includes(mod.facing) ? mod.facing : defaultFacing(mod.type, slot)) : undefined };
+        const nextSrc = normalizeShields({ ...src, modules: src.modules.filter((x) => x.id !== mod.id) });
+        const nextDst = normalizeShields({ ...dst, modules: [...dst.modules, moved] });
+        const err = validateLoadout(nextDst, { allowed: room.settings.allowedModules }) ?? validateLoadout(nextSrc, { allowed: room.settings.allowedModules });
+        if (err) return this.error(client, `Přesun: ${err}.`);
+        m.loadouts[from] = nextSrc;
+        m.loadouts[to] = nextDst;
+        if (!m.isBot) m.lobbyReady = false;
         this.broadcastRoom(room);
         return;
       }

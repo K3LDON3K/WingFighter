@@ -319,7 +319,7 @@ function roomView(m: LobbyModel, net: Net) {
             "div",
             { class: "bot-editor" },
             fleet.length > 1 ? fleetTabs(fleet, t, (i) => ((botTab = i), rerender())) : null,
-            renderLoadout({ loadout: fleet[t], team: p.team, budget, allowed: room.settings.allowedModules, compact: true, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (lo) => net.send({ type: "setLoadout", loadout: lo, botId: p.id, index: t }) }),
+            renderLoadout({ loadout: fleet[t], team: p.team, budget, allowed: room.settings.allowedModules, compact: true, onMoveToShip: (moduleId, toIndex) => net.send({ type: "moveModule", botId: p.id, fromIndex: t, toIndex, moduleId }), hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (lo) => net.send({ type: "setLoadout", loadout: lo, botId: p.id, index: t }) }),
           );
         })()
       : null;
@@ -334,7 +334,7 @@ function roomView(m: LobbyModel, net: Net) {
       ...fleet.map((l, i) =>
         h(
           "button",
-          { class: `fleet-tab ${i === active ? "on" : ""}`, title: `${HULLS[l.hullId]?.name ?? l.hullId} · ${PILOTS[l.pilotId]?.name ?? l.pilotId} · ${l.modules.length} modulů`, onclick: () => onPick(i) },
+          { class: `fleet-tab ${i === active ? "on" : ""}`, dataset: { fleetIndex: String(i) }, title: `${HULLS[l.hullId]?.name ?? l.hullId} · ${PILOTS[l.pilotId]?.name ?? l.pilotId} · ${l.modules.length} modulů${i === active ? "" : " · přetažením modulu sem ho přesuneš"}`, onclick: () => onPick(i) },
           icon("ship", i === active ? "#7dd3fc" : "#64748b", 12),
           h("span", { class: "ft-n" }, label(`Loď ${i + 1}`)),
           h("span", { class: "ft-sub txt" }, `${HULLS[l.hullId]?.name ?? l.hullId} · ${PILOTS[l.pilotId]?.name ?? l.pilotId}`),
@@ -376,7 +376,7 @@ function roomView(m: LobbyModel, net: Net) {
           "div",
           { class: "card" },
           h("h3", {}, icon("inventory", "#7dd3fc", 12), " ", label("Tvoje výbava"), h("span", { class: "spacer" }), h("span", { class: "lo-wallet", title: "Kredity: rozpočet místnosti + výdělky z bitev − utracené za výbavu. Výbava, munice i zničené moduly ti mezi bitvami zůstávají." }, icon("credits", "#fbbf24", 12), ` ${me.credits ?? budget}`)),
-          h("div", { class: "muted txt", style: "font-size:13px", title: `Nové moduly kupuješ za plnou cenu (nový jde před bitvou vrátit za plnou cenu, použitý se prodá za ${RULES.usedSellPct} %, zničený za ${RULES.brokenSellPct} %). Munice se mezi bitvami nedoplňuje sama – dokoupíš ji tlačítkem +cena u modulu. Co neutratíš, máš ve hře jako kredity; další získáš za sestřely a přežitá kola. Váha modulů snižuje max. rychlost lodi.` }, "Klik na volný slot a pak na modul (nebo naopak) = modul do zvoleného slotu · ✕ = prodat · +cena = dokoupit munici · najetí sem = pravidla nákupu"),
+          h("div", { class: "muted txt", style: "font-size:13px", title: `Nové moduly kupuješ za plnou cenu (nový jde před bitvou vrátit za plnou cenu, použitý se prodá za ${RULES.usedSellPct} %, zničený za ${RULES.brokenSellPct} %). Munice se mezi bitvami nedoplňuje sama – dokoupíš ji tlačítkem +cena u modulu. Co neutratíš, máš ve hře jako kredity; další získáš za sestřely a přežitá kola. Váha modulů snižuje max. rychlost lodi.` }, "Klik na volný slot a pak na modul (nebo naopak) = modul do zvoleného slotu · tažení = přesun / prohození (i na jinou loď letky) · ✕ = prodat · +cena = dokoupit munici · najetí sem = pravidla nákupu"),
           (() => {
             const fleet = me.loadouts?.length ? me.loadouts : [me.loadout];
             const t = Math.min(fleetTab, fleet.length - 1);
@@ -397,7 +397,7 @@ function roomView(m: LobbyModel, net: Net) {
                 });
                 return h("div", { class: "row preset-row", style: "align-items:center;gap:6px;flex-wrap:wrap" }, h("span", { class: "txt muted", style: "font-size:13px" }, "Sada:"), ...btns, h("span", { class: "txt muted", style: "font-size:12px" }, "rychlý start – pak si výbavu uprav; co se do kreditů nevejde, sada vynechá"));
               })(),
-              renderLoadout({ loadout: lo, team: me.team, budget, wallet: me.credits ?? budget, showCargo: !!lo.cargo?.length, allowed: room.settings.allowedModules, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (nl) => net.send({ type: "setLoadout", loadout: nl, index: t }) }),
+              renderLoadout({ loadout: lo, team: me.team, budget, wallet: me.credits ?? budget, onMoveToShip: (moduleId, toIndex) => net.send({ type: "moveModule", fromIndex: t, toIndex, moduleId }), showCargo: !!lo.cargo?.length, allowed: room.settings.allowedModules, hullChoices: allowedHullIds(), pilotChoices: allowedPilotIds(), pilotsTaken: fleet.filter((_, i) => i !== t).map((l) => l.pilotId), onChange: (nl) => net.send({ type: "setLoadout", loadout: nl, index: t }) }),
             );
           })(),
         )

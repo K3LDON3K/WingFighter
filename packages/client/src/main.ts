@@ -2354,4 +2354,4 @@ try {
 }
 
 // Ladicí přístup ke stavu (pro automatické testy v prohlížeči).
-(window as unknown as { __sg: () => unknown }).__sg = () => ({ game, cam, playerId, net });
+(window as unknown as { __sg: () => unknown }).__sg = () => ({ game, cam, playerId, net, room });

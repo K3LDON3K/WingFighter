@@ -4902,3 +4902,39 @@ button.start-chip.on:hover:not(:disabled) {
 .mhelp .hcolors .man-koi {
   margin-right: 6px;
 }
+
+/* ---- přetahování modulů v editoru výbavy ---- */
+.lo-svg .lo-g.mod.mod-click {
+  touch-action: none;
+  cursor: grab;
+}
+.lo-svg.drag-on .lo-g.mod.dragging {
+  opacity: 0.35;
+}
+.lo-svg .drag-ghost {
+  opacity: 0.85;
+  filter: drop-shadow(0 0 6px #fbbf24);
+}
+.lo-svg .lo-g.drop-target polygon {
+  stroke: #fbbf24 !important;
+  stroke-width: 5 !important;
+  fill: rgba(251, 191, 36, 0.18) !important;
+}
+.fleet-tab.drop-target {
+  outline: 3px solid #fbbf24;
+  outline-offset: -3px;
+}
+.lo-dragtip {
+  position: fixed;
+  left: 50%;
+  bottom: 24%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  padding: 6px 10px;
+  background: #3b0a0a;
+  border: 3px solid;
+  border-color: #f87171 #450a0a #450a0a #f87171;
+  color: #fecaca;
+  font-family: var(--txt);
+  font-size: 16px;
+}

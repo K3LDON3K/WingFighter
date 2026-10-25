@@ -20,6 +20,7 @@ import {
   HULLS,
   hullLargePairs,
   hullOf,
+  largePair,
   loadoutWeight,
   maxSpeedFor,
   MODULE_TYPES,
@@ -79,6 +80,8 @@ export interface LoadoutEditorOptions {
   pilotsTaken?: string[];
   /** Tým hráče (barva a varianta spritu v nákresu). */
   team?: number;
+  /** Přetažení modulu na záložku jiné lodi letky (prvek s data-fleet-index): přesun bez prodeje. */
+  onMoveToShip?: (moduleId: string, toIndex: number) => void;
 }
 
 const NS = "http://www.w3.org/2000/svg";
@@ -215,6 +218,16 @@ function switchHull(loadout: ShipLoadout, hullId: string): ShipLoadout {
   return out;
 }
 
+/** Právě proběhlo tažení modulu – následný klik se ignoruje. */
+let dragMoved = false;
+/** Krátká zpráva pod kurzorem (důvod, proč přesun nejde). */
+function showTip(text: string): void {
+  document.querySelector(".lo-dragtip")?.remove();
+  const el = h("div", { class: "lo-dragtip" }, text);
+  document.body.append(el);
+  setTimeout(() => el.remove(), 1800);
+}
+
 /** Výběr slotu / modulu v editoru: nejdřív slot a pak modul z obchodu, nebo naopak. Esc / klik vedle = zrušit. */
 let pickSlot: SlotId | null = null;
 let pickType: ModuleType | null = null;
@@ -298,11 +311,108 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     y: f === "front" ? box.y + 8 : f === "back" ? box.y + box.h - 8 : box.y + box.h / 2,
     rot: f === "right" ? 90 : f === "back" ? 180 : f === "left" ? 270 : 0,
   });
+  /** Přesun modulu do slotu (volný = přesun, obsazený = prohození); vrací novou sestavu nebo text chyby. */
+  const moveModule = (m: ModuleInstance, target: SlotId): ShipLoadout | string => {
+    const def = MODULES[m.type];
+    const occOf = (x: ModuleInstance) => occupiedSlots(x);
+    const other = loadout.modules.find((x) => x.id !== m.id && occOf(x).includes(target));
+    const refacing = (x: ModuleInstance, slot: SlotId): ModuleInstance => ({ ...x, slot, facing: hasFacing(x.type) ? (x.facing && allowedFacings(x.type, slot).includes(x.facing) ? x.facing : defaultFacing(x.type, slot)) : undefined });
+    if (def.size === "large") {
+      const pair = hullLargePairs(hull).find((p) => p.includes(target));
+      if (!pair) return "velký modul patří do spojené dvojice slotů";
+      const blockers = loadout.modules.filter((x) => x.id !== m.id && occOf(x).some((s) => pair.includes(s)));
+      if (blockers.length === 0) return { ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? refacing(x, pair[0]) : x)) };
+      const myPair = largePair(m.slot)!;
+      if (blockers.length === 1 && MODULES[blockers[0].type].size === "large") return { ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? refacing(x, pair[0]) : x.id === blockers[0].id ? refacing(x, myPair[0]) : x)) };
+      if (blockers.length <= 2 && blockers.every((x) => MODULES[x.type].size !== "large")) {
+        // dva malé moduly se přesunou do mé uvolněné dvojice
+        const out = loadout.modules.map((x) => (x.id === m.id ? refacing(x, pair[0]) : x));
+        blockers.forEach((b, i) => { const k = out.findIndex((x) => x.id === b.id); out[k] = refacing(out[k], myPair[i]); });
+        return { ...loadout, modules: out };
+      }
+      return "cílová dvojice slotů je obsazená";
+    }
+    if (!other) return { ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? refacing(x, target) : x)) };
+    if (MODULES[other.type].size === "large") return "velký modul nejde prohodit s malým";
+    return { ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? refacing(x, other.slot) : x.id === other.id ? refacing(x, m.slot) : x)) };
+  };
+  const startDrag = (ev: PointerEvent, m: ModuleInstance, grp: SVGGElement, box: Box) => {
+    const svgRoot = grp.ownerSVGElement!;
+    const start = { x: ev.clientX, y: ev.clientY };
+    let ghost: SVGGElement | null = null;
+    dragMoved = false;
+    const toSvg = (cx: number, cy: number) => {
+      const r = svgRoot.getBoundingClientRect();
+      const vb = svgRoot.viewBox.baseVal;
+      return { x: ((cx - r.left) / r.width) * vb.width, y: ((cy - r.top) / r.height) * vb.height };
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!dragMoved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) return;
+      if (!dragMoved) {
+        dragMoved = true;
+        ghost = grp.cloneNode(true) as SVGGElement;
+        ghost.classList.add("drag-ghost");
+        ghost.style.pointerEvents = "none";
+        svgRoot.append(ghost);
+        grp.classList.add("dragging");
+        svgRoot.classList.add("drag-on");
+        document.body.classList.add("drag-on");
+        (document.querySelector(".ptip") as HTMLElement | null)?.style.setProperty("display", "none");
+      }
+      const p = toSvg(e.clientX, e.clientY);
+      ghost!.setAttribute("transform", `translate(${p.x - (box.x + box.w / 2)}, ${p.y - (box.y + box.h / 2)})`);
+      // zvýraznit cíl pod kurzorem
+      ghost!.style.display = "none";
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      ghost!.style.display = "";
+      svgRoot.querySelectorAll(".drop-target").forEach((x) => x.classList.remove("drop-target"));
+      document.querySelectorAll(".fleet-tab.drop-target").forEach((x) => x.classList.remove("drop-target"));
+      const slotEl = el?.closest?.("[data-slot]") as SVGGElement | null;
+      const tabEl = el?.closest?.("[data-fleet-index]") as HTMLElement | null;
+      if (slotEl && slotEl !== grp && slotEl.ownerSVGElement === svgRoot) slotEl.classList.add("drop-target");
+      else if (tabEl && !tabEl.classList.contains("on") && opts.onMoveToShip) tabEl.classList.add("drop-target");
+    };
+    const onUp = (e: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      if (!dragMoved) return;
+      ghost?.remove();
+      grp.classList.remove("dragging");
+      svgRoot.classList.remove("drag-on");
+      document.body.classList.remove("drag-on");
+      svgRoot.querySelectorAll(".drop-target").forEach((x) => x.classList.remove("drop-target"));
+      document.querySelectorAll(".fleet-tab.drop-target").forEach((x) => x.classList.remove("drop-target"));
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const slotEl = el?.closest?.("[data-slot]") as SVGGElement | null;
+      const tabEl = el?.closest?.("[data-fleet-index]") as HTMLElement | null;
+      setTimeout(() => (dragMoved = false), 0);
+      if (slotEl && slotEl !== grp && slotEl.ownerSVGElement === svgRoot) {
+        const target = slotEl.getAttribute("data-slot") as SlotId;
+        if (occupiedSlots(m).includes(target)) return;
+        const res = moveModule(m, target);
+        if (typeof res === "string") showTip(res);
+        else {
+          modPop = null;
+          change(res);
+        }
+      } else if (tabEl && opts.onMoveToShip) {
+        const idx = Number(tabEl.getAttribute("data-fleet-index"));
+        if (!tabEl.classList.contains("on") && Number.isFinite(idx)) {
+          modPop = null;
+          opts.onMoveToShip(m.id, idx);
+        }
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
   const slotBox = (slot: SlotId, box: { x: number; y: number; w: number; h: number }, m?: (typeof loadout.modules)[number]) => {
     const def = m ? MODULES[m.type] : undefined;
     const selectable = !!m && !!opts.onSelect;
     const selected = !!m && opts.selectedId === m.id;
-    const grp = svgEl("g", { class: `lo-g ${m ? "mod" : "empty"} ${ro && !selectable ? "ro" : ""} ${selected ? "sel" : ""} ${selectable ? "selectable" : ""}` });
+    const grp = svgEl("g", { class: `lo-g ${m ? "mod" : "empty"} ${ro && !selectable ? "ro" : ""} ${selected ? "sel" : ""} ${selectable ? "selectable" : ""}`, "data-slot": slot });
     const pts = hexPoints(box);
     if (m && def) {
       const broken = moduleBroken(m);
@@ -363,11 +473,17 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
         grp.classList.add("mod-click");
         grp.addEventListener("click", (ev) => {
           ev.stopPropagation();
+          if (dragMoved) return; // konec tažení není klik
           modPop = open ? null : m.id;
           pickSlot = null;
           pickType = null;
           pickerOpen = null;
           rerender();
+        });
+        // přetažení modulu do jiného slotu (prohodí se) nebo na záložku jiné lodi letky
+        grp.addEventListener("pointerdown", (ev) => {
+          if (ev.button !== 0) return;
+          startDrag(ev, m, grp, box);
         });
       }
       grp.append(svgEl("title", {}, `${def.name}${ammo !== undefined ? ` · munice ${ammo}/${def.ammo}` : ""} · životy ${moduleHp(m)}/${def.hp} · váha ${def.weight + (def.ammoWeight ?? 0) * (ammo ?? 0)}${selectable ? "\nKlik = vybrat k vyhození" : ro ? "" : "\nKlik = oprava, munice, natočení, prodej"}`));

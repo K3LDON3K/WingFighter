@@ -77,6 +77,8 @@ export type ClientMessage =
   | { type: "setBotLevel"; botId: string; level: BotLevel }
   | { type: "removeBot"; botId: string }
   | { type: "setSettings"; settings: Partial<GameSettings> }
+  /** Přesun modulu mezi loděmi letky (bez prodeje): do prvního volného slotu cílové lodi. */
+  | { type: "moveModule"; fromIndex: number; toIndex: number; moduleId: string; botId?: string }
   | { type: "setTuning"; tuning: Partial<Tuning> }
   | { type: "resetTuning" }
   | { type: "saveTuning" }
