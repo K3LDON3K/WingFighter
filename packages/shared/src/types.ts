@@ -118,6 +118,8 @@ export interface HullDef {
   profile: ManeuverProfile;
   /** Násobek dostřelu všech zbraní (bitevník 1,25). */
   rangeMul?: number;
+  /** Body technologie na bitvu (chybí = obecná hodnota z ladění). */
+  techMax?: number;
   /** Lasery mají do všech směrů stejnou výseč jako dopředu (bitevník). */
   sameArcs?: boolean;
 }

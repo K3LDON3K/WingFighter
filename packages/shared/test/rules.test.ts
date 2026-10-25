@@ -908,6 +908,8 @@ describe("bitevník", () => {
     expect(validateLoadout(lo, { allowed: {} })).toBeNull();
     expect(fleetPoints([lo])).toBe(2);
     expect(HULLS.battleship.slots.map((s) => s.id)).toEqual(["front", "back", "podLeft", "left", "podRight", "right"]);
+    expect(computeStats(lo).techMax).toBe(10);
+    expect(computeStats(DEFAULT_LOADOUT).techMax).toBe(DEFAULT_TUNING.techMax);
     expect(listManeuvers(profileOf(lo), 2).every((m) => m.speed <= 4)).toBe(true);
     expect(listManeuvers(profileOf(lo), 2).some((m) => m.koiogran && m.speed === 3)).toBe(true);
     expect(listManeuvers(profileOf(lo), 2).some((m) => m.koiogran && m.speed === 4)).toBe(false);
