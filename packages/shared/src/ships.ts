@@ -142,6 +142,7 @@ export const MODULES: Record<ModuleType, ModuleDef> = {
   mg: { id: "mg", name: "Kulomet", short: "KUL", icon: "mg", size: "small", weight: 1, price: 120, hp: 25, ammo: 100, ammoWeight: 0.02, ammoPrice: 0.3, description: "Krátký dosah (150), široká výseč ±45°. Dávka 10 projektilů s rozptylem, každý 3 zranění; šance zásahu klesá se vzdáleností. Střílí na začátku kola na cokoliv (loď, torpédo, trosky). Funguje i v bouři. 100 nábojů = 10 dávek." },
   scanner: { id: "scanner", name: "Skener", short: "SKEN", icon: "scan", size: "small", weight: 1, price: 130, hp: 15, description: "Čerpá technologii lodi (6 bodů na celou bitvu, nedobíjí se). Sken lodi (1 bod): hned ukáže výbavu, natočení modulů, munici a pilota cizí lodi v dohledu. Hluboký sken (2 body): hned odkryje mapu celému týmu do konce kola. Nebere akci." },
   droid: { id: "droid", name: "Droid – pilot", short: "DROID", icon: "bot", size: "small", weight: 0.5, price: 140, hp: 15, description: "Palubní droid (čerpá technologii, nebere akci). Overdrive (3 body): v tomto kole manévry nestojí stres – oranžový i nebezpečný (červený) manévr jsou „bílé“ (nebezpečný bez ztráty trupu), úhyb bez stresu, otočka jen za 1 akci a rychlost ignoruje váhu (plná max. rychlost trupu). Autopilot (2 body): zelený manévr vrátí +2 stresové body místo +1. V bouři nefunguje." },
+  repair: { id: "repair", name: "Droid – opravář", short: "OPRAV", icon: "wrench", size: "small", weight: 0.5, price: 140, hp: 15, description: "Palubní droid opravář (čerpá technologii, nebere akci, provádí se hned při plánování). Oprava modulu (4 body): plně opraví vybraný modul, i zničený. Munice (2 body): vyrobí 1 náboj do torpédometu nebo min. Oprava trupu (3 body): opraví 25 % maxima trupu. Instalace (1 bod): nasadí sebraný modul z nákladu do libovolného slotu; stojí-li tam modul, vymění se a jde do nákladu. Lze mít víc opravářů. V bouři nefunguje." },
   "shield-whole": { id: "shield-whole", name: "Energetický štít", short: "ENE", icon: "shield", size: "small", weight: 2, price: 120, hp: 40, shieldType: "whole", shields: 80, description: "Pole kolem celé lodi, zásoba 80, každé kolo +5. Laser pole jen vybíjí – do trupu nejde nic, dokud zásoba stačí. Projektil (torpédo, mina, kulomet, srážka) pole prorazí: 30 % zranění jde do trupu vždy. Dobití technologií: 3 body → +40 zásoby. Nelze kombinovat se segmentovým." },
 };
 export const MODULE_TYPES = Object.keys(MODULES) as ModuleType[];
@@ -159,6 +160,7 @@ export const MODULE_CATEGORY: Record<ModuleType, ModuleCategory> = {
   "shield-segment": "shield",
   "shield-whole": "shield",
   droid: "droid",
+  repair: "droid",
   scanner: "tech",
 };
 export const CATEGORY_LABEL: Record<ModuleCategory, string> = { weapon: "Zbraně", shield: "Štíty", droid: "Droidi", tech: "Technologie" };

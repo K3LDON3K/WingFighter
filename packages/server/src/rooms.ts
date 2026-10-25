@@ -10,6 +10,8 @@ import {
   MAX_TEAMS_TDM,
   planBot,
   plannedPaths,
+  applyRepair,
+  botPredictActive,
   applyShieldRecharge,
   type Pose,
   resolveTurn,
@@ -747,6 +749,7 @@ export class Hub {
         if (res.error) return this.error(client, `Skener: ${res.error}.`);
         g.pendingEvents.push({ type: "scan", shipId: ship.id, mode: msg.mode, targetId: res.target?.id });
         if (res.target) this.send(client, { type: "scanResult", shooterId: ship.id, ship: structuredClone(res.target) });
+        if (msg.mode === "predict") this.sendBotPlans(room, client.id);
         // nový stav všem (náboje, odkrytá mapa pro tým)
         for (const m of room.members.values()) {
           if (m.isBot) continue;
@@ -765,6 +768,26 @@ export class Hub {
         if (!ship) return this.error(client, "Dobití štítu: to není tvoje loď.");
         const res = applyShieldRecharge(g.state, ship, Array.isArray(msg.segments) ? msg.segments.map(Number) : undefined);
         if (res.error) return this.error(client, `Dobití štítu: ${res.error}.`);
+        g.pendingEvents.push(res.event!);
+        for (const m of room.members.values()) {
+          if (m.isBot) continue;
+          const c = this.clients.get(m.id);
+          if (!c) continue;
+          const t = teamOf(g, m.id);
+          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room) });
+        }
+        return;
+      }
+      case "repair": {
+        if (!room?.game) return;
+        const g = room.game;
+        if (g.state.status === "finished") return;
+        const ship = g.state.ships.find((x) => x.id === msg.shipId && x.ownerId === client.id && x.alive);
+        if (!ship) return this.error(client, "Opravář: to není tvoje loď.");
+        const ord = msg.order;
+        if (!ord || typeof ord !== "object" || !["module", "ammo", "hull", "install"].includes((ord as { kind?: string }).kind ?? "")) return this.error(client, "Opravář: neplatný úkon.");
+        const res = applyRepair(g.state, ship, ord);
+        if (res.error) return this.error(client, `Opravář: ${res.error}.`);
         g.pendingEvents.push(res.event!);
         for (const m of room.members.values()) {
           if (m.isBot) continue;
@@ -913,18 +936,43 @@ export class Hub {
       const seen = stateForTeam(g.state, m.team, memoryFor(g, m.team));
       const allyPaths = pathsOf(m.team);
       const planned = planBot(seen, m.id, g.rng, m.botLevel ?? "kadet", { allyPaths });
-      // dobití štítu technologií se provádí hned (jako u lidí), ne až při vyhodnocení
+      // dobití štítu technologií a úkony opraváře se provádí hned (jako u lidí), ne až při vyhodnocení
       for (const o of planned) {
-        if (!o.rechargeShield) continue;
         const ship = g.state.ships.find((x) => x.id === o.shipId && x.alive);
         if (!ship) continue;
-        const res = applyShieldRecharge(g.state, ship, o.rechargeShield.segments);
-        if (res.event) g.pendingEvents.push(res.event);
+        if (o.rechargeShield) {
+          const res = applyShieldRecharge(g.state, ship, o.rechargeShield.segments);
+          if (res.event) g.pendingEvents.push(res.event);
+        }
+        for (const r of o.repair ?? []) {
+          const res = applyRepair(g.state, ship, r);
+          if (res.event) g.pendingEvents.push(res.event);
+        }
       }
       const orders = sanitizeOrders(g.state, m.id, planned);
       g.orders.set(m.id, orders);
       for (const [id, p] of plannedPaths(g.state, orders)) allyPaths.set(id, p);
       m.ready = true;
+    }
+    this.sendBotPlans(room);
+  }
+
+  /** Předpověď skeneru: hráčům s aktivní předpovědí pošle manévry nepřátelských botů, které jejich tým vidí. */
+  private sendBotPlans(room: Room, onlyId?: string) {
+    const g = room.game!;
+    for (const m of room.members.values()) {
+      if (m.isBot || (onlyId && m.id !== onlyId)) continue;
+      if (!botPredictActive(g.state, m.id)) continue;
+      const c = this.clients.get(m.id);
+      if (!c) continue;
+      const seen = stateForTeam(g.state, m.team, memoryFor(g, m.team));
+      const plans: { shipId: string; maneuverId: string }[] = [];
+      for (const [pid, orders] of g.orders) {
+        const owner = room.members.get(pid);
+        if (!owner?.isBot || owner.team === m.team) continue;
+        for (const o of orders) if (seen.ships.some((x) => x.id === o.shipId && x.alive)) plans.push({ shipId: o.shipId, maneuverId: o.maneuverId });
+      }
+      this.send(c, { type: "botPlans", turn: g.state.turn, plans });
     }
   }
 

@@ -167,11 +167,16 @@ export const MG = {
 export const SCANNER = {
   shipCost: 1,
   deepCost: 2,
+  /** Předpověď manévrů nepřátelských botů: cena a počet kol (toto + další). */
+  predictCost: 3,
+  predictTurns: 2,
   range: 600,
   deepRange: 2000,
 };
 /** Droid – pilot (mutovatelné kvůli ladění): ceny funkcí v technologii, regenerace stresu s autopilotem. */
 export const DROID = { overdriveCost: 3, autopilotCost: 2, autopilotRegen: 2 };
+/** Droid – opravář: ceny úkonů v bodech technologie; hullPct = oprava trupu v % maxima (ladí se). */
+export const REPAIR = { moduleCost: 4, ammoCost: 2, hullCost: 3, hullPct: 25, installCost: 1 };
 /** Technologie: body na celou bitvu (nedobíjí se); utrácí je skener. Mutovatelné kvůli ladění. */
 export const TECH = { max: 6 };
 

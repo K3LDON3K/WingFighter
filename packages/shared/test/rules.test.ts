@@ -28,6 +28,8 @@ import {
   moduleCost,
   validateLoadout,
   applyScan,
+  botPredictActive,
+  SCANNER,
   HULLS,
   hullLargePairs,
   laserRange,
@@ -38,6 +40,9 @@ import {
   fleetPoints,
   modulePos,
   applyShieldRecharge,
+  applyRepair,
+  repairBlocked,
+  REPAIR,
   shieldRechargeBlocked,
   generateMap,
   DEFAULT_MAP,
@@ -960,7 +965,17 @@ describe("skener", () => {
     expect(g.revealTeams).toEqual([0]);
     expect(stateForTeam(g, 0, new Map()).ships.some((s) => s.id === "ship-p2-0")).toBe(true);
     expect(stateForTeam(g, 1, new Map()).ships.some((s) => s.id === "ship-p1-0")).toBe(false);
+    // předpověď manévrů botů: 3 body, platí toto a příští kolo, podruhé nejde zaplatit
+    expect(applyScan(g, me, "sc", "predict").error).toBeUndefined();
+    expect(me.techPoints).toBe(0);
+    expect(botPredictActive(g, me.ownerId)).toBe(true);
+    expect(g.botPredict?.[me.ownerId]).toBe(g.turn + SCANNER.predictTurns - 1);
+    me.techPoints = 3;
+    expect(applyScan(g, me, "sc", "predict").error).toMatch(/běží/);
     let r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m2a0", fire: false }], createRng(1));
+    expect(botPredictActive(r.state, me.ownerId)).toBe(true);
+    r = resolveTurn(r.state, [{ shipId: me.id, maneuverId: "m2a0", fire: false }], createRng(1));
+    expect(botPredictActive(r.state, me.ownerId)).toBe(false);
     expect(r.state.revealTeams).toEqual([]);
     expect(stateForTeam(r.state, 0, new Map()).ships.some((s) => s.id === "ship-p2-0")).toBe(false);
     // technologie se zeleným manévrem nedobíjí
@@ -1300,6 +1315,65 @@ describe("náraz do asteroidu / komety", () => {
     const s = r.state.ships.find((x) => x.id === me.id)!;
     expect(s.speed).toBe(1);
     expect(s.stressPoints).toBe(0);
+  });
+});
+
+describe("droid – opravář", () => {
+  it("oprava modulu, munice, trupu a instalace z nákladu (hned, za technologii); v bouři ne", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    me.loadout.modules = [newModule("laser", "front", "l1"), newModule("torpedo", "back", "t1"), newModule("repair", "left", "r1")];
+    me.loadout.cargo = [newModule("mine", "front", "c1")];
+    refreshShip(me);
+    me.techPoints = 6;
+    me.hull = 40;
+    me.loadout.modules[0].hp = 0; // zničený laser
+    me.loadout.modules[1].ammo = 0;
+    expect(repairBlocked(g, me)).toBeUndefined();
+    // modul (4)
+    let r = applyRepair(g, me, { kind: "module", moduleId: "l1" });
+    expect(r.error).toBeUndefined();
+    expect(moduleWorking(me.loadout.modules[0])).toBe(true);
+    expect(me.techPoints).toBe(6 - REPAIR.moduleCost);
+    // munice (2) – jen do max.
+    r = applyRepair(g, me, { kind: "ammo", moduleId: "t1" });
+    expect(r.error).toBeUndefined();
+    expect(me.loadout.modules[1].ammo).toBe(1);
+    expect(me.techPoints).toBe(0);
+    expect(applyRepair(g, me, { kind: "hull" }).error).toMatch(/technologie/);
+    // trup (3): 25 % maxima, ne přes max.
+    me.techPoints = 6;
+    me.hull = me.stats.hull - 5;
+    r = applyRepair(g, me, { kind: "hull" });
+    expect(r.error).toBeUndefined();
+    expect(me.hull).toBe(me.stats.hull);
+    expect(r.event?.type === "repair" && r.event.amount).toBe(5);
+    expect(applyRepair(g, me, { kind: "hull" }).error).toMatch(/nepoškozen/);
+    me.hull = 40;
+    applyRepair(g, me, { kind: "hull" });
+    expect(me.hull).toBe(40 + Math.round((me.stats.hull * REPAIR.hullPct) / 100));
+    // instalace (1): do obsazeného slotu = výměna, původní jde do nákladu
+    me.techPoints = 2;
+    r = applyRepair(g, me, { kind: "install", moduleId: "c1", slot: "back" });
+    expect(r.error).toBeUndefined();
+    expect(me.loadout.modules.find((m) => m.slot === "back")?.type).toBe("mine");
+    expect(me.loadout.cargo?.map((m) => m.type)).toEqual(["torpedo"]);
+    expect(me.stats.mines).toBeGreaterThan(0);
+    expect(me.techPoints).toBe(1);
+    // do volného slotu
+    r = applyRepair(g, me, { kind: "install", moduleId: me.loadout.cargo![0].id, slot: "right" });
+    expect(r.error).toBeUndefined();
+    expect(me.loadout.cargo).toBeUndefined();
+    expect(me.loadout.modules.some((m) => m.type === "torpedo" && m.slot === "right")).toBe(true);
+    // bez opraváře / v bouři
+    const g2 = game();
+    const me2 = place(g2, "ship-p1-0", 500, 500, 0);
+    expect(repairBlocked(g2, me2)).toMatch(/opravář/);
+    me2.loadout.modules.push(newModule("repair", "left", "r1"));
+    refreshShip(me2);
+    g2.storms = [{ id: "s1", blobs: [{ x: 500, y: 500, r: 100 }] }];
+    expect(repairBlocked(g2, me2)).toMatch(/bouři/);
   });
 });
 

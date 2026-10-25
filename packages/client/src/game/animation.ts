@@ -1,4 +1,4 @@
-import { CARGO, COMET, MODULES, MOVE_STEPS, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
+import { CARGO, COMET, MODULES, MOVE_STEPS, SCANNER, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
 import { cometToView, mineToView, shipToView, torpedoToView, viewFromState, type ViewModel } from "./view.ts";
 import { sfxAt } from "../sound.ts";
 
@@ -99,8 +99,14 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
         lines.push(`${name(e.shipId)} dobil štít technologií: ${what} (−${e.cost} technologie, zbývá ${e.techPoints}).`);
         break;
       }
+      case "repair": {
+        const mt = e.moduleType ? MODULES[e.moduleType]?.name ?? e.moduleType : "";
+        const what = e.kind === "module" ? `opravil modul ${mt} (+${e.amount})` : e.kind === "ammo" ? `vyrobil náboj do ${mt}` : e.kind === "hull" ? `opravil trup o ${e.amount} → ${e.hullAfter}` : `nasadil ${mt}${e.swappedType ? ` (výměnou za ${MODULES[e.swappedType]?.name ?? e.swappedType})` : ""}`;
+        lines.push(`${name(e.shipId)}: opravář ${what} (−${e.cost} technologie, zbývá ${e.techPoints}).`);
+        break;
+      }
       case "scan":
-        lines.push(e.mode === "ship" ? `${name(e.shipId)} skenoval ${e.targetId ? name(e.targetId) : "loď"}.` : e.mode === "deep" ? `${name(e.shipId)} provedl hluboký sken – mapa odkryta do konce kola.` : `${name(e.shipId)} vynutil cooldown skeneru.`);
+        lines.push(e.mode === "ship" ? `${name(e.shipId)} skenoval ${e.targetId ? name(e.targetId) : "loď"}.` : e.mode === "deep" ? `${name(e.shipId)} provedl hluboký sken – mapa odkryta do konce kola.` : e.mode === "predict" ? `${name(e.shipId)} skenerem předpovídá manévry botů (${SCANNER.predictTurns} kola).` : `${name(e.shipId)} vynutil cooldown skeneru.`);
         break;
       case "jettison":
         if (e.dropped) lines.push(`Z vraku ${name(e.shipId)} vypadl modul ${MODULES[e.debris.type]?.name ?? e.debris.type}${e.debris.module && (e.debris.module.hp ?? 1) <= 0 ? " (zničený)" : ""} – lze zvednout.`);
@@ -286,6 +292,7 @@ export class TurnAnimation {
           break;
         case "scan":
         case "droid":
+        case "repair":
         case "shieldRecharge":
           time = 0;
           break;

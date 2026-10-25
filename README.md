@@ -83,6 +83,15 @@ boku ±15°, dozadu ±10°), miny se odhazují na tu stranu a torpédo tím smě
 (klik na šipku modulu). **Skener** (130 cr, váha 1): 2 náboje; sken lodi (1 náboj, do 600, cíl v dohledu) hned
 ukáže výbavu cizí lodi; hluboký sken (2 náboje) hned odkryje mapu do 2000 celému týmu do konce kola a spustí cooldown
 3 kola (po něm plné náboje); zelený manévr dobíjí +1; cooldown jde vynutit (délka = 3 − náboje). Nebere akci.
+**Manévry botů** (3 body technologie): hráči (jen jemu, ne spoluhráčům) ukáže naplánované manévry nepřátelských
+botů v dohledu jeho týmu – čárkovaná dráha v barvě nepřítele a průsvitný duch s nápisem SKEN – v tomto a příštím
+kole; lidské protihráče neodhalí. **Pasivně:** předpověď dráhy komet v kole vidí jen hráč, jehož vlastní loď má
+funkční skener. **Droid – opravář** (140 cr, váha 0,5, 15 HP): čerpá technologii, nebere akci, úkony se provedou
+hned při plánování (libovolný počet, i víc opravářů na lodi). Oprava modulu (4): plně opraví vybraný modul, i
+zničený. Munice (2): vyrobí 1 náboj do torpédometu nebo min (jen do plného zásobníku). Oprava trupu (3): +25 %
+maxima trupu (ladění → „Opravář – oprava trupu“), ne přes maximum. Instalace (1): nasadí modul z nákladu do
+libovolného slotu; stojí-li tam modul, vymění se a jde do nákladu. V bouři nefunguje. Boti ho používají (zničený
+modul, slabý trup, prázdná munice).
 Pilot: zatím jen **Kadet** (bez schopností).
 
 **Nákup:** v místnosti má každý rozpočet (ladění → Ekonomika, výchozí 500) a kupuje moduly; host může omezit
@@ -156,6 +165,8 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.138 – **Skener: manévry botů** (3 body technologie): hráči ukáže naplánované manévry nepřátelských botů v dohledu týmu na toto a příští kolo (čárkovaná dráha v barvě nepřítele, tečky po dílech rychlosti, průsvitný duch s nápisem SKEN); vidí jen skenující hráč, lidské protihráče neodhalí, nebere akci. Třetí tlačítko v okénku skeneru (MANÉVRY; po zaplacení „běží“). **Dráha komet** v kole se už nekreslí všem – jen hráči, jehož vlastní loď má funkční skener (pasivní funkce skeneru). Log hlásí předpověď.
+- v3.137 – **Nový modul Droid – opravář** (140 cr, váha 0,5, 15 HP, kategorie Droidi): úkony za technologii, hned při plánování, bez omezení počtu, nebere akci, v bouři nefunguje; loď může mít víc opravářů. Oprava modulu (4 body) plně opraví i zničený modul; munice (2) vyrobí 1 náboj do torpédometu/min (do plného zásobníku); oprava trupu (3) +25 % maxima (nový parametr ladění „Opravář – oprava trupu (% maxima)“); instalace (1) nasadí modul z nákladu do libovolného slotu (obsazený se vymění a jde do nákladu). Dlaždice OPRAVÁŘ s okénkem: záložky MODUL / MUNICE / TRUP / NASADIT se seznamem cílů (poškozené moduly s HP, zásobníky, náhled trupu, moduly v nákladu → sloty lodi). Boti opraváře používají (zničený modul, trup pod 50 %, prázdná munice). Log hlásí úkony.
 - v3.136 – **Náraz do asteroidu / kometa do lodi:** loď vykousne do asteroidu díru v místě dotyku (poloměr = větší z „Díra po nárazu lodi“ v ladění a poloměru lodi – bitevník dělá větší díru), otočí se do zcela náhodného směru (ne jen odmrštění od asteroidu), po kole má rychlost 1 a všechny stresové body jsou odebrány. Totéž (rychlost 1, nulový stres, náhodný směr) při nárazu komety do lodi. Zranění 15 zůstává.
 - v3.135 – Pásmo dostřelu laserů podle zasažené plochy: nejbližší pásmo, ve kterém leží aspoň pětina trupu ve výseči (dřív podle středu cíle) – u bitevníku s přídí zblízka platí bonus +1 kostka; vzorkování trupu je úměrné ploše. Kulomet počítá šanci z průměrné vzdálenosti zasažené části. Náhled střelby ukazuje pásmo („pásmo 1 · +1 kostka“). Bitevník: lasery mají do všech směrů stejnou výseč ±20°. Duch taženého modulu je nad celou stránkou (nezmizí pod obchodem).
 - v3.134 – Startovní rozestupy lodí podle velikosti: sousední lodě ve formaci dělí součet jejich poloměrů + 36 (stíhač–stíhač 68, bitevník–stíhač 110), takže se bitevník se stíhačem nepřekrývají.

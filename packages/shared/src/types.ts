@@ -68,7 +68,16 @@ export interface ShipOrders {
   droid?: DroidOrder;
   /** Jen boti: přání dobít štít technologií (server provede hned při plánování; z rozkazu se odstraní). */
   rechargeShield?: { segments?: number[] };
+  /** Jen boti: úkony droida opraváře (server provede hned při plánování; z rozkazu se odstraní). */
+  repair?: RepairOrder[];
 }
+
+/** Úkon droida opraváře (provádí se hned, platí se technologií). */
+export type RepairOrder =
+  | { kind: "module"; moduleId: string }
+  | { kind: "ammo"; moduleId: string }
+  | { kind: "hull" }
+  | { kind: "install"; moduleId: string; slot: SlotId; facing?: Facing };
 
 /** Výstřel z jednoho modulu v kole; `targetId` přebíjí `preferredTargetId` lodi. */
 export interface Shot {
@@ -85,7 +94,7 @@ export interface DroidOrder {
 /** Sloty stíhače. */
 /** Sloty: stíhač příď/záď/levobok/pravobok; bitevník navíc levá a pravá gondola. */
 export type SlotId = "front" | "back" | "left" | "right" | "podLeft" | "podRight";
-export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg" | "droid";
+export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg" | "droid" | "repair";
 
 /** Trup lodi – nese moduly ve slotech. */
 export interface HullDef {
@@ -493,6 +502,8 @@ export interface GameState {
   players: PlayerInfo[];
   /** Týmy, které mají do konce kola odkrytou mapu (hluboký sken). */
   revealTeams?: number[];
+  /** Předpověď manévrů botů (skener): hráč → poslední kolo, ve kterém ji vidí. */
+  botPredict?: Record<string, number>;
   /** Statistiky hráčů (klíč = id hráče). */
   stats?: Record<string, PlayerStats>;
   status: "planning" | "finished";
@@ -523,9 +534,10 @@ export type TurnEvent =
   | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" | "comet" | "tail" }
   | { type: "moduleDamage"; shipId: string; moduleId: string; moduleType: ModuleType; damage: number; hp: number; maxHp: number; broken: boolean }
   /** Skener (vyhodnocuje se hned při plánování, ale zapisuje se do logu kola). */
-  | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }
+  | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown" | "predict"; targetId?: string }
   /** Droid – pilot aktivoval funkce (technologie odečtena). */
   | { type: "droid"; shipId: string; overdrive: boolean; autopilot: boolean; cost: number; techPoints: number }
+  | { type: "repair"; shipId: string; kind: RepairOrder["kind"]; cost: number; techPoints: number; moduleId?: string; moduleType?: ModuleType; amount?: number; slot?: SlotId; swappedType?: ModuleType; hullAfter?: number }
   /** Dobití štítu technologií (hned při plánování): energetický +amount, segmentový +segments po segmentech. */
   | { type: "shieldRecharge"; shipId: string; cost: number; techPoints: number; amount?: number; segments?: Segments; shieldsAfter: number; segmentsAfter: Segments }
   | { type: "action"; shipId: string; action: ActionOrder; ok: boolean; path?: Pose[] }

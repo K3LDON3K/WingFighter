@@ -13,6 +13,7 @@ import {
   RULES,
   SCANNER,
   DROID,
+  REPAIR,
   STRESS,
   TORPEDO,
   TORPEDO_AGILITY,
@@ -32,7 +33,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { activeShield, cargoCapacity, computeStats, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
+import { activeShield, allowedFacings, cargoCapacity, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
 
@@ -49,7 +50,7 @@ export function inBorderStorm(state: Pick<GameState, "width" | "height" | "borde
 function laserBlockedByStorm(state: GameState, a: Vec, b: Vec): boolean {
   return (state.storms?.length ?? 0) > 0 && (inStorm(state, a) || inStorm(state, b) || lineCrossesStorm(state.storms, a, b));
 }
-import type { Difficulty, DroidOrder, ManeuverProfile, ModuleInstance } from "./types.ts";
+import type { Difficulty, DroidOrder, ManeuverProfile, ModuleInstance, RepairOrder } from "./types.ts";
 
 /** Pozice lodi natočená podle směru modulu (výseč laserů, výlet torpéda). */
 /** Odkud a kam modul míří: z pozice slotu na trupu, ve směru natočení modulu. */
@@ -1805,11 +1806,26 @@ export function laserOdds(ship: Ship, target: Ship, laserModuleId?: string): { h
  * ship = SCANNER.shipCost bodů, cíl musí být nepřátelská loď v dosahu (viditelnost ověřuje server);
  * deep = SCANNER.deepCost bodů, odkryje mapu týmu do konce kola.
  */
-export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: "ship" | "deep" | "cooldown", targetId?: string): { error?: string; target?: Ship } {
+/** Vidí hráč v tomto kole předpověď manévrů botů (zaplatil skenerem)? */
+export function botPredictActive(state: GameState, playerId: string): boolean {
+  return (state.botPredict?.[playerId] ?? -1) >= state.turn;
+}
+
+export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: "ship" | "deep" | "cooldown" | "predict", targetId?: string): { error?: string; target?: Ship } {
   const mod = ship.loadout.modules.find((m) => m.id === moduleId && m.type === "scanner");
   if (!mod) return { error: "loď nemá skener" };
   if (!moduleWorking(mod)) return { error: "skener je zničený" };
   if (mode === "cooldown") return { error: "cooldown skeneru už ve hře není" };
+  if (mode === "predict") {
+    if (botPredictActive(state, ship.ownerId)) return { error: "předpověď manévrů už běží" };
+    if (ship.techPoints < SCANNER.predictCost) return { error: `nedostatek technologie (${ship.techPoints}/${SCANNER.predictCost})` };
+    if (inStorm(state, ship)) return { error: "bouře ruší skener" };
+    ship.techPoints -= SCANNER.predictCost;
+    const st = statsOf(state, ship.ownerId);
+    if (st) st.scans++;
+    state.botPredict = { ...(state.botPredict ?? {}), [ship.ownerId]: state.turn + SCANNER.predictTurns - 1 };
+    return {};
+  }
   const cost = mode === "ship" ? SCANNER.shipCost : SCANNER.deepCost;
   if (ship.techPoints < cost) return { error: `nedostatek technologie (${ship.techPoints}/${cost})` };
   if (mode === "ship") {
@@ -1846,6 +1862,105 @@ export function shieldRechargeRoom(ship: Ship): number {
 }
 
 /** Proč nejde dobít štít technologií (undefined = jde). */
+/* ---------- Droid – opravář ---------- */
+
+/** Funkční droid opravář lodi (první). */
+export function repairModule(ship: Ship): ModuleInstance | undefined {
+  return ship.loadout.modules.find((m) => m.type === "repair" && moduleWorking(m));
+}
+
+/** Cena úkonu opraváře v bodech technologie. */
+export function repairCost(kind: RepairOrder["kind"]): number {
+  return kind === "module" ? REPAIR.moduleCost : kind === "ammo" ? REPAIR.ammoCost : kind === "hull" ? REPAIR.hullCost : REPAIR.installCost;
+}
+
+/** Proč opravář teď nemůže pracovat (undefined = může). */
+export function repairBlocked(state: GameState, ship: Ship): string | undefined {
+  if (!repairModule(ship)) return "loď nemá funkční droida opraváře";
+  if (inStorm(state, ship)) return "v bouři droid nefunguje";
+  return undefined;
+}
+
+/** Moduly, které opravář umí opravit (poškozené nebo zničené). */
+export function repairableModules(ship: Ship): ModuleInstance[] {
+  return ship.loadout.modules.filter((m) => moduleHp(m) < moduleMaxHp(m.type));
+}
+/** Moduly, do kterých lze vyrobit munici (torpéda/miny pod plným zásobníkem). */
+export function ammoModules(ship: Ship): ModuleInstance[] {
+  return ship.loadout.modules.filter((m) => (MODULES[m.type]?.ammo ?? 0) > 0 && (m.ammo ?? 0) < (MODULES[m.type].ammo ?? 0));
+}
+/** O kolik trupu opraví úkon „oprava trupu“ (max. do plného). */
+export function repairHullAmount(ship: Ship): number {
+  return Math.min(Math.max(1, Math.round((ship.stats.hull * REPAIR.hullPct) / 100)), ship.stats.hull - ship.hull);
+}
+
+/**
+ * Úkon droida opraváře – provede se hned při plánování, nebere akci, platí se technologií.
+ * Instalace: modul z nákladu do libovolného slotu; obsazený slot → stávající modul (i velký, zabírající dvojici) jde do nákladu.
+ */
+export function applyRepair(state: GameState, ship: Ship, order: RepairOrder): { error?: string; event?: TurnEvent } {
+  const why = repairBlocked(state, ship);
+  if (why) return { error: why };
+  const cost = repairCost(order.kind);
+  if (ship.techPoints < cost) return { error: `nedostatek technologie (${ship.techPoints}/${cost})` };
+  const base = { type: "repair" as const, shipId: ship.id, kind: order.kind, cost };
+  switch (order.kind) {
+    case "module": {
+      const m = ship.loadout.modules.find((x) => x.id === order.moduleId);
+      if (!m) return { error: "takový modul loď nemá" };
+      const max = moduleMaxHp(m.type);
+      const hp = moduleHp(m);
+      if (hp >= max) return { error: "modul je nepoškozený" };
+      m.hp = undefined;
+      delete m.repair;
+      ship.techPoints -= cost;
+      syncShields(ship);
+      return { event: { ...base, techPoints: ship.techPoints, moduleId: m.id, moduleType: m.type, amount: max - hp } };
+    }
+    case "ammo": {
+      const m = ship.loadout.modules.find((x) => x.id === order.moduleId);
+      if (!m) return { error: "takový modul loď nemá" };
+      const cap = MODULES[m.type]?.ammo ?? 0;
+      if (!cap) return { error: "modul nemá munici" };
+      if ((m.ammo ?? 0) >= cap) return { error: "zásobník je plný" };
+      m.ammo = (m.ammo ?? 0) + 1;
+      ship.techPoints -= cost;
+      refreshShip(ship);
+      return { event: { ...base, techPoints: ship.techPoints, moduleId: m.id, moduleType: m.type, amount: 1 } };
+    }
+    case "hull": {
+      const amount = repairHullAmount(ship);
+      if (amount <= 0) return { error: "trup je nepoškozený" };
+      ship.hull += amount;
+      ship.techPoints -= cost;
+      return { event: { ...base, techPoints: ship.techPoints, amount, hullAfter: ship.hull } };
+    }
+    case "install": {
+      const cargo = ship.loadout.cargo ?? [];
+      const ci = cargo.findIndex((x) => x.id === order.moduleId);
+      if (ci < 0) return { error: "takový modul v nákladu není" };
+      const hull = hullOf(ship.loadout);
+      if (!hull.slots.some((x) => x.id === order.slot)) return { error: "takový slot loď nemá" };
+      const mod = cargo[ci];
+      // obsazený slot → stávající modul (i velký) jde do nákladu místo nasazovaného
+      const outIdx = ship.loadout.modules.findIndex((x) => occupiedSlots(x).includes(order.slot));
+      const out = outIdx >= 0 ? ship.loadout.modules[outIdx] : undefined;
+      const facing = hasFacing(mod.type) ? (order.facing && allowedFacings(mod.type, order.slot).includes(order.facing) ? order.facing : defaultFacing(mod.type, order.slot)) : undefined;
+      const installed: ModuleInstance = { ...mod, slot: order.slot, facing, off: undefined };
+      cargo.splice(ci, 1);
+      if (out) {
+        ship.loadout.modules.splice(outIdx, 1);
+        cargo.splice(ci, 0, { ...out, off: undefined });
+      }
+      ship.loadout.modules.push(installed);
+      ship.loadout.cargo = cargo.length ? cargo : undefined;
+      ship.techPoints -= cost;
+      syncShields(ship);
+      return { event: { ...base, techPoints: ship.techPoints, moduleId: installed.id, moduleType: installed.type, slot: order.slot, swappedType: out?.type } };
+    }
+  }
+}
+
 export function shieldRechargeBlocked(state: GameState, ship: Ship): string | undefined {
   if (ship.shieldType === "none" || !activeShieldModule(ship)) return "loď nemá funkční štít";
   if (inStorm(state, ship)) return "v bouři štít nefunguje";

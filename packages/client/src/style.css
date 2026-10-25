@@ -5043,3 +5043,87 @@ body.drag-on * {
   filter: drop-shadow(0 0 6px #fbbf24);
   overflow: visible;
 }
+
+/* ---- okénko droida opraváře: záložky úkonů + seznam cílů ---- */
+.repair-pop {
+  min-width: 330px;
+  max-width: 380px;
+  background: #1e1033;
+  border-color: #d8b4fe #3b0764 #3b0764 #d8b4fe;
+}
+.repair-pop .rtabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.repair-pop .rtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  font-size: 11px;
+  background: #2e1065;
+  border-color: #c084fc #3b0764 #3b0764 #c084fc;
+}
+.repair-pop .rtab.on {
+  background: #c084fc;
+  color: #1c1917;
+}
+.repair-pop .rtab .cost-pips {
+  position: static;
+}
+.repair-pop .rlist {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  align-items: stretch;
+}
+.repair-pop .rmod,
+.repair-pop .rslot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  text-align: left;
+  background: #0f172a;
+  border-color: #64748b #0b1220 #0b1220 #64748b;
+}
+.repair-pop .rmod:hover:not(:disabled),
+.repair-pop .rslot:hover:not(:disabled) {
+  background: #c084fc;
+  color: #1c1917;
+}
+.repair-pop .rmod .rx,
+.repair-pop .rslot .rx {
+  margin-left: auto;
+  font-family: var(--txt);
+  font-size: 11px;
+  opacity: 0.85;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.repair-pop .rmod.broken {
+  color: #fca5a5;
+}
+.repair-pop .rslot.free .rx {
+  color: #86efac;
+}
+.repair-pop .rslots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+.repair-pop .snote {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+}
+.repair-pop .stab.go {
+  justify-content: center;
+}

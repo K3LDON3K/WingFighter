@@ -43,6 +43,18 @@ import {
   droidModule,
   droidCost,
   DROID,
+  REPAIR,
+  hullOf,
+  occupiedSlots,
+  repairModule,
+  repairBlocked,
+  repairableModules,
+  ammoModules,
+  repairHullAmount,
+  repairCost,
+  botPredictActive,
+  type RepairOrder,
+  type SlotId,
   TEAM_COLORS,
   type Difficulty,
   type GameState,
@@ -82,13 +94,18 @@ export interface PlanningCallbacks {
   /** Otevřít / zavřít podmenu zbraně s více moduly. */
   weaponToggle(shipId: string, type: "laser" | "mg"): void;
   droidToggle(shipId: string): void;
+  /** Droid – opravář: otevřít/zavřít okénko, zvolit úkon, zvolit modul z nákladu (instalace), provést hned. */
+  repairToggle(shipId: string): void;
+  repairMode(shipId: string, kind: RepairOrder["kind"] | null): void;
+  repairPickCargo(shipId: string, moduleId: string | null): void;
+  repair(shipId: string, order: RepairOrder): void;
   /** Dobití štítu technologií: nabídka, výběr segmentu (+1 / −1), provést hned. */
   /** Okénko štítu: režim přesunu (akce) / dobití (technologie) / zavřít. */
   shieldMode(shipId: string, mode: "move" | "recharge" | "close"): void;
   rechargePick(shipId: string, seg: number): void;
   recharge(shipId: string): void;
   scanPickTarget(shipId: string, on: boolean): void;
-  scan(shipId: string, mode: "deep" | "cooldown"): void;
+  scan(shipId: string, mode: "deep" | "cooldown" | "predict"): void;
   /** Pozorovatel: tabulka skóre / opuštění hry. */
   showScore(): void;
   leave(): void;
@@ -125,6 +142,9 @@ export interface PlanningModel {
   /** Otevřené podmenu zbraně (víc modulů stejného typu): "laser" | "mg". */
   weaponOpen?: "laser" | "mg" | null;
   droidOpen?: boolean;
+  repairOpen?: boolean;
+  repairKind?: RepairOrder["kind"] | null;
+  repairCargoId?: string | null;
   rechargeOpen?: boolean;
   rechargePick?: number[];
   scanPick?: boolean;
@@ -194,6 +214,7 @@ function costPipsAll(c: { actions?: number; stress?: number; tech?: number }, sp
 /** Okénka otevřená při minulém vykreslení – při překreslení (klik na +/−) se znovu neanimují. */
 let openPops = new Set<string>();
 const popsNow = new Set<string>();
+type ModuleInstanceLike = { id: string; type: import("@wingfighter/shared").ModuleType; slot: SlotId; ammo?: number; hp?: number };
 const popClass = (key: string) => (popsNow.add(key), openPops.has(key) ? "noanim" : "");
 
 /** Obsah nápovědy k manévrům (rychlosti, úhly, barvy, stres, akce). */
@@ -518,7 +539,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
     // skupina bez dostupných akcí se neukazuje; Loď = NÁKLAD (vyhodit / zvednout), Speciální = štít, skener, droid
     if (grp.label === "Loď" && ship.loadout.modules.length === 0) continue;
-    if (avail.length === 0 && grp.label !== "Loď" && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.loadout.modules.some((x) => x.type === "droid") || ship.shieldType === "whole"))) continue;
+    if (avail.length === 0 && grp.label !== "Loď" && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.loadout.modules.some((x) => x.type === "droid" || x.type === "repair") || ship.shieldType === "whole"))) continue;
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
@@ -750,6 +771,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           ),
         );
         if (m.scanOpen && !stormed) {
+          const predictOn = botPredictActive(m.state, m.myId);
           // dvě tlačítka vyjedou nad tlačítko skeneru (přes okraj lišty), stejně velká jako ono
           const cost = (n: number) => costPipsAll({ tech: n }, false, `${n} ${n === 1 ? "bod" : "body"} technologie (nebere akci)`);
           holder.append(
@@ -758,6 +780,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
               { class: `scan-pop ${popClass(`scan:${ship.id}`)}` },
               h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || tech < SCANNER.shipCost, ...tipAttr({ ...actionTip("scan-ship", ship, o, man), ...(tech < SCANNER.shipCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(SCANNER.shipCost)),
               h("button", { class: "px bb-weapon sm", disabled: locked || tech < SCANNER.deepCost, ...tipAttr({ ...actionTip("scan-deep", ship, o, man), ...(tech < SCANNER.deepCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(SCANNER.deepCost)),
+              h("button", { class: `px bb-weapon sm ${predictOn ? "done" : ""}`, disabled: locked || predictOn || tech < SCANNER.predictCost, ...tipAttr({ ...actionTip("scan-predict", ship, o, man), ...(predictOn ? { note: `předpověď běží do kola ${m.state.botPredict?.[m.myId] ?? 0}` } : tech < SCANNER.predictCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scan(ship.id, "predict") }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Manévry")), predictOn ? h("span", { class: "reset-strip" }, label("běží")) : cost(SCANNER.predictCost)),
             ),
           );
         }
@@ -847,6 +870,100 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             ),
           );
         }
+        row.append(holder);
+      }
+      // Droid – opravář: tlačítko s okénkem úkonů (provádí se hned, platí se technologií)
+      const hasRepair = ship.loadout.modules.some((x) => x.type === "repair");
+      if (hasRepair) {
+        const rDestroyed = !repairModule(ship);
+        const why = repairBlocked(m.state, ship);
+        const tech = ship.techPoints;
+        const open = !!m.repairOpen && !why;
+        const holder = h("div", { class: "scan-holder stack" });
+        const kind = m.repairKind ?? null;
+        if (open) {
+          const pop = h("div", { class: `shield-pop repair-pop ${popClass(`repair:${ship.id}`)}` });
+          const tabs = h("div", { class: "rtabs" });
+          const tab = (k: RepairOrder["kind"], ic: string, name: string, avail: boolean, note: string) => {
+            const c = repairCost(k);
+            const can = avail && tech >= c;
+            tabs.append(
+              h(
+                "button",
+                { class: `px seg rtab ${kind === k ? "on" : ""}`, disabled: locked || !can, ...tipAttr({ icon: ic, iconColor: "#c084fc", title: `Opravář – ${name}`, fx: [], note, ...(tech < c ? { warn: "Nelze: nedostatek technologie." } : !avail ? { warn: "Nelze: není co dělat." } : {}) }), onclick: () => cb.repairMode(ship.id, kind === k ? null : k) },
+                icon(ic, "currentColor", 16),
+                h("span", { class: "lbl" }, label(name)),
+                costPipsAll({ tech: c }, false, `${c} ${c === 1 ? "bod" : "body"} technologie`),
+              ),
+            );
+          };
+          const fixable = repairableModules(ship);
+          const ammoable = ammoModules(ship);
+          const hullAdd = repairHullAmount(ship);
+          const cargo = ship.loadout.cargo ?? [];
+          tab("module", "wrench", "Modul", fixable.length > 0, `plně opraví vybraný modul (i zničený) · ${REPAIR.moduleCost} body technologie`);
+          tab("ammo", "torpedo", "Munice", ammoable.length > 0, `vyrobí 1 náboj do torpédometu nebo min · ${REPAIR.ammoCost} body technologie`);
+          tab("hull", "hull", "Trup", hullAdd > 0, `opraví trup o ${REPAIR.hullPct} % maxima (${Math.max(0, hullAdd)}) · ${REPAIR.hullCost} body technologie`);
+          tab("install", "cargo", "Nasadit", cargo.length > 0, `nasadí modul z nákladu do libovolného slotu (obsazený se vymění) · ${REPAIR.installCost} bod technologie`);
+          pop.append(tabs);
+          const list = h("div", { class: "rlist" });
+          const modBtn = (x: ModuleInstanceLike, extra: string, onclick: () => void, title: string) => {
+            const def = MODULES[x.type];
+            const broken = moduleHp(x) <= 0;
+            return h("button", { class: `px rmod ${broken ? "broken" : ""}`, disabled: locked, title, onclick }, icon(def.icon, broken ? "#fca5a5" : "#e2e8f0", 14), h("span", { class: "lbl" }, label(def.short)), h("span", { class: "rx" }, extra));
+          };
+          const slotName = (id: SlotId) => hullOf(ship.loadout).slots.find((x) => x.id === id)?.name ?? id;
+          if (kind === "module") {
+            if (!fixable.length) list.append(h("div", { class: "muted snote" }, label("žádný poškozený modul")));
+            for (const x of fixable) list.append(modBtn(x, `${moduleHp(x)}/${moduleMaxHp(x.type)}`, () => cb.repair(ship.id, { kind: "module", moduleId: x.id }), `${MODULES[x.type].name} (${slotName(x.slot)}): opravit ${moduleHp(x)} → ${moduleMaxHp(x.type)} za ${REPAIR.moduleCost} body technologie`));
+          } else if (kind === "ammo") {
+            if (!ammoable.length) list.append(h("div", { class: "muted snote" }, label("všechny zásobníky plné")));
+            for (const x of ammoable) list.append(modBtn(x, `${x.ammo ?? 0}/${MODULES[x.type].ammo}`, () => cb.repair(ship.id, { kind: "ammo", moduleId: x.id }), `${MODULES[x.type].name} (${slotName(x.slot)}): +1 náboj (${x.ammo ?? 0} → ${(x.ammo ?? 0) + 1}) za ${REPAIR.ammoCost} body technologie`));
+          } else if (kind === "hull") {
+            list.append(
+              h("div", { class: "snote" }, label(`trup ${ship.hull} → `), h("b", { style: "color:#fbbf24" }, `${ship.hull + Math.max(0, hullAdd)}`), label(` / ${ship.stats.hull} · +${Math.max(0, hullAdd)}`)),
+              h("button", { class: "px seg stab on go", disabled: locked || hullAdd <= 0, onclick: () => cb.repair(ship.id, { kind: "hull" }) }, label("Opravit trup"), costPipsAll({ tech: REPAIR.hullCost }, false, `${REPAIR.hullCost} body technologie`)),
+            );
+          } else if (kind === "install") {
+            const picked = cargo.find((x) => x.id === m.repairCargoId);
+            if (!picked) {
+              list.append(h("div", { class: "muted snote" }, label(cargo.length ? "vyber modul z nákladu:" : "náklad je prázdný")));
+              for (const x of cargo) list.append(modBtn(x, moduleHp(x) < moduleMaxHp(x.type) ? `${moduleHp(x)}/${moduleMaxHp(x.type)}` : "", () => cb.repairPickCargo(ship.id, x.id), `${MODULES[x.type].name} – nasadit`));
+            } else {
+              list.append(h("div", { class: "snote" }, icon(MODULES[picked.type].icon, "#e2e8f0", 12), label(` ${MODULES[picked.type].name} → kam?`), h("button", { class: "px tiny", title: "Jiný modul", onclick: () => cb.repairPickCargo(ship.id, null) }, "✕")));
+              const slots = h("div", { class: "rslots" });
+              for (const sl of hullOf(ship.loadout).slots) {
+                const cur = ship.loadout.modules.find((x) => occupiedSlots(x).includes(sl.id));
+                slots.append(
+                  h(
+                    "button",
+                    { class: `px rslot ${cur ? "used" : "free"}`, disabled: locked, title: cur ? `${sl.name}: vyměnit za ${MODULES[cur.type].name} (ten jde do nákladu)` : `${sl.name}: volný slot`, onclick: () => cb.repair(ship.id, { kind: "install", moduleId: picked.id, slot: sl.id }) },
+                    h("span", { class: "lbl" }, label(sl.name)),
+                    cur ? h("span", { class: "rx" }, icon(MODULES[cur.type].icon, moduleHp(cur) <= 0 ? "#fca5a5" : "#94a3b8", 11), label(` ${MODULES[cur.type].short} ⇄`)) : h("span", { class: "rx free" }, label("volný")),
+                  ),
+                );
+              }
+              list.append(slots);
+            }
+          } else list.append(h("div", { class: "muted snote" }, label("vyber úkon")));
+          pop.append(list, h("div", { class: "muted snote" }, label(`technologie ${tech}/${ship.stats.techMax} · nebere akci · provede se hned`)));
+          holder.append(pop);
+        }
+        holder.append(
+          h(
+            "button",
+            {
+              class: `px bb-weapon droid-btn ${open ? "on" : ""} ${stormed ? "stormed" : ""} ${rDestroyed ? "destroyed" : ""}`,
+              disabled: locked || !!why,
+              ...tipAttr({ icon: "wrench", iconColor: "#c084fc", title: "Droid – opravář", fx: [], note: `technologie ${tech}/${ship.stats.techMax} · nebere akci · provede se hned · v bouři nefunguje`, ...(rDestroyed ? { warn: "ZNIČENO – modul nefunguje" } : why ? { warn: `Nelze: ${why}.` } : {}) }),
+              onclick: () => cb.repairToggle(ship.id),
+            },
+            icon("wrench", "currentColor", 22),
+            h("span", { class: "lbl" }, label("Opravář")),
+            stormed ? h("span", { class: "sb" }, "⚡") : null,
+            rDestroyed ? h("span", { class: "dead-x" }, "✕") : null,
+          ),
+        );
         row.append(holder);
       }
     }

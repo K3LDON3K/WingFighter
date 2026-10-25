@@ -10,15 +10,15 @@
  * skener a sbírá ocasy komet, když má vybitý štít.
  */
 import { circleHitsAsteroid } from "./asteroids.ts";
-import { DROID, LASER, MG, RULES, TORPEDO } from "./constants.ts";
+import { DROID, LASER, MG, REPAIR, RULES, TORPEDO } from "./constants.ts";
 import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from "./geometry.ts";
 import { listManeuvers, maneuverEnd, maneuverPath, makeManeuver } from "./maneuvers.ts";
 import { insideMap } from "./mapshape.ts";
 import { pointInStorm } from "./mapgen.ts";
-import { actionCost, aimPose, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, sectorHit, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
+import { actionCost, aimPose, ammoModules, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, repairBlocked, repairableModules, sectorHit, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
 import type { Rng } from "./rng.ts";
 import { laserHalfArc, laserRange, mgRange, moduleWorking, profileOf, torpedoLockRange, torpedoPointRange } from "./ships.ts";
-import type { BotLevel, GameState, Maneuver, Segments, Ship, ShipOrders, Shot } from "./types.ts";
+import type { BotLevel, GameState, Maneuver, RepairOrder, Segments, Ship, ShipOrders, Shot } from "./types.ts";
 
 /** Předpokládané pozice nepřítele po tomto kole (s vahou). */
 interface Guess {
@@ -386,6 +386,27 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
       const low = ship.shieldType === "whole" ? ship.shields <= ship.stats.shields * 0.4 : ship.segments.reduce((a, b) => a + b, 0) <= 3;
       const reserve = level === "eso" && droid ? DROID.overdriveCost : 0;
       if (low && ship.techPoints - RULES.rechargeTechCost >= reserve) orders.rechargeShield = { segments: ship.shieldType === "segment" ? shieldRechargeSplit(ship, enemies) : undefined };
+    }
+    // droid opravář (nebere akci): zničený/poškozený modul, prázdná munice, slabý trup – pokud technologie zbývá
+    if (!repairBlocked(state, ship)) {
+      const reserve = level === "eso" && droid ? DROID.overdriveCost : 0;
+      let tech = ship.techPoints - (overdrive ? DROID.overdriveCost : 0) - (orders.rechargeShield ? RULES.rechargeTechCost : 0);
+      const rep: RepairOrder[] = [];
+      const broken = repairableModules(ship).filter((m) => !moduleWorking(m) && m.type !== "repair");
+      if (broken.length && tech - REPAIR.moduleCost >= reserve) {
+        rep.push({ kind: "module", moduleId: broken[0].id });
+        tech -= REPAIR.moduleCost;
+      }
+      if (ship.hull <= ship.stats.hull * 0.5 && tech - REPAIR.hullCost >= reserve) {
+        rep.push({ kind: "hull" });
+        tech -= REPAIR.hullCost;
+      }
+      const empty = ammoModules(ship).filter((m) => (m.ammo ?? 0) === 0);
+      if (empty.length && tech - REPAIR.ammoCost >= reserve) {
+        rep.push({ kind: "ammo", moduleId: empty[0].id });
+        tech -= REPAIR.ammoCost;
+      }
+      if (rep.length) orders.repair = rep;
     }
     const left = () => RULES.actionPoints - actionCost(ship, orders);
 

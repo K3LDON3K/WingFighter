@@ -163,6 +163,8 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
         fx: [
           { icon: "ship", text: `sken lodi ${SCANNER.shipCost} tech · do ${SCANNER.range}` },
           { icon: "deep", text: `vesmír ${SCANNER.deepCost} tech · do ${SCANNER.deepRange}` },
+          { icon: "turn", text: `manévry botů ${SCANNER.predictCost} tech · ${SCANNER.predictTurns} kola` },
+          { icon: "comet", text: "pasivně: dráha komet", tone: "good" },
           { icon: "clock", text: "proběhne hned", tone: "good" },
         ],
         note: "nebere akci · v bouři nefunguje",
@@ -194,6 +196,20 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
           { icon: "clock", text: "proběhne hned", tone: "good" },
         ],
         note: "nebere akci",
+        ...w,
+      };
+    case "scan-predict":
+      return {
+        icon: "turn",
+        iconColor: "#a78bfa",
+        title: "Manévry botů",
+        cost: { tech: SCANNER.predictCost },
+        fx: [
+          { icon: "eye", text: "ukáže naplánované manévry nepřátelských botů v dohledu" },
+          { icon: "clock", text: `toto a příští kolo (${SCANNER.predictTurns} kola)` },
+          { icon: "people", text: "vidíš jen ty (ne spoluhráči)" },
+        ],
+        note: "nebere akci · lidské protihráče neodhalí",
         ...w,
       };
     case "recharge":

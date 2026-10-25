@@ -1,11 +1,13 @@
 import {
   setPilots,
+  type RepairOrder,
   RULES,
   actionCost,
   ANGLE_STEP,
   defaultOrders,
   dist,
   profileOf,
+  botPredictActive,
   MODULES,
   loadoutWeight,
   LOCK_RANGE,
@@ -131,6 +133,8 @@ import { Net } from "./net.ts";
 interface GameSession {
   state: GameState;
   view: ViewModel;
+  /** Předpověď skeneru: manévry nepřátelských botů na dané kolo. */
+  botPlans?: { turn: number; plans: { shipId: string; maneuverId: string }[] };
   anim: TurnAnimation | null;
   queue: TurnResult[];
   orders: Map<string, ShipOrders>;
@@ -163,6 +167,9 @@ interface GameSession {
   /** Skener: vysunutá tlačítka / výběr cíle skenu lodi. */
   scanOpen: boolean;
   droidOpen: boolean;
+  repairOpen: boolean;
+  repairKind: RepairOrder["kind"] | null;
+  repairCargoId: string | null;
   scanPick: boolean;
   /** Dobití štítu: vysunutá nabídka / zvolené body do segmentů. */
   rechargeOpen: boolean;
@@ -293,6 +300,12 @@ net.on((msg) => {
       sfx("scan");
       if (game) showScanResult(msg.ship);
       break;
+    case "botPlans":
+      if (game) {
+        game.botPlans = { turn: msg.turn, plans: msg.plans };
+        if (msg.turn === game.state.turn && !game.anim) sfx("scan");
+      }
+      break;
     case "turnResult":
       if (game) {
         game.queue.push(msg.result);
@@ -343,6 +356,9 @@ function startGame(state: GameState) {
     skipConfirm: !loadAskConfirm(),
     scanOpen: false,
     droidOpen: false,
+    repairOpen: false,
+    repairKind: null,
+    repairCargoId: null,
     scanPick: false,
     rechargeOpen: false,
     rechargePick: [0, 0, 0, 0],
@@ -379,6 +395,9 @@ function resetOrders() {
   game.minePick = null;
   game.cargoOpen = false;
   game.droidOpen = false;
+  game.repairOpen = false;
+  game.repairKind = null;
+  game.repairCargoId = null;
   game.rechargeOpen = false;
   game.scanOpen = false;
   game.scanPick = false;
@@ -585,6 +604,9 @@ function submitOrders(force = false) {
   game.aimingShipId = null;
   closeShieldEdit(game, game.selectedShipId ?? null);
   game.droidOpen = false;
+  game.repairOpen = false;
+  game.repairKind = null;
+  game.repairCargoId = null;
   game.rechargeOpen = false;
   game.scanOpen = false;
   game.scanPick = false;
@@ -794,7 +816,19 @@ function buildOverlay(view: ViewModel): Overlay {
   overlay.visionRing = true;
   overlay.myShipIds = g.state.ships.filter((s) => s.alive && s.ownerId === playerId).map((s) => s.id);
   if (g.anim || g.state.status === "finished") return overlay;
-  overlay.cometPredict = true;
+  // dráhu komet vidí jen hráč, jehož vlastní loď má funkční skener
+  overlay.cometPredict = g.state.ships.some((s) => s.alive && s.ownerId === playerId && scannerModule(s.loadout));
+  // předpověď skeneru: manévry nepřátelských botů (jen toto a příští kolo)
+  if (g.botPlans && g.botPlans.turn === g.state.turn && botPredictActive(g.state, playerId)) {
+    overlay.botPlans = [];
+    for (const pl of g.botPlans.plans) {
+      const ship = g.state.ships.find((s) => s.id === pl.shipId && s.alive);
+      const vs = view.ships.find((s) => s.id === pl.shipId);
+      if (!ship || !vs) continue;
+      const man = resolveManeuver(profileOf(ship.loadout), pl.maneuverId, ship.speed);
+      if (man) overlay.botPlans.push({ ship: vs, maneuver: man });
+    }
+  }
   overlay.selectedShipId = g.selectedShipId;
   overlay.showHitboxes = showHitboxes();
   overlay.showSelectRing = showSelectRing();
@@ -1320,6 +1354,9 @@ function renderSide() {
       scanOpen: game.scanOpen,
       weaponOpen: game.weaponOpen,
       droidOpen: game.droidOpen,
+      repairOpen: game.repairOpen,
+      repairKind: game.repairKind,
+      repairCargoId: game.repairCargoId,
       rechargeOpen: game.rechargeOpen,
       rechargePick: game.rechargePick,
       scanPick: game.scanPick,
@@ -1440,6 +1477,37 @@ function renderSide() {
         game!.selectedShipId = id;
         game!.droidOpen = !game!.droidOpen;
         game!.rechargeOpen = false;
+        game!.repairOpen = false;
+        renderSide();
+      },
+      repairToggle: (id) => {
+        const g = game!;
+        g.selectedShipId = id;
+        g.repairOpen = !g.repairOpen;
+        g.repairKind = null;
+        g.repairCargoId = null;
+        g.droidOpen = false;
+        g.rechargeOpen = false;
+        renderSide();
+      },
+      repairMode: (id, kind) => {
+        const g = game!;
+        g.selectedShipId = id;
+        g.repairKind = kind;
+        g.repairCargoId = null;
+        renderSide();
+      },
+      repairPickCargo: (id, moduleId) => {
+        game!.selectedShipId = id;
+        game!.repairCargoId = moduleId;
+        renderSide();
+      },
+      repair: (id, order) => {
+        net.send({ type: "repair", shipId: id, order });
+        sfx("click");
+        const g = game!;
+        g.repairCargoId = null;
+        if (order.kind === "install" || order.kind === "hull") g.repairKind = null; // okénko zůstane, úkon se zobrazí po novém stavu
         renderSide();
       },
       shieldMode: (id, mode) => {

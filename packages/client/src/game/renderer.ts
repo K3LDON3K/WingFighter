@@ -90,6 +90,8 @@ export interface Overlay {
   myTeam?: number;
   /** Plánování: kreslit předpověď dráhy komet v tomto kole. */
   cometPredict?: boolean;
+  /** Předpověď skeneru: naplánované manévry nepřátelských botů (čárkovaná dráha + duch). */
+  botPlans?: { ship: ViewShip; maneuver: Maneuver }[];
   /** Průběh přehrávání kola 0..1 (undefined = plánování, nic se nehýbe). */
   animating?: number;
   /** Vlastní lodě (ocas komety, který už využily, se kreslí vybledle). */
@@ -223,6 +225,7 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
     for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArcs, p.mgArcs);
+    for (const p of overlay.botPlans ?? []) this.drawBotPlan(p.ship, p.maneuver);
 
     for (const t of view.torpedoes) {
       // plamen motoru
@@ -995,6 +998,49 @@ export class Renderer {
       this.drawPixelIcon("turn", bx, by, s, "#0b1020");
       ctx.restore();
     }
+  }
+
+  /** Předpověď skeneru: čárkovaná dráha v barvě nepřítele, tečky po dílech, průsvitný duch na konci. */
+  private drawBotPlan(ship: ViewShip, man: Maneuver) {
+    const ctx = this.ctx;
+    const color = TEAM_COLORS[ship.team];
+    const pts = samplePath(maneuverPath(ship, man), 24);
+    const end = pts[pts.length - 1];
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.7;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (const p of pts) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    const last = pts.length - 1;
+    for (let k = 1; k <= man.speed; k++) {
+      const q = pts[Math.round((k / man.speed) * last)];
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = shade(color, 1.3);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, ship.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    drawSprite(ctx, this.sprites.ship(ship.hullId, ship.team, color), end.x, end.y, end.heading, 0.35);
+    // štítek „sken“ nad duchem
+    ctx.save();
+    ctx.font = "11px Jersey, ui-monospace, Menlo, monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#a78bfa";
+    ctx.globalAlpha = 0.9;
+    ctx.fillText("SKEN", end.x, end.y - ship.radius - 6);
+    ctx.restore();
   }
 
   private drawIcons(icons: IconSpot[], cam: Camera) {

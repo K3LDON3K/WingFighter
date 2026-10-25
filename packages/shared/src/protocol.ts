@@ -1,6 +1,6 @@
 import type { Tuning } from "./tuning.ts";
 import type { SeriesState } from "./series.ts";
-import type { BotLevel, GameSettings, GameState, PilotDef, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
+import type { BotLevel, GameSettings, GameState, PilotDef, RepairOrder, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
 
 /** Stav místnosti v lobby. */
 export interface RoomPlayer {
@@ -89,9 +89,11 @@ export type ClientMessage =
   | { type: "startGame" }
   | { type: "submitOrders"; orders: ShipOrders[] }
   /** Skener – vyhodnotí se hned: sken lodi (1 náboj), hluboký sken (2 náboje), vynucený cooldown. */
-  | { type: "scan"; shipId: string; moduleId: string; mode: "ship" | "deep" | "cooldown"; targetId?: string }
+  | { type: "scan"; shipId: string; moduleId: string; mode: "ship" | "deep" | "cooldown" | "predict"; targetId?: string }
   /** Dobití štítu technologií (hned, nebere akci). U segmentového: kolik bodů do kterého segmentu. */
   | { type: "rechargeShield"; shipId: string; segments?: number[] }
+  /** Droid – opravář: úkon (hned, nebere akci, platí se technologií). */
+  | { type: "repair"; shipId: string; order: RepairOrder }
   | { type: "unready" }
   | { type: "backToLobby" };
 
@@ -108,4 +110,6 @@ export type ServerMessage =
   | { type: "turnResult"; result: TurnResult }
   /** Výsledek skenu lodi: plná loď včetně výbavy (jen pro skenujícího). */
   | { type: "scanResult"; shooterId: string; ship: Ship }
+  /** Předpověď skeneru: naplánované manévry nepřátelských botů v dohledu (jen pro skenujícího hráče, na dané kolo). */
+  | { type: "botPlans"; turn: number; plans: { shipId: string; maneuverId: string }[] }
   | { type: "error"; message: string };
