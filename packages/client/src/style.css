@@ -5127,3 +5127,110 @@ body.drag-on * {
 .repair-pop .stab.go {
   justify-content: center;
 }
+
+/* ---- výbava: seznam modulů s váhou (modul šedě, munice žlutě) ---- */
+.lo-wlist-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 8px 0 2px;
+}
+.lo-wlist-wrap .wlbl {
+  font-size: 11px;
+  color: #64748b;
+  letter-spacing: 1px;
+}
+.lo-wlist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--txt);
+  font-size: 12px;
+}
+.lo-wlist .wl-row,
+.lo-wlist .wl-foot {
+  display: grid;
+  grid-template-columns: 118px 72px minmax(60px, 1fr) 34px 38px 44px;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  background: #0b1222;
+  border: 1px solid #1e293b;
+}
+.lo-wlist.vA .wl-row,
+.lo-wlist.vA .wl-foot {
+  grid-template-columns: 118px 1fr 58px 58px 54px;
+}
+.lo-wlist .wl-row.cargo {
+  opacity: 0.75;
+  border-style: dashed;
+}
+.lo-wlist .wl-foot {
+  background: transparent;
+  border-color: transparent;
+  border-top: 1px solid #334155;
+  margin-top: 2px;
+  color: #e2e8f0;
+}
+.lo-wlist .wl-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--px);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.lo-wlist .wl-slot {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.lo-wlist .wl-num {
+  text-align: right;
+  white-space: nowrap;
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 3px;
+}
+.lo-wlist .wl-num.mod {
+  color: #cbd5e1;
+}
+.lo-wlist .wl-num.ammo {
+  color: #fbbf24;
+}
+.lo-wlist .wl-num.tot {
+  color: #f8fafc;
+}
+.lo-wlist .wl-bar {
+  display: flex;
+  min-width: 60px;
+  height: 8px;
+  background: #111827;
+  border: 1px solid #1f2937;
+}
+.lo-wlist .wl-bar i,
+.lo-wlist .wl-legend i {
+  display: block;
+  height: 100%;
+}
+.lo-wlist .wl-bar i.mod,
+.lo-wlist .wl-legend i.mod {
+  background: #94a3b8;
+}
+.lo-wlist .wl-bar i.ammo,
+.lo-wlist .wl-legend i.ammo {
+  background: #fbbf24;
+}
+.lo-wlist .wl-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: #64748b;
+}
+.lo-wlist .wl-legend i {
+  width: 10px;
+  height: 8px;
+}

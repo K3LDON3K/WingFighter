@@ -360,9 +360,12 @@ export function spawnComet(state: GameState, rng: Rng, id: string): Comet {
   const from = pointOnEdge(state, a0, r);
   const to = pointOnEdge(state, a1, r);
   const heading = Math.atan2(to.y - from.y, to.x - from.x);
+  // rychlost náhodně v rozmezí ±COMET.speedVarPct % základu (zaokrouhlená na 10)
+  const v = COMET.speedVarPct / 100;
+  const speed = Math.max(10, Math.round((COMET.speed * (1 - v + rng.next() * 2 * v)) / 10) * 10);
   // objeví se COMET.approachTurns kol letu za okrajem a na mapu teprve přiletí (do té doby je jen vidět)
-  const back = COMET.speed * COMET.approachTurns;
-  return { id, x: from.x - Math.cos(heading) * back, y: from.y - Math.sin(heading) * back, heading, speed: COMET.speed, hull: COMET.hull, maxHull: COMET.hull, radius: r, tailUsed: [], entered: false };
+  const back = speed * COMET.approachTurns;
+  return { id, x: from.x - Math.cos(heading) * back, y: from.y - Math.sin(heading) * back, heading, speed, hull: COMET.hull, maxHull: COMET.hull, radius: r, tailUsed: [], entered: false };
 }
 
 /** Je kometa na mapě (střed uvnitř)? Za okrajem je jen vidět – nejde zasáhnout ani do ničeho narazit. */

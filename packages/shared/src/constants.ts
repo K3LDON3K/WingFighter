@@ -106,6 +106,8 @@ export const TORPEDO = {
 export const COMET = {
   /** Ujetá vzdálenost za kolo (o něco víc než torpédo). */
   speed: 300,
+  /** Rozptyl rychlosti nové komety: ± % základu (ladění). */
+  speedVarPct: 20,
   /** Kolik kol letu za okrajem mapy se kometa objeví (je vidět, přiletí později). */
   approachTurns: 2,
   hull: 30,

@@ -165,6 +165,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.141 – Komety mají náhodnou rychlost: každá nová kometa dostane 80–120 % základní rychlosti (zaokrouhleno na 10); rozptyl je v ladění → Komety „Rozptyl rychlosti (± %)“. Bublina komety na mapě ukazuje její skutečnou rychlost.
 - v3.140 – Bitevník má **10 bodů technologie** (stíhač dál 6 ze sekce Skener); nový parametr ladění → Loď „Bitevník – body technologie“. Popis trupu doplněn.
 - v3.139 – **Ocas komety: los.** Průlet ocasem už nedává technologii a štít zároveň – náhodně (výchozí 50 %, ladění → Komety „šance na technologii“) buď +2 body technologie, nebo část štítu jako dřív (plný štít → trup → kredity; bez štítového modulu reset stresu + kredity). Když vylosované není kam dát (plná technologie / plný štít), dostaneš to druhé. Nápověda v bublině komety a v panelu technologie.
 - v3.138 – **Skener: manévry botů** (3 body technologie): hráči ukáže naplánované manévry nepřátelských botů v dohledu týmu na toto a příští kolo (čárkovaná dráha v barvě nepřítele, tečky po dílech rychlosti, průsvitný duch s nápisem SKEN); vidí jen skenující hráč, lidské protihráče neodhalí, nebere akci. Třetí tlačítko v okénku skeneru (MANÉVRY; po zaplacení „běží“). **Dráha komet** v kole se už nekreslí všem – jen hráči, jehož vlastní loď má funkční skener (pasivní funkce skeneru). Log hlásí předpověď.

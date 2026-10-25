@@ -113,6 +113,7 @@ export interface Tuning {
   droidAutopilotRegen: number;
   // komety
   cometSpeed: number;
+  cometSpeedVarPct: number;
   cometHull: number;
   cometDamage: number;
   cometRadius: number;
@@ -249,6 +250,7 @@ export const DEFAULT_TUNING: Tuning = {
   droidAutopilotCost: 2,
   droidAutopilotRegen: 2,
   cometSpeed: 300,
+  cometSpeedVarPct: 20,
   cometHull: 30,
   cometDamage: 30,
   cometRadius: 12,
@@ -403,7 +405,8 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "droidAutopilotCost", label: "Autopilot – cena (technologie)", group: "Droid", min: 0, max: 6, step: 1 },
   { key: "droidAutopilotRegen", label: "Autopilot – stres za zelený manévr", group: "Droid", min: 1, max: 5, step: 1, hint: "bez droida +1" },
   // --- komety ---
-  { key: "cometSpeed", label: "Rychlost / kolo", group: "Komety", min: 50, max: 1000, step: 10, hint: "torpédo má 240" },
+  { key: "cometSpeed", label: "Rychlost / kolo", group: "Komety", min: 50, max: 1000, step: 10, hint: "torpédo má 240; každá kometa dostane náhodnou rychlost ± rozptyl" },
+  { key: "cometSpeedVarPct", label: "Rozptyl rychlosti (± %)", group: "Komety", min: 0, max: 50, step: 5, hint: "20 = nové komety mají 80–120 % základní rychlosti" },
   { key: "cometHull", label: "Odolnost (trup komety)", group: "Komety", min: 5, max: 300, step: 5 },
   { key: "cometDamage", label: "Zranění lodi při nárazu", group: "Komety", min: 0, max: 200, step: 5 },
   { key: "cometRadius", label: "Poloměr jádra", group: "Komety", min: 4, max: 40, step: 1 },
@@ -560,6 +563,7 @@ export function applyTuning(t: Tuning): void {
   DROID.autopilotCost = t.droidAutopilotCost;
   DROID.autopilotRegen = t.droidAutopilotRegen;
   COMET.speed = t.cometSpeed;
+  COMET.speedVarPct = t.cometSpeedVarPct;
   COMET.hull = t.cometHull;
   COMET.damage = t.cometDamage;
   COMET.radius = t.cometRadius;

@@ -928,9 +928,49 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       h("span", { class: "txt muted wtxt" }, `váha ${weight} → max. rychlost ${maxSpeed} · každých ${per} váhy = −1 rychlost`),
     );
   })();
+  /* --- seznam modulů s váhou: modul (šedá) a munice (žlutá) zvlášť; varianty A (tabulka) / B (pruhy) --- */
+  const weightList = (() => {
+    const variant = (window as unknown as { __wlistVariant?: string }).__wlistVariant as "A" | "B" | undefined;
+    if (!variant) return null; // zatím jen návrh (čeká na schválení)
+    const fmt = (n: number) => (Math.round(n * 100) / 100).toString().replace(".", ",");
+    const rows: { m: ModuleInstance; cargo: boolean }[] = [...loadout.modules.map((m) => ({ m, cargo: false })), ...(loadout.cargo ?? []).map((m) => ({ m, cargo: true }))];
+    if (!rows.length) return null;
+    const maxRow = Math.max(0.5, ...rows.map(({ m }) => moduleWeight(m)));
+    let sumMod = 0;
+    let sumAmmo = 0;
+    const list = h("div", { class: `lo-wlist v${variant}` });
+    for (const { m, cargo } of rows) {
+      const def = MODULES[m.type];
+      const wm = def.weight;
+      const wa = (def.ammoWeight ?? 0) * (m.ammo ?? 0);
+      sumMod += wm;
+      sumAmmo += wa;
+      const col = moduleColor(m.type);
+      const slotName = cargo ? "náklad" : (hull.slots.find((x) => x.id === m.slot)?.name ?? m.slot);
+      const ammoTxt = def.ammo ? ` (${m.ammo ?? 0}×${fmt(def.ammoWeight ?? 0)})` : "";
+      const row = h("div", { class: `wl-row ${cargo ? "cargo" : ""}`, title: `${def.name} – ${slotName}: modul ${fmt(wm)}${def.ammo ? `, munice ${fmt(wa)}${ammoTxt}` : ""} = ${fmt(wm + wa)}` });
+      row.append(h("span", { class: "wl-name", style: `color:${col}` }, icon(def.icon, col, 11), label(def.name)), h("span", { class: "wl-slot muted" }, label(slotName)));
+      if (variant === "A") {
+        row.append(
+          h("span", { class: "wl-num mod" }, icon("weight", "#94a3b8", 10), ` ${fmt(wm)}`),
+          def.ammo ? h("span", { class: "wl-num ammo" }, icon("weight", "#fbbf24", 10), ` ${fmt(wa)}`) : h("span", { class: "wl-num ammo muted" }, "–"),
+          h("span", { class: "wl-num tot" }, `= ${fmt(wm + wa)}`),
+        );
+      } else {
+        const bar = h("span", { class: "wl-bar" });
+        bar.append(h("i", { class: "mod", style: `width:${(wm / maxRow) * 100}%` }));
+        if (wa > 0) bar.append(h("i", { class: "ammo", style: `width:${(wa / maxRow) * 100}%` }));
+        row.append(bar, h("span", { class: "wl-num mod" }, fmt(wm)), h("span", { class: "wl-num ammo" }, wa > 0 ? `+${fmt(wa)}` : ""), h("span", { class: "wl-num tot" }, `= ${fmt(wm + wa)}`));
+      }
+      list.append(row);
+    }
+    const foot = h("div", { class: "wl-foot" }, h("span", { class: "wl-name muted" }, label("celkem")), h("span", { class: "wl-slot" }), variant === "B" ? h("span", { class: "wl-legend" }, h("i", { class: "mod" }), label("modul"), h("i", { class: "ammo" }), label("munice")) : null, variant === "A" ? h("span", { class: "wl-num mod" }, icon("weight", "#94a3b8", 10), ` ${fmt(sumMod)}`) : h("span", { class: "wl-num mod" }, fmt(sumMod)), variant === "A" ? h("span", { class: "wl-num ammo" }, icon("weight", "#fbbf24", 10), ` ${fmt(sumAmmo)}`) : h("span", { class: "wl-num ammo" }, `+${fmt(sumAmmo)}`), h("span", { class: "wl-num tot" }, `= ${fmt(sumMod + sumAmmo)}`));
+    list.append(foot);
+    return h("div", { class: "lo-wlist-wrap" }, h("span", { class: "wlbl" }, label("Moduly a váha")), list);
+  })();
   const hint = !ro && (pickSlot || pickType) ? h("div", { class: "lo-pickhint txt" }, pickSlot ? `Slot „${hull.slots.find((x) => x.id === pickSlot)?.name ?? pickSlot}“ vybraný – klikni na modul v obchodě (Esc = zrušit).` : `${MODULES[pickType!].name}: klikni na volný slot v nákresu, kam ho dát (nebo znovu na modul = zrušit).`) : null;
   // rozvržení B: vlevo loď + piloti pod sebou, uprostřed nákres s pruhem váhy, vpravo souhrn a obchod
-  const mid = h("div", { class: "lo-mid-col" }, diagram, weightBar, hint);
+  const mid = h("div", { class: "lo-mid-col" }, diagram, weightBar, weightList, hint);
   const right = h("div", { class: "lo-right-col" }, summary, ro ? null : shopEl);
   const root = h("div", { class: `loadout ${opts.compact ? "compact" : ""} ${opts.hideHead ? "nohead" : ""}` }, opts.hideHead ? null : head, mid, right);
   rootRef = root;

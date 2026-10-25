@@ -1124,7 +1124,12 @@ describe("komety", () => {
     // objeví se COMET.approachTurns kol letu za okrajem a míří dovnitř
     expect(cometOnMap(g, c)).toBe(false);
     const f = { x: Math.cos(c.heading), y: Math.sin(c.heading) };
-    const edgePt = { x: c.x + f.x * COMET.speed * COMET.approachTurns, y: c.y + f.y * COMET.speed * COMET.approachTurns };
+    // rychlost náhodně v rozmezí ±20 % základu
+    expect(c.speed).toBeGreaterThanOrEqual(COMET.speed * 0.8);
+    expect(c.speed).toBeLessThanOrEqual(COMET.speed * 1.2);
+    const speeds = new Set([1, 2, 3, 4, 5, 6, 7, 8].map((seed) => spawnComet(g, createRng(seed), "c").speed));
+    expect(speeds.size).toBeGreaterThan(1);
+    const edgePt = { x: c.x + f.x * c.speed * COMET.approachTurns, y: c.y + f.y * c.speed * COMET.approachTurns };
     // bod vstupu leží na hraně oválu (zmenšeného o poloměr komety)
     expect(Math.abs(ellipseNorm(g, edgePt, c.radius) - 1)).toBeLessThan(1e-6);
     // za okrajem na ni nejde střílet ani ji netrefí loď
