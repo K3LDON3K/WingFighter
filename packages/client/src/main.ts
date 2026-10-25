@@ -1427,6 +1427,8 @@ function renderSide() {
         const o = g.orders.get(id);
         const ship = g.state.ships.find((x) => x.id === id);
         if (!o || !ship || shieldInHand(ship, o) > 0) return;
+        g.rechargeOpen = false;
+        g.rechargePick = [0, 0, 0, 0];
         closeShieldEdit(g, id);
         renderSide();
       },
@@ -1437,11 +1439,23 @@ function renderSide() {
         game!.rechargeOpen = false;
         renderSide();
       },
-      rechargeToggle: (id) => {
-        game!.selectedShipId = id;
-        game!.rechargeOpen = !game!.rechargeOpen;
-        game!.rechargePick = [0, 0, 0, 0];
-        game!.droidOpen = false;
+      shieldMode: (id, mode) => {
+        const g = game!;
+        g.selectedShipId = id;
+        g.droidOpen = false;
+        if (!g.scanPick) g.scanOpen = false;
+        g.rechargePick = [0, 0, 0, 0];
+        if (mode === "close") {
+          g.rechargeOpen = false;
+          closeShieldEdit(g, id);
+        } else if (mode === "recharge") {
+          g.rechargeOpen = true;
+        } else {
+          g.rechargeOpen = false;
+          const o = g.orders.get(id);
+          if (o?.action?.type === "shield") g.shieldEdit = true;
+          else chooseIcon(id, "shield"); // zvolí akci a otevře −/+
+        }
         renderSide();
       },
       rechargePick: (id, seg) => {
@@ -1463,6 +1477,7 @@ function renderSide() {
         sfx("click");
         game!.rechargeOpen = false;
         game!.rechargePick = [0, 0, 0, 0];
+        if (sh.shieldType === "segment") closeShieldEdit(game!, id);
         renderSide();
       },
       weaponToggle: (id, type) => {
@@ -1989,6 +2004,11 @@ function bindInput(c: HTMLCanvasElement) {
       g.scanOpen = false;
       closed = true;
     }
+    if (g.rechargeOpen) {
+      g.rechargeOpen = false;
+      g.rechargePick = [0, 0, 0, 0];
+      closed = true;
+    }
     if (g.shieldEdit) {
       const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
       const so = sel && g.orders.get(sel.id);
@@ -2191,7 +2211,7 @@ function bindInput(c: HTMLCanvasElement) {
     const id = game.selectedShipId;
     const o = id && game.orders.get(id);
     const cur = o ? parseManeuverId(o.maneuverId) : null;
-    if (e.key === "Escape" && (game.submitted || !id || !cur || (!game.shieldEdit && !game.minePick && !game.picking && !game.aimingShipId && !game.jettisonPick && !game.inventoryOpen && !tuningOpen && !game.scanPick && !game.cargoOpen))) {
+    if (e.key === "Escape" && (game.submitted || !id || !cur || (!game.shieldEdit && !game.rechargeOpen && !game.minePick && !game.picking && !game.aimingShipId && !game.jettisonPick && !game.inventoryOpen && !tuningOpen && !game.scanPick && !game.cargoOpen))) {
       toggleMenu(true);
       e.preventDefault();
       return;
@@ -2205,6 +2225,9 @@ function bindInput(c: HTMLCanvasElement) {
       else if (game.jettisonPick || game.inventoryOpen) {
         game.jettisonPick = false;
         game.inventoryOpen = false;
+      } else if (game.rechargeOpen) {
+        game.rechargeOpen = false;
+        game.rechargePick = [0, 0, 0, 0];
       } else if (game.shieldEdit) {
         // zpět na původní rozložení = akce se zruší
         game.shieldEdit = false;
