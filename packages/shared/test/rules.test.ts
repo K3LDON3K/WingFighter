@@ -41,6 +41,9 @@ import {
   modulePos,
   applyShieldRecharge,
   applyRepair,
+  applyHack,
+  hackBlocked,
+  HACK,
   repairBlocked,
   REPAIR,
   shieldRechargeBlocked,
@@ -1412,7 +1415,7 @@ describe("mlha války – přesně hranice dohledu", () => {
     expect(seen.ships.some((s) => s.id === foe.id)).toBe(false);
     expect(seen.storms.map((s) => s.id)).toEqual(["s2"]);
     // ocas komety „tail“ (za jádrem směrem doleva) zasahuje do dohledu → kometa se posílá; „far“ ne
-    expect(seen.comets.map((c) => c.id)).toEqual(["tail"]);
+    expect(seen.comets?.map((c) => c.id)).toEqual(["tail"]);
     // o kousek blíž → nepřítel v dohledu
     foe.x = 500 + me.stats.vision + foe.stats.radius - 1;
     seen = stateForTeam(g, 0, new Map());
@@ -1420,6 +1423,94 @@ describe("mlha války – přesně hranice dohledu", () => {
     function foe0r() {
       return g.ships[1].stats.radius;
     }
+  });
+});
+
+describe("droid – hacker", () => {
+  it("hack modulu: laser oběti v tomto kole nevystřelí, oběť dostane zprávu; vlastní tým flag nevidí; příští kolo zas funguje", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    const foe = place(g, "ship-p2-0", 700, 500, Math.PI);
+    me.loadout.modules.push(newModule("hacker", "left", "h1"));
+    refreshShip(me);
+    me.techPoints = 6;
+    const laser = foe.loadout.modules.find((m) => m.type === "laser")!;
+    expect(hackBlocked(g, me)).toBeUndefined();
+    const seen = stateForTeam(g, 0, new Map());
+    const r0 = applyHack(g, seen, me, { kind: "module", shipId: foe.id, moduleId: laser.id });
+    expect(r0.error).toBeUndefined();
+    expect(me.techPoints).toBe(6 - HACK.moduleCost);
+    expect(laser.hacked).toBe(true);
+    // tým oběti flag nevidí, tým hackera ano
+    expect(stateForTeam(g, 1, new Map()).ships.find((s) => s.id === foe.id)!.loadout.modules.find((m) => m.id === laser.id)!.hacked).toBeUndefined();
+    expect(stateForTeam(g, 0, new Map()).ships.find((s) => s.id === foe.id)!.loadout.modules.find((m) => m.id === laser.id)!.hacked).toBe(true);
+    expect(applyHack(g, seen, me, { kind: "module", shipId: foe.id, moduleId: laser.id }).error).toMatch(/hacknut/);
+    const orders: ShipOrders[] = [{ shipId: me.id, maneuverId: "m1a0", fire: false }, { shipId: foe.id, maneuverId: "m1a0", fire: true }];
+    let r = resolveTurn(g, orders, createRng(7));
+    expect(r.events.some((e) => e.type === "laser" && e.shooterId === foe.id)).toBe(false);
+    expect(r.events.some((e) => e.type === "hacked" && e.shipId === foe.id && e.moduleType === "laser")).toBe(true);
+    expect(r.state.ships.find((s) => s.id === foe.id)!.loadout.modules.some((m) => m.hacked)).toBe(false);
+    r = resolveTurn(r.state, orders, createRng(7));
+    expect(r.events.some((e) => e.type === "laser" && e.shooterId === foe.id)).toBe(true);
+  });
+  it("hack štítu: zásah jde do trupu; hack miny a torpéda je převezme; pasivní oprava 4 kola", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    const foe = place(g, "ship-p2-0", 700, 500, Math.PI);
+    me.loadout.modules.push(newModule("hacker", "left", "h1"));
+    refreshShip(me);
+    me.techPoints = 6;
+    const shield = foe.loadout.modules.find((m) => m.type.startsWith("shield"))!;
+    const seen = stateForTeam(g, 0, new Map());
+    expect(applyHack(g, seen, me, { kind: "module", shipId: foe.id, moduleId: shield.id }).error).toBeUndefined();
+    const hullBefore = foe.hull;
+    const r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: true }, { shipId: foe.id, maneuverId: "m1a0", fire: false }], createRng(3));
+    const f2 = r.state.ships.find((s) => s.id === foe.id)!;
+    const dmg = r.events.filter((e) => e.type === "damage" && e.shipId === foe.id);
+    if (dmg.length) expect(f2.hull).toBeLessThan(hullBefore);
+    // mina a torpédo
+    const g2 = game();
+    const me2 = place(g2, "ship-p1-0", 500, 500, 0);
+    const foe2 = place(g2, "ship-p2-0", 1200, 500, Math.PI);
+    me2.loadout.modules.push(newModule("hacker", "left", "h1"));
+    refreshShip(me2);
+    me2.techPoints = 6;
+    g2.mines = [{ id: "mn", ownerId: foe2.ownerId, team: 1, x: 600, y: 600, radius: 70, armed: true }];
+    g2.torpedoes = [{ id: "tp", ownerId: foe2.ownerId, team: 1, x: 620, y: 400, heading: 0, targetId: me2.id, trackLeft: 1, lifeLeft: 1, phase: "lock", speed: 240, launchLeft: 0 }];
+    const seen2 = stateForTeam(g2, 0, new Map());
+    expect(applyHack(g2, seen2, me2, { kind: "mine", mineId: "mn", timer: 1 }).error).toBeUndefined();
+    expect(g2.mines[0].team).toBe(0);
+    expect(g2.mines[0].timer).toBe(1);
+    expect(applyHack(g2, seen2, me2, { kind: "torpedo", torpedoId: "tp", targetId: foe2.id }).error).toBeUndefined();
+    expect(g2.torpedoes[0].team).toBe(0);
+    expect(g2.torpedoes[0].targetId).toBe(foe2.id);
+    expect(g2.torpedoes[0].lifeLeft).toBe(1 + HACK.torpedoLife);
+    expect(me2.techPoints).toBe(6 - 2 * HACK.ordnanceCost);
+    // mina vybuchne na startu kola
+    const r2 = resolveTurn(g2, [{ shipId: me2.id, maneuverId: "m1a0", fire: false }, { shipId: foe2.id, maneuverId: "m1a0", fire: false }], createRng(3));
+    expect(r2.events.some((e) => e.type === "mineBlast")).toBe(true);
+    // pasivní oprava
+    const g3 = game();
+    const me3 = place(g3, "ship-p1-0", 500, 500, 0);
+    place(g3, "ship-p2-0", 1500, 1200, Math.PI);
+    me3.loadout.modules.push(newModule("hacker", "left", "h1"));
+    refreshShip(me3);
+    me3.techPoints = 6;
+    me3.hull = 50;
+    expect(applyHack(g3, stateForTeam(g3, 0, new Map()), me3, { kind: "repair" }).error).toBeUndefined();
+    me3.techPoints = 6;
+    expect(applyHack(g3, stateForTeam(g3, 0, new Map()), me3, { kind: "repair" }).error).toMatch(/běží/);
+    let st = g3;
+    for (let i = 0; i < HACK.repairTurns; i++) {
+      const rr = resolveTurn(st, [{ shipId: me3.id, maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(3));
+      expect(rr.events.some((e) => e.type === "autoRepair" && e.shipId === me3.id)).toBe(true);
+      st = rr.state;
+    }
+    const m3 = st.ships.find((s) => s.id === me3.id)!;
+    expect(m3.hull).toBe(50 + HACK.repairTurns * Math.round((m3.stats.hull * HACK.repairPct) / 100));
+    expect(m3.autoRepair).toBe(0);
+    const rr = resolveTurn(st, [{ shipId: me3.id, maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(3));
+    expect(rr.events.some((e) => e.type === "autoRepair")).toBe(false);
   });
 });
 

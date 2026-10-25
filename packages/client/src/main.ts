@@ -1,6 +1,7 @@
 import {
   setPilots,
   type RepairOrder,
+  type HackOrder,
   RULES,
   actionCost,
   ANGLE_STEP,
@@ -170,6 +171,9 @@ interface GameSession {
   repairOpen: boolean;
   repairKind: RepairOrder["kind"] | null;
   repairCargoId: string | null;
+  hackOpen: boolean;
+  hackKind: HackOrder["kind"] | null;
+  hackSel: { kind: "mine" | "torpedo" | "ship"; id: string } | null;
   scanPick: boolean;
   /** Dobití štítu: vysunutá nabídka / zvolené body do segmentů. */
   rechargeOpen: boolean;
@@ -359,6 +363,9 @@ function startGame(state: GameState) {
     repairOpen: false,
     repairKind: null,
     repairCargoId: null,
+    hackOpen: false,
+    hackKind: null,
+    hackSel: null,
     scanPick: false,
     rechargeOpen: false,
     rechargePick: [0, 0, 0, 0],
@@ -398,6 +405,9 @@ function resetOrders() {
   game.repairOpen = false;
   game.repairKind = null;
   game.repairCargoId = null;
+  game.hackOpen = false;
+  game.hackKind = null;
+  game.hackSel = null;
   game.rechargeOpen = false;
   game.scanOpen = false;
   game.scanPick = false;
@@ -607,6 +617,9 @@ function submitOrders(force = false) {
   game.repairOpen = false;
   game.repairKind = null;
   game.repairCargoId = null;
+  game.hackOpen = false;
+  game.hackKind = null;
+  game.hackSel = null;
   game.rechargeOpen = false;
   game.scanOpen = false;
   game.scanPick = false;
@@ -1357,6 +1370,9 @@ function renderSide() {
       repairOpen: game.repairOpen,
       repairKind: game.repairKind,
       repairCargoId: game.repairCargoId,
+      hackOpen: game.hackOpen,
+      hackKind: game.hackKind,
+      hackSel: game.hackSel,
       rechargeOpen: game.rechargeOpen,
       rechargePick: game.rechargePick,
       scanPick: game.scanPick,
@@ -1436,6 +1452,9 @@ function renderSide() {
       },
       cargoToggle: (id) => {
         game!.selectedShipId = id;
+        game!.hackOpen = false;
+        game!.hackKind = null;
+        game!.hackSel = null;
         game!.cargoOpen = !game!.cargoOpen;
         renderSide();
       },
@@ -1475,6 +1494,9 @@ function renderSide() {
       centerOn: (id) => centerOnShip(id),
       droidToggle: (id) => {
         game!.selectedShipId = id;
+        game!.hackOpen = false;
+        game!.hackKind = null;
+        game!.hackSel = null;
         game!.droidOpen = !game!.droidOpen;
         game!.rechargeOpen = false;
         game!.repairOpen = false;
@@ -1483,6 +1505,9 @@ function renderSide() {
       repairToggle: (id) => {
         const g = game!;
         g.selectedShipId = id;
+        g.hackOpen = false;
+        g.hackKind = null;
+        g.hackSel = null;
         g.repairOpen = !g.repairOpen;
         g.repairKind = null;
         g.repairCargoId = null;
@@ -1502,6 +1527,36 @@ function renderSide() {
         game!.repairCargoId = moduleId;
         renderSide();
       },
+      hackToggle: (id) => {
+        const g = game!;
+        g.selectedShipId = id;
+        g.hackOpen = !g.hackOpen;
+        g.hackKind = null;
+        g.hackSel = null;
+        g.droidOpen = false;
+        g.repairOpen = false;
+        g.rechargeOpen = false;
+        g.weaponOpen = null;
+        g.cargoOpen = false;
+        if (!g.scanPick) g.scanOpen = false;
+        renderSide();
+      },
+      hackMode: (id, kind) => {
+        const g = game!;
+        g.selectedShipId = id;
+        g.hackKind = kind;
+        g.hackSel = null;
+        g.picking = null;
+        renderSide();
+      },
+      hack: (id, order) => {
+        net.send({ type: "hack", shipId: id, order });
+        sfx("click");
+        const g = game!;
+        g.hackSel = null;
+        g.hackKind = null;
+        renderSide();
+      },
       repair: (id, order) => {
         net.send({ type: "repair", shipId: id, order });
         sfx("click");
@@ -1513,6 +1568,9 @@ function renderSide() {
       shieldMode: (id, mode) => {
         const g = game!;
         g.selectedShipId = id;
+        g.hackOpen = false;
+        g.hackKind = null;
+        g.hackSel = null;
         g.droidOpen = false;
         if (!g.scanPick) g.scanOpen = false;
         g.rechargePick = [0, 0, 0, 0];
@@ -1553,6 +1611,9 @@ function renderSide() {
       },
       weaponToggle: (id, type) => {
         game!.selectedShipId = id;
+        game!.hackOpen = false;
+        game!.hackKind = null;
+        game!.hackSel = null;
         game!.weaponOpen = game!.weaponOpen === type ? null : type;
         game!.droidOpen = false;
         if (!game!.scanPick) game!.scanOpen = false;
@@ -1560,6 +1621,9 @@ function renderSide() {
       },
       scanToggle: (id) => {
         game!.selectedShipId = id;
+        game!.hackOpen = false;
+        game!.hackKind = null;
+        game!.hackSel = null;
         game!.weaponOpen = null;
         game!.scanOpen = !game!.scanOpen;
         game!.scanPick = false;
@@ -1681,7 +1745,7 @@ let logOpen = false;
 /* ------------------------------------------------------------------ */
 
 interface Entity {
-  kind: "ship" | "torpedo" | "debris" | "comet";
+  kind: "ship" | "torpedo" | "debris" | "comet" | "mine";
   id: string;
   team: number;
   ownerId?: string;
@@ -1703,6 +1767,12 @@ function entityAt(x: number, y: number): Entity | undefined {
   for (const db of view.debris) {
     const d = Math.hypot(db.x - x, db.y - y);
     if (d <= 16 && (!best || d < best.d)) best = { e: { kind: "debris", id: db.id, team: -1 }, d };
+  }
+  if (game.hackKind === "mine" || game.hackKind === "torpedo") {
+    for (const mn of view.mines) {
+      const d = Math.hypot(mn.x - x, mn.y - y);
+      if (d <= Math.max(18, mn.radius) && (!best || d < best.d)) best = { e: { kind: "mine", id: mn.id, team: mn.team }, d };
+    }
   }
   for (const c of view.comets) {
     const d = Math.hypot(c.x - x, c.y - y);
@@ -2122,6 +2192,27 @@ function bindInput(c: HTMLCanvasElement) {
     const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
     const o = sel && g.orders.get(sel.id);
     if (!sel || !o) return;
+    // 3a) hacker: výběr miny / torpéda / cíle torpéda / cizí lodi
+    if (g.hackOpen && g.hackKind && hit) {
+      if ((g.hackKind === "mine" || g.hackKind === "torpedo") && !g.hackSel && (hit.kind === "mine" || hit.kind === "torpedo")) {
+        g.hackSel = { kind: hit.kind, id: hit.id };
+        renderSide();
+        return;
+      }
+      if (g.hackSel?.kind === "torpedo" && (hit.kind === "ship" || hit.kind === "torpedo") && hit.id !== g.hackSel.id) {
+        net.send({ type: "hack", shipId: sel.id, order: { kind: "torpedo", torpedoId: g.hackSel.id, targetId: hit.id } });
+        sfx("click");
+        g.hackSel = null;
+        g.hackKind = null;
+        renderSide();
+        return;
+      }
+      if (g.hackKind === "module" && hit.kind === "ship" && hit.team !== sel.team) {
+        g.hackSel = { kind: "ship", id: hit.id };
+        renderSide();
+        return;
+      }
+    }
     // 3b) sken lodi: klik na cizí loď → hned
     if (g.scanPick && hit && hit.kind === "ship" && hit.team !== sel.team) {
       const mod = scannerModule(sel.loadout);

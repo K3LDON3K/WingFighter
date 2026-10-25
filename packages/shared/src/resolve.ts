@@ -13,6 +13,7 @@ import {
   RULES,
   SCANNER,
   DROID,
+  HACK,
   REPAIR,
   STRESS,
   TORPEDO,
@@ -33,7 +34,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { makeManeuver, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { activeShield, allowedFacings, cargoCapacity, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
+import { activeShield, allowedFacings, cargoCapacity, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleUsable, moduleWorking, MODULES, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
 
@@ -50,7 +51,7 @@ export function inBorderStorm(state: Pick<GameState, "width" | "height" | "borde
 function laserBlockedByStorm(state: GameState, a: Vec, b: Vec): boolean {
   return (state.storms?.length ?? 0) > 0 && (inStorm(state, a) || inStorm(state, b) || lineCrossesStorm(state.storms, a, b));
 }
-import type { Difficulty, DroidOrder, ManeuverProfile, ModuleInstance, RepairOrder } from "./types.ts";
+import type { Difficulty, DroidOrder, HackOrder, ManeuverProfile, ModuleInstance, RepairOrder } from "./types.ts";
 
 /** Pozice lodi natočená podle směru modulu (výseč laserů, výlet torpéda). */
 /** Odkud a kam modul míří: z pozice slotu na trupu, ve směru natočení modulu. */
@@ -286,7 +287,7 @@ function applyDamage(ship: Ship, amount: number, events: TurnEvent[], from?: Vec
   let absorbed = 0;
   let segment: number | undefined;
   let pierced = 0; // část, která prošla štítem do trupu i když štít ještě držel
-  const stormed = !!creditCtx && inStorm(creditCtx.state, ship); // v bouři štíty nefungují
+  const stormed = (!!creditCtx && inStorm(creditCtx.state, ship)) || !!activeShield(ship.loadout)?.hacked; // v bouři (a s hacknutým štítem) štíty nefungují
   if (stormed) {
     /* zásah jde rovnou do trupu */
   } else if (from && ship.shieldType === "segment") {
@@ -394,7 +395,7 @@ export function validShieldAction(ship: Ship, segments: unknown): segments is Se
 
 /** Funkční droid-pilot na lodi. */
 export function droidModule(ship: Ship): ModuleInstance | undefined {
-  return ship.loadout.modules.find((m) => m.type === "droid" && moduleWorking(m));
+  return ship.loadout.modules.find((m) => m.type === "droid" && moduleUsable(m));
 }
 /** Kolik technologie stojí zapnuté funkce droida. */
 export function droidCost(o: Pick<ShipOrders, "droid"> | undefined): number {
@@ -471,16 +472,16 @@ export function actionCost(ship: Ship, o: ShipOrders): number {
 /** Je cíl (loď nebo torpédo) nepřátelský a existující? */
 /** Torpédový modul s municí (zadaný, nebo první s municí). */
 export function torpedoModule(ship: Ship, moduleId?: string) {
-  const mods = ship.loadout.modules.filter((m) => m.type === "torpedo" && (m.ammo ?? 0) > 0 && moduleWorking(m));
+  const mods = ship.loadout.modules.filter((m) => m.type === "torpedo" && (m.ammo ?? 0) > 0 && moduleUsable(m));
   return mods.find((m) => m.id === moduleId) ?? mods[0];
 }
 /** Minový modul s municí. */
 export function mineModule(ship: Ship) {
-  return ship.loadout.modules.find((m) => m.type === "mine" && (m.ammo ?? 0) > 0 && moduleWorking(m));
+  return ship.loadout.modules.find((m) => m.type === "mine" && (m.ammo ?? 0) > 0 && moduleUsable(m));
 }
 /** Kulometný modul s municí (zadaný, nebo první s municí). */
 export function mgModule(ship: Ship, moduleId?: string) {
-  const mods = ship.loadout.modules.filter((m) => m.type === "mg" && (m.ammo ?? 0) > 0 && moduleWorking(m));
+  const mods = ship.loadout.modules.filter((m) => m.type === "mg" && (m.ammo ?? 0) > 0 && moduleUsable(m));
   return mods.find((m) => m.id === moduleId) ?? mods[0];
 }
 
@@ -494,7 +495,7 @@ export function mgHitChance(d: number, targetEvading = false, range = MG.range):
 
 /** Laserový modul (zadaný, nebo první). */
 export function laserModule(ship: Ship, moduleId?: string) {
-  const mods = ship.loadout.modules.filter((m) => m.type === "laser" && moduleWorking(m));
+  const mods = ship.loadout.modules.filter((m) => m.type === "laser" && moduleUsable(m));
   return mods.find((m) => m.id === moduleId) ?? mods[0];
 }
 
@@ -517,7 +518,7 @@ export function shotsOfType(ship: Ship, o: ShipOrders, type: "laser" | "mg"): { 
   const out: { shot: Shot; mod: ModuleInstance }[] = [];
   for (const shot of shotsOf(ship, o)) {
     const mod = ship.loadout.modules.find((m) => m.id === shot.moduleId);
-    if (mod && mod.type === type) out.push({ shot, mod });
+    if (mod && mod.type === type && !mod.hacked) out.push({ shot, mod });
   }
   return out;
 }
@@ -596,7 +597,7 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     for (const rs of rawShots) {
       if (!rs || typeof rs.moduleId !== "string" || seen.has(rs.moduleId)) continue;
       const mod = ship.loadout.modules.find((m) => m.id === rs.moduleId);
-      if (!mod || !moduleWorking(mod) || (mod.type !== "laser" && mod.type !== "mg") || (mod.type === "mg" && (mod.ammo ?? 0) <= 0)) continue;
+      if (!mod || !moduleUsable(mod) || (mod.type !== "laser" && mod.type !== "mg") || (mod.type === "mg" && (mod.ammo ?? 0) <= 0)) continue;
       seen.add(mod.id);
       const tid = typeof rs.targetId === "string" ? (enemyTarget(state, ship, rs.targetId)?.id ?? state.debris.find((d) => d.id === rs.targetId)?.id ?? (state.comets ?? []).find((c) => c.id === rs.targetId)?.id) : undefined;
       shots.push(tid ? { moduleId: mod.id, targetId: tid } : { moduleId: mod.id });
@@ -693,6 +694,11 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const c = spawnComet(state, rng, `comet-${turn}`);
     state.comets.push(c);
     events.push({ type: "spawnComet", comet: c });
+  }
+  // hacknuté moduly: oběť se to dozví teď (modul na toto kolo nefunguje)
+  for (const ship of state.ships) {
+    if (!ship.alive) continue;
+    for (const m of ship.loadout.modules) if (m.hacked) events.push({ type: "hacked", shipId: ship.id, moduleId: m.id, moduleType: m.type });
   }
   const shotComets = new Set<string>();
   const cometById = (id: string | undefined) => state.comets!.find((c) => c.id === id && !shotComets.has(c.id) && cometOnMap(state, c));
@@ -1687,6 +1693,17 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (ship.lockTargetId && !shipById(state, ship.lockTargetId)?.alive) ship.lockTargetId = undefined;
   }
   for (const p of state.players) if (state.ships.some((s) => s.alive && s.ownerId === p.id)) awardCredits(state, events, p.id, RULES.creditsPerTurn, "survive");
+  // pasivní oprava trupu (hacker): jen když droid funguje a loď není v bouři; hack modulů platil jen na toto kolo
+  for (const ship of state.ships) {
+    for (const m of ship.loadout.modules) if (m.hacked) delete m.hacked;
+    if (!ship.alive || !(ship.autoRepair ?? 0)) continue;
+    if (hackerModule(ship) && !inStorm(state, ship)) {
+      const amount = Math.min(Math.max(1, Math.round((ship.stats.hull * HACK.repairPct) / 100)), ship.stats.hull - ship.hull);
+      ship.autoRepair = (ship.autoRepair ?? 1) - 1;
+      if (amount > 0) ship.hull += amount;
+      events.push({ type: "autoRepair", shipId: ship.id, amount: Math.max(0, amount), hullAfter: ship.hull, turnsLeft: ship.autoRepair });
+    }
+  }
   state.revealTeams = []; // hluboký sken platí jen do konce kola
   creditCtx = null;
   state.turn = turn + 1;
@@ -1824,6 +1841,7 @@ export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: 
   const mod = ship.loadout.modules.find((m) => m.id === moduleId && m.type === "scanner");
   if (!mod) return { error: "loď nemá skener" };
   if (!moduleWorking(mod)) return { error: "skener je zničený" };
+  if (mod.hacked) return { error: "skener je hacknutý" };
   if (mode === "cooldown") return { error: "cooldown skeneru už ve hře není" };
   if (mode === "predict") {
     if (botPredictActive(state, ship.ownerId)) return { error: "předpověď manévrů už běží" };
@@ -1875,7 +1893,7 @@ export function shieldRechargeRoom(ship: Ship): number {
 
 /** Funkční droid opravář lodi (první). */
 export function repairModule(ship: Ship): ModuleInstance | undefined {
-  return ship.loadout.modules.find((m) => m.type === "repair" && moduleWorking(m));
+  return ship.loadout.modules.find((m) => m.type === "repair" && moduleUsable(m));
 }
 
 /** Cena úkonu opraváře v bodech technologie. */
@@ -1970,6 +1988,82 @@ export function applyRepair(state: GameState, ship: Ship, order: RepairOrder): {
   }
 }
 
+/* ---------- Droid – hacker ---------- */
+
+export function hackerModule(ship: Ship): ModuleInstance | undefined {
+  return ship.loadout.modules.find((m) => m.type === "hacker" && moduleUsable(m));
+}
+export function hackCost(kind: HackOrder["kind"]): number {
+  return kind === "module" ? HACK.moduleCost : kind === "repair" ? HACK.repairCost : HACK.ordnanceCost;
+}
+export function hackBlocked(state: GameState, ship: Ship): string | undefined {
+  if (!hackerModule(ship)) return "loď nemá funkční droida hackera";
+  if (inStorm(state, ship)) return "v bouři droid nefunguje";
+  return undefined;
+}
+
+/**
+ * Úkon hackera – hned při plánování, nebere akci, platí se technologií. `seen` = stav, jak ho vidí tým hackera
+ * (cíl musí být v dohledu). Mina: přejde hackerovi (volitelně odpočet: 1 = vybuchne na startu kola, n = za n−1 kol);
+ * torpédo: přejde hackerovi, nový cíl, +kola života; modul: cizí modul na toto kolo nefunguje; oprava: pasivní oprava trupu.
+ */
+export function applyHack(state: GameState, seen: GameState, ship: Ship, order: HackOrder): { error?: string; event?: TurnEvent } {
+  const why = hackBlocked(state, ship);
+  if (why) return { error: why };
+  const cost = hackCost(order.kind);
+  if (ship.techPoints < cost) return { error: `nedostatek technologie (${ship.techPoints}/${cost})` };
+  const base = { type: "hack" as const, shipId: ship.id, kind: order.kind, cost };
+  switch (order.kind) {
+    case "mine": {
+      const mine = state.mines.find((m) => m.id === order.mineId);
+      if (!mine || !seen.mines.some((m) => m.id === mine.id)) return { error: "mina není v dohledu" };
+      if (mine.team === ship.team && mine.ownerId === ship.ownerId && order.timer === undefined) return { error: "mina už je tvoje" };
+      mine.ownerId = ship.ownerId;
+      mine.team = ship.team;
+      mine.armed = true;
+      if (order.timer !== undefined) mine.timer = Math.max(1, Math.min(4, Math.round(order.timer)));
+      ship.techPoints -= cost;
+      return { event: { ...base, techPoints: ship.techPoints, targetId: mine.id, timer: mine.timer } };
+    }
+    case "torpedo": {
+      const t = state.torpedoes.find((x) => x.id === order.torpedoId);
+      if (!t || !seen.torpedoes.some((x) => x.id === t.id)) return { error: "torpédo není v dohledu" };
+      const target = state.ships.find((x) => x.id === order.targetId && x.alive) ?? state.torpedoes.find((x) => x.id === order.targetId && x.id !== t.id);
+      if (!target) return { error: "cíl torpéda musí být loď nebo jiné torpédo" };
+      if (!seen.ships.some((x) => x.id === target.id) && !seen.torpedoes.some((x) => x.id === target.id)) return { error: "cíl není v dohledu" };
+      t.ownerId = ship.ownerId;
+      t.team = ship.team;
+      t.targetId = target.id;
+      t.targetPoint = undefined;
+      t.lost = false;
+      t.lifeLeft += HACK.torpedoLife;
+      t.trackLeft = Math.max(t.trackLeft, HACK.torpedoLife) + HACK.torpedoLife;
+      if (t.phase === "cruise") t.phase = "lock";
+      ship.techPoints -= cost;
+      return { event: { ...base, techPoints: ship.techPoints, targetId: t.id, victimId: target.id } };
+    }
+    case "module": {
+      const victim = state.ships.find((x) => x.id === order.shipId && x.alive);
+      if (!victim || victim.team === ship.team) return { error: "cíl musí být živá cizí loď" };
+      if (!seen.ships.some((x) => x.id === victim.id)) return { error: "loď není v dohledu" };
+      if (inStorm(state, victim)) return { error: "bouře ruší hack" };
+      const mod = victim.loadout.modules.find((m) => m.id === order.moduleId);
+      if (!mod) return { error: "takový modul loď nemá" };
+      if (!moduleWorking(mod)) return { error: "modul je už zničený" };
+      if (mod.hacked) return { error: "modul je už hacknutý" };
+      mod.hacked = true;
+      ship.techPoints -= cost;
+      return { event: { ...base, techPoints: ship.techPoints, victimId: victim.id, moduleId: mod.id, moduleType: mod.type } };
+    }
+    case "repair": {
+      if ((ship.autoRepair ?? 0) > 0) return { error: `pasivní oprava už běží (zbývá ${ship.autoRepair} kol)` };
+      ship.autoRepair = HACK.repairTurns;
+      ship.techPoints -= cost;
+      return { event: { ...base, techPoints: ship.techPoints } };
+    }
+  }
+}
+
 export function shieldRechargeBlocked(state: GameState, ship: Ship): string | undefined {
   if (ship.shieldType === "none" || !activeShieldModule(ship)) return "loď nemá funkční štít";
   if (inStorm(state, ship)) return "v bouři štít nefunguje";
@@ -2024,7 +2118,7 @@ export function applyShieldRecharge(state: GameState, ship: Ship, segments?: num
 
 /** Náhled kulometu: cíl (stejná pravidla jako vyhodnocení), šance zásahu projektilu a očekávané zranění. */
 export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: string, mgModuleId?: string): { targetId: string; x: number; y: number; hitChance: number; expectedDamage: number; shots: number; coverage: number } | undefined {
-  const mod = ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m) && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m));
+  const mod = ship.loadout.modules.find((m) => m.type === "mg" && moduleUsable(m) && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg" && moduleUsable(m));
   if (!mod) return undefined;
   const aim = aimPose(ship, mod);
   const mgR = mgRange(ship);
@@ -2054,7 +2148,7 @@ export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: stri
 
 /** Výseč kulometu pro náhled. */
 export function mgArcOf(ship: Ship, mgModuleId?: string): { x: number; y: number; heading: number; halfArc: number; range: number } {
-  const mod = ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m) && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg" && moduleWorking(m));
+  const mod = ship.loadout.modules.find((m) => m.type === "mg" && moduleUsable(m) && m.id === (mgModuleId ?? m.id)) ?? ship.loadout.modules.find((m) => m.type === "mg" && moduleUsable(m));
   const aim = aimPose(ship, mod);
   return { x: aim.x, y: aim.y, heading: aim.heading, halfArc: MG.halfArc, range: mgRange(ship) };
 }

@@ -105,6 +105,18 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
         lines.push(`${name(e.shipId)}: opravář ${what} (−${e.cost} technologie, zbývá ${e.techPoints}).`);
         break;
       }
+      case "hack": {
+        const mt = e.moduleType ? MODULES[e.moduleType]?.name ?? e.moduleType : "";
+        const what = e.kind === "mine" ? `hackl minu${e.timer !== undefined ? ` (odpočet ${e.timer === 1 ? "start kola" : `${e.timer - 1} ${e.timer - 1 === 1 ? "kolo" : "kola"}`})` : ""}` : e.kind === "torpedo" ? `hackl torpédo → nový cíl ${e.victimId ? name(e.victimId) : "?"}` : e.kind === "module" ? `hackl ${mt} lodi ${name(e.victimId ?? "")} (na toto kolo nefunguje)` : "zapnul pasivní opravu trupu";
+        lines.push(`${name(e.shipId)}: hacker ${what} (−${e.cost} technologie, zbývá ${e.techPoints}).`);
+        break;
+      }
+      case "hacked":
+        lines.push(`⚠ ${name(e.shipId)}: systém ${MODULES[e.moduleType]?.name ?? e.moduleType} byl na toto kolo HACKNUT – nefunguje.`);
+        break;
+      case "autoRepair":
+        lines.push(`${name(e.shipId)}: pasivní oprava trupu +${e.amount} → ${e.hullAfter}${e.turnsLeft > 0 ? ` (zbývá ${e.turnsLeft} kol)` : " (konec)"}.`);
+        break;
       case "scan":
         lines.push(e.mode === "ship" ? `${name(e.shipId)} skenoval ${e.targetId ? name(e.targetId) : "loď"}.` : e.mode === "deep" ? `${name(e.shipId)} provedl hluboký sken – mapa odkryta do konce kola.` : e.mode === "predict" ? `${name(e.shipId)} skenerem předpovídá manévry botů (${SCANNER.predictTurns} kola).` : `${name(e.shipId)} vynutil cooldown skeneru.`);
         break;
@@ -293,8 +305,13 @@ export class TurnAnimation {
         case "scan":
         case "droid":
         case "repair":
+        case "hack":
+        case "hacked":
         case "shieldRecharge":
           time = 0;
+          break;
+        case "autoRepair":
+          time = lastTime + 80;
           break;
         case "action":
           time = movePassed ? actionTime : 0;

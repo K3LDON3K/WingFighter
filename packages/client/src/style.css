@@ -5198,3 +5198,19 @@ body.drag-on * {
 .lo-wbar .wleg.ammo {
   background: repeating-linear-gradient(135deg, #fbbf24 0 3px, #94a3b8 3px 6px);
 }
+
+/* ---- okénko droida hackera ---- */
+.repair-pop.hack-pop {
+  background: #2a1038;
+  border-color: #f0abfc #4a044e #4a044e #f0abfc;
+}
+.repair-pop.hack-pop .rtab {
+  background: #4a044e;
+  border-color: #e879f9 #4a044e #4a044e #e879f9;
+}
+.repair-pop.hack-pop .rtab.on {
+  background: #e879f9;
+}
+.repair-pop .snote.warn {
+  color: #fbbf24;
+}

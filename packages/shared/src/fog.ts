@@ -63,7 +63,7 @@ export function stateForTeam(state: GameState, team: number, memory: AsteroidMem
   return {
     ...state,
     // cizí lodě přesně podle hranice dohledu (vraky se posílají vždy kvůli panelu hráčů; klient je mimo dohled nekreslí)
-    ships: state.ships.filter((s) => s.team === team || !s.alive || seenBy(eyes, s, s.stats.radius)),
+    ships: state.ships.filter((s) => s.team === team || !s.alive || seenBy(eyes, s, s.stats.radius)).map((s) => (s.team === team && s.loadout.modules.some((m) => m.hacked) ? { ...s, loadout: { ...s.loadout, modules: s.loadout.modules.map((m) => (m.hacked ? { ...m, hacked: undefined } : m)) } } : s)),
     torpedoes: state.torpedoes.filter((t) => t.team === team || seenBy(eyes, t, TORPEDO.radius)),
     mines: state.mines.filter((m) => m.team === team || seenBy(eyes, m, m.radius)),
     debris: (state.debris ?? []).filter((d) => seenBy(eyes, d, 12)),
@@ -181,7 +181,16 @@ export function resultForTeam(result: TurnResult, prev: GameState, team: number,
         if (visibleShip.has(e.shooterId) || seenBy(eyes, e, 20)) events.push(e);
         break;
       case "scan":
+      case "droid":
+      case "shieldRecharge":
+      case "repair":
+      case "autoRepair":
         if (visibleShip.has(e.shipId)) events.push(e);
+        break;
+      case "hack":
+      case "hacked":
+        // hack vidí jen tým hackera, zprávu o hacknutém modulu jen tým oběti
+        if (shipTeam(e.shipId) === team) events.push(e);
         break;
       case "credits":
         // kredity jsou veřejné (tabulka), ale důvod sestřelu vidí všichni stejně

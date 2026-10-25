@@ -144,6 +144,7 @@ export const MODULES: Record<ModuleType, ModuleDef> = {
   scanner: { id: "scanner", name: "Skener", short: "SKEN", icon: "scan", size: "small", weight: 1, price: 130, hp: 15, description: "Čerpá technologii lodi (6 bodů na celou bitvu, nedobíjí se). Sken lodi (1 bod): hned ukáže výbavu, natočení modulů, munici a pilota cizí lodi v dohledu. Hluboký sken (2 body): hned odkryje mapu celému týmu do konce kola. Nebere akci." },
   droid: { id: "droid", name: "Droid – pilot", short: "DROID", icon: "bot", size: "small", weight: 0.5, price: 140, hp: 15, description: "Palubní droid (čerpá technologii, nebere akci). Overdrive (3 body): v tomto kole manévry nestojí stres – oranžový i nebezpečný (červený) manévr jsou „bílé“ (nebezpečný bez ztráty trupu), úhyb bez stresu, otočka jen za 1 akci a rychlost ignoruje váhu (plná max. rychlost trupu). Autopilot (2 body): zelený manévr vrátí +2 stresové body místo +1. V bouři nefunguje." },
   repair: { id: "repair", name: "Droid – opravář", short: "OPRAV", icon: "wrench", size: "small", weight: 0.5, price: 140, hp: 15, description: "Palubní droid opravář (čerpá technologii, nebere akci, provádí se hned při plánování). Oprava modulu (4 body): plně opraví vybraný modul, i zničený. Munice (2 body): vyrobí 1 náboj do torpédometu nebo min. Oprava trupu (3 body): opraví 25 % maxima trupu. Instalace (1 bod): nasadí sebraný modul z nákladu do libovolného slotu; stojí-li tam modul, vymění se a jde do nákladu. Lze mít víc opravářů. V bouři nefunguje." },
+  hacker: { id: "hacker", name: "Droid – hacker", short: "HACK", icon: "hack", size: "small", weight: 0.5, price: 140, hp: 15, description: "Palubní droid hacker (čerpá technologii, nebere akci, provádí se hned při plánování, cíle v dohledu týmu). Hack miny/torpéda (2 body): mina se stane tvou (jde nastavit odpočet nebo odpálit na startu kola), torpédu určíš nový cíl a dostane +2 kola života. Hack modulu (3 body): vybraný modul cizí lodi na toto kolo nefunguje – zbraň nevystřelí, štít nechrání, droid/skener nejde použít; oběť se to dozví až při vyhodnocení. Pasivní oprava (4 body): 4 kola po 5 % trupu za kolo (jen když hacker funguje). V bouři nefunguje." },
   "shield-whole": { id: "shield-whole", name: "Energetický štít", short: "ENE", icon: "shield", size: "small", weight: 2, price: 120, hp: 40, shieldType: "whole", shields: 80, description: "Pole kolem celé lodi, zásoba 80, každé kolo +5. Laser pole jen vybíjí – do trupu nejde nic, dokud zásoba stačí. Projektil (torpédo, mina, kulomet, srážka) pole prorazí: 30 % zranění jde do trupu vždy. Dobití technologií: 3 body → +40 zásoby. Nelze kombinovat se segmentovým." },
 };
 export const MODULE_TYPES = Object.keys(MODULES) as ModuleType[];
@@ -162,6 +163,7 @@ export const MODULE_CATEGORY: Record<ModuleType, ModuleCategory> = {
   "shield-whole": "shield",
   droid: "droid",
   repair: "droid",
+  hacker: "droid",
   scanner: "tech",
 };
 export const CATEGORY_LABEL: Record<ModuleCategory, string> = { weapon: "Zbraně", shield: "Štíty", droid: "Droidi", tech: "Technologie" };
@@ -257,7 +259,7 @@ export function newModule(type: ModuleType, slot: SlotId, id?: string): ModuleIn
 
 /** Skenerový modul lodi (první). */
 export function scannerModule(loadout: ShipLoadout): ModuleInstance | undefined {
-  return loadout.modules.find((m) => m.type === "scanner" && moduleWorking(m));
+  return loadout.modules.find((m) => m.type === "scanner" && moduleUsable(m));
 }
 
 /** Životy modulů se ladí procentem základu. */
@@ -271,6 +273,10 @@ export function moduleHp(m: ModuleInstance): number {
 /** Modul funguje, dokud má životy. */
 export function moduleWorking(m: ModuleInstance): boolean {
   return moduleHp(m) > 0;
+}
+/** Modul jde v tomto kole použít: funguje a není hacknutý. */
+export function moduleUsable(m: ModuleInstance): boolean {
+  return moduleWorking(m) && !m.hacked;
 }
 export function moduleBroken(m: ModuleInstance): boolean {
   return !moduleWorking(m);

@@ -53,6 +53,11 @@ import {
   repairHullAmount,
   repairCost,
   botPredictActive,
+  HACK,
+  hackerModule,
+  hackBlocked,
+  hackCost,
+  type HackOrder,
   type RepairOrder,
   type SlotId,
   TEAM_COLORS,
@@ -99,6 +104,10 @@ export interface PlanningCallbacks {
   repairMode(shipId: string, kind: RepairOrder["kind"] | null): void;
   repairPickCargo(shipId: string, moduleId: string | null): void;
   repair(shipId: string, order: RepairOrder): void;
+  /** Droid – hacker: okénko, volba úkonu (zapne výběr cíle na mapě), zrušení výběru, provedení. */
+  hackToggle(shipId: string): void;
+  hackMode(shipId: string, kind: HackOrder["kind"] | null): void;
+  hack(shipId: string, order: HackOrder): void;
   /** Dobití štítu technologií: nabídka, výběr segmentu (+1 / −1), provést hned. */
   /** Okénko štítu: režim přesunu (akce) / dobití (technologie) / zavřít. */
   shieldMode(shipId: string, mode: "move" | "recharge" | "close"): void;
@@ -145,6 +154,10 @@ export interface PlanningModel {
   repairOpen?: boolean;
   repairKind?: RepairOrder["kind"] | null;
   repairCargoId?: string | null;
+  hackOpen?: boolean;
+  hackKind?: HackOrder["kind"] | null;
+  /** Vybraný cíl hacku na mapě: mina / torpédo / cizí loď (id). */
+  hackSel?: { kind: "mine" | "torpedo" | "ship"; id: string } | null;
   rechargeOpen?: boolean;
   rechargePick?: number[];
   scanPick?: boolean;
@@ -539,7 +552,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
     // skupina bez dostupných akcí se neukazuje; Loď = NÁKLAD (vyhodit / zvednout), Speciální = štít, skener, droid
     if (grp.label === "Loď" && ship.loadout.modules.length === 0) continue;
-    if (avail.length === 0 && grp.label !== "Loď" && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.loadout.modules.some((x) => x.type === "droid" || x.type === "repair") || ship.shieldType === "whole"))) continue;
+    if (avail.length === 0 && grp.label !== "Loď" && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.loadout.modules.some((x) => x.type === "droid" || x.type === "repair" || x.type === "hacker") || ship.shieldType === "whole"))) continue;
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
@@ -962,6 +975,98 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             h("span", { class: "lbl" }, label("Opravář")),
             stormed ? h("span", { class: "sb" }, "⚡") : null,
             rDestroyed ? h("span", { class: "dead-x" }, "✕") : null,
+          ),
+        );
+        row.append(holder);
+      }
+      // Droid – hacker: okénko s úkony; cíle se vybírají klikem na mapě (mina / torpédo / cizí loď)
+      const hasHacker = ship.loadout.modules.some((x) => x.type === "hacker");
+      if (hasHacker) {
+        const hDestroyed = !hackerModule(ship);
+        const why = hackBlocked(m.state, ship);
+        const tech = ship.techPoints;
+        const open = !!m.hackOpen && !why;
+        const holder = h("div", { class: "scan-holder stack" });
+        const kind = m.hackKind ?? null;
+        const sel = m.hackSel ?? null;
+        if (open) {
+          const pop = h("div", { class: `shield-pop repair-pop hack-pop ${popClass(`hack:${ship.id}`)}` });
+          const tabs = h("div", { class: "rtabs" });
+          const tab = (k: HackOrder["kind"], ic: string, name: string, avail: boolean, note: string, warn?: string) => {
+            const c = hackCost(k);
+            const can = avail && tech >= c;
+            tabs.append(
+              h(
+                "button",
+                { class: `px seg rtab ${kind === k ? "on" : ""}`, disabled: locked || !can, ...tipAttr({ icon: ic, iconColor: "#c084fc", title: `Hacker – ${name}`, fx: [], note, ...(tech < c ? { warn: "Nelze: nedostatek technologie." } : !avail ? { warn: warn ?? "Nelze." } : {}) }), onclick: () => cb.hackMode(ship.id, kind === k ? null : k) },
+                icon(ic, "currentColor", 16),
+                h("span", { class: "lbl" }, label(name)),
+                costPipsAll({ tech: c }, false, `${c} ${c === 1 ? "bod" : "body"} technologie`),
+              ),
+            );
+          };
+          const anyOrdnance = m.state.mines.length > 0 || m.state.torpedoes.length > 0;
+          const anyEnemy = m.state.ships.some((x) => x.alive && x.team !== ship.team);
+          const running = ship.autoRepair ?? 0;
+          tab("mine", "mine", "Mina / torpédo", anyOrdnance, `mina se stane tvou (jde nastavit odpočet nebo odpálit na startu kola); torpédu určíš nový cíl a dostane +${HACK.torpedoLife} kola života · ${HACK.ordnanceCost} body technologie`, "Nelze: v dohledu není žádná mina ani torpédo.");
+          tab("module", "scan", "Modul lodi", anyEnemy, `vybraný modul cizí lodi na toto kolo nefunguje (zbraň nevystřelí, štít nechrání, droid/skener nejde použít); oběť se to dozví až při vyhodnocení · ${HACK.moduleCost} body technologie`, "Nelze: v dohledu není cizí loď.");
+          tab("repair", "hull", "Pasivní oprava", running <= 0 && ship.hull < ship.stats.hull, `${HACK.repairTurns} kola po ${HACK.repairPct} % trupu za kolo (jen když hacker funguje) · ${HACK.repairCost} body technologie`, running > 0 ? `Nelze: oprava už běží (zbývá ${running} kol).` : "Nelze: trup je nepoškozený.");
+          pop.append(tabs);
+          const list = h("div", { class: "rlist" });
+          if (kind === "mine" || kind === "torpedo") {
+            if (!sel) list.append(h("div", { class: "warn snote" }, label("klikni na minu nebo torpédo v dohledu")));
+            else if (sel.kind === "mine") {
+              const mine = m.state.mines.find((x) => x.id === sel.id);
+              list.append(h("div", { class: "snote" }, icon("mine", "#fbbf24", 12), label(` mina ${mine?.team === ship.team ? "(vlastní)" : "(cizí)"} – odpočet:`)));
+              const opts = h("div", { class: "rslots" });
+              const opt = (name: string, timer: number | undefined, hint: string) => opts.append(h("button", { class: "px rslot free", disabled: locked, title: hint, onclick: () => cb.hack(ship.id, { kind: "mine", mineId: sel.id, timer }) }, h("span", { class: "lbl" }, label(name))));
+              opt("Odpálit na startu kola", 1, "vybuchne hned na začátku vyhodnocení tohoto kola");
+              opt("Za 1 kolo", 2, "vybuchne na začátku příštího kola");
+              opt("Za 2 kola", 3, "vybuchne na začátku přespříštího kola");
+              opt("Reakční (nechat)", undefined, "mina přejde k tobě a reaguje na vstup nepřítele (odpočet beze změny)");
+              list.append(opts);
+            } else {
+              list.append(h("div", { class: "warn snote" }, icon("torpedo", "#fb923c", 12), label(" torpédo vybráno – klikni na nový cíl (loď nebo torpédo)")), h("button", { class: "px tiny", title: "Jiné torpédo", onclick: () => cb.hackMode(ship.id, "mine") }, "✕"));
+            }
+          } else if (kind === "module") {
+            if (!sel || sel.kind !== "ship") list.append(h("div", { class: "warn snote" }, label("klikni na cizí loď v dohledu")));
+            else {
+              const victim = m.state.ships.find((x) => x.id === sel.id);
+              if (!victim) list.append(h("div", { class: "muted snote" }, label("loď už není v dohledu")));
+              else {
+                list.append(h("div", { class: "snote" }, label(`${victim.name ?? "loď"} – který modul vypnout:`), h("button", { class: "px tiny", title: "Jiná loď", onclick: () => cb.hackMode(ship.id, "module") }, "✕")));
+                const slotName = (id: SlotId) => hullOf(victim.loadout).slots.find((x) => x.id === id)?.name ?? id;
+                for (const x of victim.loadout.modules) {
+                  const def = MODULES[x.type];
+                  const broken = moduleHp(x) <= 0;
+                  list.append(h("button", { class: `px rmod ${broken || x.hacked ? "broken" : ""}`, disabled: locked || broken || !!x.hacked, title: broken ? `${def.name}: už zničený` : x.hacked ? `${def.name}: už hacknutý` : `${def.name} (${slotName(x.slot)}): vypnout na toto kolo za ${HACK.moduleCost} body technologie`, onclick: () => cb.hack(ship.id, { kind: "module", shipId: victim.id, moduleId: x.id }) }, icon(def.icon, broken ? "#fca5a5" : "#e2e8f0", 14), h("span", { class: "lbl" }, label(def.short)), h("span", { class: "rx" }, label(x.hacked ? "hacknut" : broken ? "zničen" : slotName(x.slot)))));
+                }
+              }
+            }
+          } else if (kind === "repair") {
+            const add = Math.min(Math.max(1, Math.round((ship.stats.hull * HACK.repairPct) / 100)), ship.stats.hull - ship.hull);
+            list.append(
+              h("div", { class: "snote" }, label(`trup ${ship.hull} / ${ship.stats.hull} · +${Math.max(0, add)} za kolo, ${HACK.repairTurns} kola`)),
+              h("button", { class: "px seg stab on go", disabled: locked, onclick: () => cb.hack(ship.id, { kind: "repair" }) }, label("Zapnout opravu"), costPipsAll({ tech: HACK.repairCost }, false, `${HACK.repairCost} body technologie`)),
+            );
+          } else list.append(h("div", { class: "muted snote" }, label(running > 0 ? `vyber úkon · pasivní oprava běží (zbývá ${running} kol)` : "vyber úkon")));
+          pop.append(list, h("div", { class: "muted snote" }, label(`technologie ${tech}/${ship.stats.techMax} · nebere akci · provede se hned`)));
+          holder.append(pop);
+        }
+        holder.append(
+          h(
+            "button",
+            {
+              class: `px bb-weapon droid-btn ${open ? "on" : ""} ${stormed ? "stormed" : ""} ${hDestroyed ? "destroyed" : ""}`,
+              disabled: locked || !!why,
+              ...tipAttr({ icon: "hack", iconColor: "#c084fc", title: "Droid – hacker", fx: [], note: `technologie ${tech}/${ship.stats.techMax} · nebere akci · provede se hned · v bouři nefunguje${(ship.autoRepair ?? 0) > 0 ? ` · pasivní oprava běží (${ship.autoRepair} kol)` : ""}`, ...(hDestroyed ? { warn: "ZNIČENO – modul nefunguje" } : why ? { warn: `Nelze: ${why}.` } : {}) }),
+              onclick: () => cb.hackToggle(ship.id),
+            },
+            icon("hack", "currentColor", 22),
+            h("span", { class: "lbl" }, label("Hacker")),
+            (ship.autoRepair ?? 0) > 0 ? h("span", { class: "reset-strip" }, label(`oprava ${ship.autoRepair}`)) : null,
+            stormed ? h("span", { class: "sb" }, "⚡") : null,
+            hDestroyed ? h("span", { class: "dead-x" }, "✕") : null,
           ),
         );
         row.append(holder);

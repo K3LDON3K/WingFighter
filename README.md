@@ -93,7 +93,14 @@ hned při plánování (libovolný počet, i víc opravářů na lodi). Oprava m
 zničený. Munice (2): vyrobí 1 náboj do torpédometu nebo min (jen do plného zásobníku). Oprava trupu (3): +25 %
 maxima trupu (ladění → „Opravář – oprava trupu“), ne přes maximum. Instalace (1): nasadí modul z nákladu do
 libovolného slotu; stojí-li tam modul, vymění se a jde do nákladu. V bouři nefunguje. Boti ho používají (zničený
-modul, slabý trup, prázdná munice).
+modul, slabý trup, prázdná munice). **Droid – hacker** (140 cr, váha 0,5, 15 HP): čerpá technologii, nebere akci,
+úkony hned při plánování, cíle v dohledu týmu, v bouři nefunguje. Hack miny / torpéda (2): klik na minu v dohledu →
+mina je tvá (odpálit na startu kola / za 1 kolo / za 2 kola / nechat reakční); klik na torpédo a pak na nový cíl
+(loď nebo torpédo) → torpédo je tvé, letí na nový cíl a má +2 kola života. Hack modulu (3): klik na cizí loď → seznam
+jejích modulů → vybraný modul na toto kolo nefunguje (zbraň nevystřelí, štít nechrání, droid/skener nejde použít);
+oběť to při plánování nevidí, dozví se to až při vyhodnocení („systém byl na toto kolo HACKNUT“). Pasivní oprava (4):
+4 kola po 5 % maxima trupu za kolo, jen když hacker funguje; nejde zapnout, dokud běží. Ceny, procenta i počet kol
+jsou v ladění (Akce a stres).
 Pilot: zatím jen **Kadet** (bez schopností).
 
 **Nákup:** v místnosti má každý rozpočet (ladění → Ekonomika, výchozí 500) a kupuje moduly; host může omezit
@@ -167,6 +174,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.144 – **Nový modul Droid – hacker** (140 cr, váha 0,5, 15 HP, kategorie Droidi): hack miny/torpéda (2 body technologie) – mina přejde k tobě (volba odpočtu: start kola / 1 kolo / 2 kola / reakční), torpédu určíš nový cíl a dostane +2 kola života; hack modulu cizí lodi (3) – vybraný modul na toto kolo nefunguje (zbraň nevystřelí, štít nechrání, droid/skener nejde použít), oběť to zjistí až při vyhodnocení z logu; pasivní oprava trupu (4) – 4 kola po 5 % za kolo, jen když hacker funguje. Vše hned při plánování, bez limitu počtu, nebere akci, cíle v dohledu týmu, v bouři ne. Dlaždice HACKER s okénkem (MINA / TORPÉDO → klik na mapě, MODUL LODI → klik na loď → seznam modulů, PASIVNÍ OPRAVA). Ladění: ceny, % a počet kol. Oprava: zprávy o dobití štítu, droidovi a opraváři se dřív v logu nezobrazovaly (mlha války je zahazovala).
 - v3.143 – Výbava: v pruhu „Váha a rychlost“ jsou přímo moduly – každý zabírá šířku podle své váhy (barva kategorie, ikona a zkratka), munice jako žlutě šrafovaná část bloku, modul z nákladu průhlednější; bublina ukáže „modul 1 + munice 3 (3 × 1) = 4“. Pod bloky zůstává barevná linka podle výsledné max. rychlosti, žluté značky prahů rychlosti zůstávají.
 - v3.142 – **Mlha války přesně po hranici dohledu.** Cizí lodě se už neposílají 160 jednotek před hranicí (nevplouvají, objeví se až v dohledu – i jejich jmenovky), komety jen když je v dohledu jádro nebo kus ocasu, bouře jen když je v dohledu aspoň část mraku; torpéda, miny a trosky byly jen v dohledu už dřív. Paměť asteroidů zůstává.
 - v3.141 – Komety mají náhodnou rychlost: každá nová kometa dostane 80–120 % základní rychlosti (zaokrouhleno na 10); rozptyl je v ladění → Komety „Rozptyl rychlosti (± %)“. Bublina komety na mapě ukazuje její skutečnou rychlost.

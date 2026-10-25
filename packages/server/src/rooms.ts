@@ -10,6 +10,7 @@ import {
   MAX_TEAMS_TDM,
   planBot,
   plannedPaths,
+  applyHack,
   applyRepair,
   botPredictActive,
   applyShieldRecharge,
@@ -788,6 +789,27 @@ export class Hub {
         if (!ord || typeof ord !== "object" || !["module", "ammo", "hull", "install"].includes((ord as { kind?: string }).kind ?? "")) return this.error(client, "Opravář: neplatný úkon.");
         const res = applyRepair(g.state, ship, ord);
         if (res.error) return this.error(client, `Opravář: ${res.error}.`);
+        g.pendingEvents.push(res.event!);
+        for (const m of room.members.values()) {
+          if (m.isBot) continue;
+          const c = this.clients.get(m.id);
+          if (!c) continue;
+          const t = teamOf(g, m.id);
+          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room) });
+        }
+        return;
+      }
+      case "hack": {
+        if (!room?.game) return;
+        const g = room.game;
+        if (g.state.status === "finished") return;
+        const ship = g.state.ships.find((x) => x.id === msg.shipId && x.ownerId === client.id && x.alive);
+        if (!ship) return this.error(client, "Hacker: to není tvoje loď.");
+        const ord = msg.order;
+        if (!ord || typeof ord !== "object" || !["mine", "torpedo", "module", "repair"].includes((ord as { kind?: string }).kind ?? "")) return this.error(client, "Hacker: neplatný úkon.");
+        const team = teamOf(g, client.id);
+        const res = applyHack(g.state, stateForTeam(g.state, team, memoryFor(g, team)), ship, ord);
+        if (res.error) return this.error(client, `Hacker: ${res.error}.`);
         g.pendingEvents.push(res.event!);
         for (const m of room.members.values()) {
           if (m.isBot) continue;

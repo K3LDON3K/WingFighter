@@ -72,6 +72,13 @@ export interface ShipOrders {
   repair?: RepairOrder[];
 }
 
+/** Úkon droida hackera (provádí se hned, platí se technologií). */
+export type HackOrder =
+  | { kind: "mine"; mineId: string; timer?: number }
+  | { kind: "torpedo"; torpedoId: string; targetId: string }
+  | { kind: "module"; shipId: string; moduleId: string }
+  | { kind: "repair" };
+
 /** Úkon droida opraváře (provádí se hned, platí se technologií). */
 export type RepairOrder =
   | { kind: "module"; moduleId: string }
@@ -94,7 +101,7 @@ export interface DroidOrder {
 /** Sloty stíhače. */
 /** Sloty: stíhač příď/záď/levobok/pravobok; bitevník navíc levá a pravá gondola. */
 export type SlotId = "front" | "back" | "left" | "right" | "podLeft" | "podRight";
-export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg" | "droid" | "repair";
+export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg" | "droid" | "repair" | "hacker";
 
 /** Trup lodi – nese moduly ve slotech. */
 export interface HullDef {
@@ -192,6 +199,8 @@ export interface ModuleInstance {
   off?: boolean;
   /** Požadavek na opravu zničeného modulu v obchodě (platí se % ceny; po zpracování se smaže). */
   repair?: boolean;
+  /** Hacknutý na toto kolo (droid hacker protivníka): nevystřelí / nechrání / nejde použít. Vlastní tým to nevidí. */
+  hacked?: boolean;
   /** Zastaralé (skener dřív míval náboje a cooldown; teď čerpá technologii lodi). */
   charges?: number;
   cooldown?: number;
@@ -247,6 +256,8 @@ export interface Ship extends Pose {
   techPoints: number;
   /** Kolo, ve kterém byl štít naposledy dobit technologií (1× za kolo). */
   shieldRechargedTurn?: number;
+  /** Pasivní oprava trupu (droid hacker): kolik kol ještě opravuje. */
+  autoRepair?: number;
   /** Rychlost posledního manévru (prudká změna o 2+ = červený manévr). */
   speed: number;
   tokens: { focus: number; evade: number };
@@ -539,6 +550,10 @@ export type TurnEvent =
   | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown" | "predict"; targetId?: string }
   /** Droid – pilot aktivoval funkce (technologie odečtena). */
   | { type: "droid"; shipId: string; overdrive: boolean; autopilot: boolean; cost: number; techPoints: number }
+  | { type: "hack"; shipId: string; kind: HackOrder["kind"]; cost: number; techPoints: number; targetId?: string; victimId?: string; moduleId?: string; moduleType?: ModuleType; timer?: number }
+  /** Oběti: modul byl na toto kolo hacknut (hlásí se při vyhodnocení). */
+  | { type: "hacked"; shipId: string; moduleId: string; moduleType: ModuleType }
+  | { type: "autoRepair"; shipId: string; amount: number; hullAfter: number; turnsLeft: number }
   | { type: "repair"; shipId: string; kind: RepairOrder["kind"]; cost: number; techPoints: number; moduleId?: string; moduleType?: ModuleType; amount?: number; slot?: SlotId; swappedType?: ModuleType; hullAfter?: number }
   /** Dobití štítu technologií (hned při plánování): energetický +amount, segmentový +segments po segmentech. */
   | { type: "shieldRecharge"; shipId: string; cost: number; techPoints: number; amount?: number; segments?: Segments; shieldsAfter: number; segmentsAfter: Segments }

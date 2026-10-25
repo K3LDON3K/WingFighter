@@ -1,6 +1,6 @@
 import type { Tuning } from "./tuning.ts";
 import type { SeriesState } from "./series.ts";
-import type { BotLevel, GameSettings, GameState, PilotDef, RepairOrder, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
+import type { BotLevel, GameSettings, GameState, HackOrder, PilotDef, RepairOrder, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
 
 /** Stav místnosti v lobby. */
 export interface RoomPlayer {
@@ -94,6 +94,8 @@ export type ClientMessage =
   | { type: "rechargeShield"; shipId: string; segments?: number[] }
   /** Droid – opravář: úkon (hned, nebere akci, platí se technologií). */
   | { type: "repair"; shipId: string; order: RepairOrder }
+  /** Droid – hacker: úkon (hned, nebere akci, platí se technologií; cíle v dohledu týmu). */
+  | { type: "hack"; shipId: string; order: HackOrder }
   | { type: "unready" }
   | { type: "backToLobby" };
 
