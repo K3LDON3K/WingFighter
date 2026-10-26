@@ -36,7 +36,7 @@
     "group": "Prvky na mapě",
     "title": "Vizuální prvky bez efektů",
     "text": "Vzdálené paralaxní pozadí (galaxie, mlhoviny, planety; 4 motivy volitelné v nastavení mapy) – hotovo ve v3.104. Další dekorace (vraky, trosky) později.",
-    "status": "done",
+    "status": "later",
     "done": true
   },
   {
@@ -44,7 +44,7 @@
     "group": "Zpětná vazba",
     "title": "Zpětná vazba po zápase",
     "text": "Po dokončení zápasu může hráč napsat zpětnou vazbu; admin ji uvidí v roadmapě jako seznam zpráv.",
-    "status": "next",
+    "status": "later",
     "done": false
   },
   {
@@ -53,7 +53,8 @@
     "title": "Droid Hacker",
     "text": "",
     "status": "mid",
-    "done": false
+    "done": true,
+    "doneAt": "2026-10-26"
   },
   {
     "id": "stredni-lod",
@@ -61,7 +62,8 @@
     "title": "Střední loď",
     "text": "",
     "status": "mid",
-    "done": false
+    "done": true,
+    "doneAt": "2026-10-26"
   },
   {
     "id": "mapa-budovy",
