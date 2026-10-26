@@ -628,7 +628,7 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     if (!man || !canAfford(ship, man, { droid })) man = resolveManeuver(profile, def.maneuverId, ship.speed)!;
 
     let action: ActionOrder | undefined;
-    if (raw.action?.type === "evade") action = ship.stressPoints >= effEvadeCost({ droid }) && man.speed > 0 ? { type: "evade" } : undefined;
+    if (raw.action?.type === "evade") action = ship.stressPoints >= effEvadeCost({ droid }) && man.speed > 0 && ship.loadout.hullId !== "battleship" ? { type: "evade" } : undefined;
     else if (raw.action?.type === "shield") action = validShieldAction(ship, raw.action.segments) ? { type: "shield", segments: raw.action.segments.map((n) => Math.round(Number(n))) as Segments } : undefined;
     else if (raw.action?.type === "jettison") {
       const wantedId = raw.action.moduleId;

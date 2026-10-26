@@ -1963,7 +1963,7 @@ function chooseIcon(shipId: string, id: string) {
   if (a.id === "jettison") g.jettisonPick = false; // výběr modulu probíhá v okénku nad tlačítkem
   if (a.id === "jettison" || a.id === "pickup") g.cargoOpen = true;
   g.minePick = a.id === "mine" && next.special?.type === "mine" ? "timer" : null;
-  g.turnPick = a.id === "turn" && next.action?.type === "turn";
+  g.turnPick = a.id === "koiogran" && next.action?.type === "turn";
   renderSide();
 }
 

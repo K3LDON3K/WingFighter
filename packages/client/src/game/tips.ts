@@ -27,6 +27,20 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
       };
     }
     case "koiogran":
+      if (ship.speed === 0)
+        return {
+          icon: "center",
+          iconColor: "#e2e8f0",
+          title: "Otočit na místě",
+          cost: { actions: 1 },
+          fx: [
+            { icon: "ship", text: "stojící loď se otočí do libovolného směru (klik na mapě)" },
+            { icon: "clock", text: "platí od začátku kola – i pro střelbu", tone: "good" },
+            { icon: "stress", text: "bez stresu", tone: "good" },
+          ],
+          note: "pak může vyrazit: stíhač na 1 (zelený) nebo 2 (oranžový), bitevník na 1",
+          ...w,
+        };
       return {
         icon: "turn",
         iconColor: "#e2e8f0",
@@ -196,6 +210,20 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
           { icon: "clock", text: "proběhne hned", tone: "good" },
         ],
         note: "nebere akci",
+        ...w,
+      };
+    case "stop":
+      return {
+        icon: "stop",
+        iconColor: "#e2e8f0",
+        title: "Zastavit",
+        cost: { actions: 1 },
+        fx: [
+          { icon: "speed", text: "rychlost 0 – jen z rychlosti 1" },
+          { icon: "turn", text: "stojící loď: OTOČKA = otočení na místě (1 akce)" },
+          { icon: "evade", text: "bez úhybu a otočky 180°", tone: "bad" },
+        ],
+        note: "rozjezd: stíhač na 1 (zelený) nebo 2 (oranžový), bitevník na 1",
         ...w,
       };
     case "scan-predict":

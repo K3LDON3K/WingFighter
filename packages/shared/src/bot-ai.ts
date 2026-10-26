@@ -422,7 +422,7 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
     for (const s of shots) opts.push({ value: s.value, kind: "shot", apply: () => orders.shots!.push(s.shot) });
     const incoming = incomingNow(state, ship, enemies);
     // úhyb: vyplatí se při silné palbě; stojí stres (ne při overdrive)
-    if (incoming >= 12 && ship.stressPoints > (overdrive ? 0 : RULES.evadeStressCost)) {
+    if (incoming >= 12 && ship.stressPoints > (overdrive ? 0 : RULES.evadeStressCost) && ship.loadout.hullId !== "battleship" && chosen.man.speed > 0) {
       opts.push({ value: incoming * 0.45, kind: "action", apply: () => (orders.action = { type: "evade" }) });
     }
     // štít: přesunout segmenty k hrozbě

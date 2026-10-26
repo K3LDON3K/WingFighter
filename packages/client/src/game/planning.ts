@@ -197,12 +197,12 @@ const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: 
 /** Kategorie akcí v liště: zbraně · pohyb · speciální. */
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
-  { label: "Pohyb", ids: ["move", "turn", "evade", "koiogran"] },
+  { label: "Pohyb", ids: ["move", "stop", "evade", "koiogran"] },
   { label: "Loď", ids: [] },
   { label: "Speciální", ids: ["shield"] },
 ];
 const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
-const ACTION_ICON: Record<string, string> = { pickup: "cargo", move: "pen", turn: "center", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
+const ACTION_ICON: Record<string, string> = { pickup: "cargo", move: "pen", stop: "stop", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
   if (koiogran) return "⟲";
@@ -689,16 +689,17 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           },
           (() => {
             // cena ve všech surovinách: otočka 2 akce + stres oranžového manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
-            const manStress = a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : 0;
-            const c = { actions: a.id === "koiogran" ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
+            const turnInPlace = a.id === "koiogran" && ship.speed === 0;
+            const manStress = turnInPlace ? 0 : a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : 0;
+            const c = { actions: a.id === "koiogran" && !turnInPlace ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];
             if (c.stress > 0) parts.push(`${c.stress} stres`);
             if (c.stress < 0) parts.push(`vrací ${-c.stress} stres`);
             // během kreslení manévru (aiming) ukazujeme cenu bez fajfek – zaplaceno je až po potvrzení
             return costPipsAll(c, dots > 0 && !(isMove && aiming), `stojí ${parts.join(" + ")}${a.id === "move" ? " (rovně stejnou rychlostí zdarma)" : ""}`);
           })(),
-          icon(isMove && aiming ? "check" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
-          h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
+          icon(isMove && aiming ? "check" : a.id === "koiogran" && ship.speed === 0 ? "center" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
+          h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.id === "koiogran" && ship.speed === 0 ? "Otočit" : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
           done ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
           destroyed ? h("span", { class: "dead-x" }, "✕") : null,
