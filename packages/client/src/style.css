@@ -5254,3 +5254,30 @@ body.drag-on * {
   font-family: var(--txt);
   font-size: 11px;
 }
+
+/* ---- výzbroj s mnoha moduly (> 4): kompaktní řádky ---- */
+.bb-ammo.compact {
+  gap: 2px !important;
+}
+.bb-ammo.compact .ammo-row {
+  height: 14px;
+  gap: 4px;
+}
+.bb-ammo.compact .mod-hpv {
+  height: 14px;
+}
+.bb-ammo.compact .wtile {
+  width: 18px;
+  height: 14px;
+}
+.bb-ammo.compact .wtile .wfac {
+  top: -5px;
+  font-size: 8px;
+}
+.bb-ammo.compact .ammo-icons .inf {
+  font-size: 12px;
+}
+.bb-ammo .ammo-num {
+  font-family: var(--txt);
+  font-size: 11px;
+}

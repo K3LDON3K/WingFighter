@@ -492,7 +492,9 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   /* ---- 1b. výzbroj: munice každého modulu ---- */
   // všechny moduly: zbraně s municí, ostatní jen se stavem; každý má ukazatel životů (zničený = červený, nefunguje)
   const ammoMods = [...ship.loadout.modules].sort((a, b) => Number(b.ammo !== undefined || b.type === "laser") - Number(a.ammo !== undefined || a.type === "laser"));
-  const weapons = h("div", { class: "pnl bb-ammo" }, h("div", { class: "ttl" }, label("Výzbroj")));
+  // víc než 4 moduly: kompaktní řádky (nižší dlaždice, munice číslem), aby se vešly všechny
+  const many = ammoMods.length > 4;
+  const weapons = h("div", { class: `pnl bb-ammo ${many ? "compact" : ""}` }, h("div", { class: "ttl" }, label("Výzbroj")));
   if (ammoMods.length === 0) weapons.append(h("div", { class: "muted txt" }, "bez modulů"));
   const counters: Record<string, number> = {};
   const typeCount: Record<string, number> = {};
@@ -527,6 +529,10 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         const lit = Math.round((left / Math.max(1, max)) * 10);
         for (let i = 0; i < 10; i++) icons.append(h("i", { class: `mgpip ${i < lit ? "on" : ""}` }));
       } else if (md.ammo !== undefined) for (let i = 0; i < max; i++) icons.append(icon(def.icon, i < left ? "#f87171" : "#334155", 10));
+    }
+    if (many && !broken && md.ammo !== undefined && md.type !== "laser") {
+      // kompaktní řádek: munice číslem místo ikon
+      icons.replaceChildren(h("span", { class: "ammo-num", style: `color:${left === 0 ? "#f87171" : "#e2e8f0"}` }, `${left}/${max}`));
     }
     weapons.append(h("div", { class: `ammo-row ${broken ? "broken" : ""}`, title: `${nameFull}\n${hpTxt}${ammoTxt ? `\n${ammoTxt}` : ""}` }, hpGauge(md), tile, icons));
   }
