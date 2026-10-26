@@ -4723,10 +4723,18 @@ button.start-chip.on:hover:not(:disabled) {
 }
 /* okénka Vyhodit / Zvednout: širší, nákres lodi v plné čitelné velikosti */
 .jettison-pop,
-.cargo-pop {
+.cargo-pop.wide {
   width: 460px;
+}
+.jettison-pop,
+.cargo-pop {
   padding: 10px 12px 8px;
   gap: 8px;
+}
+.cargo-pop {
+  width: max-content;
+  min-width: 180px;
+  max-width: 460px;
 }
 .jettison-pop .loadout.compact,
 .cargo-pop .loadout.compact {
@@ -4870,8 +4878,9 @@ button.start-chip.on:hover:not(:disabled) {
   gap: 6px;
 }
 .bb-maneuver .qbtn {
-  width: 18px;
+  width: 22px;
   height: 18px;
+  margin: 2px auto 0;
   padding: 0;
   font-size: 11px;
   line-height: 1;

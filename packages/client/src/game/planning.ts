@@ -251,7 +251,7 @@ function maneuverHelp(ship: Ship): HTMLElement {
     "div",
     { class: "mhelp" },
     h("h4", {}, label("Dráha")),
-    h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 0–5 rychlost zamknou, K = otočka, mezerník potvrdí."), li(`Zastavení: rychlost 0 jde zvolit z rychlosti 1 (bílé)${prof.stopMax >= 2 ? ", stíhač i z rychlosti 2 (oranžové, 1 stres)" : ""} – tlačítko ZASTAVIT, klávesa 0 nebo myš těsně u lodi. Stojící loď nemůže uhýbat ani dělat otočku; může se ale za 1 akci otočit na místě do libovolného směru (OTOČIT) a pak vyrazit: ${prof.startMax >= 2 ? "stíhač na 1 (zelený) nebo rovnou na 2 (oranžový)" : "bitevník jen na 1"}.`)),
+    h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 0–5 rychlost zamknou, K = otočka, mezerník potvrdí."), li(`Zastavení: ZASTAVIT bez nakreslené dráhy zastaví hned (z rychlosti 1 bílé${prof.stopMax >= 2 ? ", stíhač i z 2 oranžově +1 stres" : ""}; také klávesa 0 nebo myš těsně u lodi). Nakreslíš-li nejdřív dráhu a pak stiskneš ZASTAVIT, loď ji proletí a na jejím konci zastaví (dráha rychlostí 1 bílé${prof.stopMax >= 2 ? ", rychlostí 2 oranžové" : ""}; 1 akce navíc, duch má odznak ■, panel ukáže „2 → 0“).`), li(`Stojící loď nemůže uhýbat ani dělat otočku 180°; tlačítkem OTOČKA (= OTOČIT) se za 1 akci otočí na místě do libovolného směru (myš: loď se otáčí za kurzorem, klik potvrdí; dotyk: táhni prstem po mapě) – i v kole, kdy právě zastavila – a pak vyrazí: ${prof.startMax >= 2 ? "stíhač na 1 (zelený) nebo rovnou na 2 (oranžový)" : "bitevník jen na 1"}.`), ship.loadout.hullId === "battleship" ? li("Bitevník úhybný manévr neumí.") : null),
     h("h4", {}, label("Rychlost")),
     h("ul", {}, li(`${HULLS[ship.loadout.hullId]?.name ?? "Loď"}: 1–${hullProf.maxSpeed}; tvoje loď teď max. ${prof.maxSpeed} (váha výbavy: každých ${WEIGHT.perSpeed} váhy = −1; overdrive droida váhu ignoruje).`), li(`Otočka o 180° jde jen z rychlosti ${prof.koiogranSpeeds.length ? `${Math.min(...prof.koiogranSpeeds)}–${Math.max(...prof.koiogranSpeeds)}` : "–"}, stojí 2 akce (s overdrivem 1) a po ní rychlost klesne o ${RULES.koiogranSpeedDrop}.`)),
     h("h4", {}, label("Úhel")),
@@ -278,7 +278,7 @@ function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLEle
   return h(
     "div",
     { class: "pnl bb-maneuver" },
-    h("div", { class: "ttl man-ttl" }, label("Manévr"), h("button", { class: "px tiny qbtn", title: "Nápověda: rychlosti, úhly a barvy manévrů", onclick: () => infoDialog({ title: "Manévry – nápověda", body: maneuverHelp(ship), wide: true }) }, "?")),
+    h("div", { class: "ttl man-ttl" }, label("Manévr")),
     h(
       "div",
       { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] : "Neplatný manévr" },
@@ -288,6 +288,7 @@ function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLEle
     h("div", { class: "man-angle" }, `${Math.abs(cur.angle)}°${cur.koiogran ? " +180°" : ""}`),
     h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && maneuverStress(man) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
     h("div", { class: "spacer" }),
+    h("button", { class: "px tiny qbtn", title: "Nápověda: rychlosti, úhly, barvy manévrů, zastavení a otočení", onclick: () => infoDialog({ title: "Manévry – nápověda", body: maneuverHelp(ship), wide: true }) }, "?"),
     h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
   );
 }
@@ -759,7 +760,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         ),
       );
       if (m.cargoOpen && !locked) {
-        const pop = h("div", { class: `cargo-pop ${popClass(`cargo:${ship.id}`)}` }, h("div", { class: "cargo-tabs" }, sub(jet, jetOn, whyJet, "Vyhodit"), sub(pick, pickOn, whyPick, "Zvednout")));
+        const pop = h("div", { class: `cargo-pop ${jetOn ? "wide" : ""} ${popClass(`cargo:${ship.id}`)}` }, h("div", { class: "cargo-tabs" }, sub(jet, jetOn, whyJet, "Vyhodit"), sub(pick, pickOn, whyPick, "Zvednout")));
         if (jetOn) {
           const curId = o.action?.type === "jettison" ? o.action.moduleId : undefined;
           const chosen = ship.loadout.modules.find((x) => x.id === curId) ?? (ship.loadout.cargo ?? []).find((x) => x.id === curId);
