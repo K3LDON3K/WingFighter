@@ -33,6 +33,13 @@ export function shipsOverlap(a: Pose, ca: Collider[], b: Pose, cb: Collider[]): 
   return shipCircles(a, ca).some((k) => bc.some((m) => circlesOverlap(k, k.r, m, m.r)));
 }
 
+/** Překryv lodí; loď se štítem se počítá jako kruh štítu (`shieldR` = poloměr štítu kolem středu), bez štítu kolizní kruhy trupu. */
+export function shipsOverlapPadded(a: Pose, ca: Collider[], shieldRA: number | null, b: Pose, cb: Collider[], shieldRB: number | null): boolean {
+  const ac = shieldRA !== null ? [{ x: a.x, y: a.y, r: shieldRA }] : shipCircles(a, ca);
+  const bc = shieldRB !== null ? [{ x: b.x, y: b.y, r: shieldRB }] : shipCircles(b, cb);
+  return ac.some((k) => bc.some((m) => circlesOverlap(k, k.r, m, m.r)));
+}
+
 export function shipHitsAsteroid(a: Asteroid, p: Pose, cols: Collider[]): boolean {
   return shipCircles(p, cols).some((k) => circleHitsAsteroid(a, k, k.r));
 }

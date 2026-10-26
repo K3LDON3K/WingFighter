@@ -12,6 +12,7 @@ import {
   MG,
   RULES,
   SCANNER,
+  SHIELD_GAP,
   STATION,
   DROID,
   HACK,
@@ -34,7 +35,7 @@ import {
   type Pose,
   type Vec,
 } from "./geometry.ts";
-import { makeManeuver, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
+import { listManeuvers, makeManeuver, maneuverId, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
 import { activeShield, allowedFacings, cargoCapacity, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleUsable, moduleWorking, MODULES, MODULE_CATEGORY, MODULE_TYPES, newModule, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
@@ -131,7 +132,7 @@ import type {
   TurnEvent,
   TurnResult,
 } from "./types.ts";
-import { boundingRadius, shipCircles, shipHitsAsteroid, shipHitsCircle, shipInsideMap, shipsOverlap } from "./colliders.ts";
+import { boundingRadius, shipCircles, shipHitsAsteroid, shipHitsCircle, shipInsideMap, shipsOverlap, shipsOverlapPadded } from "./colliders.ts";
 
 /* ------------------------------------------------------------------ */
 /* Pomocné                                                              */
@@ -494,16 +495,17 @@ export function canAfford(ship: Ship, man: Maneuver, o?: Pick<ShipOrders, "droid
 /** Výchozí rozkaz (bez akcí): stejná rychlost rovně, nestřílí. */
 export function defaultOrders(ship: Ship): ShipOrders {
   const profile = profileOf(ship.loadout);
-  const candidates = [ship.speed, 2, ship.speed - 1, ship.speed + 1, 1, 3];
+  const candidates = [ship.speed, 2, ship.speed - 1, ship.speed + 1, 1, 3, 0];
   for (const sp of candidates) {
     const man = makeManeuver(profile, sp, 0, false, ship.speed);
     if (man && canAfford(ship, man)) return { shipId: ship.id, maneuverId: man.id, shots: [] };
   }
-  return { shipId: ship.id, maneuverId: makeManeuver(profile, 1, 0, false, ship.speed)!.id, shots: [] };
+  const any = listManeuvers(profile, ship.speed).find((m) => !m.koiogran) ?? listManeuvers(profile, ship.speed)[0];
+  return { shipId: ship.id, maneuverId: any?.id ?? maneuverId(Math.max(0, Math.min(profile.maxSpeed, ship.speed)), 0), shots: [] };
 }
 
 /** Rozpis akcí rozkazu (každá stojí 1 bod). */
-export type ActionId = "move" | "koiogran" | "laser" | "mg" | "torpedo" | "mine" | "evade" | "shield" | "jettison" | "pickup" | "comm";
+export type ActionId = "move" | "koiogran" | "laser" | "mg" | "torpedo" | "mine" | "evade" | "shield" | "jettison" | "pickup" | "comm" | "turn";
 
 export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: string }[] {
   const out: { id: ActionId; label: string }[] = [];
@@ -521,6 +523,7 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
   if (o.action?.type === "jettison") out.push({ id: "jettison", label: "vyhození modulu" });
   if (o.action?.type === "pickup") out.push({ id: "pickup", label: "zvednutí nákladu" });
   if (o.action?.type === "comm") out.push({ id: "comm", label: "komunikace se stanicí" });
+  if (o.action?.type === "turn") out.push({ id: "turn", label: "otočení na místě" });
   for (const sh of shotsOf(ship, o)) {
     const mod = ship.loadout.modules.find((x) => x.id === sh.moduleId);
     if (mod?.type === "mg") out.push({ id: "mg", label: "kulomet" });
@@ -625,7 +628,7 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     if (!man || !canAfford(ship, man, { droid })) man = resolveManeuver(profile, def.maneuverId, ship.speed)!;
 
     let action: ActionOrder | undefined;
-    if (raw.action?.type === "evade") action = ship.stressPoints >= effEvadeCost({ droid }) ? { type: "evade" } : undefined;
+    if (raw.action?.type === "evade") action = ship.stressPoints >= effEvadeCost({ droid }) && man.speed > 0 ? { type: "evade" } : undefined;
     else if (raw.action?.type === "shield") action = validShieldAction(ship, raw.action.segments) ? { type: "shield", segments: raw.action.segments.map((n) => Math.round(Number(n))) as Segments } : undefined;
     else if (raw.action?.type === "jettison") {
       const wantedId = raw.action.moduleId;
@@ -633,6 +636,9 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     } else if (raw.action?.type === "pickup") {
       const tid = raw.action.targetId;
       action = { type: "pickup", targetId: typeof tid === "string" && (state.debris.some((d) => d.id === tid) || isStationId(state, tid)) ? tid : undefined };
+    } else if (raw.action?.type === "turn") {
+      const hd = raw.action.heading;
+      if (ship.speed === 0 && typeof hd === "number" && Number.isFinite(hd)) action = { type: "turn", heading: normalizeAngle(hd) };
     } else if (raw.action?.type === "comm") {
       const st = (state.stations ?? []).find((x) => x.id === (raw.action as { stationId?: string }).stationId);
       const mt = (raw.action as { moduleType?: string }).moduleType;
@@ -791,6 +797,13 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!ship.alive) continue;
     const o = allOrders.find((x) => x.shipId === ship.id) ?? defaultOrders(ship);
     orders.set(ship.id, o);
+  }
+  // Otočení na místě (jen stojící loď): nový kurz platí hned – pro střelbu i pohyb
+  for (const ship of state.ships) {
+    const o = orders.get(ship.id);
+    if (!ship.alive || o?.action?.type !== "turn" || ship.speed !== 0) continue;
+    ship.heading = normalizeAngle(o.action.heading);
+    events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
   }
   const startPose = new Map<string, Pose>();
   for (const ship of state.ships) startPose.set(ship.id, { x: ship.x, y: ship.y, heading: ship.heading });
@@ -1328,6 +1341,20 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   const scatter = () => (rng.next() * 2 - 1) * COLLISION_SCATTER;
   /** Lodě, které narazily do asteroidu nebo do nich narazila kometa: po tahu rychlost 1 a nulový stres. */
   const crashed = new Set<string>();
+  /** Lodě, do kterých narazila kometa: po tahu rychlost 1 a nulový stres (odmrštění náhodným směrem). */
+  const cometCrashed = new Set<string>();
+  /** Lodě zastavené srážkou (loď–loď): po tahu rychlost 0. */
+  const stopped = new Set<string>();
+  /** Zastavení na místě: zbytek dráhy stojí tam, kde k dotyku došlo (vzorek k−1). */
+  const freeze = (m: Mover, k: number) => {
+    const p0 = m.samples[Math.max(0, k - 1)];
+    for (let i = k; i <= MOVE_STEPS; i++) m.samples[i] = { ...p0 };
+    m.frozenAt = Math.max(0, k - 1);
+    m.deflections++;
+    m.collided = true;
+  };
+  /** Polštář štítu kolem lodi (dotyk štítů = srážka). */
+  const shieldPad = (sh: Ship): number | null => ((sh.shieldType === "whole" && sh.shields > 0) || (sh.shieldType === "segment" && sh.segments.some((v) => v > 0)) ? sh.stats.radius + SHIELD_GAP : null);
 
   // Překážky, kterých se loď dotýká (po srážce), ji neblokují, dokud se od nich neodlepí.
   const touching = new Map<string, Set<string>>();
@@ -1471,8 +1498,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               continue;
             }
             if (ov && !stillTouching(ship.id, a.id, true)) {
-              // náraz do asteroidu: loď se otočí náhodným směrem (viz crash níže)
-              hit = { with: "asteroid", otherId: a.id, heading: normalizeAngle(rng.next() * Math.PI * 2) };
+              // náraz do asteroidu/stanice: loď u něj zastaví (viz crash níže)
+              hit = { with: "asteroid", otherId: a.id, heading: p.heading };
               break;
             }
             if (!ov) stillTouching(ship.id, a.id, false);
@@ -1483,7 +1510,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
             if (other === ship || !other.alive) continue;
             const om = shipMovers.get(other.id)!;
             const op = posAt(om, k);
-            const ov = shipsOverlap(p, cols, op, other.stats.colliders);
+            const ov = shipsOverlapPadded(p, cols, shieldPad(ship), op, other.stats.colliders, shieldPad(other));
             if (!ov) {
               stillTouching(ship.id, other.id, false);
               continue;
@@ -1504,21 +1531,24 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               continue;
             }
             if (stillTouching(ship.id, other.id, true)) continue;
-            const away = Math.atan2(p.y - op.y, p.x - op.x);
-            hit = { with: "ship", otherId: other.id, heading: normalizeAngle(away + scatter()) };
+            // srážka lodí: obě zastaví v místě dotyku (i štítů), kurz zůstává
+            hit = { with: "ship", otherId: other.id, heading: p.heading };
             if (om.frozenAt === null) {
-              const h2 = normalizeAngle(away + Math.PI + scatter());
-              deflect(om, k, h2);
+              freeze(om, k);
+              stopped.add(other.id);
               touching.get(other.id)!.add(ship.id);
-              events.push({ type: "collision", shipId: other.id, with: "ship", otherId: ship.id, t, newHeading: h2 });
+              events.push({ type: "collision", shipId: other.id, with: "ship", otherId: ship.id, t, newHeading: op.heading });
               applyDamage(other, RULES.collisionShip, events, p);
-              if (!other.alive) om.frozenAt = k - 1;
             }
             break;
           }
         }
         if (hit) {
-          deflect(m, k, hit.heading);
+          if (hit.with === "edge") deflect(m, k, hit.heading);
+          else {
+            freeze(m, k);
+            if (hit.with === "ship") stopped.add(ship.id);
+          }
           touching.get(ship.id)!.add(hit.otherId ?? "edge");
           events.push({ type: "collision", shipId: ship.id, with: hit.with, otherId: hit.otherId, t, newHeading: hit.heading });
           const src: Vec =
@@ -1577,7 +1607,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
           // náraz komety: loď se otočí náhodným směrem, zpomalí na 1 a ztratí stres (viz crash níže)
           const h = normalizeAngle(rng.next() * Math.PI * 2);
           deflect(sm, k, h);
-          crashed.add(s.id);
+          cometCrashed.add(s.id);
           events.push({ type: "collision", shipId: s.id, with: "comet", otherId: c.id, t: k / MOVE_STEPS, newHeading: h });
         }
         const dmg = evading.has(s.id) ? COMET.damage * 2 : COMET.damage; // úhyb skončil v kometě = dvojité zranění
@@ -1734,7 +1764,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const man = maneuverOf.get(ship.id)!;
     const od = orders.get(ship.id);
     ship.speed = man.koiogran ? Math.max(1, man.speed - RULES.koiogranSpeedDrop) : man.speed;
-    if (crashed.has(ship.id)) ship.speed = 1;
+    if (crashed.has(ship.id) || stopped.has(ship.id)) ship.speed = 0;
+    else if (cometCrashed.has(ship.id)) ship.speed = 1;
     const cost = effStressCost(man, od);
     const stM = statsOf(state, ship.ownerId);
     if (stM) {
@@ -1742,7 +1773,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       if (man.koiogran) stM.maneuvers.koiogran++;
     }
     const before = ship.stressPoints;
-    ship.stressPoints = crashed.has(ship.id) ? 0 : clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
+    ship.stressPoints = crashed.has(ship.id) || cometCrashed.has(ship.id) ? 0 : clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
     if (man.difficulty === "danger" && !od?.droid?.overdrive) applyDamage(ship, Math.max(1, Math.round((ship.stats.hull * STRESS.dangerHullPercent) / 100)), events);
   }

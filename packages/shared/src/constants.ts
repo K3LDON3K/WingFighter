@@ -200,6 +200,8 @@ export const STRESS = {
 };
 /** Max. náhodná odchylka směru po odmrštění (radiány). */
 export const COLLISION_SCATTER = (40 * Math.PI) / 180;
+/** Odstup štítu od trupu (herní jednotky) – srážka lodí se počítá i dotykem štítů. */
+export const SHIELD_GAP = 14;
 /** Kolikrát se loď může v jednom kole odrazit, než se zastaví. */
 export const MAX_DEFLECTIONS = 4;
 /** Obranné kostky torpéda při pokusu o sestřelení laserem. */

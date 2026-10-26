@@ -40,11 +40,14 @@ Bez označení loď poletí tak, jak má nakresleno (výchozí = stejná rychlos
 **nebezpečný – červený** (změna rychlosti o 2+ *a* ostrý úhel) stojí 2 body a 5 % trupu. Bez bodů manévr nejde vybrat.
 Akce po pohybu zůstává vždy povolená.
 
-Lodě nikdy nestojí: při srážce s lodí nebo okrajem mapy je loď **odmrštěna** novým (náhodně
-odchýleným) směrem, dostane 15 zranění, ztratí akci a doletí zbytek pohybu tím směrem.
-**Náraz do asteroidu** (nebo komety do lodi) je tvrdší: loď vykousne do asteroidu díru (velikost podle lodi,
-min. poloměr v ladění), otočí se **zcela náhodným směrem**, po kole má **rychlost 1** a **nulový stres**
-(náraz ji „probere“); zranění 15 zůstává.
+**Zastavení:** rychlost 0 jde zvolit jen z rychlosti 1 (klávesa 0 nebo myš těsně u lodi); stojící loď
+nemůže uhýbat ani dělat otočku, může se ale za 1 akci **otočit na místě** do libovolného směru (OTOČIT, klik na
+mapě) a pak vyrazit – stíhač na 1 (zelený) nebo rovnou na 2 (oranžový), bitevník jen na 1. **Zrychlování a
+brzdění:** stíhač ±1 bílé, ±2 oranžové, ±3 nebezpečné (víc nejde); bitevník ±1 bílé, ±2 nebezpečné, ±3 nejde.
+**Srážky zastavují:** loď–loď (stačí dotyk štítů) – obě zastaví v místě dotyku, 15 zranění každé, obě ztratí akci
+a mají rychlost 0. Náraz do asteroidu nebo stanice – loď u něj zastaví (rychlost 0), vykousne do asteroidu díru
+(velikost podle lodi, min. poloměr v ladění), 15 zranění a stres na 0. Kometa loď odmrští náhodným směrem
+(rychlost 1, stres 0); okraj mapy loď odrazí zpět (15 zranění).
 
 ### Akce – 2 na kolo
 Každá stojí 1 bod: **úprava pohybu** (jiná rychlost nebo směr než „stejnou rychlostí rovně“), **otočka 180°**
@@ -187,6 +190,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.150 – **Zastavení a rozjezd.** Nová rychlost 0 (jen z rychlosti 1; klávesa 0 / myš těsně u lodi); stojící loď nemůže uhýbat ani dělat otočku, za 1 akci se otočí na místě do libovolného směru (nová akce OTOČIT v Pohybu – klik na mapě, náhled dráhy i výsečí z nového kurzu) a vyrazí: stíhač 0→1 zelený, 0→2 oranžový; bitevník jen 0→1. Zrychlení/brzdění: stíhač ±1 bílé, ±2 oranžové, ±3 nebezpečné, víc nejde; bitevník ±1 bílé, ±2 nebezpečné, ±3 nejde. Srážky zastavují: loď–loď (stačí dotyk štítů, obě zastaví v místě dotyku, 15 zranění, rychlost 0), náraz do asteroidu/stanice (zastavení u překážky, díra, 15 zranění, stres 0) – nahrazuje odmrštění a náhodné otočení; kometa a okraj mapy odmršťují dál. Boti umí zastavit, otočit se a rozjet. Nápověda manévrů doplněna.
 - v3.149 – Panel Výzbroj v liště: při více než 4 modulech (bitevník) se přepne na kompaktní řádky (nižší dlaždice, munice číslem „3/3“), aby se zobrazily všechny moduly.
 - v3.148 – Okénko Komunikace se stanicí vypisuje celé názvy modulů (širší okénko).
 - v3.147 – **Vesmírné stanice.** Nastavení mapy: 0–2 stanice (náhodné místo; náhled mapy je ukazuje). Pixel-art stanice (prstenec, čtyři ramena, náboj s okny, solární panely) se pomalu otáčí i při plánování; funkční má tyrkysový štít, lištu trupu po poškození a počet modulů; rozbitá je tmavá s dírami. Překážka jako asteroid (kryje střelbu, zastaví torpédo i kometu). Trup 2000, energetický štít 200 (+20/kolo), cíl laserů (klik), plošné výbuchy ji zraní; zničení = výbuch 60 do 150, +100 kreditů střelci, 1–2 moduly jako trosky, stanice zůstane rozbitá. Čárkovaný okruh sběru: NÁKLAD → Zvednout + klik na stanici (rychlost ≤ 2) = náhodný modul ze zásoby 3 (z povolených, bez droidů). Nová akce **Komunikace** (Speciální, 1 akce, funkční stanice v dohledu): objednávka modulu za cenu z obchodu, stanice ho vypustí jako trosky směrem k volajícímu (sebrat může kdokoliv), 1 objednávka na stanici za kolo. Boti nabírají i objednávají. Ladění: nová sekce Stanice (trup, štít, dobití, zásoba, okruh, výbuch, odměna). Log a efekty pro zásahy, zničení, nabrání i objednávky.

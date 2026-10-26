@@ -162,6 +162,7 @@ export interface PlanningModel {
   repairCargoId?: string | null;
   hackOpen?: boolean;
   commOpen?: boolean;
+  turnPick?: boolean;
   hackKind?: HackOrder["kind"] | null;
   /** Vybraný cíl hacku na mapě: mina / torpédo / cizí loď (id). */
   hackSel?: { kind: "mine" | "torpedo" | "ship"; id: string } | null;
@@ -196,12 +197,12 @@ const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: 
 /** Kategorie akcí v liště: zbraně · pohyb · speciální. */
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
-  { label: "Pohyb", ids: ["move", "evade", "koiogran"] },
+  { label: "Pohyb", ids: ["move", "turn", "evade", "koiogran"] },
   { label: "Loď", ids: [] },
   { label: "Speciální", ids: ["shield"] },
 ];
 const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
-const ACTION_ICON: Record<string, string> = { pickup: "cargo", move: "pen", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
+const ACTION_ICON: Record<string, string> = { pickup: "cargo", move: "pen", turn: "center", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
   if (koiogran) return "⟲";
@@ -248,7 +249,7 @@ function maneuverHelp(ship: Ship): HTMLElement {
     "div",
     { class: "mhelp" },
     h("h4", {}, label("Dráha")),
-    h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 1–5 rychlost zamknou, K = otočka, mezerník potvrdí.")),
+    h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 0–5 rychlost zamknou, K = otočka, mezerník potvrdí."), li(`Zastavení: rychlost 0 jde zvolit jen z rychlosti 1 (klávesa 0 / myš těsně u lodi). Stojící loď nemůže uhýbat ani dělat otočku; může se ale za 1 akci otočit na místě do libovolného směru (OTOČIT) a pak vyrazit: ${prof.startMax >= 2 ? "stíhač na 1 (zelený) nebo rovnou na 2 (oranžový)" : "bitevník jen na 1"}.`)),
     h("h4", {}, label("Rychlost")),
     h("ul", {}, li(`${HULLS[ship.loadout.hullId]?.name ?? "Loď"}: 1–${hullProf.maxSpeed}; tvoje loď teď max. ${prof.maxSpeed} (váha výbavy: každých ${WEIGHT.perSpeed} váhy = −1; overdrive droida váhu ignoruje).`), li(`Otočka o 180° jde jen z rychlosti ${prof.koiogranSpeeds.length ? `${Math.min(...prof.koiogranSpeeds)}–${Math.max(...prof.koiogranSpeeds)}` : "–"}, stojí 2 akce (s overdrivem 1) a po ní rychlost klesne o ${RULES.koiogranSpeedDrop}.`)),
     h("h4", {}, label("Úhel")),
@@ -259,12 +260,12 @@ function maneuverHelp(ship: Ship): HTMLElement {
       { class: "hcolors" },
       li(sw(DIFFICULTY_COLOR.green), h("b", {}, "zelený"), ` – mírný: rychlost 1–2 do 40°, nebo rychlost 3 rovně. Vrátí +${STRESS.regenGreen} stres (autopilot droida +${DROID.autopilotRegen}).`),
       li(sw(DIFFICULTY_COLOR.white), h("b", {}, "bílý"), " – vše ostatní, co není ostré. Nic nestojí."),
-      li(sw(DIFFICULTY_COLOR.red), h("b", {}, "oranžový"), ` – ostrý úhel (od 70°, při rychlosti 4+ od 40°) nebo změna rychlosti o 2+. Stojí ${STRESS.costRed} stres.`),
-      li(sw(DIFFICULTY_COLOR.danger), h("b", {}, "nebezpečný (červený)"), ` – ostrý úhel a zároveň změna rychlosti o 2+. Stojí ${STRESS.costDanger} stres a ${STRESS.dangerHullPercent} % trupu.`),
+      li(sw(DIFFICULTY_COLOR.red), h("b", {}, "oranžový"), ` – ostrý úhel (od 70°, při rychlosti 4+ od 40°) nebo změna rychlosti o 2. Stojí ${STRESS.costRed} stres.`),
+      li(sw(DIFFICULTY_COLOR.danger), h("b", {}, "nebezpečný (červený)"), ` – ostrý úhel a zároveň změna rychlosti o 2, nebo změna rychlosti o ${prof.deltaDanger}${prof.deltaDanger === prof.deltaMax ? "" : " a víc"} (bitevník už o 2); změna o víc než ${prof.deltaMax} nejde. Stojí ${STRESS.costDanger} stres a ${STRESS.dangerHullPercent} % trupu.`),
       li(h("span", { class: "man-koi" }, "⟲"), h("b", {}, "otočka"), " – vždy aspoň oranžová: 1 stres na zelené/bílé křivce, 2 na oranžové, 3 na nebezpečné."),
     ),
     h("h4", {}, label("Stres a akce")),
-    h("ul", {}, li(`Stresové body ${ship.stressPoints}/${ship.stats.stressMax}: bez dostatku se manévr vůbec nenabídne.`), li("Rovně stejnou rychlostí je zdarma; jakákoli změna rychlosti nebo úhlu stojí 1 akci „úprava pohybu“ (akce na kolo: 2)."), li("Dráha nehlídá překážky: srážka s lodí, asteroidem, kometou nebo okrajem = 15 zranění a odmrštění; bouře vypne štíty a lasery.")),
+    h("ul", {}, li(`Stresové body ${ship.stressPoints}/${ship.stats.stressMax}: bez dostatku se manévr vůbec nenabídne.`), li("Rovně stejnou rychlostí je zdarma; jakákoli změna rychlosti nebo úhlu stojí 1 akci „úprava pohybu“ (akce na kolo: 2)."), li("Dráha nehlídá překážky: srážka s lodí (i dotykem štítů), asteroidem nebo stanicí = 15 zranění a zastavení na místě (rychlost 0, náraz do asteroidu i nuluje stres); kometa odmrští; okraj odrazí. Bouře vypne štíty a lasery.")),
   );
 }
 
@@ -1151,6 +1152,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   };
   if (m.scanOpen && scannerModule(ship.loadout)) {
     details.append(icon("scan", "#7dd3fc"));
+    if (m.turnPick && o.action?.type === "turn") details.append(h("span", { class: "warn" }, label("otočení na místě: klikni na mapě, kam má loď mířit")), h("span", { class: "muted" }, label(` · kurz ${Math.round((((o.action.heading * 180) / Math.PI) % 360 + 360) % 360)}°`)));
     if (m.scanPick) details.append(h("span", { class: "warn" }, label(`klikni na cizí loď v dohledu (dosah ${SCANNER.range}) – sken proběhne hned`)), h("span", { class: "muted" }, label(`· technologie ${ship.techPoints}/${ship.stats.techMax} · nebere akci`)));
     else details.append(h("span", { class: "muted" }, label(`technologie ${ship.techPoints}/${ship.stats.techMax} · nedobíjí se · nebere akci`)));
   } else if (shotsOfType(ship, o, "mg").length && o.special?.type !== "torpedo" && o.special?.type !== "mine" && (!shotsOfType(ship, o, "laser").length || shotsOfType(ship, o, "mg").some((x) => x.mod.id === m.activeShot))) {

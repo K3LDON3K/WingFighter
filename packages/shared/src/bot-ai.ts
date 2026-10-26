@@ -358,8 +358,12 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
   // vlastní lodě se plánují postupně a každá zná dráhy těch předchozích
   const allyPaths = new Map(ctx.allyPaths ?? []);
   ctx = { ...ctx, allyPaths };
-  for (const ship of myShips) {
-    const enemies = state.ships.filter((e) => e.alive && e.team !== ship.team);
+  for (const ship0 of myShips) {
+    const enemies = state.ships.filter((e) => e.alive && e.team !== ship0.team);
+    // stojící loď se nejdřív otočí k nejbližšímu nepříteli (akce „otočit“) a plánuje z nového kurzu
+    const turnTo = ship0.speed === 0 && enemies.length ? enemies.reduce((a, b) => (dist(ship0, a) < dist(ship0, b) ? a : b)) : undefined;
+    const turnHeading = turnTo ? Math.atan2(turnTo.y - ship0.y, turnTo.x - ship0.x) : undefined;
+    const ship: Ship = turnHeading !== undefined ? { ...ship0, heading: turnHeading } : ship0;
     const guesses = new Map<string, Guess[]>();
     for (const e of enemies) guesses.set(e.id, guessMoves(e, level));
     const droid = droidModule(ship);
@@ -380,6 +384,7 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
     const chosen = cands[0];
     allyPaths.set(ship.id, maneuverPath(ship, chosen.man));
     const orders: ShipOrders = { shipId: ship.id, maneuverId: chosen.man.id, shots: [], preferredTargetId: enemies[0]?.id };
+    if (turnHeading !== undefined) orders.action = { type: "turn", heading: turnHeading };
     if (overdrive) orders.droid = { overdrive: true };
     // dobití štítu technologií (nebere akci): když je štít slabý a technologie zbývá; Eso si nechá rezervu na overdrive
     if (!shieldRechargeBlocked(state, ship) && !overdrive) {

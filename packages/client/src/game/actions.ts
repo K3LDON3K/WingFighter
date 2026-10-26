@@ -20,6 +20,7 @@ export interface ActionOption {
 
 /** Je akce pro loď vůbec k dispozici (má potřebný modul)? */
 export function actionAvailable(a: ActionOption, ship: Ship): boolean {
+  if (a.id === "turn") return ship.speed === 0;
   if (a.id === "shield") return ship.loadout.modules.some((m) => m.type === "shield-segment");
   if (a.id === "jettison") return ship.loadout.modules.length > 0;
   return !a.requiresModule || ship.loadout.modules.some((m) => m.type === a.requiresModule);
@@ -88,6 +89,15 @@ export const ACTIONS: ActionOption[] = [
     active: (o) => o.special?.type === "mine",
     apply: (o, ship) => ({ special: o.special?.type === "mine" ? undefined : { type: "mine", side: mineSideOf(mineModule(ship)?.facing) } }),
     requiresModule: "mine",
+  },
+  {
+    id: "turn",
+    glyph: "↻",
+    label: "Otočit (1 akce)",
+    description: "Jen stojící loď (rychlost 0): otočí se do libovolného směru ještě před střelbou a pohybem – klik na mapě = nový kurz. Bez stresu. Pak může vyrazit (stíhač až na 2 – oranžově, bitevník na 1).",
+    disabled: (ship, _s, o) => (ship.speed !== 0 ? "loď musí stát (rychlost 0)" : noAp(ship, o, o.action?.type === "turn")),
+    active: (o) => o.action?.type === "turn",
+    apply: (o, ship) => ({ action: o.action?.type === "turn" ? undefined : { type: "turn", heading: ship.heading } }),
   },
   {
     id: "evade",

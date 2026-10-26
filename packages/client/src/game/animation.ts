@@ -39,9 +39,9 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "collision":
         lines.push(
           e.with === "ship"
-            ? `${name(e.shipId)} se srazil s ${name(e.otherId!)} a byl odmrštěn.`
+            ? `${name(e.shipId)} se srazil s ${name(e.otherId!)} – obě lodě zastavily.`
             : e.with === "asteroid"
-              ? `${name(e.shipId)} narazil do asteroidu a byl odmrštěn.`
+              ? `${name(e.shipId)} narazil do ${e.otherId?.startsWith("station") ? "stanice" : "asteroidu"} a zastavil (rychlost 0).`
               : e.with === "comet"
                 ? `☄ ${name(e.shipId)} byl zasažen kometou a odmrštěn.`
                 : `${name(e.shipId)} narazil do okraje mapy.`,
@@ -163,6 +163,7 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "action":
         if (!e.ok) lines.push(`${name(e.shipId)}: akce se nepovedla.`);
         else if (e.action.type === "evade") lines.push(`${name(e.shipId)} provádí úhybný manévr.`);
+        else if (e.action.type === "turn") lines.push(`${name(e.shipId)} se otočil na místě.`);
         break;
       case "destroyed":
         lines.push(`💥 ${name(e.shipId)} byl zničen!`);
@@ -579,7 +580,13 @@ export class TurnAnimation {
           s.segments = [...e.action.segments] as import("@wingfighter/shared").Segments;
           break;
         }
-        if (e.ok && (e.action.type === "jettison" || e.action.type === "pickup")) break; // mají vlastní události
+        if (e.ok && (e.action.type === "jettison" || e.action.type === "pickup" || e.action.type === "comm")) break; // mají vlastní události
+        if (e.ok && e.action.type === "turn") {
+          // otočení na místě platí od začátku kola (před střelbou i pohybem)
+          s.heading = e.action.heading;
+          v.effects.push({ kind: "text", x: s.x, y: s.y, text: "OTOČENÍ", color: "#a7f3d0", start: now, duration: 700 });
+          break;
+        }
         if (e.ok) {
           if (e.action.type === "evade") s.evading = true;
           if (e.action.type === "focus") s.tokens.focus = 1;

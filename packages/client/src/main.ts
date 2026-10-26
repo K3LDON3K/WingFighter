@@ -173,6 +173,8 @@ interface GameSession {
   repairCargoId: string | null;
   hackOpen: boolean;
   commOpen: boolean;
+  /** Otočení na místě: čeká se na klik na mapě (nový kurz). */
+  turnPick: boolean;
   hackKind: HackOrder["kind"] | null;
   hackSel: { kind: "mine" | "torpedo" | "ship"; id: string } | null;
   scanPick: boolean;
@@ -366,6 +368,7 @@ function startGame(state: GameState) {
     repairCargoId: null,
     hackOpen: false,
     commOpen: false,
+    turnPick: false,
     hackKind: null,
     hackSel: null,
     scanPick: false,
@@ -409,6 +412,7 @@ function resetOrders() {
   game.repairCargoId = null;
   game.hackOpen = false;
   game.commOpen = false;
+  game.turnPick = false;
   game.hackKind = null;
   game.hackSel = null;
   game.rechargeOpen = false;
@@ -504,7 +508,7 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
   const o = game.orders.get(shipId);
   if (!ship || !o) return false;
   const profile = profileFor(ship, o);
-  speed = Math.max(koiogran ? 2 : 1, Math.min(profile.maxSpeed, Math.round(speed)));
+  speed = Math.max(koiogran ? 2 : 0, Math.min(profile.maxSpeed, Math.round(speed)));
   let man = makeManeuver(profile, speed, angle, koiogran, ship.speed);
   if (!man) {
     const max = profile.maxAngle[speed];
@@ -622,6 +626,7 @@ function submitOrders(force = false) {
   game.repairCargoId = null;
   game.hackOpen = false;
   game.commOpen = false;
+  game.turnPick = false;
   game.hackKind = null;
   game.hackSel = null;
   game.rechargeOpen = false;
@@ -866,15 +871,18 @@ function buildOverlay(view: ViewModel): Overlay {
     const aiming = g.aimingShipId === ship.id && !g.submitted;
     const laserShots = shotsOfType(ship, o, "laser");
     const mgShots = shotsOfType(ship, o, "mg");
-    overlay.previews.push({ ship: vs, maneuver: man, aiming, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(ship, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(ship, mod.id)) });
-    const end = maneuverEnd(ship, man);
+    // otočení na místě: náhled (dráha, výseče, duch) vychází z nového kurzu
+    const turned = o.action?.type === "turn" ? ({ ...ship, heading: o.action.heading } as typeof ship) : ship;
+    const vsT = turned === ship ? vs : { ...vs, heading: turned.heading };
+    overlay.previews.push({ ship: vsT, maneuver: man, aiming, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
+    const end = maneuverEnd(turned, man);
 
     if (aiming) {
       const dots: { x: number; y: number; color: string }[] = [];
       for (let a = -MAX_ANGLE; a <= MAX_ANGLE; a += ANGLE_STEP) {
         const mm = makeManeuver(profile, man.speed, a, man.koiogran, ship.speed);
         if (!mm || effStressCost(mm, o) > ship.stressPoints) continue;
-        const e = maneuverEnd(ship, mm);
+        const e = maneuverEnd(turned, mm);
         dots.push({ x: e.x, y: e.y, color: DIFFICULTY_COLOR[mm.difficulty] });
       }
       overlay.reachable = dots;
@@ -1404,6 +1412,7 @@ function renderSide() {
       repairCargoId: game.repairCargoId,
       hackOpen: game.hackOpen,
       commOpen: game.commOpen,
+      turnPick: game.turnPick,
       hackKind: game.hackKind,
       hackSel: game.hackSel,
       rechargeOpen: game.rechargeOpen,
@@ -1856,13 +1865,16 @@ function aimAt(wx: number, wy: number) {
   const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
   const d = Math.hypot(wx - ship.x, wy - ship.y);
   if (d < ship.stats.radius + 4) return; // těsně u lodi nic neměnit
-  const bearing = normalizeAngle(Math.atan2(wy - ship.y, wx - ship.x) - ship.heading);
+  const heading0 = o.action?.type === "turn" ? o.action.heading : ship.heading;
+  const bearing = normalizeAngle(Math.atan2(wy - ship.y, wx - ship.x) - heading0);
   // koncový bod oblouku leží na polovině úhlu zatáčky → úhel = 2 × směr k myši
   let angle = Math.round((((bearing * 180) / Math.PI) * 2) / ANGLE_STEP) * ANGLE_STEP;
   angle = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, angle));
-  // v režimu otočky je nejnižší rychlost 2
-  const speed = g.speedLock.get(id) ?? Math.max(cur.koiogran ? 2 : 1, Math.min(5, Math.round(d / (MOVE_UNIT * 0.9))));
-  setManeuver(id, speed, angle, cur.koiogran);
+  // v režimu otočky je nejnižší rychlost 2; myš těsně u lodi = zastavit (rychlost 0, jen z rychlosti 1)
+  const raw = Math.round(d / (MOVE_UNIT * 0.9));
+  const minSp = cur.koiogran ? 2 : ship.speed <= 1 ? 0 : 1;
+  const speed = g.speedLock.get(id) ?? Math.max(minSp, Math.min(5, raw));
+  setManeuver(id, speed, speed === 0 ? 0 : angle, cur.koiogran);
 }
 
 function confirmManeuver(id: string): boolean {
@@ -1951,6 +1963,7 @@ function chooseIcon(shipId: string, id: string) {
   if (a.id === "jettison") g.jettisonPick = false; // výběr modulu probíhá v okénku nad tlačítkem
   if (a.id === "jettison" || a.id === "pickup") g.cargoOpen = true;
   g.minePick = a.id === "mine" && next.special?.type === "mine" ? "timer" : null;
+  g.turnPick = a.id === "turn" && next.action?.type === "turn";
   renderSide();
 }
 
@@ -2249,6 +2262,15 @@ function bindInput(c: HTMLCanvasElement) {
     const sel = g.state.ships.find((s) => s.id === g.selectedShipId);
     const o = sel && g.orders.get(sel.id);
     if (!sel || !o) return;
+    // 3a0) otočení na místě: klik na mapě = nový kurz
+    if (g.turnPick && o.action?.type === "turn") {
+      const hd = Math.atan2(w.y - sel.y, w.x - sel.x);
+      g.orders.set(sel.id, { ...o, action: { type: "turn", heading: hd } });
+      g.turnPick = false;
+      sfx("toggle");
+      renderSide();
+      return;
+    }
     // 3a) hacker: výběr miny / torpéda / cíle torpéda / cizí lodi
     if (g.hackOpen && g.hackKind && hit) {
       if ((g.hackKind === "mine" || g.hackKind === "torpedo") && !g.hackSel && (hit.kind === "mine" || hit.kind === "torpedo")) {
@@ -2350,9 +2372,9 @@ function bindInput(c: HTMLCanvasElement) {
         const o = game.orders.get(id);
         const cur = o && parseManeuverId(o.maneuverId);
         if (cur) {
-          const sp = Math.max(1, Math.min(5, cur.speed + (e.deltaY < 0 ? 1 : -1)));
+          const sp = Math.max(cur.koiogran ? 2 : 0, Math.min(5, cur.speed + (e.deltaY < 0 ? 1 : -1)));
           game.speedLock.set(id, sp);
-          setManeuver(id, sp, cur.angle, cur.koiogran);
+          setManeuver(id, sp, sp === 0 ? 0 : cur.angle, cur.koiogran);
         }
         return;
       }
@@ -2467,9 +2489,9 @@ function bindInput(c: HTMLCanvasElement) {
       else game.aimingShipId = null;
       game.speedLock.delete(id);
       renderSide();
-    } else if (/^[1-5]$/.test(e.key)) {
+    } else if (/^[0-5]$/.test(e.key)) {
       game.speedLock.set(id, Number(e.key));
-      setManeuver(id, Number(e.key), cur.angle, cur.koiogran);
+      setManeuver(id, Number(e.key), e.key === "0" ? 0 : cur.angle, cur.koiogran);
     } else if (e.key === "k" || e.key === "K") {
       chooseIcon(id, "koiogran");
     } else if (e.key === " ") {

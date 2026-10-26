@@ -20,8 +20,12 @@ export function planBot(state: GameState, playerId: string, rng: Rng, level: Bot
   const myShips = state.ships.filter((s) => s.alive && s.ownerId === playerId);
   const allyPaths = new Map(ctx.allyPaths ?? []);
   ctx = { ...ctx, allyPaths };
-  for (const ship of myShips) {
-    const enemies = state.ships.filter((e) => e.alive && e.team !== ship.team);
+  for (const ship0 of myShips) {
+    const enemies = state.ships.filter((e) => e.alive && e.team !== ship0.team);
+    // stojící loď se nejdřív otočí k nejbližšímu nepříteli (akce „otočit“) a plánuje z nového kurzu
+    const turnTo = ship0.speed === 0 && enemies.length ? enemies.reduce((a, b) => (dist(ship0, a) < dist(ship0, b) ? a : b)) : undefined;
+    const turnHeading = turnTo ? Math.atan2(turnTo.y - ship0.y, turnTo.x - ship0.x) : undefined;
+    const ship = turnHeading !== undefined ? { ...ship0, heading: turnHeading } : ship0;
     const dial = listManeuvers(profileOf(ship.loadout), ship.speed).filter((m) => maneuverStress(m) <= ship.stressPoints && m.difficulty !== "danger");
     let best = dial[0];
     let bestScore = -Infinity;
@@ -48,6 +52,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng, level: Bot
     const willHaveTarget = enemies.some((e) => inArc(end, e, LASER.halfArc * 2) && dist(end, e) <= laserRange(ship));
 
     const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, shots: [], preferredTargetId: nearest?.id };
+    if (turnHeading !== undefined) orders.action = { type: "turn", heading: turnHeading };
     const left = () => RULES.actionPoints - actionCost(ship, orders);
     const lasers = ship.loadout.modules.filter((m) => m.type === "laser" && moduleWorking(m));
     const addLaser = () => {

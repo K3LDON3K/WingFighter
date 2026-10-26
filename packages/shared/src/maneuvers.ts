@@ -12,12 +12,19 @@ export const FIGHTER_PROFILE: ManeuverProfile = {
   maxAngle: [0, 90, 90, 90, 60, 40],
   /** Otočka 180° jde od rychlosti 2 (při libovolném úhlu, který rychlost dovolí). */
   koiogranSpeeds: [2, 3, 4, 5],
+  /** Zrychlení/brzdění: ±1 bílé, ±2 oranžové, ±3 nebezpečné, víc nelze; z 0 až na 2. */
+  deltaDanger: 3,
+  deltaMax: 3,
+  startMax: 2,
 };
-/** Profil bitevníku: pomalejší a těžkopádnější, otočka jen z rychlosti 2–3. */
+/** Profil bitevníku: pomalejší a těžkopádnější, otočka jen z rychlosti 2–3; zrychluje i brzdí hůř (±2 = nebezpečné, ±3 nelze), z 0 jen na 1. */
 export const BATTLESHIP_PROFILE: ManeuverProfile = {
   maxSpeed: 4,
   maxAngle: [0, 90, 90, 80, 60, 50],
   koiogranSpeeds: [2, 3],
+  deltaDanger: 2,
+  deltaMax: 2,
+  startMax: 1,
 };
 
 export function maneuverId(speed: number, angle: number, koiogran = false): string {
@@ -51,18 +58,26 @@ export function classifyManeuver(profile: ManeuverProfile, speed: number, angle:
   const base = classifyCurve(profile, speed, angle, prevSpeed);
   if (!base) return null;
   if (!koiogran) return base;
+  if (prevSpeed === 0) return null; // stojící loď otočku 180° nezvládne
   if (!profile.koiogranSpeeds.includes(speed)) return null;
   return base === "danger" ? "danger" : "red";
 }
 
 /** Náročnost samotné křivky (bez otočky). */
 export function classifyCurve(profile: ManeuverProfile, speed: number, angle: number, prevSpeed: number): Difficulty | null {
-  if (!Number.isInteger(speed) || speed < 1 || speed > profile.maxSpeed || speed >= profile.maxAngle.length) return null;
+  if (!Number.isInteger(speed) || speed < 0 || speed > profile.maxSpeed || speed >= profile.maxAngle.length) return null;
   if (!Number.isInteger(angle) || angle % ANGLE_STEP !== 0) return null;
   if (Math.abs(angle) > profile.maxAngle[speed]) return null;
+  const delta = Math.abs(speed - prevSpeed);
+  if (delta > (profile.deltaMax ?? 3)) return null;
+  // zastavení: jen z rychlosti 1 (nebo stát dál); rozjezd z 0 nejvýš na startMax
+  if (speed === 0 && prevSpeed > 1) return null;
+  if (prevSpeed === 0 && speed > (profile.startMax ?? 2)) return null;
+  if (speed === 0) return "white";
   const a = Math.abs(angle);
-  const bigChange = Math.abs(speed - prevSpeed) >= 2;
+  const bigChange = delta >= 2;
   const sharp = isSharp(speed, angle, false);
+  if (delta >= (profile.deltaDanger ?? 3)) return "danger";
   if (bigChange && sharp) return "danger";
   if (bigChange || sharp) return "red";
   if ((speed <= 2 && a <= 40) || (speed === 3 && a === 0)) return "green";
@@ -96,7 +111,7 @@ export function resolveManeuver(profile: ManeuverProfile, id: string, prevSpeed:
 /** Všechny povolené manévry profilu z dané rychlosti (pro bota a nápovědu). */
 export function listManeuvers(profile: ManeuverProfile, prevSpeed: number): Maneuver[] {
   const out: Maneuver[] = [];
-  for (let speed = 1; speed <= profile.maxSpeed; speed++) {
+  for (let speed = 0; speed <= profile.maxSpeed; speed++) {
     for (let angle = -MAX_ANGLE; angle <= MAX_ANGLE; angle += ANGLE_STEP) {
       const m = makeManeuver(profile, speed, angle, false, prevSpeed);
       if (m) out.push(m);
@@ -134,6 +149,7 @@ export function maneuverEnd(start: Pose, man: Maneuver): Pose {
 
 export function maneuverLabel(man: Maneuver): string {
   if (man.koiogran) return man.angle === 0 ? `Otočka ${man.speed}` : `Rychlost ${man.speed}, ${Math.abs(man.angle)}° ${man.angle < 0 ? "vlevo" : "vpravo"} + otočka`;
+  if (man.speed === 0) return "Stát (rychlost 0)";
   if (man.angle === 0) return `Rovně ${man.speed}`;
   return `Rychlost ${man.speed}, ${Math.abs(man.angle)}° ${man.angle < 0 ? "vlevo" : "vpravo"}`;
 }

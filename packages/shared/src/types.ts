@@ -24,6 +24,11 @@ export interface ManeuverProfile {
   maxSpeed: number;
   maxAngle: number[];
   koiogranSpeeds: number[];
+  /** Změna rychlosti za kolo: do `deltaWhite` bílá, do `deltaDanger`−1 oranžová, od `deltaDanger` nebezpečná, přes `deltaMax` nelze. */
+  deltaDanger: number;
+  deltaMax: number;
+  /** Nejvyšší rychlost, na kterou jde vyrazit z 0 (stíhač 2 – oranžově, bitevník 1). */
+  startMax: number;
 }
 
 /** Akce po pohybu – jedna za kolo (nebo místo ní speciální zbraň). */
@@ -37,6 +42,8 @@ export type ActionOrder =
   | { type: "jettison"; moduleId: string }
   /** Zvednutí nákladu (trosek) v dosahu kolem lodi do nákladového prostoru; před pohybem, rychlost ≤ limit. */
   | { type: "pickup"; targetId?: string }
+  /** Otočení na místě (jen stojící loď, rychlost 0): nový kurz před pohybem. */
+  | { type: "turn"; heading: number }
   /** Komunikace s funkční stanicí v dohledu: objednávka modulu (cena jako v obchodě); stanice ho vypustí jako trosky směrem k volajícímu. */
   | { type: "comm"; stationId: string; moduleType: ModuleType }
   | { type: "barrelRoll"; side: Side };
