@@ -29,6 +29,8 @@ export interface ManeuverProfile {
   deltaMax: number;
   /** Nejvyšší rychlost, na kterou jde vyrazit z 0 (stíhač 2 – oranžově, bitevník 1). */
   startMax: number;
+  /** Z jaké nejvyšší rychlosti jde zastavit (stíhač 2 – oranžově, bitevník 1). */
+  stopMax: number;
 }
 
 /** Akce po pohybu – jedna za kolo (nebo místo ní speciální zbraň). */

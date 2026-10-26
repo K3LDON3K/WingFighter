@@ -39,6 +39,7 @@ import {
   maneuverStress,
   effStressCost,
   profileFor,
+  makeManeuver,
   effEvadeCost,
   droidModule,
   droidCost,
@@ -249,7 +250,7 @@ function maneuverHelp(ship: Ship): HTMLElement {
     "div",
     { class: "mhelp" },
     h("h4", {}, label("Dráha")),
-    h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 0–5 rychlost zamknou, K = otočka, mezerník potvrdí."), li(`Zastavení: rychlost 0 jde zvolit jen z rychlosti 1 (klávesa 0 / myš těsně u lodi). Stojící loď nemůže uhýbat ani dělat otočku; může se ale za 1 akci otočit na místě do libovolného směru (OTOČIT) a pak vyrazit: ${prof.startMax >= 2 ? "stíhač na 1 (zelený) nebo rovnou na 2 (oranžový)" : "bitevník jen na 1"}.`)),
+    h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 0–5 rychlost zamknou, K = otočka, mezerník potvrdí."), li(`Zastavení: rychlost 0 jde zvolit z rychlosti 1 (bílé)${prof.stopMax >= 2 ? ", stíhač i z rychlosti 2 (oranžové, 1 stres)" : ""} – tlačítko ZASTAVIT, klávesa 0 nebo myš těsně u lodi. Stojící loď nemůže uhýbat ani dělat otočku; může se ale za 1 akci otočit na místě do libovolného směru (OTOČIT) a pak vyrazit: ${prof.startMax >= 2 ? "stíhač na 1 (zelený) nebo rovnou na 2 (oranžový)" : "bitevník jen na 1"}.`)),
     h("h4", {}, label("Rychlost")),
     h("ul", {}, li(`${HULLS[ship.loadout.hullId]?.name ?? "Loď"}: 1–${hullProf.maxSpeed}; tvoje loď teď max. ${prof.maxSpeed} (váha výbavy: každých ${WEIGHT.perSpeed} váhy = −1; overdrive droida váhu ignoruje).`), li(`Otočka o 180° jde jen z rychlosti ${prof.koiogranSpeeds.length ? `${Math.min(...prof.koiogranSpeeds)}–${Math.max(...prof.koiogranSpeeds)}` : "–"}, stojí 2 akce (s overdrivem 1) a po ní rychlost klesne o ${RULES.koiogranSpeedDrop}.`)),
     h("h4", {}, label("Úhel")),
@@ -690,7 +691,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           (() => {
             // cena ve všech surovinách: otočka 2 akce + stres oranžového manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
             const turnInPlace = a.id === "koiogran" && ship.speed === 0;
-            const manStress = turnInPlace ? 0 : a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : 0;
+            const stopMan = a.id === "stop" ? makeManeuver(profileFor(ship, o), 0, 0, false, ship.speed) : null;
+            const manStress = turnInPlace ? 0 : a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : stopMan ? effStressCost(stopMan, o) : 0;
             const c = { actions: a.id === "koiogran" && !turnInPlace ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];
             if (c.stress > 0) parts.push(`${c.stress} stres`);
@@ -1153,7 +1155,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   };
   if (m.scanOpen && scannerModule(ship.loadout)) {
     details.append(icon("scan", "#7dd3fc"));
-    if (m.turnPick && o.action?.type === "turn") details.append(h("span", { class: "warn" }, label("otočení na místě: klikni na mapě, kam má loď mířit")), h("span", { class: "muted" }, label(` · kurz ${Math.round((((o.action.heading * 180) / Math.PI) % 360 + 360) % 360)}°`)));
+    if (m.turnPick && o.action?.type === "turn") details.append(h("span", { class: "warn" }, label("otočení na místě: loď se otáčí za myší – klik na mapě potvrdí (Esc = ponechat)")), h("span", { class: "muted" }, label(` · kurz ${Math.round((((o.action.heading * 180) / Math.PI) % 360 + 360) % 360)}°`)));
     if (m.scanPick) details.append(h("span", { class: "warn" }, label(`klikni na cizí loď v dohledu (dosah ${SCANNER.range}) – sken proběhne hned`)), h("span", { class: "muted" }, label(`· technologie ${ship.techPoints}/${ship.stats.techMax} · nebere akci`)));
     else details.append(h("span", { class: "muted" }, label(`technologie ${ship.techPoints}/${ship.stats.techMax} · nedobíjí se · nebere akci`)));
   } else if (shotsOfType(ship, o, "mg").length && o.special?.type !== "torpedo" && o.special?.type !== "mine" && (!shotsOfType(ship, o, "laser").length || shotsOfType(ship, o, "mg").some((x) => x.mod.id === m.activeShot))) {

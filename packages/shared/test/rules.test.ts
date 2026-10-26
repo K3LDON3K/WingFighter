@@ -1598,7 +1598,9 @@ describe("zastavení a rozjezd", () => {
   it("rychlost 0 jen z 1; stíhač 0→1 bílý, 0→2 oranžový, 0→3 nelze; změna o 3 nebezpečná, o 4 nelze; bitevník ±2 nebezpečné, ±3 nelze, z 0 jen na 1", () => {
     const F = FIGHTER_PROFILE;
     expect(classifyManeuver(F, 0, 0, false, 1)).toBe("white");
-    expect(classifyManeuver(F, 0, 0, false, 2)).toBeNull();
+    expect(classifyManeuver(F, 0, 0, false, 2)).toBe("red"); // stíhač zastaví i z 2 (oranžově)
+    expect(classifyManeuver(F, 0, 0, false, 3)).toBeNull();
+    expect(classifyManeuver(BATTLESHIP_PROFILE, 0, 0, false, 2)).toBeNull();
     expect(classifyManeuver(F, 0, 0, false, 0)).toBe("white");
     expect(classifyManeuver(F, 1, 0, false, 0)).toBe("green"); // rozjezd na 1 rovně = mírný manévr
     expect(classifyManeuver(F, 2, 0, false, 0)).toBe("red");

@@ -16,6 +16,7 @@ export const FIGHTER_PROFILE: ManeuverProfile = {
   deltaDanger: 3,
   deltaMax: 3,
   startMax: 2,
+  stopMax: 2,
 };
 /** Profil bitevníku: pomalejší a těžkopádnější, otočka jen z rychlosti 2–3; zrychluje i brzdí hůř (±2 = nebezpečné, ±3 nelze), z 0 jen na 1. */
 export const BATTLESHIP_PROFILE: ManeuverProfile = {
@@ -25,6 +26,7 @@ export const BATTLESHIP_PROFILE: ManeuverProfile = {
   deltaDanger: 2,
   deltaMax: 2,
   startMax: 1,
+  stopMax: 1,
 };
 
 export function maneuverId(speed: number, angle: number, koiogran = false): string {
@@ -70,10 +72,10 @@ export function classifyCurve(profile: ManeuverProfile, speed: number, angle: nu
   if (Math.abs(angle) > profile.maxAngle[speed]) return null;
   const delta = Math.abs(speed - prevSpeed);
   if (delta > (profile.deltaMax ?? 3)) return null;
-  // zastavení: jen z rychlosti 1 (nebo stát dál); rozjezd z 0 nejvýš na startMax
-  if (speed === 0 && prevSpeed > 1) return null;
+  // zastavení: nejvýš z rychlosti stopMax (z 2 oranžově); rozjezd z 0 nejvýš na startMax
+  if (speed === 0 && prevSpeed > (profile.stopMax ?? 1)) return null;
   if (prevSpeed === 0 && speed > (profile.startMax ?? 2)) return null;
-  if (speed === 0) return "white";
+  if (speed === 0) return delta >= 2 ? "red" : "white";
   const a = Math.abs(angle);
   const bigChange = delta >= 2;
   const sharp = isSharp(speed, angle, false);

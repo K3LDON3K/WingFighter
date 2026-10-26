@@ -34,7 +34,7 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
           title: "Otočit na místě",
           cost: { actions: 1 },
           fx: [
-            { icon: "ship", text: "stojící loď se otočí do libovolného směru (klik na mapě)" },
+            { icon: "ship", text: "loď se otáčí za myší, klik na mapě potvrdí; další stisk = znovu upravit, stisk během otáčení = zrušit" },
             { icon: "clock", text: "platí od začátku kola – i pro střelbu", tone: "good" },
             { icon: "stress", text: "bez stresu", tone: "good" },
           ],

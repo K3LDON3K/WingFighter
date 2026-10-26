@@ -871,10 +871,12 @@ function buildOverlay(view: ViewModel): Overlay {
     const aiming = g.aimingShipId === ship.id && !g.submitted;
     const laserShots = shotsOfType(ship, o, "laser");
     const mgShots = shotsOfType(ship, o, "mg");
-    // otočení na místě: náhled (dráha, výseče, duch) vychází z nového kurzu
+    // otočení na místě: samotná loď se v náhledu otočí (žádný duch), dráha i výseče vychází z nového kurzu
     const turned = o.action?.type === "turn" ? ({ ...ship, heading: o.action.heading } as typeof ship) : ship;
-    const vsT = turned === ship ? vs : { ...vs, heading: turned.heading };
-    overlay.previews.push({ ship: vsT, maneuver: man, aiming, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
+    vs.heading = turned.heading;
+    const vsT = vs;
+    if (man.speed > 0 || man.koiogran) overlay.previews.push({ ship: vsT, maneuver: man, aiming, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
+    else if (laserShots.length || mgShots.length) overlay.previews.push({ ship: vsT, maneuver: man, aiming: false, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
     const end = maneuverEnd(turned, man);
 
     if (aiming) {
@@ -1863,6 +1865,7 @@ function aimAt(wx: number, wy: number) {
   const o = g.orders.get(id);
   if (!ship || !o) return;
   const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
+  const profile = profileFor(ship, o);
   const d = Math.hypot(wx - ship.x, wy - ship.y);
   if (d < ship.stats.radius + 4) return; // těsně u lodi nic neměnit
   const heading0 = o.action?.type === "turn" ? o.action.heading : ship.heading;
@@ -1872,7 +1875,7 @@ function aimAt(wx: number, wy: number) {
   angle = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, angle));
   // v režimu otočky je nejnižší rychlost 2; myš těsně u lodi = zastavit (rychlost 0, jen z rychlosti 1)
   const raw = Math.round(d / (MOVE_UNIT * 0.9));
-  const minSp = cur.koiogran ? 2 : ship.speed <= 1 ? 0 : 1;
+  const minSp = cur.koiogran ? 2 : ship.speed >= 1 && ship.speed <= profile.stopMax ? 0 : 1;
   const speed = g.speedLock.get(id) ?? Math.max(minSp, Math.min(5, raw));
   setManeuver(id, speed, speed === 0 ? 0 : angle, cur.koiogran);
 }
@@ -1950,6 +1953,19 @@ function chooseIcon(shipId: string, id: string) {
   }
   const a = actionById(id);
   if (!a) return;
+  // OTOČIT (stojící loď): první stisk zapne otáčení za myší, další stisk při zapnutém otáčení zruší, stisk na potvrzeném = znovu upravit
+  if (a.id === "koiogran" && ship.speed === 0 && o.action?.type === "turn") {
+    if (g.turnPick) {
+      g.orders.set(shipId, { ...o, action: undefined });
+      g.turnPick = false;
+      sfx("cancel");
+    } else {
+      g.turnPick = true;
+      sfx("toggle");
+    }
+    renderSide();
+    return;
+  }
   const why = a.disabled(ship, g.state, o);
   if (why) {
     showError(`${a.label}: ${why}.`);
@@ -2187,6 +2203,14 @@ function bindInput(c: HTMLCanvasElement) {
     game.hoverIcon = ic ? `${ic.shipId}:${ic.id}` : undefined;
     game.hoverId = ic ? undefined : entityAt(w.x, w.y)?.id;
     if (!ic && !game.anim && game.aimingShipId) aimAt(w.x, w.y);
+    // otočení na místě: loď se plynule otáčí za myší, klik potvrdí
+    if (!game.anim && game.turnPick && !game.submitted) {
+      const sel = game.state.ships.find((x) => x.id === game!.selectedShipId);
+      const o = sel && game.orders.get(sel.id);
+      if (sel && o?.action?.type === "turn" && Math.hypot(w.x - sel.x, w.y - sel.y) > 6) {
+        game.orders.set(sel.id, { ...o, action: { type: "turn", heading: Math.atan2(w.y - sel.y, w.x - sel.x) } });
+      }
+    }
   }, { signal: inputAbort.signal });
 
   window.addEventListener("mouseup", () => {
@@ -2463,7 +2487,7 @@ function bindInput(c: HTMLCanvasElement) {
     const id = game.selectedShipId;
     const o = id && game.orders.get(id);
     const cur = o ? parseManeuverId(o.maneuverId) : null;
-    if (e.key === "Escape" && (game.submitted || !id || !cur || (!game.shieldEdit && !game.rechargeOpen && !game.minePick && !game.picking && !game.aimingShipId && !game.jettisonPick && !game.inventoryOpen && !tuningOpen && !game.scanPick && !game.cargoOpen))) {
+    if (e.key === "Escape" && (game.submitted || !id || !cur || (!game.shieldEdit && !game.rechargeOpen && !game.minePick && !game.picking && !game.aimingShipId && !game.jettisonPick && !game.inventoryOpen && !tuningOpen && !game.scanPick && !game.cargoOpen && !game.turnPick))) {
       toggleMenu(true);
       e.preventDefault();
       return;
@@ -2485,6 +2509,7 @@ function bindInput(c: HTMLCanvasElement) {
         game.shieldEdit = false;
         if (o && o.action?.type === "shield") game.orders.set(id, { ...o, action: undefined });
       } else if (game.minePick) game.minePick = null;
+      else if (game.turnPick) game.turnPick = false;
       else if (game.picking) game.picking = null;
       else game.aimingShipId = null;
       game.speedLock.delete(id);

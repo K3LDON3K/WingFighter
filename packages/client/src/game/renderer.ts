@@ -1083,6 +1083,12 @@ export class Renderer {
   private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[], mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[]) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[ship.team];
+    if (man.speed === 0 && !man.koiogran) {
+      // stojící loď: jen výseče zbraní, žádná dráha ani duch
+      for (const a of laserArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, color, a.range ?? LASER.range, a.halfArc);
+      for (const a of mgArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, "#fbbf24", a.range, a.halfArc);
+      return;
+    }
     const pts = samplePath(maneuverPath(ship, man), 24);
     const end = pts[pts.length - 1];
     // dráha: tenká souvislá čára; rychlost = tečky v místech ujetých dílů (poslední u ducha lodi)

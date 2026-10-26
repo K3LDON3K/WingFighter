@@ -20,7 +20,7 @@ export interface ActionOption {
 
 /** Je akce pro loď vůbec k dispozici (má potřebný modul)? */
 export function actionAvailable(a: ActionOption, ship: Ship): boolean {
-  if (a.id === "stop") return ship.speed === 1;
+  if (a.id === "stop") return ship.speed >= 1 && ship.speed <= profileOf(ship.loadout).stopMax;
   if (a.id === "evade") return ship.loadout.hullId !== "battleship";
   if (a.id === "shield") return ship.loadout.modules.some((m) => m.type === "shield-segment");
   if (a.id === "jettison") return ship.loadout.modules.length > 0;
@@ -95,8 +95,14 @@ export const ACTIONS: ActionOption[] = [
     id: "stop",
     glyph: "■",
     label: "Zastavit (1 akce)",
-    description: "Jen z rychlosti 1: loď v tomto kole zastaví (rychlost 0). Stojící loď nemůže uhýbat ani dělat otočku 180°, tlačítkem OTOČKA se ale za 1 akci otočí na místě do libovolného směru a pak může vyrazit (stíhač až na 2 – oranžově, bitevník na 1).",
-    disabled: (ship, _s, o) => (ship.speed !== 1 ? "zastavit jde jen z rychlosti 1" : noAp(ship, o, parseManeuverId(o.maneuverId)?.speed === 0)),
+    description: "Z rychlosti 1 (bílé), stíhač i z rychlosti 2 (oranžové, 1 stres): loď v tomto kole zastaví (rychlost 0). Stojící loď nemůže uhýbat ani dělat otočku 180°, tlačítkem OTOČKA se ale za 1 akci otočí na místě do libovolného směru a pak může vyrazit (stíhač až na 2 – oranžově, bitevník na 1).",
+    disabled: (ship, _s, o) => {
+      const prof = profileFor(ship, o);
+      if (ship.speed < 1 || ship.speed > prof.stopMax) return `zastavit jde jen z rychlosti ${prof.stopMax >= 2 ? "1–2" : "1"}`;
+      const man = makeManeuver(prof, 0, 0, false, ship.speed);
+      if (man && effStressCost(man, o) > ship.stressPoints && parseManeuverId(o.maneuverId)?.speed !== 0) return `chybí stres (zastavení z ${ship.speed} stojí ${effStressCost(man, o)})`;
+      return noAp(ship, o, parseManeuverId(o.maneuverId)?.speed === 0);
+    },
     active: (o) => parseManeuverId(o.maneuverId)?.speed === 0,
     apply: (o, ship) => {
       const profile = profileFor(ship, o);
