@@ -57,7 +57,7 @@ export interface Overlay {
   selectedShipId?: string;
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
-  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[]; mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[] }[];
+  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; stopNow?: boolean; laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[]; mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[] }[];
   /** Dohled vlastního týmu (fog of war). */
   vision?: { x: number; y: number; r: number }[];
   /** Kreslit slabý kruh dohledu kolem vlastních lodí. */
@@ -230,7 +230,7 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
-    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArcs, p.mgArcs);
+    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArcs, p.mgArcs, p.stopNow);
     for (const p of overlay.botPlans ?? []) this.drawBotPlan(p.ship, p.maneuver);
     for (const l of overlay.torpedoLines ?? []) this.drawTorpedoLine(l);
 
@@ -1088,13 +1088,14 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[], mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[]) {
+  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[], mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[], stopBadge = false) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[ship.team];
     if (man.speed === 0 && !man.koiogran) {
-      // stojící loď: jen výseče zbraní, žádná dráha ani duch
+      // stojící loď: jen výseče zbraní, žádná dráha ani duch; při zastavení hned odznak stopky u lodi
       for (const a of laserArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, color, a.range ?? LASER.range, a.halfArc);
       for (const a of mgArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, "#fbbf24", a.range, a.halfArc);
+      if (stopBadge) this.drawStopBadge(ship.x + ship.radius + 6, ship.y - ship.radius - 2);
       return;
     }
     const pts = samplePath(maneuverPath(ship, man), 24);
@@ -1144,19 +1145,20 @@ export class Renderer {
       this.drawPixelIcon("turn", bx, by, s, "#0b1020");
       ctx.restore();
     }
-    if (man.stop) {
-      // zastavení na konci dráhy: odznak ■ vedle ducha
-      const s = 1.4;
-      const bx = end.x + ship.radius + 6;
-      const by = end.y - ship.radius - 2;
-      ctx.save();
-      ctx.fillStyle = "#0b1020";
-      ctx.fillRect(bx - 8 * s, by - 8 * s, 16 * s, 16 * s);
-      ctx.fillStyle = "#ef4444";
-      ctx.fillRect(bx - 7 * s, by - 7 * s, 14 * s, 14 * s);
-      this.drawPixelIcon("stop", bx, by, s, "#f8fafc");
-      ctx.restore();
-    }
+    if (man.stop) this.drawStopBadge(end.x + ship.radius + 6, end.y - ship.radius - 2); // zastavení na konci dráhy: stopka vedle ducha
+  }
+
+  /** Odznak zastavení (červená stopka). */
+  private drawStopBadge(bx: number, by: number) {
+    const ctx = this.ctx;
+    const s = 1.4;
+    ctx.save();
+    ctx.fillStyle = "#0b1020";
+    ctx.fillRect(bx - 8 * s, by - 8 * s, 16 * s, 16 * s);
+    ctx.fillStyle = "#ef4444";
+    ctx.fillRect(bx - 7 * s, by - 7 * s, 14 * s, 14 * s);
+    this.drawPixelIcon("stop", bx, by, s, "#f8fafc");
+    ctx.restore();
   }
 
   /** Torpédo v letu: čárkovaná čára k cíli se šipkou, plná část = dolet v tomto kole (tečka na konci). */

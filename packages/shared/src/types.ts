@@ -77,6 +77,8 @@ export interface ShipOrders {
   mgModuleId?: string;
   /** Výchozí cíl (loď, torpédo, trosky, kometa) pro střely bez vlastního cíle; když není ve výseči, střílí se na nejbližší nepřátelskou loď. */
   preferredTargetId?: string;
+  /** Jen klient: hráč potvrdil dráhu tlačítkem MANÉVR (i beze změny) – ZASTAVIT pak zastaví až na jejím konci. */
+  pathDrawn?: boolean;
   /** Droid – pilot: funkce zapnuté pro toto kolo (platí se technologií při vyhodnocení). */
   droid?: DroidOrder;
   /** Jen boti: přání dobít štít technologií (server provede hned při plánování; z rozkazu se odstraní). */

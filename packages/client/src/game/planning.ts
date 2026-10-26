@@ -652,7 +652,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       const isMove = a.id === "move";
       const active = isMove ? aiming : a.active(o, ship);
       // manévr nakreslen a potvrzen: zelené tlačítko, stisk = reset na rovně stejnou rychlostí
-      const moveDone = isMove && !aiming && o.maneuverId !== defaultOrders(ship).maneuverId;
+      const moveDone = isMove && !aiming && (o.maneuverId !== defaultOrders(ship).maneuverId || !!o.pathDrawn);
       // štít: upraveno a okénko zavřené = hotovo (zelené), stisk = reset (zrušit úpravu)
       const shieldDone = a.id === "shield" && !!planned && !editing && !rechargeMode;
       const stopDone = a.id === "stop" && !!parseManeuverId(o.maneuverId)?.stop;
@@ -694,7 +694,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           (() => {
             // cena ve všech surovinách: otočka 2 akce + stres oranžového manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
             const turnInPlace = a.id === "koiogran" && stoppedNow(ship, o);
-            const stopMan = a.id === "stop" ? (() => { const cur = parseManeuverId(o.maneuverId); const atEnd = !!cur && cur.speed > 0 && (cur.speed !== ship.speed || cur.angle !== 0 || cur.stop); return atEnd ? makeManeuver(profileFor(ship, o), cur!.speed, cur!.angle, false, ship.speed, true) : makeManeuver(profileFor(ship, o), 0, 0, false, ship.speed); })() : null;
+            const stopMan = a.id === "stop" ? (() => { const cur = parseManeuverId(o.maneuverId); const atEnd = !!cur && cur.speed > 0 && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0 || cur.stop); return atEnd ? makeManeuver(profileFor(ship, o), cur!.speed, cur!.angle, false, ship.speed, true) : makeManeuver(profileFor(ship, o), 0, 0, false, ship.speed); })() : null;
             const manStress = turnInPlace ? 0 : a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : stopMan ? effStressCost(stopMan, o) : 0;
             const c = { actions: a.id === "koiogran" && !turnInPlace ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];

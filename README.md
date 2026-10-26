@@ -194,6 +194,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.157 – Zastavení na konci dráhy i beze změny dráhy: stiskni MANÉVR a potvrď (i stejný směr a rychlost), pak ZASTAVIT – loď dráhu proletí a zastaví až na konci; bez potvrzené dráhy ZASTAVIT zastaví hned (stopka se pak kreslí přímo u lodi, jako ⟲ u otočky). Stisk ZASTAVIT během kreslení dráhu rovnou potvrdí a přidá zastavení na konci. Reset manévru potvrzení zruší.
 - v3.156 – Tlačítko ZASTAVIT je v liště vždy; když zastavení nejde (rychlost, stres, akce), je šedé s důvodem v bublině. Odznak zastavení u ducha na konci dráhy je červená „stopka“ (osmiúhelník), pixelové ikony v odznacích se kreslí bez mezer.
 - v3.155 – Okénko NÁKLAD je jen tak široké, jak potřebuje (široké zůstává jen při výběru modulu k vyhození). Otazník s nápovědou manévrů je v panelu Manévr pod barvou manévru nad „mezerník“; nápověda doplněna o zastavení (hned / na konci dráhy), otočení na místě a chybějící úhyb bitevníku.
 - v3.154 – Otočení na místě na dotykových zařízeních: po stisku OTOČIT táhneš prstem kdekoliv po mapě a loď se otáčí k prstu (s odsazením jako při kreslení dráhy), zvednutí prstu kurz potvrdí; ťuknutí = kurz k místu dotyku; druhý prst otáčení přeruší (kurz zůstane). Nápověda pod lištou podle zařízení.

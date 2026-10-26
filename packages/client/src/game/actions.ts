@@ -100,13 +100,13 @@ export const ACTIONS: ActionOption[] = [
     id: "stop",
     glyph: "■",
     label: "Zastavit (1 akce)",
-    description: "Bez nakreslené dráhy: loď zastaví hned (rychlost 0; z rychlosti 1 bílé, stíhač i z 2 oranžově +1 stres). Po nakreslené dráze: loď ji proletí a na jejím konci zastaví (dráha rychlostí 1 bílé, rychlostí 2 jen stíhač – oranžově). Stojící loď nemůže uhýbat ani dělat otočku 180°, tlačítkem OTOČKA se ale otočí na místě a pak může vyrazit.",
+    description: "Bez potvrzené dráhy: loď zastaví hned (rychlost 0; z rychlosti 1 bílé, stíhač i z 2 oranžově +1 stres). Po dráze potvrzené tlačítkem MANÉVR (i beze změny): loď ji proletí a na jejím konci zastaví (dráha rychlostí 1 bílé, rychlostí 2 jen stíhač – oranžově). Stojící loď nemůže uhýbat ani dělat otočku 180°, tlačítkem OTOČKA se ale otočí na místě a pak může vyrazit.",
     disabled: (ship, _s, o) => {
       const prof = profileFor(ship, o);
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.speed === 0 || cur?.stop) return noAp(ship, o, true);
       if (cur?.koiogran) return "s otočkou 180° zastavit nejde";
-      const atEnd = !!cur && (cur.speed !== ship.speed || cur.angle !== 0);
+      const atEnd = !!cur && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0);
       const sp = atEnd ? cur!.speed : ship.speed;
       if (sp < 1 || sp > prof.stopMax) return atEnd ? `zastavit jde jen na konci dráhy rychlostí ${prof.stopMax >= 2 ? "1–2" : "1"}` : `zastavit jde jen z rychlosti ${prof.stopMax >= 2 ? "1–2" : "1"}`;
       const man = atEnd ? makeManeuver(prof, cur!.speed, cur!.angle, false, ship.speed, true) : makeManeuver(prof, 0, 0, false, ship.speed);
@@ -123,7 +123,7 @@ export const ACTIONS: ActionOption[] = [
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.speed === 0) return { maneuverId: makeManeuver(profile, 1, 0, false, ship.speed)?.id ?? o.maneuverId };
       if (cur?.stop) return { maneuverId: makeManeuver(profile, cur.speed, cur.angle, false, ship.speed)?.id ?? o.maneuverId };
-      const atEnd = !!cur && (cur.speed !== ship.speed || cur.angle !== 0);
+      const atEnd = !!cur && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0);
       if (atEnd) return { maneuverId: makeManeuver(profile, cur!.speed, cur!.angle, false, ship.speed, true)?.id ?? o.maneuverId };
       return { maneuverId: makeManeuver(profile, 0, 0, false, ship.speed)?.id ?? o.maneuverId };
     },

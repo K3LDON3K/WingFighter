@@ -877,7 +877,7 @@ function buildOverlay(view: ViewModel): Overlay {
     vs.heading = turned.heading;
     const vsT = vs;
     if (man.speed > 0 || man.koiogran) overlay.previews.push({ ship: vsT, maneuver: man, aiming, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
-    else if (laserShots.length || mgShots.length) overlay.previews.push({ ship: vsT, maneuver: man, aiming: false, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
+    else overlay.previews.push({ ship: vsT, maneuver: man, aiming: false, fire: laserShots.length > 0, stopNow: ship.speed > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
     const end = maneuverEnd(turned, man);
 
     if (aiming) {
@@ -1450,7 +1450,7 @@ function renderSide() {
         const ship = g.state.ships.find((x) => x.id === id);
         const o = g.orders.get(id);
         if (!ship || !o) return;
-        g.orders.set(id, { ...o, maneuverId: defaultOrders(ship).maneuverId });
+        g.orders.set(id, { ...o, maneuverId: defaultOrders(ship).maneuverId, pathDrawn: false });
         g.aimingShipId = null;
         g.speedLock.delete(id);
         sfx("cancel");
@@ -1893,6 +1893,7 @@ function confirmManeuver(id: string): boolean {
   }
   g.aimingShipId = null;
   g.speedLock.delete(id);
+  g.orders.set(id, { ...o, pathDrawn: true }); // potvrzená dráha: ZASTAVIT zastaví až na jejím konci
   renderSide();
   return true;
 }
@@ -1954,6 +1955,20 @@ function chooseIcon(shipId: string, id: string) {
   }
   const a = actionById(id);
   if (!a) return;
+  // ZASTAVIT během kreslení dráhy: dráhu potvrdit a zastavit na jejím konci
+  if (a.id === "stop" && g.aimingShipId === shipId) {
+    if (!confirmManeuver(shipId)) return;
+    const o2 = g.orders.get(shipId)!;
+    const why2 = a.disabled(ship, g.state, o2);
+    if (why2) {
+      showError(`${a.label}: ${why2}.`);
+      return;
+    }
+    g.orders.set(shipId, { ...o2, ...a.apply(o2, ship, g.state) });
+    sfx("toggle");
+    renderSide();
+    return;
+  }
   // OTOČIT (stojící loď): první stisk zapne otáčení za myší, další stisk při zapnutém otáčení zruší, stisk na potvrzeném = znovu upravit
   if (a.id === "koiogran" && stoppedNow(ship, o) && o.action?.type === "turn") {
     if (g.turnPick) {
