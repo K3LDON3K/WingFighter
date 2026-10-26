@@ -76,6 +76,7 @@ import {
   actionCost,
 } from "@wingfighter/shared";
 import { clear, h } from "../dom.ts";
+import { isTouchMode } from "../touch.ts";
 import { actionTip } from "./tips.ts";
 import { tipAttr } from "../tooltip.ts";
 import { infoDialog } from "../dialog.ts";
@@ -1158,7 +1159,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   };
   if (m.scanOpen && scannerModule(ship.loadout)) {
     details.append(icon("scan", "#7dd3fc"));
-    if (m.turnPick && o.action?.type === "turn") details.append(h("span", { class: "warn" }, label("otočení na místě: loď se otáčí za myší – klik na mapě potvrdí (Esc = ponechat)")), h("span", { class: "muted" }, label(` · kurz ${Math.round((((o.action.heading * 180) / Math.PI) % 360 + 360) % 360)}°`)));
+    if (m.turnPick && o.action?.type === "turn") details.append(h("span", { class: "warn" }, label(isTouchMode() ? "otočení na místě: táhni prstem po mapě – loď se otáčí, zvednutí prstu potvrdí (ťuknutí = kurz k místu)" : "otočení na místě: loď se otáčí za myší – klik na mapě potvrdí (Esc = ponechat)")), h("span", { class: "muted" }, label(` · kurz ${Math.round((((o.action.heading * 180) / Math.PI) % 360 + 360) % 360)}°`)));
     if (m.scanPick) details.append(h("span", { class: "warn" }, label(`klikni na cizí loď v dohledu (dosah ${SCANNER.range}) – sken proběhne hned`)), h("span", { class: "muted" }, label(`· technologie ${ship.techPoints}/${ship.stats.techMax} · nebere akci`)));
     else details.append(h("span", { class: "muted" }, label(`technologie ${ship.techPoints}/${ship.stats.techMax} · nedobíjí se · nebere akci`)));
   } else if (shotsOfType(ship, o, "mg").length && o.special?.type !== "torpedo" && o.special?.type !== "mine" && (!shotsOfType(ship, o, "laser").length || shotsOfType(ship, o, "mg").some((x) => x.mod.id === m.activeShot))) {

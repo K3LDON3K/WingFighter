@@ -2006,6 +2006,7 @@ function bindInput(c: HTMLCanvasElement) {
   const fingers = new Map<number, { x: number; y: number }>();
   let pinch: { dist: number; mx: number; my: number } | null = null;
   let aimDrag: string | null = null; // loď, ze které se táhne dráha
+  let turnDrag: string | null = null; // dotyk: otáčení stojící lodi tažením prstu kdekoliv po mapě
   let longPress = 0;
   let longPressed = false;
   const TAP_SLOP = 8;
@@ -2052,6 +2053,7 @@ function bindInput(c: HTMLCanvasElement) {
         cancelAiming(aimDrag);
         aimDrag = null;
       }
+      turnDrag = null;
       return;
     }
     if (fingers.size > 2) return;
@@ -2063,7 +2065,12 @@ function bindInput(c: HTMLCanvasElement) {
     game.hoverId = undefined;
     game.hoverIcon = undefined;
     const hit = !game.anim && !game.submitted ? entityAt(w.x, w.y) : undefined;
-    if (hit?.kind === "ship" && hit.ownerId === playerId && !iconAt(w.x, w.y)) {
+    const turnShip = game.turnPick && !game.anim && !game.submitted ? game.state.ships.find((x) => x.id === game!.selectedShipId) : undefined;
+    if (turnShip && game.orders.get(turnShip.id)?.action?.type === "turn" && !iconAt(w.x, w.y)) {
+      // otáčení na místě: tažení prstem kdekoliv po mapě otáčí loď, zvednutí prstu kurz potvrdí
+      turnDrag = turnShip.id;
+      aimDrag = null;
+    } else if (hit?.kind === "ship" && hit.ownerId === playerId && !iconAt(w.x, w.y)) {
       // tažení z vlastní lodi = kreslení dráhy (rozhodne se až po pohybu)
       aimDrag = hit.id;
     } else {
@@ -2105,6 +2112,15 @@ function bindInput(c: HTMLCanvasElement) {
     if (!moved && !aimDragMoved(e)) return;
     moved = true;
     clearTimeout(longPress);
+    if (turnDrag) {
+      const ship = game.state.ships.find((x) => x.id === turnDrag);
+      const o = ship && game.orders.get(ship.id);
+      if (ship && o?.action?.type === "turn") {
+        const w = worldPos({ clientX: e.clientX, clientY: e.clientY - AIM_OFFSET });
+        if (Math.hypot(w.x - ship.x, w.y - ship.y) > 6) game.orders.set(ship.id, { ...o, action: { type: "turn", heading: Math.atan2(w.y - ship.y, w.x - ship.x) } });
+      }
+      return;
+    }
     if (aimDrag) {
       if (game.aimingShipId !== aimDrag && !startAiming(aimDrag)) {
         aimDrag = null;
@@ -2145,6 +2161,26 @@ function bindInput(c: HTMLCanvasElement) {
     if (fingers.size > 0) return;
     if (!game || !cam) return;
     const g = game;
+    if (turnDrag) {
+      const id = turnDrag;
+      turnDrag = null;
+      if (moved) {
+        // tažením otočeno: zvednutí prstu kurz potvrdí
+        g.turnPick = false;
+        sfx("toggle");
+        renderSide();
+        return;
+      }
+      // ťuknutí: kurz směrem k místu dotyku a potvrdit
+      const ship = g.state.ships.find((x) => x.id === id);
+      const o = ship && g.orders.get(id);
+      const w = worldPos(e);
+      if (ship && o?.action?.type === "turn" && Math.hypot(w.x - ship.x, w.y - ship.y) > 6) g.orders.set(id, { ...o, action: { type: "turn", heading: Math.atan2(w.y - ship.y, w.x - ship.x) } });
+      g.turnPick = false;
+      sfx("toggle");
+      renderSide();
+      return;
+    }
     if (aimDrag) {
       const id = aimDrag;
       aimDrag = null;
