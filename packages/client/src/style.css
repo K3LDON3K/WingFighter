@@ -408,9 +408,10 @@ h3,
 .hint {
   position: absolute;
   bottom: 8px;
-  left: 10px;
+  right: 10px;
+  max-width: calc(100% - 300px);
   color: var(--muted);
-  font-size: 17px;
+  font-size: 13px;
   background: rgba(5, 7, 15, 0.75);
   padding: 4px 8px;
 }
@@ -497,10 +498,10 @@ h3,
   flex: none;
 }
 .ship-tabs button {
-  padding: 0 6px;
-  height: 16px;
+  padding: 0 8px;
+  height: 20px;
   line-height: 1;
-  font-size: 11px;
+  font-size: 12px;
   border-width: 2px;
   min-width: 26px;
   white-space: nowrap;
@@ -546,6 +547,7 @@ h3,
 .map-zoom,
 .hud,
 .map .hint,
+.subbar,
 .pstat,
 .maplog,
 .confirm-wrap,
@@ -708,10 +710,30 @@ h3,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* akce ve dvou řádcích: nahoře zbraně (zalamují se), dole pohyb · loď · speciální */
 .bb-weapons {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.act-line {
+  display: flex;
   gap: 10px;
-  height: 72px;
+}
+.act-line-top {
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--bevel-d);
+  padding-bottom: 2px;
+}
+.act-line-top .act-group {
+  border-right: 0;
+}
+.act-line-top .act-row {
+  flex-wrap: wrap;
+}
+.bottombar .pnl.bb-actions {
+  padding: 6px 8px;
+  gap: 0;
 }
 .act-group {
   display: flex;
@@ -736,9 +758,9 @@ h3,
 .bb-weapon {
   flex-direction: column;
   width: 72px;
-  flex: 0 1 72px;
+  flex: 0 0 72px;
   min-width: 58px;
-  height: 62px;
+  height: 52px;
   gap: 5px;
   padding: 4px 0 2px;
 }
@@ -1557,22 +1579,22 @@ h3,
   overflow: visible !important;
   justify-content: center;
 }
+/* jméno lodi + přepínač lodí: samostatný rámeček nad lištou (nevyčnívá z lišty) */
 .bb-tab {
   position: absolute;
-  top: -22px;
-  left: 6px;
-  height: 22px;
+  top: -48px;
+  left: 0;
+  height: 30px;
   padding: 0 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   white-space: nowrap;
   z-index: 3;
   font-size: 15px;
   font-weight: 700;
-  background: var(--panel-2);
-  border: 3px solid;
-  border-color: var(--bevel-l) var(--bevel-d) transparent var(--bevel-l);
+  background: rgba(5, 7, 15, 0.8);
+  border: 2px solid #1e293b;
 }
 .bb-shipbody {
   align-items: center;
@@ -3763,10 +3785,6 @@ button.start-chip.on:hover:not(:disabled) {
 }
 
 /* hlavička Akce: suroviny vedle sebe – popisek nad pilulkami (varianta C) */
-.bb-head.res-head {
-  height: auto;
-  min-height: 26px;
-}
 .res-row {
   display: flex;
   align-items: flex-end;
@@ -5289,4 +5307,39 @@ body.drag-on * {
 .bb-ammo .ammo-num {
   font-family: var(--txt);
   font-size: 11px;
+}
+
+/* podlišta pod spodní lištou: ukazatele akce / stres / technologie vlevo, vedle popisek k vybrané akci */
+.subbar {
+  height: 30px;
+  background: #0b1220;
+  border-top: 2px solid #1e293b;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 18px;
+  flex: none;
+}
+.subbar:empty {
+  display: none;
+}
+.subbar .res-row {
+  gap: 12px;
+  align-items: center;
+  flex-wrap: nowrap;
+  flex: none;
+}
+.subbar .res-grp {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.subbar .res-grp .res-lbl {
+  font-size: 11px;
+}
+.subbar .bb-details {
+  border-left: 2px solid #1e293b;
+  padding-left: 14px;
+  height: auto;
+  min-width: 0;
 }

@@ -309,17 +309,19 @@ export function updateManeuverPanel(root: HTMLElement, m: PlanningModel): boolea
   return true;
 }
 
-export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks) {
+/** Spodní lišta (root) + podlišta pod ní (sub): ukazatele akce/stres/technologie a popisek k vybrané akci. */
+export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks, sub?: HTMLElement) {
   clear(root);
+  if (sub) clear(sub);
   popsNow.clear();
   try {
-    renderBottomBarInner(root, m, cb);
+    renderBottomBarInner(root, m, cb, sub);
   } finally {
     openPops = new Set(popsNow);
   }
 }
 
-function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks) {
+function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks, sub?: HTMLElement) {
   const my = m.state.ships.filter((s) => s.alive && s.ownerId === m.myId);
   const ship = my.find((s) => s.id === m.selectedShipId) ?? my[0];
 
@@ -564,7 +566,10 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   );
   /** Kolik akcí tlačítko právě stojí (tečky): otočka 2, manévr 1 (jen když se liší od rovně stejnou rychlostí), ostatní 1. */
   const dotsFor = (id: string) => (id === "koiogran" ? (acts.some((a) => a.id === "koiogran") ? 2 : 0) : id === "move" ? (acts.some((a) => a.id === "move") && !acts.some((a) => a.id === "koiogran") ? 1 : 0) : acts.some((a) => a.id === id) ? 1 : 0);
-  const buttons = h("div", { class: "bb-weapons" });
+  // dva řádky: nahoře zbraně (při mnoha modulech se zalamují), dole pohyb · loď · speciální
+  const rowTop = h("div", { class: "act-line act-line-top" });
+  const rowBot = h("div", { class: "act-line" });
+  const buttons = h("div", { class: "bb-weapons" }, rowTop, rowBot);
   for (const grp of ACTION_GROUPS) {
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
     // skupina bez dostupných akcí se neukazuje; Loď = NÁKLAD (vyhodit / zvednout), Speciální = štít, skener, droid
@@ -1138,8 +1143,9 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       }
     }
     box.append(row);
-    buttons.append(box);
+    (grp.label === "Zbraně" ? rowTop : rowBot).append(box);
   }
+  if (!rowTop.childElementCount) rowTop.remove();
   const details = h("div", { class: "bb-details" });
   const seg = (content: Node | string, active: boolean, title: string, onclick: () => void) => h("button", { class: `px seg ${active ? "on" : ""}`, disabled: locked, title, onclick }, content);
   /** Výběr modulu (když je jich víc stejného typu): 1, 2, … s municí. */
@@ -1266,10 +1272,11 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const actions = h(
     "div",
     { class: "pnl bb-actions" },
-    h("div", { class: "bb-head res-head" }, resources),
     buttons,
-    details,
   );
+  // podlišta: ukazatele úplně vlevo, vedle popisek k vybrané akci
+  if (sub) sub.append(resources, details);
+  else actions.append(details);
 
   /* ---- 4. spuštění kola (úzký sloupec) ---- */
   let confirmPop: HTMLElement | null = null;

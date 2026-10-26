@@ -650,6 +650,7 @@ let renderer: Renderer | null = null;
 let cam: Camera | null = null;
 let sideEl: HTMLElement | null = null;
 let barEl: HTMLElement | null = null;
+let subEl: HTMLElement | null = null;
 let hudEl: HTMLElement | null = null;
 let overlayEl: HTMLElement | null = null;
 let menuEl: HTMLElement | null = null;
@@ -674,6 +675,7 @@ function mountGame() {
   pstatEl = h("div", { class: "pstat" });
   confirmEl = h("div", { class: "confirm-wrap", style: "display:none" });
   barEl = h("div", { class: "bottombar" });
+  subEl = h("div", { class: "subbar" });
   sideEl = h("div", { class: "maplog" });
   mapEl = h(
     "div",
@@ -709,7 +711,7 @@ function mountGame() {
     tuneEl,
     toastEl,
   );
-  app.append(h("div", { class: "game" }, h("div", { class: "mapcol" }, mapEl, barEl)));
+  app.append(h("div", { class: "game" }, h("div", { class: "mapcol" }, mapEl, barEl, subEl)));
 
   const ctx = canvas.getContext("2d")!;
   renderer = new Renderer(canvas, ctx);
@@ -753,7 +755,7 @@ function unmountGame() {
   cancelAnimationFrame(raf);
   inputAbort.abort();
   resizeObs?.disconnect();
-  canvas = renderer = cam = sideEl = barEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = null;
+  canvas = renderer = cam = sideEl = barEl = subEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = null;
   render();
 }
 
@@ -1720,6 +1722,7 @@ function renderSide() {
         renderSide();
       },
     },
+    subEl ?? undefined,
   );
   document.getElementById("inv-btn")?.classList.toggle("on", game.inventoryOpen);
   if (game.inventoryOpen) {

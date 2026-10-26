@@ -194,6 +194,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.159 – Spodní lišta: ukazatele AKCE / STRES / TECHNOLOGIE a popisek k vybrané akci se přesunuly do nové podlišty pod lištou (ukazatele úplně vlevo). Tlačítka akcí jsou ve dvou řádcích – nahoře zbraně (zalamují se podle počtu modulů), dole pohyb · loď · speciální – a všechna jsou stejně velká (72×52). Jméno lodi a přepínač lodí letky jsou v samostatném rámečku nad lištou (nevyčnívá z ní), nápověda k ovládání je vpravo dole nad lištou.
 - v3.158 – Po srážce lodí mají obě lodě v příštím kole imunitu vůči sobě (nesrazí se znovu, mohou se od sebe rozjet i skrz sebe); vůči ostatním lodím a překážkám platí srážky normálně.
 - v3.157 – Zastavení na konci dráhy i beze změny dráhy: stiskni MANÉVR a potvrď (i stejný směr a rychlost), pak ZASTAVIT – loď dráhu proletí a zastaví až na konci; bez potvrzené dráhy ZASTAVIT zastaví hned (stopka se pak kreslí přímo u lodi, jako ⟲ u otočky). Stisk ZASTAVIT během kreslení dráhu rovnou potvrdí a přidá zastavení na konci. Reset manévru potvrzení zruší.
 - v3.156 – Tlačítko ZASTAVIT je v liště vždy; když zastavení nejde (rychlost, stres, akce), je šedé s důvodem v bublině. Odznak zastavení u ducha na konci dráhy je červená „stopka“ (osmiúhelník), pixelové ikony v odznacích se kreslí bez mezer.
