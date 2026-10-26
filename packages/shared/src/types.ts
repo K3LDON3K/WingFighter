@@ -273,6 +273,8 @@ export interface Ship extends Pose {
   shieldRechargedTurn?: number;
   /** Pasivní oprava trupu (droid hacker): kolik kol ještě opravuje. */
   autoRepair?: number;
+  /** Po srážce lodí: id druhé lodi → poslední kolo, ve kterém se tyto dvě lodě navzájem nesrazí (mohou se rozjet). */
+  collidedWith?: Record<string, number>;
   /** Rychlost posledního manévru (prudká změna o 2+ = červený manévr). */
   speed: number;
   tokens: { focus: number; evade: number };

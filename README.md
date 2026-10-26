@@ -49,7 +49,7 @@ nemůže uhýbat ani dělat otočku 180°, může se ale za 1 akci **otočit na 
 OTOČKA se u stojící lodi změní na OTOČIT, klik na mapě) a pak vyrazit – stíhač na 1 (zelený) nebo rovnou na 2 (oranžový), bitevník jen na 1. **Zrychlování a
 brzdění:** stíhač ±1 bílé, ±2 oranžové, ±3 nebezpečné (víc nejde); bitevník ±1 bílé, ±2 nebezpečné, ±3 nejde.
 **Srážky zastavují:** loď–loď (stačí dotyk štítů) – obě zastaví v místě dotyku, 15 zranění každé, obě ztratí akci
-a mají rychlost 0. Náraz do asteroidu nebo stanice – loď u něj zastaví (rychlost 0), vykousne do asteroidu díru
+a mají rychlost 0; v příštím kole mají vůči sobě imunitu (nesrazí se, i když se rozjíždějí skrz sebe). Náraz do asteroidu nebo stanice – loď u něj zastaví (rychlost 0), vykousne do asteroidu díru
 (velikost podle lodi, min. poloměr v ladění), 15 zranění a stres na 0. Kometa loď odmrští náhodným směrem
 (rychlost 1, stres 0); okraj mapy loď odrazí zpět (15 zranění).
 
@@ -194,6 +194,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.158 – Po srážce lodí mají obě lodě v příštím kole imunitu vůči sobě (nesrazí se znovu, mohou se od sebe rozjet i skrz sebe); vůči ostatním lodím a překážkám platí srážky normálně.
 - v3.157 – Zastavení na konci dráhy i beze změny dráhy: stiskni MANÉVR a potvrď (i stejný směr a rychlost), pak ZASTAVIT – loď dráhu proletí a zastaví až na konci; bez potvrzené dráhy ZASTAVIT zastaví hned (stopka se pak kreslí přímo u lodi, jako ⟲ u otočky). Stisk ZASTAVIT během kreslení dráhu rovnou potvrdí a přidá zastavení na konci. Reset manévru potvrzení zruší.
 - v3.156 – Tlačítko ZASTAVIT je v liště vždy; když zastavení nejde (rychlost, stres, akce), je šedé s důvodem v bublině. Odznak zastavení u ducha na konci dráhy je červená „stopka“ (osmiúhelník), pixelové ikony v odznacích se kreslí bez mezer.
 - v3.155 – Okénko NÁKLAD je jen tak široké, jak potřebuje (široké zůstává jen při výběru modulu k vyhození). Otazník s nápovědou manévrů je v panelu Manévr pod barvou manévru nad „mezerník“; nápověda doplněna o zastavení (hned / na konci dráhy), otočení na místě a chybějící úhyb bitevníku.

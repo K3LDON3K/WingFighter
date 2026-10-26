@@ -1510,6 +1510,8 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
         if (!hit) {
           for (const other of state.ships) {
             if (other === ship || !other.alive) continue;
+            // po srážce mají obě lodě jedno kolo imunitu vůči sobě (ať se od sebe dokážou rozjet)
+            if ((ship.collidedWith?.[other.id] ?? -1) >= turn || (other.collidedWith?.[ship.id] ?? -1) >= turn) continue;
             const om = shipMovers.get(other.id)!;
             const op = posAt(om, k);
             const ov = shipsOverlapPadded(p, cols, shieldPad(ship), op, other.stats.colliders, shieldPad(other));
@@ -1533,8 +1535,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               continue;
             }
             if (stillTouching(ship.id, other.id, true)) continue;
-            // srážka lodí: obě zastaví v místě dotyku (i štítů), kurz zůstává
+            // srážka lodí: obě zastaví v místě dotyku (i štítů), kurz zůstává; příští kolo se vůči sobě nesrazí
             hit = { with: "ship", otherId: other.id, heading: p.heading };
+            ship.collidedWith = { ...(ship.collidedWith ?? {}), [other.id]: turn + 1 };
+            other.collidedWith = { ...(other.collidedWith ?? {}), [ship.id]: turn + 1 };
             if (om.frozenAt === null) {
               freeze(om, k);
               stopped.add(other.id);
@@ -1879,6 +1883,12 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     }
   }
   for (const stn of state.stations ?? []) if (!stn.broken) stn.shields = Math.min(stn.maxShields, stn.shields + STATION.shieldRegen);
+  // prošlá imunita po srážce
+  for (const ship of state.ships) {
+    if (!ship.collidedWith) continue;
+    const keep = Object.fromEntries(Object.entries(ship.collidedWith).filter(([, t]) => t > turn));
+    ship.collidedWith = Object.keys(keep).length ? keep : undefined;
+  }
   state.revealTeams = []; // hluboký sken platí jen do konce kola
   creditCtx = null;
   state.turn = turn + 1;

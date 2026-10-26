@@ -209,6 +209,12 @@ describe("vyhodnocení kola", () => {
     expect(a.speed).toBe(0);
     expect(b.speed).toBe(0);
     expect(a.heading).toBeCloseTo(0, 5);
+    // příští kolo imunita: lodě se vůči sobě nesrazí a rozjedou se (i skrz sebe)
+    expect(a.collidedWith?.[b.id]).toBe(r.state.turn);
+    const r2 = resolveTurn(r.state, [{ shipId: "ship-p1-0", maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r2.events.some((e) => e.type === "collision")).toBe(false);
+    expect(r2.state.ships[0].speed).toBe(1);
+    expect(r2.state.ships[0].collidedWith).toBeUndefined();
     expect(a.tokens.focus).toBe(0);
     expect(r.events.some((e) => e.type === "action" && e.ok === false)).toBe(true);
   });
