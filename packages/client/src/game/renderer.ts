@@ -1136,6 +1136,19 @@ export class Renderer {
       this.drawPixelIcon("turn", bx, by, s, "#0b1020");
       ctx.restore();
     }
+    if (man.stop) {
+      // zastavení na konci dráhy: odznak ■ vedle ducha
+      const s = 1.4;
+      const bx = end.x + ship.radius + 6;
+      const by = end.y - ship.radius - 2;
+      ctx.save();
+      ctx.fillStyle = "#0b1020";
+      ctx.fillRect(bx - 8 * s, by - 8 * s, 16 * s, 16 * s);
+      ctx.fillStyle = "#e2e8f0";
+      ctx.fillRect(bx - 7 * s, by - 7 * s, 14 * s, 14 * s);
+      this.drawPixelIcon("stop", bx, by, s, "#0b1020");
+      ctx.restore();
+    }
   }
 
   /** Torpédo v letu: čárkovaná čára k cíli se šipkou, plná část = dolet v tomto kole (tečka na konci). */

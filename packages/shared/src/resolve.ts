@@ -505,7 +505,7 @@ export function defaultOrders(ship: Ship): ShipOrders {
 }
 
 /** Rozpis akcí rozkazu (každá stojí 1 bod). */
-export type ActionId = "move" | "koiogran" | "laser" | "mg" | "torpedo" | "mine" | "evade" | "shield" | "jettison" | "pickup" | "comm" | "turn";
+export type ActionId = "move" | "koiogran" | "laser" | "mg" | "torpedo" | "mine" | "evade" | "shield" | "jettison" | "pickup" | "comm" | "turn" | "stop";
 
 export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: string }[] {
   const out: { id: ActionId; label: string }[] = [];
@@ -517,6 +517,7 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
       out.push({ id: "koiogran", label: "otočka 180°" });
     }
     else if (m.speed !== ship.speed || m.angle !== 0) out.push({ id: "move", label: "úprava pohybu" });
+    if (m.stop) out.push({ id: "stop", label: "zastavení na konci dráhy" });
   }
   if (o.action?.type === "evade") out.push({ id: "evade", label: "úhybný manévr" });
   if (o.action?.type === "shield") out.push({ id: "shield", label: "úprava štítu" });
@@ -638,7 +639,8 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
       action = { type: "pickup", targetId: typeof tid === "string" && (state.debris.some((d) => d.id === tid) || isStationId(state, tid)) ? tid : undefined };
     } else if (raw.action?.type === "turn") {
       const hd = raw.action.heading;
-      if (ship.speed === 0 && typeof hd === "number" && Number.isFinite(hd)) action = { type: "turn", heading: normalizeAngle(hd) };
+      // otočení na místě: loď stojí (rychlost 0), nebo v tomto kole zastaví hned (manévr rychlostí 0)
+      if ((ship.speed === 0 || man.speed === 0) && typeof hd === "number" && Number.isFinite(hd)) action = { type: "turn", heading: normalizeAngle(hd) };
     } else if (raw.action?.type === "comm") {
       const st = (state.stations ?? []).find((x) => x.id === (raw.action as { stationId?: string }).stationId);
       const mt = (raw.action as { moduleType?: string }).moduleType;
@@ -801,7 +803,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   // Otočení na místě (jen stojící loď): nový kurz platí hned – pro střelbu i pohyb
   for (const ship of state.ships) {
     const o = orders.get(ship.id);
-    if (!ship.alive || o?.action?.type !== "turn" || ship.speed !== 0) continue;
+    if (!ship.alive || o?.action?.type !== "turn" || (ship.speed !== 0 && (parseManeuverId(o.maneuverId)?.speed ?? ship.speed) !== 0)) continue;
     ship.heading = normalizeAngle(o.action.heading);
     events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
   }
@@ -1763,7 +1765,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!ship.alive) continue;
     const man = maneuverOf.get(ship.id)!;
     const od = orders.get(ship.id);
-    ship.speed = man.koiogran ? Math.max(1, man.speed - RULES.koiogranSpeedDrop) : man.speed;
+    ship.speed = man.stop ? 0 : man.koiogran ? Math.max(1, man.speed - RULES.koiogranSpeedDrop) : man.speed;
     if (crashed.has(ship.id) || stopped.has(ship.id)) ship.speed = 0;
     else if (cometCrashed.has(ship.id)) ship.speed = 1;
     const cost = effStressCost(man, od);

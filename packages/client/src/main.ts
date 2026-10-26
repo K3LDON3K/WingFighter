@@ -100,7 +100,7 @@ function closeMusicPanel() {
 }
 import { icon, label } from "./icons.ts";
 import { renderLoadout } from "./loadout-ui.ts";
-import { actionById } from "./game/actions.ts";
+import { actionById, stoppedNow } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
 import { DIFFICULTY_COLOR, renderBottomBar, shieldInHand, updateManeuverPanel } from "./game/planning.ts";
@@ -502,18 +502,19 @@ function ensureVisible(shipId: string | undefined) {
 }
 
 /** Nastaví manévr; úhel ořízne na to, co loď při dané rychlosti zvládne. Vrací true při úspěchu. */
-function setManeuver(shipId: string, speed: number, angle: number, koiogran: boolean): boolean {
+function setManeuver(shipId: string, speed: number, angle: number, koiogran: boolean, stop = false): boolean {
   if (!game) return false;
   const ship = game.state.ships.find((s) => s.id === shipId);
   const o = game.orders.get(shipId);
   if (!ship || !o) return false;
   const profile = profileFor(ship, o);
   speed = Math.max(koiogran ? 2 : 0, Math.min(profile.maxSpeed, Math.round(speed)));
-  let man = makeManeuver(profile, speed, angle, koiogran, ship.speed);
+  const st = stop && !koiogran && speed >= 1 && speed <= profile.stopMax; // zastavení na konci jde jen při pomalé dráze
+  let man = makeManeuver(profile, speed, angle, koiogran, ship.speed, st);
   if (!man) {
     const max = profile.maxAngle[speed];
     const clamped = Math.sign(angle) * Math.min(Math.abs(angle), max);
-    man = makeManeuver(profile, speed, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, koiogran, ship.speed);
+    man = makeManeuver(profile, speed, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, koiogran, ship.speed, st);
   }
   if (!man) return false;
   // bez volných stresových bodů se manévr vůbec nenabízí (dřív šel vybrat a jen se neprovedl)
@@ -872,7 +873,7 @@ function buildOverlay(view: ViewModel): Overlay {
     const laserShots = shotsOfType(ship, o, "laser");
     const mgShots = shotsOfType(ship, o, "mg");
     // otočení na místě: samotná loď se v náhledu otočí (žádný duch), dráha i výseče vychází z nového kurzu
-    const turned = o.action?.type === "turn" ? ({ ...ship, heading: o.action.heading } as typeof ship) : ship;
+    const turned = o.action?.type === "turn" && stoppedNow(ship, o) ? ({ ...ship, heading: o.action.heading } as typeof ship) : ship;
     vs.heading = turned.heading;
     const vsT = vs;
     if (man.speed > 0 || man.koiogran) overlay.previews.push({ ship: vsT, maneuver: man, aiming, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
@@ -1864,7 +1865,7 @@ function aimAt(wx: number, wy: number) {
   const ship = g.state.ships.find((s) => s.id === id);
   const o = g.orders.get(id);
   if (!ship || !o) return;
-  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
+  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false, stop: false };
   const profile = profileFor(ship, o);
   const d = Math.hypot(wx - ship.x, wy - ship.y);
   if (d < ship.stats.radius + 4) return; // těsně u lodi nic neměnit
@@ -1877,7 +1878,7 @@ function aimAt(wx: number, wy: number) {
   const raw = Math.round(d / (MOVE_UNIT * 0.9));
   const minSp = cur.koiogran ? 2 : ship.speed >= 1 && ship.speed <= profile.stopMax ? 0 : 1;
   const speed = g.speedLock.get(id) ?? Math.max(minSp, Math.min(5, raw));
-  setManeuver(id, speed, speed === 0 ? 0 : angle, cur.koiogran);
+  setManeuver(id, speed, speed === 0 ? 0 : angle, cur.koiogran, cur.stop);
 }
 
 function confirmManeuver(id: string): boolean {
@@ -1954,7 +1955,7 @@ function chooseIcon(shipId: string, id: string) {
   const a = actionById(id);
   if (!a) return;
   // OTOČIT (stojící loď): první stisk zapne otáčení za myší, další stisk při zapnutém otáčení zruší, stisk na potvrzeném = znovu upravit
-  if (a.id === "koiogran" && ship.speed === 0 && o.action?.type === "turn") {
+  if (a.id === "koiogran" && stoppedNow(ship, o) && o.action?.type === "turn") {
     if (g.turnPick) {
       g.orders.set(shipId, { ...o, action: undefined });
       g.turnPick = false;
@@ -2398,7 +2399,7 @@ function bindInput(c: HTMLCanvasElement) {
         if (cur) {
           const sp = Math.max(cur.koiogran ? 2 : 0, Math.min(5, cur.speed + (e.deltaY < 0 ? 1 : -1)));
           game.speedLock.set(id, sp);
-          setManeuver(id, sp, sp === 0 ? 0 : cur.angle, cur.koiogran);
+          setManeuver(id, sp, sp === 0 ? 0 : cur.angle, cur.koiogran, cur.stop);
         }
         return;
       }
@@ -2516,7 +2517,7 @@ function bindInput(c: HTMLCanvasElement) {
       renderSide();
     } else if (/^[0-5]$/.test(e.key)) {
       game.speedLock.set(id, Number(e.key));
-      setManeuver(id, Number(e.key), e.key === "0" ? 0 : cur.angle, cur.koiogran);
+      setManeuver(id, Number(e.key), e.key === "0" ? 0 : cur.angle, cur.koiogran, cur.stop);
     } else if (e.key === "k" || e.key === "K") {
       chooseIcon(id, "koiogran");
     } else if (e.key === " ") {

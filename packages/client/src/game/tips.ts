@@ -1,5 +1,5 @@
 /** Strukturované vysvětlivky tlačítek akcí (varianta B): název + cena, štítky efektů, poznámka. */
-import { CARGO, DROID, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO, cargoCapacity, laserRange, mgRange, torpedoLockRange, torpedoPointRange, effEvadeCost, effStressCost, loadoutWeight, type Maneuver, type Ship, type ShipOrders } from "@wingfighter/shared";
+import { CARGO, DROID, LASER, MG, MINE, RULES, SCANNER, STRESS, TORPEDO, cargoCapacity, laserRange, mgRange, torpedoLockRange, torpedoPointRange, effEvadeCost, effStressCost, loadoutWeight, parseManeuverId, type Maneuver, type Ship, type ShipOrders } from "@wingfighter/shared";
 import type { TipSpec } from "../tooltip.ts";
 
 const deg = (rad: number) => Math.round((rad * 180) / Math.PI);
@@ -27,7 +27,7 @@ export function actionTip(id: string, ship: Ship, o: ShipOrders, man: Maneuver |
       };
     }
     case "koiogran":
-      if (ship.speed === 0)
+      if (ship.speed === 0 || parseManeuverId(o.maneuverId)?.speed === 0)
         return {
           icon: "center",
           iconColor: "#e2e8f0",

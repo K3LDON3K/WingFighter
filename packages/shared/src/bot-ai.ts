@@ -386,6 +386,15 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
     const orders: ShipOrders = { shipId: ship.id, maneuverId: chosen.man.id, shots: [], preferredTargetId: enemies[0]?.id };
     if (turnHeading !== undefined) orders.action = { type: "turn", heading: turnHeading };
     if (overdrive) orders.droid = { overdrive: true };
+    // dojet ke stanici a zastavit na konci dráhy (příští kolo nabrat modul): jen pomalá dráha, místo v nákladu, zásoba
+    if (level !== "kadet" && !chosen.man.koiogran && chosen.man.speed >= 1 && chosen.man.speed <= profileOf(ship.loadout).stopMax && !enemies.some((e) => dist(ship, e) < 500)) {
+      const endPos = maneuverEnd(ship, chosen.man);
+      const stn = stationInPickupRange(state, endPos);
+      if (stn && stn.stock > 0 && (ship.loadout.cargo ?? []).length < cargoCapacity(ship.loadout)) {
+        const stopMan = makeManeuver(profileOf(ship.loadout), chosen.man.speed, chosen.man.angle, false, ship.speed, true);
+        if (stopMan && canAfford(ship, stopMan, orders)) orders.maneuverId = stopMan.id;
+      }
+    }
     // dobití štítu technologií (nebere akci): když je štít slabý a technologie zbývá; Eso si nechá rezervu na overdrive
     if (!shieldRechargeBlocked(state, ship) && !overdrive) {
       const low = ship.shieldType === "whole" ? ship.shields <= ship.stats.shields * 0.4 : ship.segments.reduce((a, b) => a + b, 0) <= 3;

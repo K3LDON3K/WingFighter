@@ -19,8 +19,13 @@ export interface ActionOption {
 }
 
 /** Je akce pro loď vůbec k dispozici (má potřebný modul)? */
+/** Loď v tomto kole stojí: už stojí, nebo zastaví hned (manévr rychlostí 0). */
+export function stoppedNow(ship: Ship, o: ShipOrders): boolean {
+  return ship.speed === 0 || parseManeuverId(o.maneuverId)?.speed === 0;
+}
+
 export function actionAvailable(a: ActionOption, ship: Ship): boolean {
-  if (a.id === "stop") return ship.speed >= 1 && ship.speed <= profileOf(ship.loadout).stopMax;
+  if (a.id === "stop") return ship.speed >= 1;
   if (a.id === "evade") return ship.loadout.hullId !== "battleship";
   if (a.id === "shield") return ship.loadout.modules.some((m) => m.type === "shield-segment");
   if (a.id === "jettison") return ship.loadout.modules.length > 0;
@@ -95,18 +100,31 @@ export const ACTIONS: ActionOption[] = [
     id: "stop",
     glyph: "■",
     label: "Zastavit (1 akce)",
-    description: "Z rychlosti 1 (bílé), stíhač i z rychlosti 2 (oranžové, 1 stres): loď v tomto kole zastaví (rychlost 0). Stojící loď nemůže uhýbat ani dělat otočku 180°, tlačítkem OTOČKA se ale za 1 akci otočí na místě do libovolného směru a pak může vyrazit (stíhač až na 2 – oranžově, bitevník na 1).",
+    description: "Bez nakreslené dráhy: loď zastaví hned (rychlost 0; z rychlosti 1 bílé, stíhač i z 2 oranžově +1 stres). Po nakreslené dráze: loď ji proletí a na jejím konci zastaví (dráha rychlostí 1 bílé, rychlostí 2 jen stíhač – oranžově). Stojící loď nemůže uhýbat ani dělat otočku 180°, tlačítkem OTOČKA se ale otočí na místě a pak může vyrazit.",
     disabled: (ship, _s, o) => {
       const prof = profileFor(ship, o);
-      if (ship.speed < 1 || ship.speed > prof.stopMax) return `zastavit jde jen z rychlosti ${prof.stopMax >= 2 ? "1–2" : "1"}`;
-      const man = makeManeuver(prof, 0, 0, false, ship.speed);
-      if (man && effStressCost(man, o) > ship.stressPoints && parseManeuverId(o.maneuverId)?.speed !== 0) return `chybí stres (zastavení z ${ship.speed} stojí ${effStressCost(man, o)})`;
-      return noAp(ship, o, parseManeuverId(o.maneuverId)?.speed === 0);
+      const cur = parseManeuverId(o.maneuverId);
+      if (cur?.speed === 0 || cur?.stop) return noAp(ship, o, true);
+      if (cur?.koiogran) return "s otočkou 180° zastavit nejde";
+      const atEnd = !!cur && (cur.speed !== ship.speed || cur.angle !== 0);
+      const sp = atEnd ? cur!.speed : ship.speed;
+      if (sp < 1 || sp > prof.stopMax) return atEnd ? `zastavit jde jen na konci dráhy rychlostí ${prof.stopMax >= 2 ? "1–2" : "1"}` : `zastavit jde jen z rychlosti ${prof.stopMax >= 2 ? "1–2" : "1"}`;
+      const man = atEnd ? makeManeuver(prof, cur!.speed, cur!.angle, false, ship.speed, true) : makeManeuver(prof, 0, 0, false, ship.speed);
+      if (!man) return "zastavení tu nejde";
+      if (effStressCost(man, o) > ship.stressPoints) return `chybí stres (zastavení stojí ${effStressCost(man, o)})`;
+      return noAp(ship, o, false);
     },
-    active: (o) => parseManeuverId(o.maneuverId)?.speed === 0,
+    active: (o) => {
+      const cur = parseManeuverId(o.maneuverId);
+      return cur?.speed === 0 || !!cur?.stop;
+    },
     apply: (o, ship) => {
       const profile = profileFor(ship, o);
-      if (parseManeuverId(o.maneuverId)?.speed === 0) return { maneuverId: makeManeuver(profile, 1, 0, false, ship.speed)?.id ?? o.maneuverId };
+      const cur = parseManeuverId(o.maneuverId);
+      if (cur?.speed === 0) return { maneuverId: makeManeuver(profile, 1, 0, false, ship.speed)?.id ?? o.maneuverId };
+      if (cur?.stop) return { maneuverId: makeManeuver(profile, cur.speed, cur.angle, false, ship.speed)?.id ?? o.maneuverId };
+      const atEnd = !!cur && (cur.speed !== ship.speed || cur.angle !== 0);
+      if (atEnd) return { maneuverId: makeManeuver(profile, cur!.speed, cur!.angle, false, ship.speed, true)?.id ?? o.maneuverId };
       return { maneuverId: makeManeuver(profile, 0, 0, false, ship.speed)?.id ?? o.maneuverId };
     },
   },
@@ -115,7 +133,7 @@ export const ACTIONS: ActionOption[] = [
     glyph: "⤭",
     label: "Úhybný manévr (1 akce)",
     description: `Během pohybu proletíš skrz nepřátelské lodě (každá z nich ztratí ${RULES.evadePassStress} stresový bod), asteroidy i komety bez srážky; nesmíš ale v nich skončit – v nepříteli = normální srážka, v asteroidu nebo kometě = dvojité zranění. Zranění minou i torpédem je v tomto kole nižší o ${RULES.evadeDamageReduction} %. Stojí ${RULES.evadeStressCost} stresový bod.`,
-    disabled: (ship, _s, o) => (ship.loadout.hullId === "battleship" ? "bitevník úhyb nezvládne" : ship.speed === 0 ? "stojící loď nemůže uhýbat" : ship.stressPoints < effEvadeCost(o) ? "chybí stresový bod" : noAp(ship, o, o.action?.type === "evade")),
+    disabled: (ship, _s, o) => (ship.loadout.hullId === "battleship" ? "bitevník úhyb nezvládne" : stoppedNow(ship, o) ? "stojící loď nemůže uhýbat" : ship.stressPoints < effEvadeCost(o) ? "chybí stresový bod" : noAp(ship, o, o.action?.type === "evade")),
     active: (o) => o.action?.type === "evade",
     apply: (o) => ({ action: o.action?.type === "evade" ? undefined : { type: "evade" } }),
   },
@@ -144,7 +162,7 @@ export const ACTIONS: ActionOption[] = [
     description: `Na konci nakreslené křivky (nebo rovné dráhy) se loď otočí o 180°; její rychlost pak klesne o ${RULES.koiogranSpeedDrop}. Jde od rychlosti 2. Stojí obě akce kola. Stres: 1 na zelené/bílé křivce, 2 na oranžové, 3 na nebezpečné – červené (ta navíc zraní trup). Zapni před kreslením, nebo až po něm – duch v cíli se otočí.`,
     disabled: (ship, _s, o) => {
       const cur = parseManeuverId(o.maneuverId);
-      if (ship.speed === 0) return noAp(ship, o, o.action?.type === "turn"); // stojící loď: otočení na místě (1 akce)
+      if (stoppedNow(ship, o)) return noAp(ship, o, o.action?.type === "turn"); // stojící loď: otočení na místě (1 akce)
       if (cur?.koiogran) return null;
       const profile = profileFor(ship, o);
       const sp = Math.max(2, cur?.speed ?? ship.speed);
@@ -154,9 +172,9 @@ export const ACTIONS: ActionOption[] = [
       const cost = actionCost(ship, { ...o, maneuverId: man.id });
       return cost > RULES.actionPoints ? `otočka by stála ${cost} akce` : null;
     },
-    active: (o, ship) => (ship.speed === 0 ? o.action?.type === "turn" : !!parseManeuverId(o.maneuverId)?.koiogran),
+    active: (o, ship) => (stoppedNow(ship, o) ? o.action?.type === "turn" : !!parseManeuverId(o.maneuverId)?.koiogran),
     apply: (o, ship) => {
-      if (ship.speed === 0) return { action: o.action?.type === "turn" ? undefined : { type: "turn", heading: ship.heading } };
+      if (stoppedNow(ship, o)) return { action: o.action?.type === "turn" ? undefined : { type: "turn", heading: ship.heading } };
       const profile = profileFor(ship, o);
       const cur = parseManeuverId(o.maneuverId);
       // přepínač: zachová rychlost i úhel křivky; otočka jde od rychlosti 2

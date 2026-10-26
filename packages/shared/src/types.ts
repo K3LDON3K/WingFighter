@@ -14,6 +14,8 @@ export interface Maneuver {
   speed: number;
   angle: number;
   koiogran: boolean;
+  /** Zastavení na konci dráhy (id "s…"): po pohybu rychlost 0; z rychlosti 1 bílé, z 2 (jen stíhač) oranžové. */
+  stop?: boolean;
   difficulty: Difficulty;
   /** U otočky: náročnost samotné křivky (otočka k ní přidává stres: zelená/bílá → 1, červená → 2, nebezpečná → 3). */
   base?: Difficulty;

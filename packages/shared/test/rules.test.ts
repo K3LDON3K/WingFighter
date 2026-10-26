@@ -1617,6 +1617,38 @@ describe("zastavení a rozjezd", () => {
     expect(listManeuvers(F, 1).some((m) => m.speed === 0)).toBe(true);
     expect(listManeuvers(F, 0).every((m) => !m.koiogran)).toBe(true);
   });
+  it("zastavení na konci dráhy: rychlostí 1 bílé, rychlostí 2 oranžové (stíhač), s otočkou ne; stojí 1 akci; po kole rychlost 0 na konci dráhy", () => {
+    const F = FIGHTER_PROFILE;
+    expect(parseManeuverId("s2a30")).toEqual({ speed: 2, angle: 30, koiogran: false, stop: true });
+    expect(classifyManeuver(F, 1, 0, false, 1, true)).toBe("white");
+    expect(classifyManeuver(F, 2, 0, false, 2, true)).toBe("red");
+    expect(classifyManeuver(F, 3, 0, false, 3, true)).toBeNull();
+    expect(classifyManeuver(BATTLESHIP_PROFILE, 2, 0, false, 2, true)).toBeNull();
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    me.speed = 2;
+    const o: ShipOrders = { shipId: me.id, maneuverId: "s2a0", fire: false };
+    expect(actionCost(me, o)).toBe(1); // jen zastavení (rovně stejnou rychlostí je zdarma)
+    const r = resolveTurn(g, [o], createRng(1));
+    const s = r.state.ships.find((x) => x.id === me.id)!;
+    expect(s.x).toBeCloseTo(500 + 2 * MOVE_UNIT, 1);
+    expect(s.speed).toBe(0);
+    expect(s.stressPoints).toBe(2); // oranžový: −1
+    // zastavit hned + otočit na místě = 2 akce, kurz platí hned
+    const g2 = game();
+    const me2 = place(g2, "ship-p1-0", 500, 500, 0);
+    place(g2, "ship-p2-0", 1500, 1200, 0);
+    me2.speed = 1;
+    const fixed = sanitizeOrders(g2, "p1", [{ shipId: me2.id, maneuverId: "m0a0", fire: false, action: { type: "turn", heading: 1 } }]);
+    expect(fixed[0].action?.type).toBe("turn");
+    expect(actionCost(me2, fixed[0])).toBe(2);
+    const r2 = resolveTurn(g2, fixed, createRng(1));
+    const s2 = r2.state.ships.find((x) => x.id === me2.id)!;
+    expect(s2.heading).toBeCloseTo(1, 5);
+    expect(s2.x).toBeCloseTo(500, 1);
+    expect(s2.speed).toBe(0);
+  });
   it("stojící loď se otočí (1 akce) a vyrazí novým směrem; úhyb při rychlosti 0 nejde", () => {
     const g = game();
     const me = place(g, "ship-p1-0", 500, 500, 0);
@@ -2019,8 +2051,8 @@ describe("otočka na konci křivky", () => {
     expect(makeManeuver(P, 1, 0, true, 1)).toBeNull();
     const k = makeManeuver(P, 3, -40, true, 3)!;
     expect(k.id).toBe("k3a-40");
-    expect(parseManeuverId("k3a-40")).toEqual({ speed: 3, angle: -40, koiogran: true });
-    expect(parseManeuverId("k3")).toEqual({ speed: 3, angle: 0, koiogran: true });
+    expect(parseManeuverId("k3a-40")).toEqual({ speed: 3, angle: -40, koiogran: true, stop: false });
+    expect(parseManeuverId("k3")).toEqual({ speed: 3, angle: 0, koiogran: true, stop: false });
     expect(makeManeuver(P, 5, 60, true, 5)).toBeNull(); // rychlost 5 dovolí jen ±40°
     expect(makeManeuver(P, 5, 40, true, 5)).not.toBeNull();
   });

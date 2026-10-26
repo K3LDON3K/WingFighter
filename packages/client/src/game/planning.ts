@@ -80,7 +80,7 @@ import { actionTip } from "./tips.ts";
 import { tipAttr } from "../tooltip.ts";
 import { infoDialog } from "../dialog.ts";
 import { icon, label, segBar } from "../icons.ts";
-import { ACTIONS, actionAvailable } from "./actions.ts";
+import { ACTIONS, actionAvailable, stoppedNow } from "./actions.ts";
 import { SEGMENT_NAMES, shieldBubble, strengthColor } from "./shield-ui.ts";
 import { pilotBadge } from "../pilot-ui.ts";
 import { moduleColor, renderLoadout } from "../loadout-ui.ts";
@@ -272,7 +272,7 @@ function maneuverHelp(ship: Ship): HTMLElement {
 
 /** Panel „Manévr“ (náhled nakreslené dráhy: směr, rychlost, úhel, náročnost). */
 function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLElement {
-  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
+  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false, stop: false };
   const dcolor = man ? (o.droid?.overdrive && maneuverStress(man) > 0 ? DIFFICULTY_COLOR.white : DIFFICULTY_COLOR[man.difficulty]) : "#f87171";
   return h(
     "div",
@@ -282,7 +282,7 @@ function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLEle
       "div",
       { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] : "Neplatný manévr" },
       h("span", { class: "man-glyph", style: `color:${dcolor}` }, angleGlyph(cur.angle, false), cur.koiogran ? h("span", { class: "man-koi", title: "Otočka 180° na konci" }, "⟲") : null),
-      h("span", { class: "man-speed" }, String(cur.speed)),
+      h("span", { class: "man-speed" }, cur.stop ? `${cur.speed}→0` : String(cur.speed)),
     ),
     h("div", { class: "man-angle" }, `${Math.abs(cur.angle)}°${cur.koiogran ? " +180°" : ""}`),
     h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && maneuverStress(man) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
@@ -343,7 +343,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   // po odeslání i během vyhodnocování kola zůstává lišta vidět, jen jsou všechna tlačítka vypnutá
   const locked = m.submitted || m.animating;
   const man = resolveManeuver(profileFor(ship, o), o.maneuverId, ship.speed);
-  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false };
+  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false, stop: false };
   const acts = actionList(ship, o);
   const aiming = m.aimingShipId === ship.id;
 
@@ -571,6 +571,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
+      // ZASTAVIT jen když jde použít (nebo už je zvolené)
+      if (a.id === "stop" && !a.active(o, ship) && a.disabled(ship, m.state, o)) continue;
       if (a.id === "laser" || a.id === "mg") {
         // jedna dlaždice na typ zbraně; víc modulů = vyjížděcí podmenu s jedním tlačítkem na modul (vlastní akce a cíl)
         const type = a.id;
@@ -653,7 +655,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       const moveDone = isMove && !aiming && o.maneuverId !== defaultOrders(ship).maneuverId;
       // štít: upraveno a okénko zavřené = hotovo (zelené), stisk = reset (zrušit úpravu)
       const shieldDone = a.id === "shield" && !!planned && !editing && !rechargeMode;
-      const done = moveDone || shieldDone;
+      const stopDone = a.id === "stop" && !!parseManeuverId(o.maneuverId)?.stop;
+      const done = moveDone || shieldDone || stopDone;
       const stormOff = stormed && (a.id === "laser" || a.id === "shield");
       // všechny moduly, které akce potřebuje, jsou zničené → tlačítko „zničeno“ (šrafování + křížek)
       const destroyed = !!a.requiresModule && ship.loadout.modules.some((x) => x.type === a.requiresModule) && !ship.loadout.modules.some((x) => x.type === a.requiresModule && moduleWorking(x));
@@ -670,7 +673,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             disabled: locked || stormOff || destroyed || (!!why && !active && !done && dots === 0),
             ...tipAttr({
               ...actionTip(a.id, ship, o, man, destroyed ? null : why),
-              ...(moveDone ? { note: "nakresleno a platí · stisk = reset (rovně stejnou rychlostí, zdarma)" } : shieldDone ? { note: "úprava platí · stisk = otevřít (upravit, dobít, reset)" } : a.id === "shield" && rechargeMode ? { note: "režim DOBÍT – klik vedle = zavřít" } : a.id === "shield" && editing ? { note: "rozmísti body −/+ a klikni vedle – úprava se potvrdí" } : {}),
+              ...(stopDone ? { note: "loď proletí dráhu a na jejím konci zastaví · stisk = zrušit zastavení" } : moveDone ? { note: "nakresleno a platí · stisk = reset (rovně stejnou rychlostí, zdarma)" } : shieldDone ? { note: "úprava platí · stisk = otevřít (upravit, dobít, reset)" } : a.id === "shield" && rechargeMode ? { note: "režim DOBÍT – klik vedle = zavřít" } : a.id === "shield" && editing ? { note: "rozmísti body −/+ a klikni vedle – úprava se potvrdí" } : {}),
               ...(destroyed ? { warn: "ZNIČENO – modul nefunguje" } : {}),
             }),
             onclick: () =>
@@ -690,8 +693,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           },
           (() => {
             // cena ve všech surovinách: otočka 2 akce + stres oranžového manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
-            const turnInPlace = a.id === "koiogran" && ship.speed === 0;
-            const stopMan = a.id === "stop" ? makeManeuver(profileFor(ship, o), 0, 0, false, ship.speed) : null;
+            const turnInPlace = a.id === "koiogran" && stoppedNow(ship, o);
+            const stopMan = a.id === "stop" ? (() => { const cur = parseManeuverId(o.maneuverId); const atEnd = !!cur && cur.speed > 0 && (cur.speed !== ship.speed || cur.angle !== 0 || cur.stop); return atEnd ? makeManeuver(profileFor(ship, o), cur!.speed, cur!.angle, false, ship.speed, true) : makeManeuver(profileFor(ship, o), 0, 0, false, ship.speed); })() : null;
             const manStress = turnInPlace ? 0 : a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : stopMan ? effStressCost(stopMan, o) : 0;
             const c = { actions: a.id === "koiogran" && !turnInPlace ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];
@@ -700,9 +703,9 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             // během kreslení manévru (aiming) ukazujeme cenu bez fajfek – zaplaceno je až po potvrzení
             return costPipsAll(c, dots > 0 && !(isMove && aiming), `stojí ${parts.join(" + ")}${a.id === "move" ? " (rovně stejnou rychlostí zdarma)" : ""}`);
           })(),
-          icon(isMove && aiming ? "check" : a.id === "koiogran" && ship.speed === 0 ? "center" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
-          h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.id === "koiogran" && ship.speed === 0 ? "Otočit" : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
-          done ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
+          icon(isMove && aiming ? "check" : a.id === "koiogran" && stoppedNow(ship, o) ? "center" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
+          h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.id === "koiogran" && stoppedNow(ship, o) ? "Otočit" : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
+          stopDone ? h("span", { class: "reset-strip" }, label("na konci dráhy")) : done ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
           destroyed ? h("span", { class: "dead-x" }, "✕") : null,
         );

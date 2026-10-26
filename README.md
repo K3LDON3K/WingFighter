@@ -41,7 +41,10 @@ Bez označení loď poletí tak, jak má nakresleno (výchozí = stejná rychlos
 Akce po pohybu zůstává vždy povolená.
 
 **Zastavení:** rychlost 0 jde zvolit z rychlosti 1 (bílé), stíhač i z rychlosti 2 (oranžové, 1 stres) – tlačítko
-ZASTAVIT (objeví se jen, když jde použít, 1 akce), klávesa 0 nebo myš těsně u lodi; bitevník úhybný manévr neumí vůbec; stojící loď
+ZASTAVIT (objeví se jen, když jde použít, 1 akce), klávesa 0 nebo myš těsně u lodi. Záleží na pořadí: nakreslíš-li
+nejdřív dráhu a pak stiskneš ZASTAVIT, loď dráhu proletí a **na jejím konci zastaví** (další akce + stres podle
+rychlosti dráhy: 1 bílé, 2 oranžové – jen stíhač; duch má odznak ■, panel ukazuje „2 → 0“); stiskneš-li ZASTAVIT bez
+dráhy, zastaví hned a OTOČKA ji pak ještě otočí na místě (celkem 2 akce); bitevník úhybný manévr neumí vůbec; stojící loď
 nemůže uhýbat ani dělat otočku 180°, může se ale za 1 akci **otočit na místě** do libovolného směru (tlačítko
 OTOČKA se u stojící lodi změní na OTOČIT, klik na mapě) a pak vyrazit – stíhač na 1 (zelený) nebo rovnou na 2 (oranžový), bitevník jen na 1. **Zrychlování a
 brzdění:** stíhač ±1 bílé, ±2 oranžové, ±3 nebezpečné (víc nejde); bitevník ±1 bílé, ±2 nebezpečné, ±3 nejde.
@@ -191,6 +194,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.153 – **Zastavení na konci dráhy.** Nakresli manévr a pak stiskni ZASTAVIT: loď dráhu proletí a na jejím konci zastaví (manévry „s…“; 1 akce navíc, stres podle rychlosti dráhy – 1 bílé, 2 oranžové jen stíhač, z 3+ nejde; ne s otočkou 180°). Duch na konci má odznak ■, panel Manévr ukazuje „2 → 0“, tlačítko ZASTAVIT zeleně „na konci dráhy“ (stisk = zrušit). Opačné pořadí: ZASTAVIT bez dráhy zastaví hned a OTOČKA pak loď otočí na místě (otočení jde i v kole, kdy loď zastaví, a stojící loď se může otočit a hned vyrazit). Tlačítko ZASTAVIT se ukáže jen, když jde použít. Boti (Pilot/Eso) dojedou ke stanici a zastaví na konci dráhy, aby příští kolo nabrali modul.
 - v3.152 – Stíhač může zastavit i z rychlosti 2 (oranžový manévr: 1 akce + 1 stres; bitevník jen z 1) – tlačítko ZASTAVIT ukazuje i cenu stresu. OTOČIT: stojící loď se při otáčení plynule otáčí za myší (bez ducha), klik na mapě kurz potvrdí; další stisk tlačítka otáčení znovu otevře k úpravě, stisk během otáčení ho zruší, Esc ponechá nastavený kurz. U stojící lodi se nekreslí duch dráhy, jen výseče zbraní.
 - v3.151 – Tlačítko **ZASTAVIT** ve skupině Pohyb (jen při rychlosti 1, s cenou 1 akce; stisk znovu = zrušit). **OTOČKA** u stojící lodi slouží jako otočení na místě (OTOČIT, 1 akce, bez stresu, klik na mapě) – samostatné tlačítko zrušeno. **Bitevník nemá úhybný manévr** (tlačítko chybí, server ho odmítne, boti ho nepoužívají).
 - v3.150 – **Zastavení a rozjezd.** Nová rychlost 0 (jen z rychlosti 1; klávesa 0 / myš těsně u lodi); stojící loď nemůže uhýbat ani dělat otočku, za 1 akci se otočí na místě do libovolného směru (nová akce OTOČIT v Pohybu – klik na mapě, náhled dráhy i výsečí z nového kurzu) a vyrazí: stíhač 0→1 zelený, 0→2 oranžový; bitevník jen 0→1. Zrychlení/brzdění: stíhač ±1 bílé, ±2 oranžové, ±3 nebezpečné, víc nejde; bitevník ±1 bílé, ±2 nebezpečné, ±3 nejde. Srážky zastavují: loď–loď (stačí dotyk štítů, obě zastaví v místě dotyku, 15 zranění, rychlost 0), náraz do asteroidu/stanice (zastavení u překážky, díra, 15 zranění, stres 0) – nahrazuje odmrštění a náhodné otočení; kometa a okraj mapy odmršťují dál. Boti umí zastavit, otočit se a rozjet. Nápověda manévrů doplněna.
