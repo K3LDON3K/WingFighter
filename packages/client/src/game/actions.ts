@@ -25,7 +25,7 @@ export function stoppedNow(ship: Ship, o: ShipOrders): boolean {
 }
 
 export function actionAvailable(a: ActionOption, ship: Ship): boolean {
-  if (a.id === "stop") return ship.speed >= 1;
+  if (a.id === "stop") return true;
   if (a.id === "evade") return ship.loadout.hullId !== "battleship";
   if (a.id === "shield") return ship.loadout.modules.some((m) => m.type === "shield-segment");
   if (a.id === "jettison") return ship.loadout.modules.length > 0;

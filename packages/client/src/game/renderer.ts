@@ -592,7 +592,15 @@ export class Renderer {
     const ctx = this.ctx;
     const rows = ICONS[name] ?? ICONS.target;
     ctx.fillStyle = color;
-    rows.forEach((row, y) => [...row].forEach((ch, x) => ch === "#" && ctx.fillRect(Math.round(cx - 4 * s + x * s), Math.round(cy - 4 * s + y * s), s, s)));
+    // sousední pixely na sebe navazují (bez mezer při neceločíselném měřítku)
+    rows.forEach((row, y) =>
+      [...row].forEach((ch, x) => {
+        if (ch !== "#") return;
+        const x0 = Math.round(cx - 4 * s + x * s);
+        const y0 = Math.round(cy - 4 * s + y * s);
+        ctx.fillRect(x0, y0, Math.round(cx - 4 * s + (x + 1) * s) - x0, Math.round(cy - 4 * s + (y + 1) * s) - y0);
+      }),
+    );
   }
 
   /**
@@ -1144,9 +1152,9 @@ export class Renderer {
       ctx.save();
       ctx.fillStyle = "#0b1020";
       ctx.fillRect(bx - 8 * s, by - 8 * s, 16 * s, 16 * s);
-      ctx.fillStyle = "#e2e8f0";
+      ctx.fillStyle = "#ef4444";
       ctx.fillRect(bx - 7 * s, by - 7 * s, 14 * s, 14 * s);
-      this.drawPixelIcon("stop", bx, by, s, "#0b1020");
+      this.drawPixelIcon("stop", bx, by, s, "#f8fafc");
       ctx.restore();
     }
   }

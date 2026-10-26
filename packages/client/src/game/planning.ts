@@ -573,8 +573,6 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
-      // ZASTAVIT jen když jde použít (nebo už je zvolené)
-      if (a.id === "stop" && !a.active(o, ship) && a.disabled(ship, m.state, o)) continue;
       if (a.id === "laser" || a.id === "mg") {
         // jedna dlaždice na typ zbraně; víc modulů = vyjížděcí podmenu s jedním tlačítkem na modul (vlastní akce a cíl)
         const type = a.id;
