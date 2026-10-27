@@ -1445,7 +1445,7 @@ export function renderInventoryBar(root: HTMLElement, m: PlanningModel, cb: Plan
       { class: "inv-check" },
       h("span", {}, label("dosah: "), h("b", {}, String(CARGO.range))),
       h("span", {}, label("rychlost: "), h("b", {}, String(sp)), ck(sp <= CARGO.maxSpeed), h("span", { class: sp <= CARGO.maxSpeed ? "ok" : "bad" }, label(sp <= CARGO.maxSpeed ? "OK" : `zpomal na ≤ ${CARGO.maxSpeed}`))),
-      h("span", {}, label("opravář "), ck(canInstall), h("span", { class: canInstall ? "ok" : "bad" }, label(canInstall ? "OK, lze i nasadit" : "lze přesunout jen do nákladu"))),
+      h("span", {}, label("opravář "), ck(canInstall), h("span", { class: canInstall ? "ok" : "bad" }, label(canInstall ? "OK, lze i nasadit" : "chybí · trosky jen do nákladu"))),
       h("span", {}, label("náklad: "), h("b", {}, `${cargo.length}/${cap}`), ck(cargoFree), h("span", { class: cargoFree ? "ok" : "bad" }, label(cargoFree ? "místo" : "plný"))),
     );
 
