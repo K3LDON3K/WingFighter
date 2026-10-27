@@ -598,8 +598,8 @@ function submitOrders(force = false) {
   if (game.confirmOpen) force = true; // otevřené potvrzení: další SPUSTIT / Enter = potvrdit
   for (const [id, o] of game.orders) {
     const ship = game.state.ships.find((x) => x.id === id);
-    if (ship && o.action?.type === "jettison" && !ship.loadout.modules.some((m) => m.id === (o.action as { moduleId: string }).moduleId)) {
-      showError(`${ship.name}: vyber modul k vyhození v okénku nad tlačítkem VYHODIT (nebo akci zruš).`);
+    if (ship && o.action?.type === "jettison" && !o.action.moduleIds.some((id) => ship.loadout.modules.some((m) => m.id === id) || (ship.loadout.cargo ?? []).some((m) => m.id === id))) {
+      showError(`${ship.name}: přetáhni modul na vyhazovací slot v INVENTÁŘI (nebo akci zruš).`);
       game.selectedShipId = id;
       renderSide();
       return;
@@ -1481,7 +1481,7 @@ function renderSide() {
         if (!o) return;
         const ship = g.state.ships.find((x) => x.id === id);
         const mod = ship?.loadout.modules.find((x) => x.id === moduleId) ?? ship?.loadout.cargo?.find((x) => x.id === moduleId);
-        g.orders.set(id, { ...o, action: { type: "jettison", moduleId } });
+        g.orders.set(id, { ...o, action: { type: "jettison", moduleIds: [moduleId] } });
         g.cargoOpen = false; // potvrzení = okénko se zavře
         sfx("toggle");
         if (mod) showNotice(`Vyhodí se: ${MODULES[mod.type].name} (na začátku kola)`);
@@ -1739,7 +1739,7 @@ function renderSide() {
           if (!sh) return h("div", { class: "txt muted" }, "Žádná loď.");
           const o = g.orders.get(sh.id);
           const picking = g.jettisonPick && o?.action?.type === "jettison" && !g.submitted;
-          const chosenId = o?.action?.type === "jettison" ? o.action.moduleId : undefined;
+          const chosenId = o?.action?.type === "jettison" ? o.action.moduleIds[0] : undefined;
           const chosen = sh.loadout.modules.find((m) => m.id === chosenId);
           const wrap = h("div", {});
           if (picking) {
@@ -1758,7 +1758,7 @@ function renderSide() {
                 onSelect: (id) => {
                   const cur = g.orders.get(sh.id);
                   if (!cur) return;
-                  g.orders.set(sh.id, { ...cur, action: { type: "jettison", moduleId: id } });
+                  g.orders.set(sh.id, { ...cur, action: { type: "jettison", moduleIds: [id] } });
                   renderSide();
                 },
               }),

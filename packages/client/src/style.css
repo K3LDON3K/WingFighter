@@ -5553,11 +5553,28 @@ body.drag-on * {
   background: rgba(5, 7, 15, 0.55);
   border: 2px solid #1e293b;
   width: 150px;
-  align-self: flex-start;
+  align-self: stretch;
+  align-items: flex-start;
+}
+.inv-reach .inv-cap,
+.inv-jet .inv-cap,
+.inv-reach .inv-lbl,
+.inv-jet .inv-lbl {
+  text-align: left;
+  justify-content: flex-start;
+  align-self: stretch;
+}
+.inv-reach .inv-list,
+.inv-jet .inv-list {
+  align-self: stretch;
+  justify-content: start;
 }
 .inv-jet {
   border-color: #3b1d1d;
-  width: 120px;
+}
+.inv-jet .inv-cancel {
+  margin-top: auto;
+  align-self: center;
 }
 .inv-jet.has {
   border-color: #f87171;
@@ -5624,6 +5641,10 @@ body.drag-on * {
 }
 .inv-free.drop-target {
   filter: drop-shadow(0 0 4px #4ade80);
+}
+.inv-mid.drop-target {
+  outline: 2px dashed #4ade80;
+  outline-offset: 2px;
 }
 .inv-planned {
   display: flex;

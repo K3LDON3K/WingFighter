@@ -637,8 +637,10 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     if (raw.action?.type === "evade") action = ship.stressPoints >= effEvadeCost({ droid }) && man.speed > 0 && ship.loadout.hullId !== "battleship" ? { type: "evade" } : undefined;
     else if (raw.action?.type === "shield") action = validShieldAction(ship, raw.action.segments) ? { type: "shield", segments: raw.action.segments.map((n) => Math.round(Number(n))) as Segments } : undefined;
     else if (raw.action?.type === "jettison") {
-      const wantedId = raw.action.moduleId;
-      action = ship.loadout.modules.some((m) => m.id === wantedId) || (ship.loadout.cargo ?? []).some((m) => m.id === wantedId) ? { type: "jettison", moduleId: wantedId } : undefined;
+      const raws = raw.action as { moduleIds?: unknown; moduleId?: unknown };
+      const wanted = (Array.isArray(raws.moduleIds) ? raws.moduleIds : [raws.moduleId]).filter((x): x is string => typeof x === "string");
+      const ids = [...new Set(wanted)].filter((id) => ship.loadout.modules.some((m) => m.id === id) || (ship.loadout.cargo ?? []).some((m) => m.id === id));
+      action = ids.length ? { type: "jettison", moduleIds: ids } : undefined;
     } else if (raw.action?.type === "pickup") {
       const tid = raw.action.targetId;
       action = { type: "pickup", targetId: typeof tid === "string" && (state.debris.some((d) => d.id === tid) || isStationId(state, tid)) ? tid : undefined };
@@ -857,26 +859,31 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   for (const ship of state.ships) {
     const o = orders.get(ship.id);
     if (!ship.alive || o?.action?.type !== "jettison") continue;
-    const wanted = o.action.moduleId;
-    const idx = ship.loadout.modules.findIndex((m) => m.id === wanted);
-    const cidx = (ship.loadout.cargo ?? []).findIndex((m) => m.id === wanted);
-    if (idx < 0 && cidx < 0) continue;
-    const [mod] = idx >= 0 ? ship.loadout.modules.splice(idx, 1) : ship.loadout.cargo!.splice(cidx, 1);
-    syncShields(ship);
-    const f = forward(ship.heading);
-    const back = ship.stats.radius + 14;
-    const debris: Debris = {
-      id: `debris-${turn}-${ship.id}-${mod.id}`,
-      type: mod.type,
-      x: clamp(ship.x - f.x * back, 0, state.width),
-      y: clamp(ship.y - f.y * back, 0, state.height),
-      team: ship.team,
-      value: Math.round((MODULES[mod.type].price * RULES.debrisRewardPct * (moduleWorking(mod) ? 1 : RULES.brokenSellPct / 100)) / 100),
-      module: { ...mod },
-    };
-    state.debris.push(debris);
-    events.push({ type: "jettison", shipId: ship.id, debris, shieldType: ship.shieldType });
-    events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
+    let any = false;
+    o.action.moduleIds.forEach((wanted, k) => {
+      const idx = ship.loadout.modules.findIndex((m) => m.id === wanted);
+      const cidx = (ship.loadout.cargo ?? []).findIndex((m) => m.id === wanted);
+      if (idx < 0 && cidx < 0) return;
+      const [mod] = idx >= 0 ? ship.loadout.modules.splice(idx, 1) : ship.loadout.cargo!.splice(cidx, 1);
+      syncShields(ship);
+      // trosky za lodí; více modulů vedle sebe (do stran od osy)
+      const f = forward(ship.heading);
+      const back = ship.stats.radius + 14;
+      const side = (k - (o.action!.type === "jettison" ? (o.action.moduleIds.length - 1) / 2 : 0)) * 26;
+      const debris: Debris = {
+        id: `debris-${turn}-${ship.id}-${mod.id}`,
+        type: mod.type,
+        x: clamp(ship.x - f.x * back - f.y * side, 0, state.width),
+        y: clamp(ship.y - f.y * back + f.x * side, 0, state.height),
+        team: ship.team,
+        value: Math.round((MODULES[mod.type].price * RULES.debrisRewardPct * (moduleWorking(mod) ? 1 : RULES.brokenSellPct / 100)) / 100),
+        module: { ...mod },
+      };
+      state.debris.push(debris);
+      events.push({ type: "jettison", shipId: ship.id, debris, shieldType: ship.shieldType });
+      any = true;
+    });
+    if (any) events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
   }
   const scaleEvade = (ship: Ship, dmg: number) => (evading.has(ship.id) ? Math.round(dmg * (1 - RULES.evadeDamageReduction / 100)) : dmg);
   const passedThrough = new Set<string>(); // "evader:enemy"

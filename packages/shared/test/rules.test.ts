@@ -744,7 +744,7 @@ describe("inventář a ekonomika", () => {
     place(g, "ship-p1-0", 500, 500, 0);
     place(g, "ship-p2-0", 700, 500, Math.PI);
     const mineMod = g.ships[0].loadout.modules.find((m) => m.type === "mine")!;
-    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: false, action: { type: "jettison", moduleId: mineMod.id } }], createRng(1));
+    let r = resolveTurn(g, [{ shipId: "ship-p1-0", maneuverId: "m2a0", fire: false, action: { type: "jettison", moduleIds: [mineMod.id] } }], createRng(1));
     expect(r.state.ships[0].loadout.modules.some((m) => m.type === "mine")).toBe(false);
     expect(r.state.ships[0].ammo.mines).toBe(0);
     expect(r.state.debris).toHaveLength(1);
@@ -1710,7 +1710,7 @@ describe("náklad", () => {
     r = resolveTurn(g4, [noFire(me.id, "m1a0", { type: "pickup", targetId: "d1" }), noFire(foe.id, "m1a0")], createRng(1));
     expect(r.events.some((e) => e.type === "pickup" && !e.ok && e.reason === "full")).toBe(true);
     // vyhození nákladu: modul z carga se stane troskami i s původním id
-    r = resolveTurn(g4, [noFire(me.id, "m1a0", { type: "jettison", moduleId: "c0" }), noFire(foe.id, "m1a0")], createRng(1));
+    r = resolveTurn(g4, [noFire(me.id, "m1a0", { type: "jettison", moduleIds: ["c0"] }), noFire(foe.id, "m1a0")], createRng(1));
     expect(r.state.ships[0].loadout.cargo?.length).toBe(0);
     expect(r.state.debris.some((d) => d.module?.id === "c0")).toBe(true);
     // sanitizace: zvednutí je 1 akce

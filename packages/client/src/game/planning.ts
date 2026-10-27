@@ -722,7 +722,9 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       const cap = cargoCapacity(ship.loadout);
       const canInstall = !repairBlocked(m.state, ship);
       const holder = h("div", { class: `scan-holder ${m.cargoOpen ? "stack" : ""}` });
-      const jetMod = jetOn ? (ship.loadout.modules.find((x) => x.id === (o.action as { moduleId: string }).moduleId) ?? cargo.find((x) => x.id === (o.action as { moduleId: string }).moduleId)) : undefined;
+      const jetIds = o.action?.type === "jettison" ? o.action.moduleIds : [];
+      const jetMods = jetIds.map((id) => ship.loadout.modules.find((x) => x.id === id) ?? cargo.find((x) => x.id === id)).filter((x): x is ModuleInstance => !!x);
+      const jetMod = jetMods[0];
       const tgtDebris = pickTgt ? m.state.debris.find((d) => d.id === pickTgt) : undefined;
       const tgtStation = pickTgt ? (m.state.stations ?? []).find((x) => x.id === pickTgt) : undefined;
       holder.append(
@@ -789,14 +791,29 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
 
         /* --- uprostřed: nákres lodi (jen k tažení) --- */
         const lo = renderLoadout({ loadout: ship.loadout, team: ship.team, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: false, selectedId: jetMod?.id });
+        // všechny vyhazované moduly v plástvi červeně čárkovaně (renderLoadout zvýrazní jen jeden)
+        for (const g of lo.querySelectorAll<SVGGElement>(".lo-g.mod[data-slot]")) {
+          const sl = g.getAttribute("data-slot") as SlotId;
+          const mod = ship.loadout.modules.find((x) => occupiedSlots(x).includes(sl));
+          if (mod && jetIds.includes(mod.id)) g.classList.add("sel");
+        }
 
         /* --- vpravo: vyhazovací slot --- */
+        const jetList = h("div", { class: "inv-list" });
+        const dragBack: { el: Element; mod: ModuleInstance }[] = [];
+        for (const x of jetMods) {
+          const el = moduleStateHex(x, { r: 26, sub: "VYHODIT", subColor: "#fca5a5", title: `${MODULES[x.type].name} se vyhodí na začátku kola – přetáhni zpět na loď = rozmyslet si to` });
+          el.classList.add("inv-drag");
+          jetList.append(el);
+          dragBack.push({ el, mod: x });
+        }
+        jetList.append(moduleStateHex(null, { r: 26, empty: jetMods.length ? "DALŠÍ" : "SEM", title: "Přetáhni sem modul z lodi nebo z nákladu" }));
         const jetBox = h(
           "div",
           { class: `inv-jet ${jetMod ? "has" : ""}`, dataset: { drop: "jettison" } },
-          h("div", { class: "inv-cap" }, label("Vyhodit")),
-          jetMod ? h("div", { class: "inv-lbl ok" }, label("vyhodí se na začátku kola")) : h("div", { class: "inv-lbl" }, label("přetáhni sem modul z lodi nebo z nákladu")),
-          jetMod ? moduleStateHex(jetMod, { r: 26, sub: "VYHODIT", subColor: "#fca5a5", title: `${MODULES[jetMod.type].name} se vyhodí na začátku kola` }) : moduleStateHex(null, { r: 26, empty: "SEM", title: "Přetáhni sem modul z lodi nebo z nákladu" }),
+          h("div", { class: "inv-cap" }, label(`Vyhodit${jetMods.length ? ` · ${jetMods.length}` : ""}`)),
+          jetMod ? h("div", { class: "inv-lbl ok" }, label("vyhodí se na začátku kola · přetažení zpět na loď = zrušit")) : h("div", { class: "inv-lbl" }, label("přetáhni sem modul z lodi nebo z nákladu (i víc najednou)")),
+          jetList,
           jetMod ? cancelBtn() : null,
         );
 
@@ -804,7 +821,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         const cargoRow = h("div", { class: "inv-cargo" }, h("div", { class: "inv-cap" }, label(`Náklad ${cargo.length}/${cap}`)));
         const dragOut: { el: Element; mod: ModuleInstance }[] = [];
         for (const x of cargo) {
-          const el = moduleStateHex(x, { r: 26, sub: jetMod?.id === x.id ? "VYHODIT" : moduleHp(x) < moduleMaxHp(x.type) ? `${moduleHp(x)}/${moduleMaxHp(x.type)}` : undefined, subColor: jetMod?.id === x.id ? "#fca5a5" : undefined, selected: jetMod?.id === x.id, title: `${MODULES[x.type].name} v nákladu (nefunguje, jen váží) – přetáhni na vyhazovací slot` });
+          const el = moduleStateHex(x, { r: 26, sub: jetIds.includes(x.id) ? "VYHODIT" : moduleHp(x) < moduleMaxHp(x.type) ? `${moduleHp(x)}/${moduleMaxHp(x.type)}` : undefined, subColor: jetIds.includes(x.id) ? "#fca5a5" : undefined, selected: jetIds.includes(x.id), title: `${MODULES[x.type].name} v nákladu (nefunguje, jen váží) – přetáhni na vyhazovací slot` });
           el.classList.add("inv-drag");
           cargoRow.append(el);
           dragOut.push({ el, mod: x });
@@ -828,13 +845,16 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         const pop = h("div", { class: `cargo-pop inv-pop ${popClass(`cargo:${ship.id}`)}` }, h("div", { class: "inv-title" }, icon("cargo", "#7dd3fc", 12), " ", label("Inventář · přetahuj moduly")), h("div", { class: "inv-body" }, reach, h("div", { class: "inv-mid" }, lo, cargoRow), jetBox));
 
         /* --- tažení: moduly lodi / nákladu → vyhazovací slot; trosky → náklad / volný slot --- */
-        const targetOf = (el: Element | null): { kind: "jettison" | "cargo" | "slot"; slot?: SlotId; el: Element } | null => {
+        const targetOf = (el: Element | null): { kind: "jettison" | "cargo" | "slot" | "ship"; slot?: SlotId; el: Element } | null => {
           const drop = el?.closest?.("[data-drop]");
           if (drop) return { kind: drop.getAttribute("data-drop") as "jettison" | "cargo", el: drop };
           const g = el?.closest?.("[data-slot]");
           if (g && g.classList.contains("empty") && pop.contains(g)) return { kind: "slot", slot: g.getAttribute("data-slot") as SlotId, el: g };
+          const dia = el?.closest?.(".inv-mid");
+          if (dia && pop.contains(dia)) return { kind: "ship", el: dia };
           return null;
         };
+        const setJet = (ids: string[]) => cb.setOrders(ship.id, { action: ids.length ? { type: "jettison", moduleIds: ids } : undefined });
         const mark = (t: ReturnType<typeof targetOf>, ok: boolean) => {
           pop.querySelectorAll(".drop-target, .drop-bad").forEach((x) => x.classList.remove("drop-target", "drop-bad"));
           if (t) t.el.classList.add(ok ? "drop-target" : "drop-bad");
@@ -852,11 +872,28 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
               () => moduleStateHex(mod, { r: 26 }),
               (under) => {
                 const t = targetOf(under);
-                if (t?.kind === "jettison") cb.setOrders(ship.id, { action: { type: "jettison", moduleId: mod.id } });
+                if (t?.kind === "jettison" && !jetIds.includes(mod.id)) setJet([...jetIds, mod.id]);
               },
               (under) => {
                 const t = targetOf(under);
                 mark(t, t?.kind === "jettison");
+              },
+            ),
+          );
+        }
+        // z vyhazovacího slotu zpět na loď / do nákladu = rozmyslet si to (modul je pořád nainstalovaný, opravář netřeba)
+        for (const { el, mod } of dragBack) {
+          el.addEventListener("pointerdown", (ev) =>
+            dragHex(
+              ev as PointerEvent,
+              () => moduleStateHex(mod, { r: 26 }),
+              (under) => {
+                const t = targetOf(under);
+                if (t && t.kind !== "jettison") setJet(jetIds.filter((x) => x !== mod.id));
+              },
+              (under) => {
+                const t = targetOf(under);
+                mark(t, !!t && t.kind !== "jettison");
               },
             ),
           );
@@ -1095,12 +1132,13 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     if (timer) details.append(h("span", { class: "muted" }, icon("clock", "#94a3b8", 12), ` ${timer}`));
     if (m.minePick === "timer") details.append(h("span", { class: "warn" }, label("← klikni na mapě na čas výbuchu (✕ = jiné místo)")));
   } else if (o.action?.type === "jettison") {
-    const cur = o.action.moduleId;
-    const chosen = ship.loadout.modules.find((x) => x.id === cur) ?? (ship.loadout.cargo ?? []).find((x) => x.id === cur);
+    const ids = o.action.moduleIds;
+    const chosenAll = ids.map((id) => ship.loadout.modules.find((x) => x.id === id) ?? (ship.loadout.cargo ?? []).find((x) => x.id === id)).filter((x): x is ModuleInstance => !!x);
+    const chosen = chosenAll[0];
     details.append(icon("debris", "#94a3b8"));
     if (chosen) {
-      const after = { ...ship.loadout, modules: ship.loadout.modules.filter((x) => x.id !== cur), cargo: (ship.loadout.cargo ?? []).filter((x) => x.id !== cur) };
-      details.append(h("span", { class: "odds", style: "color:#4ade80" }, label(`✔ vyhodí se: ${MODULES[chosen.type].name}`)), h("span", { class: "muted" }, label(`· váha ${loadoutWeight(ship.loadout)} → ${loadoutWeight(after)} · max. rychlost ${profileOf(ship.loadout).maxSpeed} → ${profileOf(after).maxSpeed}`)));
+      const after = { ...ship.loadout, modules: ship.loadout.modules.filter((x) => !ids.includes(x.id)), cargo: (ship.loadout.cargo ?? []).filter((x) => !ids.includes(x.id)) };
+      details.append(h("span", { class: "odds", style: "color:#4ade80" }, label(`✔ vyhodí se: ${chosenAll.map((x) => MODULES[x.type].name).join(", ")}`)), h("span", { class: "muted" }, label(`· váha ${loadoutWeight(ship.loadout)} → ${loadoutWeight(after)} · max. rychlost ${profileOf(ship.loadout).maxSpeed} → ${profileOf(after).maxSpeed}`)));
     } else details.append(h("span", { class: "warn" }, label("↑ přetáhni modul na vyhazovací slot v inventáři – jinak se nic nevyhodí")));
   } else if (o.action?.type === "pickup") {
     const wantId = o.action.targetId;

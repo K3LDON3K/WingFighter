@@ -153,7 +153,7 @@ export const ACTIONS: ActionOption[] = [
     description: "Na začátku kola vyhodí zvolený modul z lodi – loď je lehčí (vyšší max. rychlost od příštího kola). Modul zůstane za lodí jako trosky; kdo je sestřelí lasery, dostane kredity, kdo k nim doletí, může je zvednout. V inventáři: přetáhni modul na vyhazovací slot.",
     disabled: (ship, _s, o) => (ship.loadout.modules.length === 0 ? "loď nemá žádný modul" : noAp(ship, o, o.action?.type === "jettison")),
     active: (o) => o.action?.type === "jettison",
-    apply: (o) => ({ action: o.action?.type === "jettison" ? undefined : { type: "jettison", moduleId: "" } }),
+    apply: (o) => ({ action: o.action?.type === "jettison" ? undefined : { type: "jettison", moduleIds: [] } }),
   },
   {
     id: "koiogran",
