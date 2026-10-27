@@ -5839,3 +5839,62 @@ body.drag-on * {
 .inv-title svg {
   margin-right: 5px;
 }
+
+/* ---- štít v segmentu LOĎ: okénko vlevo od tlačítka, 1,5× větší, velká tlačítka −/+ ---- */
+.invbar .shield-pop {
+  bottom: auto;
+  left: auto;
+  right: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%);
+  animation: flyin 0.22s steps(4, end) both;
+  zoom: 1.5;
+  padding: 10px 12px 12px;
+}
+.invbar .shield-pop::after {
+  left: auto;
+  bottom: auto;
+  right: -11px;
+  top: 50%;
+  width: 8px;
+  height: 4px;
+  margin: -2px 0 0;
+}
+.invbar .shield-pop .sbtn {
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+}
+.invbar .shield-pop .sbtn svg {
+  width: 14px;
+  height: 14px;
+}
+.invbar .shield-pop .stabs {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.invbar .shield-pop .stab.wide {
+  width: 100%;
+  justify-content: center;
+}
+.invbar .shield-pop .sreset.icon {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  color: #fecaca;
+  background: #7f1d1d;
+  border-color: #fca5a5 #450a0a #450a0a #fca5a5;
+}
+.invbar .shield-pop .sreset.icon:hover {
+  background: #b91c1c;
+}

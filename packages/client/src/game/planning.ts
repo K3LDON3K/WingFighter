@@ -201,7 +201,7 @@ const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: 
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
   { label: "Pohyb", ids: ["move", "stop", "evade", "koiogran"] },
-  { label: "Speciální", ids: ["shield"] },
+  { label: "Speciální", ids: [] },
 ];
 const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
 const ACTION_ICON: Record<string, string> = { pickup: "cargo", move: "pen", stop: "stop", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
@@ -367,76 +367,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const bubbleSize = 110;
   const bubble = h("div", { class: "bubble-box", title: ship.shieldType === "whole" ? `Energetický štít: zásoba ${ship.shields}/${ship.stats.shields}${RULES.shieldRecharge > 0 ? `, dobíjí se +${RULES.shieldRecharge} za kolo` : ""}${RULES.wholeEffDrop > 0 ? `, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : ""}. Lasery pole jen vybíjejí; projektily prorazí ${RULES.wholePiercePct} % do trupu.` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Projektil zachytí segment celý za 1 bod; laser ubere 1 bod a ${RULES.segmentPassPct} % pronikne do trupu; při 0 jde vše do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, bubbleSize, stormed));
   const shieldBox = h("div", { class: "shield-box" }, bubble);
-  /** Vysouvací editor štítu nad tlačítkem ŠTÍT (stejný styl jako skener). */
-  let shieldPop: HTMLElement | null = null;
-  /** Záložky režimů nahoře v okénku štítu: PŘESUNOUT (1 akce) / DOBÍT (technologie). */
-  const shieldTabs = () => {
-    const act = ACTIONS.find((x) => x.id === "shield")!;
-    const moveWhy = act.disabled(ship, m.state, o);
-    const pick = m.rechargePick ?? [0, 0, 0, 0];
-    const picked = pick.reduce((a, b) => a + b, 0);
-    const moveTab = h(
-      "button",
-      { class: `px seg stab ${!rechargeMode ? "on" : ""}`, disabled: locked || (!!moveWhy && !planned), ...tipAttr({ ...actionTip("shield", ship, o, man, moveWhy && !planned ? moveWhy : null), note: "přesun bodů štítu – 1 akce, platí od začátku kola" }), onclick: () => cb.shieldMode(ship.id, "move") },
-      label("Přesunout"),
-      costPipsAll({ actions: 1 }, !!planned && !rechargeMode, "1 akce"),
-    );
-    const canGo = rechargeMode && picked > 0;
-    const doTab = h(
-      "button",
-      { class: `px seg stab ${rechargeMode ? "on" : ""} ${canGo ? "go" : ""}`, disabled: locked || !!rechargeWhy, ...tipAttr({ ...actionTip("recharge", ship, o, man, rechargeWhy ?? null), note: rechargeMode ? (picked > 0 ? `klik = dobít hned (+${picked} ${picked === 1 ? "bod" : "body"} do zvolených segmentů)${picked < RULES.rechargeSegments ? " · nevyužitý bod propadne" : ""}` : `klikni na + u segmentů (${RULES.rechargeSegments} body), pak znovu DOBÍT`) : "dobití technologií – nebere akci, 1× za kolo, hned" }), onclick: () => (canGo ? cb.recharge(ship.id) : cb.shieldMode(ship.id, "recharge")) },
-      label(rechargeMode ? `Dobít ${picked}/${RULES.rechargeSegments}` : "Dobít"),
-      costPipsAll({ tech: RULES.rechargeTechCost }, false, `${RULES.rechargeTechCost} body technologie`),
-    );
-    return h("div", { class: "stabs" }, moveTab, doTab);
-  };
-  if (rechargeMode) {
-    // režim DOBÍT: žluté + u segmentů, dole body k rozdělení
-    const pick = m.rechargePick ?? [0, 0, 0, 0];
-    const picked = pick.reduce((a, b) => a + b, 0);
-    const cap = RULES.segmentHp * ship.stats.segmentModules;
-    const preview = ship.segments.map((v, i) => v + pick[i]) as Segments;
-    const pbtn = (seg: number) => {
-      const full = ship.segments[seg] + pick[seg] >= cap;
-      const can = pick[seg] > 0 || (picked < RULES.rechargeSegments && !full);
-      return h("button", { class: `px sbtn y ${pick[seg] > 0 ? "on" : ""}`, disabled: !can, title: full && pick[seg] === 0 ? `${SEGMENT_NAMES[seg]}: segment je plný` : pick[seg] > 0 ? `${SEGMENT_NAMES[seg]}: +${pick[seg]} · klik = ubrat` : picked >= RULES.rechargeSegments ? "všechny body rozdělené – klikem na + jinde je ubereš" : `${SEGMENT_NAMES[seg]}: přidat bod`, onclick: () => cb.rechargePick(ship.id, seg) }, pick[seg] > 0 ? `+${pick[seg]}` : icon("plus", "currentColor", 9));
-    };
-    const slots = h("div", { class: "hand-slots y", title: `${RULES.rechargeSegments - picked} ${RULES.rechargeSegments - picked === 1 ? "bod" : "body"} k rozdělení` });
-    for (let i = 0; i < RULES.rechargeSegments; i++) slots.append(h("i", { class: i < RULES.rechargeSegments - picked ? "on" : "" }));
-    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, preview, 84, stormed);
-    shieldPop = h(
-      "div",
-      { class: `shield-pop ${popClass(`shield:${ship.id}`)}` },
-      shieldTabs(),
-      h("div", { class: "spair top" }, pbtn(0)),
-      h("div", { class: "smid" }, h("div", { class: "spair left" }, pbtn(3)), popBubble, h("div", { class: "spair right" }, pbtn(1))),
-      h("div", { class: "spair bottom" }, pbtn(2)),
-      slots,
-      h("div", { class: "muted snote" }, label(picked > 0 ? "potvrď tlačítkem DOBÍT nahoře" : "klik na + dá bod do segmentu")),
-    );
-  } else if (editing && planned) {
-    const btn = (seg: number, d: 1 | -1) => {
-      const v = planned[seg];
-      const can = d < 0 ? v > 0 : inHand > 0 && v < RULES.segmentMax;
-      return h("button", { class: "px sbtn", disabled: !can, title: d < 0 ? `${SEGMENT_NAMES[seg]}: odebrat bod` : inHand <= 0 ? "nejdřív bod někde odeber" : `${SEGMENT_NAMES[seg]}: přidat bod (max. ${RULES.segmentMax})`, onclick: () => cb.shieldDelta(ship.id, seg, d) }, icon(d < 0 ? "minus" : "plus", "currentColor", 8));
-    };
-    // příď a záď: − vlevo, + vpravo; boky: + nahoře, − dole
-    const total = ship.segments.reduce((a, b) => a + b, 0);
-    const slots = h("div", { class: "hand-slots", title: inHand > 0 ? `${inHand} bodů v ruce – polož je tlačítkem +` : "body štítu v ruce (odebrané, ještě nepoložené)" });
-    for (let i = 0; i < total; i++) slots.append(h("i", { class: i < inHand ? "on" : "" }));
-    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, 84, stormed);
-    shieldPop = h(
-      "div",
-      { class: `shield-pop ${popClass(`shield:${ship.id}`)}` },
-      shieldTabs(),
-      h("div", { class: "spair top" }, btn(0, -1), btn(0, 1)),
-      h("div", { class: "smid" }, h("div", { class: "spair left" }, btn(3, 1), btn(3, -1)), popBubble, h("div", { class: "spair right" }, btn(1, 1), btn(1, -1))),
-      h("div", { class: "spair bottom" }, btn(2, -1), btn(2, 1)),
-      slots,
-      h("button", { class: "px tiny sreset", title: "Zrušit úpravu – zpět na původní rozložení", onclick: () => cb.cancelAction(ship.id) }, "↺ ", label("reset")),
-    );
-  }
-  const shieldPopOpen = !!shieldPop;
+  const shieldPopOpen = false; // štít je v segmentu LOĎ vpravo (renderInventoryBar)
   const vgauge = (n: number, val: number, color: string, dark: string, name: string, num: string | Node, title: string, blockedFrom = n) => {
     const bar = h("div", { class: "vbar" });
     // dílky nad blockedFrom jsou blokované váhou (tmavě červené s rámečkem)
@@ -565,7 +496,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   for (const grp of ACTION_GROUPS) {
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
     // skupina bez dostupných akcí se neukazuje; Loď = NÁKLAD (vyhodit / zvednout), Speciální = štít, skener, droid
-    if (avail.length === 0 && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.shieldType === "whole"))) continue;
+    if (avail.length === 0 && !(grp.label === "Speciální" && scannerModule(ship.loadout))) continue;
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
@@ -705,8 +636,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
           destroyed ? h("span", { class: "dead-x" }, "✕") : null,
         );
-      if (a.id === "shield" && shieldPopOpen) row.append(h("div", { class: "scan-holder stack" }, shieldPop, wbtn));
-      else row.append(wbtn);
+      row.append(wbtn);
     }
     if (grp.label === "Speciální") {
       // Komunikace se stanicí: funkční stanice v dohledu → objednávka modulu (1 akce, cena jako v obchodě)
@@ -782,49 +712,6 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             ),
           );
         }
-        row.append(holder);
-      }
-      // Energetický štít: tlačítko ŠTÍT s okénkem DOBÍT (segmentový má ŠTÍT jako akci výš v řádku)
-      if (ship.shieldType === "whole") {
-        const tech = ship.techPoints;
-        const why = rechargeWhy;
-        const room = shieldRechargeRoom(ship);
-        const add = Math.min(RULES.rechargeWhole, room);
-        const open = !!m.rechargeOpen && !why;
-        const holder = h("div", { class: "scan-holder stack" });
-        if (open) {
-          const max = ship.stats.shields;
-          const cells = 16;
-          const gauge = h("div", { class: "sgauge", title: `zásoba ${ship.shields} → ${ship.shields + add} / ${max}` });
-          for (let i = 0; i < cells; i++) {
-            const lo = (i / cells) * max;
-            gauge.append(h("i", { class: lo < ship.shields ? "on" : lo < ship.shields + add ? "add" : "" }));
-          }
-          holder.append(
-            h(
-              "div",
-              { class: `shield-pop ${popClass(`shield:${ship.id}`)}` },
-              h("div", { class: "stabs" }, h("button", { class: "px seg stab on go", disabled: locked, ...tipAttr({ ...actionTip("recharge", ship, o, man), note: `klik = dobít hned: ${ship.shields} → ${ship.shields + add} / ${max} · nebere akci · 1× za kolo` }), onclick: () => cb.recharge(ship.id) }, label("Dobít"), costPipsAll({ tech: RULES.rechargeTechCost }, false, `${RULES.rechargeTechCost} body technologie`))),
-              gauge,
-              h("div", { class: "snote" }, label(`zásoba ${ship.shields} → `), h("b", { style: "color:#fbbf24" }, `${ship.shields + add}`), label(` / ${max} · +${add}`)),
-              h("div", { class: "muted snote" }, label(`technologie ${tech}/${ship.stats.techMax} · nebere akci · 1× za kolo`)),
-            ),
-          );
-        }
-        holder.append(
-          h(
-            "button",
-            {
-              class: `px bb-weapon shield-btn ${open ? "on" : ""} ${stormed ? "stormed" : ""} ${why ? "cool" : ""}`,
-              disabled: locked || !!why,
-              ...tipAttr({ ...actionTip("recharge", ship, o, man), ...(why ? { warn: `Nelze: ${why}.` } : { note: `energetický štít ${ship.shields}/${ship.stats.shields} · dobití: ${RULES.rechargeTechCost} tech → +${RULES.rechargeWhole}` }) }),
-              onclick: () => cb.shieldMode(ship.id, open ? "close" : "recharge"),
-            },
-            icon("shield", "currentColor", 22),
-            h("span", { class: "lbl" }, label("Štít")),
-            stormed ? h("span", { class: "sb" }, "⚡") : null,
-          ),
-        );
         row.append(holder);
       }
     }
@@ -1314,8 +1201,9 @@ export function renderInventoryBar(root: HTMLElement, m: PlanningModel, cb: Plan
   const jetMods = jetIds.map((id) => ship.loadout.modules.find((x) => x.id === id) ?? cargo.find((x) => x.id === id)).filter((x): x is ModuleInstance => !!x);
   const tgtDebris = pickTgt ? m.state.debris.find((d) => d.id === pickTgt) : undefined;
   const tgtStation = pickTgt ? (m.state.stations ?? []).find((x) => x.id === pickTgt) : undefined;
-  const holder = h("div", { class: `scan-holder ${m.cargoOpen ? "stack" : ""}` });
   root.append(h("div", { class: "cap" }, label("Loď")));
+  renderShieldButton(root, m, cb, ship, o, locked);
+  const holder = h("div", { class: `scan-holder ${m.cargoOpen ? "stack" : ""}` });
   holder.append(
     h(
       "button",
@@ -1579,5 +1467,161 @@ export function renderInventoryBar(root: HTMLElement, m: PlanningModel, cb: Plan
     }
     holder.append(pop);
   }
+  root.append(holder);
+}
+
+/**
+ * Tlačítko ŠTÍT v segmentu LOĎ. Segmentový štít: okénko s −/+ u segmentů (změna platí hned jako naplánovaná akce
+ * PŘESUN, 1 akce; návrat na původní = akce zmizí), nahoře DOBÍT (technologie, hned), vpravo dole červený reset po změně.
+ * Energetický štít: okénko DOBÍT.
+ */
+function renderShieldButton(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks, ship: Ship, o: ShipOrders, locked: boolean) {
+  if (ship.shieldType !== "segment" && ship.shieldType !== "whole") return;
+  const man = resolveManeuver(profileFor(ship, o), o.maneuverId, ship.speed);
+  const stormed = inStorm(m.state, ship);
+  const teamColor = TEAM_COLORS[ship.team];
+  const rechargeWhy = shieldRechargeBlocked(m.state, ship);
+  const tech = ship.techPoints;
+  const holder = h("div", { class: "scan-holder stack" });
+  if (ship.shieldType === "whole") {
+    const why = rechargeWhy;
+    const room = shieldRechargeRoom(ship);
+    const add = Math.min(RULES.rechargeWhole, room);
+    const open = !!m.rechargeOpen && !why;
+    if (open) {
+      const max = ship.stats.shields;
+      const cells = 16;
+      const gauge = h("div", { class: "sgauge", title: `zásoba ${ship.shields} → ${ship.shields + add} / ${max}` });
+      for (let i = 0; i < cells; i++) {
+        const lo = (i / cells) * max;
+        gauge.append(h("i", { class: lo < ship.shields ? "on" : lo < ship.shields + add ? "add" : "" }));
+      }
+      holder.append(
+        h(
+          "div",
+          { class: `shield-pop big ${popClass(`shield:${ship.id}`)}` },
+          h("div", { class: "stabs" }, h("button", { class: "px seg stab on go wide", disabled: locked, ...tipAttr({ ...actionTip("recharge", ship, o, man), note: `klik = dobít hned: ${ship.shields} → ${ship.shields + add} (+${add}) za ${RULES.rechargeTechCost} technologie` }), onclick: () => cb.recharge(ship.id) }, label("Dobít"), costPipsAll({ tech: RULES.rechargeTechCost }, false, `${RULES.rechargeTechCost} body technologie`))),
+          gauge,
+          h("div", { class: "snote" }, label(`zásoba ${ship.shields} → `), h("b", { style: "color:#fbbf24" }, `${ship.shields + add}`), label(` / ${max} · +${add}`)),
+          h("div", { class: "muted snote" }, label(`technologie ${tech}/${ship.stats.techMax} · nebere akci · 1× za kolo`)),
+        ),
+      );
+    }
+    holder.append(
+      h(
+        "button",
+        {
+          class: `px bb-weapon shield-btn ${open ? "on" : ""} ${stormed ? "stormed" : ""} ${why ? "cool" : ""}`,
+          disabled: locked || !!why,
+          ...tipAttr({ ...actionTip("recharge", ship, o, man), ...(why ? { warn: `Nelze: ${why}.` } : { note: `energetický štít ${ship.shields}/${ship.stats.shields} · dobití: ${RULES.rechargeTechCost} tech → +${RULES.rechargeWhole}` }) }),
+          onclick: () => cb.shieldMode(ship.id, open ? "close" : "recharge"),
+        },
+        icon("shield", "currentColor", 22),
+        h("span", { class: "lbl" }, label("Štít")),
+        stormed ? h("span", { class: "sb" }, "⚡") : null,
+      ),
+    );
+    root.append(holder);
+    return;
+  }
+  /* ---- segmentový štít ---- */
+  const planned = o.action?.type === "shield" ? o.action.segments : undefined;
+  const inHand = shieldInHand(ship, o);
+  const editing = !!planned && !locked && !!m.shieldEdit; // okénko −/+ otevřené; klik vedle = potvrdit
+  const rechargeMode = !!m.rechargeOpen && !locked;
+  const changed = !!planned && planned.some((v, i) => v !== ship.segments[i]);
+  const act = ACTIONS.find((x) => x.id === "shield")!;
+  const moveWhy = act.disabled(ship, m.state, o);
+  const stormOff = stormed;
+  const destroyed = ship.loadout.modules.some((x) => x.type === "shield-segment") && !ship.loadout.modules.some((x) => x.type === "shield-segment" && moduleWorking(x));
+  /** DOBÍT přes celou šířku nahoře: přepne do režimu dobití; s rozdělenými body = provede. */
+  const doTab = () => {
+    const pick = m.rechargePick ?? [0, 0, 0, 0];
+    const picked = pick.reduce((a, b) => a + b, 0);
+    const canGo = rechargeMode && picked > 0;
+    return h(
+      "div",
+      { class: "stabs" },
+      h(
+        "button",
+        { class: `px seg stab wide ${rechargeMode ? "on" : ""} ${canGo ? "go" : ""}`, disabled: locked || !!rechargeWhy, ...tipAttr({ ...actionTip("recharge", ship, o, man, rechargeWhy ?? null), note: rechargeMode ? (picked > 0 ? `klik = dobít hned (+${picked} ${picked === 1 ? "bod" : "body"} do zvolených segmentů)${picked < RULES.rechargeSegments ? " · nevyužitý bod propadne" : ""}` : `klikni na + u segmentů (${RULES.rechargeSegments} body), pak znovu DOBÍT`) : "dobití technologií – nebere akci, 1× za kolo, hned" }), onclick: () => (canGo ? cb.recharge(ship.id) : cb.shieldMode(ship.id, rechargeMode ? "move" : "recharge")) },
+        label(rechargeMode ? `Dobít ${picked}/${RULES.rechargeSegments}` : "Dobít"),
+        costPipsAll({ tech: RULES.rechargeTechCost }, false, `${RULES.rechargeTechCost} body technologie`),
+      ),
+    );
+  };
+  let pop: HTMLElement | null = null;
+  if (rechargeMode) {
+    const pick = m.rechargePick ?? [0, 0, 0, 0];
+    const picked = pick.reduce((a, b) => a + b, 0);
+    const cap = RULES.segmentHp * ship.stats.segmentModules;
+    const preview = ship.segments.map((v, i) => v + pick[i]) as Segments;
+    const pbtn = (seg: number) => {
+      const full = ship.segments[seg] + pick[seg] >= cap;
+      const can = pick[seg] > 0 || (picked < RULES.rechargeSegments && !full);
+      return h("button", { class: `px sbtn y ${pick[seg] > 0 ? "on" : ""}`, disabled: !can, title: full && pick[seg] === 0 ? `${SEGMENT_NAMES[seg]}: segment je plný` : pick[seg] > 0 ? `${SEGMENT_NAMES[seg]}: +${pick[seg]} · klik = ubrat` : picked >= RULES.rechargeSegments ? "všechny body rozdělené – klikem na + jinde je ubereš" : `${SEGMENT_NAMES[seg]}: přidat bod`, onclick: () => cb.rechargePick(ship.id, seg) }, pick[seg] > 0 ? `+${pick[seg]}` : icon("plus", "currentColor", 12));
+    };
+    const slots = h("div", { class: "hand-slots y", title: `${RULES.rechargeSegments - picked} ${RULES.rechargeSegments - picked === 1 ? "bod" : "body"} k rozdělení` });
+    for (let i = 0; i < RULES.rechargeSegments; i++) slots.append(h("i", { class: i < RULES.rechargeSegments - picked ? "on" : "" }));
+    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, preview, 84, stormed);
+    pop = h(
+      "div",
+      { class: `shield-pop big ${popClass(`shield:${ship.id}`)}` },
+      doTab(),
+      h("div", { class: "spair top" }, pbtn(0)),
+      h("div", { class: "smid" }, h("div", { class: "spair left" }, pbtn(3)), popBubble, h("div", { class: "spair right" }, pbtn(1))),
+      h("div", { class: "spair bottom" }, pbtn(2)),
+      slots,
+      h("div", { class: "muted snote" }, label(picked > 0 ? "potvrď tlačítkem DOBÍT nahoře" : "klik na + dá bod do segmentu")),
+    );
+  } else if (editing && planned) {
+    const btn = (seg: number, d: 1 | -1) => {
+      const v = planned[seg];
+      const can = d < 0 ? v > 0 : inHand > 0 && v < RULES.segmentMax;
+      return h("button", { class: "px sbtn", disabled: !can, title: d < 0 ? `${SEGMENT_NAMES[seg]}: odebrat bod` : inHand <= 0 ? "nejdřív bod někde odeber" : `${SEGMENT_NAMES[seg]}: přidat bod (max. ${RULES.segmentMax})`, onclick: () => cb.shieldDelta(ship.id, seg, d) }, icon(d < 0 ? "minus" : "plus", "currentColor", 12));
+    };
+    // příď a záď: − vlevo, + vpravo; boky: + nahoře, − dole
+    const total = ship.segments.reduce((a, b) => a + b, 0);
+    const slots = h("div", { class: "hand-slots", title: inHand > 0 ? `${inHand} bodů v ruce – polož je tlačítkem +` : "body štítu v ruce (odebrané, ještě nepoložené)" });
+    for (let i = 0; i < total; i++) slots.append(h("i", { class: i < inHand ? "on" : "" }));
+    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, 84, stormed);
+    pop = h(
+      "div",
+      { class: `shield-pop big ${popClass(`shield:${ship.id}`)}` },
+      doTab(),
+      h("div", { class: "spair top" }, btn(0, -1), btn(0, 1)),
+      h("div", { class: "smid" }, h("div", { class: "spair left" }, btn(3, 1), btn(3, -1)), popBubble, h("div", { class: "spair right" }, btn(1, 1), btn(1, -1))),
+      h("div", { class: "spair bottom" }, btn(2, -1), btn(2, 1)),
+      slots,
+      changed ? h("button", { class: "px sreset icon", title: "Reset – vrátit původní rozložení štítu (akce se zruší)", onclick: () => cb.cancelAction(ship.id) }, "↺") : null,
+    );
+  }
+  const open = !!pop;
+  const done = !!planned && changed && !open;
+  let why = destroyed ? "ZNIČENO – modul nefunguje" : stormOff ? "systém je v bouři mimo provoz" : moveWhy;
+  const alt = !!why && !stormOff && !destroyed && !rechargeWhy; // bez volné akce jde aspoň dobít
+  if (alt) why = null;
+  if (pop) holder.append(pop);
+  holder.append(
+    h(
+      "button",
+      {
+        class: `px bb-weapon ${open && !stormOff ? "on" : ""} ${done ? "done" : ""} ${stormOff ? "stormed" : ""} ${changed ? "spent" : ""} ${destroyed ? "destroyed" : ""}`,
+        disabled: locked || stormOff || destroyed || (!!why && !open && !done),
+        ...tipAttr({
+          ...actionTip("shield", ship, o, man, destroyed ? null : why),
+          ...(done ? { note: "úprava platí · stisk = otevřít (upravit, dobít, reset)" } : rechargeMode ? { note: "režim DOBÍT – klik vedle = zavřít" } : editing ? { note: "−/+ přesouvá body hned (1 akce) · klik vedle = zavřít" } : { note: "otevře okénko štítu: −/+ přesun bodů (1 akce), DOBÍT technologií" }),
+          ...(destroyed ? { warn: "ZNIČENO – modul nefunguje" } : {}),
+        }),
+        onclick: () => (open ? cb.shieldConfirm(ship.id) : done ? cb.shieldMode(ship.id, "move") : alt ? cb.shieldMode(ship.id, "recharge") : cb.shieldMode(ship.id, "move")),
+      },
+      changed ? costPipsAll({ actions: 1 }, true, "1 akce (přesun bodů štítu)") : null,
+      icon("segments", "currentColor", 22),
+      h("span", { class: "lbl" }, label("Štít")),
+      done ? h("span", { class: "reset-strip" }, label(`${planned!.join("/")}`)) : null,
+      stormOff ? h("span", { class: "sb" }, "⚡") : null,
+      destroyed ? h("span", { class: "dead-x" }, "✕") : null,
+    ),
+  );
   root.append(holder);
 }

@@ -901,7 +901,7 @@ export class Renderer {
       } else {
         ctx.strokeStyle = segmentColor(hp);
         ctx.setLineDash([]);
-        ctx.lineWidth = hp >= 3 ? 4 : 3;
+        ctx.lineWidth = hp >= 3 ? 6.5 : 3; // 3 vrstvy = výrazně silnější čára
       }
       ctx.stroke();
     }

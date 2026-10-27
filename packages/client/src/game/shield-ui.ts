@@ -15,8 +15,8 @@ export function strengthColor(frac: number): string {
 export function segmentColor(hp: number): string {
   if (hp <= 0) return SHIELD_DARK;
   if (hp === 1) return SHIELD_RED;
-  if (hp === 2) return SHIELD_BLUE;
-  return SHIELD_YELLOW;
+  // 2 i 3 vrstvy modře – třetí vrstva se pozná podle tloušťky (žlutá vypadala jako poškození)
+  return SHIELD_BLUE;
 }
 
 export interface BubbleShip {
