@@ -364,7 +364,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const rechargeWhy = shieldRechargeBlocked(m.state, ship);
   const teamColor = TEAM_COLORS[ship.team];
   const stormed = inStorm(m.state, ship);
-  const bubbleSize = 110;
+  const bubbleSize = 106;
   const bubble = h("div", { class: "bubble-box", title: ship.shieldType === "whole" ? `Energetický štít: zásoba ${ship.shields}/${ship.stats.shields}${RULES.shieldRecharge > 0 ? `, dobíjí se +${RULES.shieldRecharge} za kolo` : ""}${RULES.wholeEffDrop > 0 ? `, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : ""}. Lasery pole jen vybíjejí; projektily prorazí ${RULES.wholePiercePct} % do trupu.` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Projektil zachytí segment celý za 1 bod; laser ubere 1 bod a ${RULES.segmentPassPct} % pronikne do trupu; při 0 jde vše do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, bubbleSize, stormed));
   const shieldBox = h("div", { class: "shield-box" }, bubble);
   const shieldPopOpen = false; // štít je v segmentu LOĎ vpravo (renderInventoryBar)
