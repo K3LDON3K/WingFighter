@@ -36,7 +36,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { listManeuvers, makeManeuver, maneuverId, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { activeShield, allowedFacings, cargoCapacity, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleUsable, moduleWorking, MODULES, MODULE_CATEGORY, MODULE_TYPES, newModule, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
+import { activeShield, allowedFacings, cargoCapacity, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleUsable, moduleWorking, moveModule, MODULES, MODULE_CATEGORY, MODULE_TYPES, newModule, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
 
@@ -1896,12 +1896,12 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (ship.lockTargetId && !shipById(state, ship.lockTargetId)?.alive) ship.lockTargetId = undefined;
   }
   for (const p of state.players) if (state.ships.some((s) => s.alive && s.ownerId === p.id)) awardCredits(state, events, p.id, RULES.creditsPerTurn, "survive");
-  // pasivní oprava trupu (hacker): jen když droid funguje a loď není v bouři; hack modulů platil jen na toto kolo
+  // pasivní oprava trupu (droid opravář): jen když droid funguje a loď není v bouři; hack modulů platil jen na toto kolo
   for (const ship of state.ships) {
     for (const m of ship.loadout.modules) if (m.hacked) delete m.hacked;
     if (!ship.alive || !(ship.autoRepair ?? 0)) continue;
-    if (hackerModule(ship) && !inStorm(state, ship)) {
-      const amount = Math.min(Math.max(1, Math.round((ship.stats.hull * HACK.repairPct) / 100)), ship.stats.hull - ship.hull);
+    if (repairModule(ship) && !inStorm(state, ship)) {
+      const amount = Math.min(Math.max(1, Math.round((ship.stats.hull * REPAIR.autoPct) / 100)), ship.stats.hull - ship.hull);
       ship.autoRepair = (ship.autoRepair ?? 1) - 1;
       if (amount > 0) ship.hull += amount;
       events.push({ type: "autoRepair", shipId: ship.id, amount: Math.max(0, amount), hullAfter: ship.hull, turnsLeft: ship.autoRepair });
@@ -2108,7 +2108,7 @@ export function repairModule(ship: Ship): ModuleInstance | undefined {
 
 /** Cena úkonu opraváře v bodech technologie. */
 export function repairCost(kind: RepairOrder["kind"]): number {
-  return kind === "module" ? REPAIR.moduleCost : kind === "ammo" ? REPAIR.ammoCost : kind === "hull" ? REPAIR.hullCost : REPAIR.installCost;
+  return kind === "module" ? REPAIR.moduleCost : kind === "ammo" ? REPAIR.ammoCost : kind === "hull" ? REPAIR.hullCost : kind === "auto" ? REPAIR.autoCost : REPAIR.installCost;
 }
 
 /** Proč opravář teď nemůže pracovat (undefined = může). */
@@ -2195,6 +2195,37 @@ export function applyRepair(state: GameState, ship: Ship, order: RepairOrder): {
       syncShields(ship);
       return { event: { ...base, techPoints: ship.techPoints, moduleId: installed.id, moduleType: installed.type, slot: order.slot, swappedType: out?.type } };
     }
+    case "uninstall": {
+      const idx = ship.loadout.modules.findIndex((x) => x.id === order.moduleId);
+      if (idx < 0) return { error: "takový modul loď nemá" };
+      const cargo = ship.loadout.cargo ?? [];
+      if (cargo.length >= cargoCapacity(ship.loadout)) return { error: "náklad je plný" };
+      const [mod] = ship.loadout.modules.splice(idx, 1);
+      ship.loadout.cargo = [...cargo, { ...mod, off: undefined }];
+      ship.techPoints -= cost;
+      syncShields(ship);
+      return { event: { ...base, techPoints: ship.techPoints, moduleId: mod.id, moduleType: mod.type } };
+    }
+    case "move": {
+      const mod = ship.loadout.modules.find((x) => x.id === order.moduleId);
+      if (!mod) return { error: "takový modul loď nemá" };
+      const hull = hullOf(ship.loadout);
+      if (!hull.slots.some((x) => x.id === order.slot)) return { error: "takový slot loď nemá" };
+      if (occupiedSlots(mod).includes(order.slot)) return { error: "modul už na tom slotu je" };
+      const res = moveModule(ship.loadout, mod, order.slot);
+      if (typeof res === "string") return { error: res };
+      ship.loadout = res;
+      ship.techPoints -= cost;
+      syncShields(ship);
+      return { event: { ...base, techPoints: ship.techPoints, moduleId: mod.id, moduleType: mod.type, slot: order.slot } };
+    }
+    case "auto": {
+      if ((ship.autoRepair ?? 0) > 0) return { error: `pasivní oprava už běží (zbývá ${ship.autoRepair} kol)` };
+      if (ship.hull >= ship.stats.hull) return { error: "trup je nepoškozený" };
+      ship.autoRepair = REPAIR.autoTurns;
+      ship.techPoints -= cost;
+      return { event: { ...base, techPoints: ship.techPoints } };
+    }
   }
 }
 
@@ -2204,7 +2235,7 @@ export function hackerModule(ship: Ship): ModuleInstance | undefined {
   return ship.loadout.modules.find((m) => m.type === "hacker" && moduleUsable(m));
 }
 export function hackCost(kind: HackOrder["kind"]): number {
-  return kind === "module" ? HACK.moduleCost : kind === "repair" ? HACK.repairCost : HACK.ordnanceCost;
+  return kind === "module" ? HACK.moduleCost : HACK.ordnanceCost;
 }
 export function hackBlocked(state: GameState, ship: Ship): string | undefined {
   if (!hackerModule(ship)) return "loď nemá funkční droida hackera";
@@ -2264,12 +2295,6 @@ export function applyHack(state: GameState, seen: GameState, ship: Ship, order: 
       mod.hacked = true;
       ship.techPoints -= cost;
       return { event: { ...base, techPoints: ship.techPoints, victimId: victim.id, moduleId: mod.id, moduleType: mod.type } };
-    }
-    case "repair": {
-      if ((ship.autoRepair ?? 0) > 0) return { error: `pasivní oprava už běží (zbývá ${ship.autoRepair} kol)` };
-      ship.autoRepair = HACK.repairTurns;
-      ship.techPoints -= cost;
-      return { event: { ...base, techPoints: ship.techPoints } };
     }
   }
 }

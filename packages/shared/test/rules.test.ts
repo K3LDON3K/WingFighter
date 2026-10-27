@@ -1501,25 +1501,25 @@ describe("droid – hacker", () => {
     // mina vybuchne na startu kola
     const r2 = resolveTurn(g2, [{ shipId: me2.id, maneuverId: "m1a0", fire: false }, { shipId: foe2.id, maneuverId: "m1a0", fire: false }], createRng(3));
     expect(r2.events.some((e) => e.type === "mineBlast")).toBe(true);
-    // pasivní oprava
+    // pasivní oprava (droid opravář)
     const g3 = game();
     const me3 = place(g3, "ship-p1-0", 500, 500, 0);
     place(g3, "ship-p2-0", 1500, 1200, Math.PI);
-    me3.loadout.modules.push(newModule("hacker", "left", "h1"));
+    me3.loadout.modules.push(newModule("repair", "left", "r1"));
     refreshShip(me3);
     me3.techPoints = 6;
     me3.hull = 50;
-    expect(applyHack(g3, stateForTeam(g3, 0, new Map()), me3, { kind: "repair" }).error).toBeUndefined();
+    expect(applyRepair(g3, me3, { kind: "auto" }).error).toBeUndefined();
     me3.techPoints = 6;
-    expect(applyHack(g3, stateForTeam(g3, 0, new Map()), me3, { kind: "repair" }).error).toMatch(/běží/);
+    expect(applyRepair(g3, me3, { kind: "auto" }).error).toMatch(/běží/);
     let st = g3;
-    for (let i = 0; i < HACK.repairTurns; i++) {
+    for (let i = 0; i < REPAIR.autoTurns; i++) {
       const rr = resolveTurn(st, [{ shipId: me3.id, maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(3));
       expect(rr.events.some((e) => e.type === "autoRepair" && e.shipId === me3.id)).toBe(true);
       st = rr.state;
     }
     const m3 = st.ships.find((s) => s.id === me3.id)!;
-    expect(m3.hull).toBe(50 + HACK.repairTurns * Math.round((m3.stats.hull * HACK.repairPct) / 100));
+    expect(m3.hull).toBe(50 + REPAIR.autoTurns * Math.round((m3.stats.hull * REPAIR.autoPct) / 100));
     expect(m3.autoRepair).toBe(0);
     const rr = resolveTurn(st, [{ shipId: me3.id, maneuverId: "m1a0", fire: false }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(3));
     expect(rr.events.some((e) => e.type === "autoRepair")).toBe(false);

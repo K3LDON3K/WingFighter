@@ -662,3 +662,33 @@ export function randomLoadout(rng: () => number, allowed: Partial<Record<ModuleT
   }
   return lo;
 }
+
+/** Přesun modulu do slotu (volný = přesun, obsazený = prohození); vrací novou sestavu nebo text chyby. */
+export function moveModule(loadout: ShipLoadout, m: ModuleInstance, target: SlotId): ShipLoadout | string {
+  const hull = hullOf(loadout);
+  const def = MODULES[m.type];
+  const occOf = (x: ModuleInstance) => occupiedSlots(x);
+  const other = loadout.modules.find((x) => x.id !== m.id && occOf(x).includes(target));
+  const refacing = (x: ModuleInstance, slot: SlotId): ModuleInstance => ({ ...x, slot, facing: hasFacing(x.type) ? (x.facing && allowedFacings(x.type, slot).includes(x.facing) ? x.facing : defaultFacing(x.type, slot)) : undefined });
+  if (def.size === "large") {
+    const pair = hullLargePairs(hull).find((p) => p.includes(target));
+    if (!pair) return "velký modul patří do spojené dvojice slotů";
+    const blockers = loadout.modules.filter((x) => x.id !== m.id && occOf(x).some((s) => pair.includes(s)));
+    if (blockers.length === 0) return { ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? refacing(x, pair[0]) : x)) };
+    const myPair = largePair(m.slot)!;
+    if (blockers.length === 1 && MODULES[blockers[0].type].size === "large") return { ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? refacing(x, pair[0]) : x.id === blockers[0].id ? refacing(x, myPair[0]) : x)) };
+    if (blockers.length <= 2 && blockers.every((x) => MODULES[x.type].size !== "large")) {
+      // dva malé moduly se přesunou do mé uvolněné dvojice
+      const out = loadout.modules.map((x) => (x.id === m.id ? refacing(x, pair[0]) : x));
+      blockers.forEach((b, i) => {
+        const k = out.findIndex((x) => x.id === b.id);
+        out[k] = refacing(out[k], myPair[i]);
+      });
+      return { ...loadout, modules: out };
+    }
+    return "cílová dvojice slotů je obsazená";
+  }
+  if (!other) return { ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? refacing(x, target) : x)) };
+  if (MODULES[other.type].size === "large") return "velký modul nejde prohodit s malým";
+  return { ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? refacing(x, other.slot) : x.id === other.id ? refacing(x, m.slot) : x)) };
+}

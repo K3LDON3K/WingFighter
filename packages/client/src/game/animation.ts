@@ -101,7 +101,8 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       }
       case "repair": {
         const mt = e.moduleType ? MODULES[e.moduleType]?.name ?? e.moduleType : "";
-        const what = e.kind === "module" ? `opravil modul ${mt} (+${e.amount})` : e.kind === "ammo" ? `vyrobil náboj do ${mt}` : e.kind === "hull" ? `opravil trup o ${e.amount} → ${e.hullAfter}` : `nasadil ${mt}${e.swappedType ? ` (výměnou za ${MODULES[e.swappedType]?.name ?? e.swappedType})` : ""}`;
+        const what =
+          e.kind === "module" ? `opravil modul ${mt} (+${e.amount})` : e.kind === "ammo" ? `vyrobil náboj do ${mt}` : e.kind === "hull" ? `opravil trup o ${e.amount} → ${e.hullAfter}` : e.kind === "uninstall" ? `odpojil ${mt} do nákladu` : e.kind === "move" ? `přesunul ${mt}` : e.kind === "auto" ? "zapnul pasivní opravu trupu" : `nasadil ${mt}${e.swappedType ? ` (výměnou za ${MODULES[e.swappedType]?.name ?? e.swappedType})` : ""}`;
         lines.push(`${name(e.shipId)}: opravář ${what} (−${e.cost} technologie, zbývá ${e.techPoints}).`);
         break;
       }

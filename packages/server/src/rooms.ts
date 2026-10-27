@@ -786,7 +786,7 @@ export class Hub {
         const ship = g.state.ships.find((x) => x.id === msg.shipId && x.ownerId === client.id && x.alive);
         if (!ship) return this.error(client, "Opravář: to není tvoje loď.");
         const ord = msg.order;
-        if (!ord || typeof ord !== "object" || !["module", "ammo", "hull", "install"].includes((ord as { kind?: string }).kind ?? "")) return this.error(client, "Opravář: neplatný úkon.");
+        if (!ord || typeof ord !== "object" || !["module", "ammo", "hull", "install", "uninstall", "move", "auto"].includes((ord as { kind?: string }).kind ?? "")) return this.error(client, "Opravář: neplatný úkon.");
         const res = applyRepair(g.state, ship, ord);
         if (res.error) return this.error(client, `Opravář: ${res.error}.`);
         g.pendingEvents.push(res.event!);
@@ -806,7 +806,7 @@ export class Hub {
         const ship = g.state.ships.find((x) => x.id === msg.shipId && x.ownerId === client.id && x.alive);
         if (!ship) return this.error(client, "Hacker: to není tvoje loď.");
         const ord = msg.order;
-        if (!ord || typeof ord !== "object" || !["mine", "torpedo", "module", "repair"].includes((ord as { kind?: string }).kind ?? "")) return this.error(client, "Hacker: neplatný úkon.");
+        if (!ord || typeof ord !== "object" || !["mine", "torpedo", "module"].includes((ord as { kind?: string }).kind ?? "")) return this.error(client, "Hacker: neplatný úkon.");
         const team = teamOf(g, client.id);
         const res = applyHack(g.state, stateForTeam(g.state, team, memoryFor(g, team)), ship, ord);
         if (res.error) return this.error(client, `Hacker: ${res.error}.`);

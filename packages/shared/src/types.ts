@@ -94,15 +94,20 @@ export interface ShipOrders {
 export type HackOrder =
   | { kind: "mine"; mineId: string; timer?: number }
   | { kind: "torpedo"; torpedoId: string; targetId: string }
-  | { kind: "module"; shipId: string; moduleId: string }
-  | { kind: "repair" };
+  | { kind: "module"; shipId: string; moduleId: string };
 
 /** Úkon droida opraváře (provádí se hned, platí se technologií). */
 export type RepairOrder =
   | { kind: "module"; moduleId: string }
   | { kind: "ammo"; moduleId: string }
   | { kind: "hull" }
-  | { kind: "install"; moduleId: string; slot: SlotId; facing?: Facing };
+  | { kind: "install"; moduleId: string; slot: SlotId; facing?: Facing }
+  /** Nainstalovaný modul do nákladu (odpojení). */
+  | { kind: "uninstall"; moduleId: string }
+  /** Přesun nainstalovaného modulu na jiný slot (obsazený = prohození). */
+  | { kind: "move"; moduleId: string; slot: SlotId }
+  /** Pasivní oprava trupu: několik kol po X % trupu (běží, jen dokud opravář funguje). */
+  | { kind: "auto" };
 
 /** Výstřel z jednoho modulu v kole; `targetId` přebíjí `preferredTargetId` lodi. */
 export interface Shot {

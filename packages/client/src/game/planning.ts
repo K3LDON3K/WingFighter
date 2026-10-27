@@ -85,7 +85,7 @@ import { icon, label, segBar } from "../icons.ts";
 import { ACTIONS, actionAvailable, stoppedNow } from "./actions.ts";
 import { SEGMENT_NAMES, shieldBubble, strengthColor } from "./shield-ui.ts";
 import { pilotBadge } from "../pilot-ui.ts";
-import { moduleColor, moduleStateHex, renderLoadout, slotHexOffset } from "../loadout-ui.ts";
+import { moduleColor, moduleStateHex, renderLoadout, showTip, slotHexOffset } from "../loadout-ui.ts";
 
 export interface PlanningCallbacks {
   select(shipId: string): void;
@@ -201,7 +201,6 @@ const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: 
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
   { label: "Pohyb", ids: ["move", "stop", "evade", "koiogran"] },
-  { label: "Loď", ids: [] },
   { label: "Speciální", ids: ["shield"] },
 ];
 const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
@@ -566,8 +565,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   for (const grp of ACTION_GROUPS) {
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
     // skupina bez dostupných akcí se neukazuje; Loď = NÁKLAD (vyhodit / zvednout), Speciální = štít, skener, droid
-    if (grp.label === "Loď" && ship.loadout.modules.length === 0) continue;
-    if (avail.length === 0 && grp.label !== "Loď" && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.shieldType === "whole"))) continue;
+    if (avail.length === 0 && !(grp.label === "Speciální" && (scannerModule(ship.loadout) || ship.shieldType === "whole"))) continue;
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
@@ -709,235 +707,6 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         );
       if (a.id === "shield" && shieldPopOpen) row.append(h("div", { class: "scan-holder stack" }, shieldPop, wbtn));
       else row.append(wbtn);
-    }
-    if (grp.label === "Loď") {
-      // INVENTÁŘ: okénko s nákresem lodi – přetahováním se vyhazuje (vyhazovací slot) a zvedá (trosky v dosahu → náklad / volný slot s opravářem)
-      const jetOn = o.action?.type === "jettison";
-      const pickTgt = o.action?.type === "pickup" ? o.action.targetId : undefined;
-      const installSlot = o.action?.type === "pickup" ? o.action.installSlot : undefined;
-      const cargoActive = jetOn || !!pickTgt;
-      const cargoSpent = dotsFor("jettison") + dotsFor("pickup");
-      const cargoDone = cargoActive && !m.cargoOpen; // akce zvolená, okénko zavřené = hotovo, stisk = reset
-      const cargo = ship.loadout.cargo ?? [];
-      const cap = cargoCapacity(ship.loadout);
-      const canInstall = !repairBlocked(m.state, ship);
-      const holder = h("div", { class: `scan-holder ${m.cargoOpen ? "stack" : ""}` });
-      const jetIds = o.action?.type === "jettison" ? o.action.moduleIds : [];
-      const jetMods = jetIds.map((id) => ship.loadout.modules.find((x) => x.id === id) ?? cargo.find((x) => x.id === id)).filter((x): x is ModuleInstance => !!x);
-      const jetMod = jetMods[0];
-      const tgtDebris = pickTgt ? m.state.debris.find((d) => d.id === pickTgt) : undefined;
-      const tgtStation = pickTgt ? (m.state.stations ?? []).find((x) => x.id === pickTgt) : undefined;
-      holder.append(
-        h(
-          "button",
-          {
-            class: `px bb-weapon ${cargoActive && !cargoDone ? "on" : ""} ${cargoDone ? "done" : ""} ${cargoSpent > 0 ? "spent" : ""} ${m.cargoOpen ? "open" : ""}`,
-            disabled: locked,
-            ...tipAttr({
-              icon: "cargo",
-              iconColor: "#94a3b8",
-              title: "Inventář",
-              cost: { actions: 1 },
-              fx: [
-                { icon: "debris", text: "přetáhni modul lodi / nákladu na vyhazovací slot = vyhodit (trosky)" },
-                { icon: "cargo", text: `přetáhni trosky v dosahu ${CARGO.range} do nákladu = zvednout` },
-                { icon: "wrench", text: "s droidem opravářem i rovnou na volný slot = zvednout a nasadit" },
-              ],
-              note: cargoDone ? `${jetOn ? "vyhození" : installSlot ? "zvednutí a nasazení" : "zvednutí"} platí · stisk = reset` : "klik vedle okénko zavře a volba platí",
-            }),
-            onclick: () => (cargoDone ? cb.cancelAction(ship.id) : cb.cargoToggle(ship.id)),
-          },
-          costPips(1, cargoSpent > 0 ? "spent" : "red", "stojí 1 akci"),
-          icon("cargo", "currentColor", 22),
-          h("span", { class: "lbl" }, label("Inventář")),
-          cargoDone ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
-        ),
-      );
-      if (m.cargoOpen && !locked) {
-        const sp = cur.speed;
-        const near = m.state.debris.filter((d) => dist(ship, d) <= CARGO.range).sort((a, b) => dist(ship, a) - dist(ship, b));
-        const stn = stationInPickupRange(m.state, ship);
-        const debrisModule = (d: Debris): ModuleInstance => d.module ?? { id: d.id, type: d.type, slot: "front", ammo: MODULES[d.type].ammo };
-        const cancelBtn = () => h("button", { class: "px tiny inv-cancel", title: "Zrušit", onclick: () => cb.setOrders(ship.id, { action: undefined }) }, "✕ ", label("zrušit"));
-        const slotName = (id: SlotId) => hullOf(ship.loadout).slots.find((x) => x.id === id)?.name ?? id;
-
-        /* --- vlevo: trosky (a stanice) v dosahu – tažením do lodi --- */
-        const reachList = h("div", { class: "inv-list" });
-        const dragIn: { el: SVGSVGElement; id: string; mod: ModuleInstance | null }[] = [];
-        for (const d of near) {
-          const mod = debrisModule(d);
-          const planned = pickTgt === d.id;
-          const el = moduleStateHex(mod, { r: 26, sub: planned ? (installSlot ? "NASADIT" : "ZVEDNOUT") : moduleHp(mod) < moduleMaxHp(mod.type) ? `${moduleHp(mod)}/${moduleMaxHp(mod.type)}` : undefined, subColor: planned ? "#86efac" : undefined, selected: planned, title: `${MODULES[mod.type].name} · ${Math.round(dist(ship, d))} / ${CARGO.range} · přetáhni do nákladu${canInstall ? " nebo na volný slot" : ""}` });
-          el.classList.add("inv-drag");
-          reachList.append(el);
-          dragIn.push({ el, id: d.id, mod });
-        }
-        if (stn) {
-          const planned = pickTgt === stn.id;
-          const el = moduleStateHex(null, { r: 26, empty: planned ? "ZVEDNOUT" : "STANICE", selected: planned, title: `Stanice: nabere náhodný modul ze zásoby (${stn.stock}) – přetáhni do nákladu` });
-          el.classList.add("inv-drag");
-          reachList.append(el);
-          dragIn.push({ el, id: stn.id, mod: null });
-        }
-        if (!near.length && !stn) reachList.append(h("div", { class: "inv-none" }, label("nic v dosahu")));
-        const reach = h(
-          "div",
-          { class: "inv-reach" },
-          h("div", { class: "inv-cap" }, label(`V dosahu${near.length + (stn ? 1 : 0) ? ` · ${near.length + (stn ? 1 : 0)}` : ""}`)),
-          h("div", { class: `inv-lbl ${sp > CARGO.maxSpeed ? "warn" : ""}` }, label(sp > CARGO.maxSpeed ? `rychlost ${sp} > ${CARGO.maxSpeed} – zpomal, jinak se nezvedne` : `dosah ${CARGO.range} · rychlost ${sp} ok`)),
-          h("div", { class: `inv-lbl ${canInstall ? "ok" : "warn"}` }, icon("wrench", canInstall ? "#86efac" : "#fca5a5", 10), " ", label(canInstall ? "lze i nasadit – opravář na palubě" : "nelze nasadit – chybí droid opravář")),
-          reachList,
-        );
-
-        /* --- uprostřed: nákres lodi (jen k tažení) --- */
-        const lo = renderLoadout({ loadout: ship.loadout, team: ship.team, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: false, selectedId: jetMod?.id });
-        // všechny vyhazované moduly v plástvi červeně čárkovaně (renderLoadout zvýrazní jen jeden)
-        for (const g of lo.querySelectorAll<SVGGElement>(".lo-g.mod[data-slot]")) {
-          const sl = g.getAttribute("data-slot") as SlotId;
-          const mod = ship.loadout.modules.find((x) => occupiedSlots(x).includes(sl));
-          if (mod && jetIds.includes(mod.id)) g.classList.add("sel");
-        }
-
-        /* --- vpravo: vyhazovací slot --- */
-        const jetList = h("div", { class: "inv-list" });
-        const dragBack: { el: Element; mod: ModuleInstance }[] = [];
-        for (const x of jetMods) {
-          const el = moduleStateHex(x, { r: 26, sub: "VYHODIT", subColor: "#fca5a5", title: `${MODULES[x.type].name} se vyhodí na začátku kola – přetáhni zpět na loď = rozmyslet si to` });
-          el.classList.add("inv-drag");
-          jetList.append(el);
-          dragBack.push({ el, mod: x });
-        }
-        jetList.append(moduleStateHex(null, { r: 26, empty: jetMods.length ? "DALŠÍ" : "SEM", title: "Přetáhni sem modul z lodi nebo z nákladu" }));
-        const jetBox = h(
-          "div",
-          { class: `inv-jet ${jetMod ? "has" : ""}`, dataset: { drop: "jettison" } },
-          h("div", { class: "inv-cap" }, label(`Vyhodit${jetMods.length ? ` · ${jetMods.length}` : ""}`)),
-          jetMod ? h("div", { class: "inv-lbl ok" }, label("vyhodí se na začátku kola · přetažení zpět na loď = zrušit")) : h("div", { class: "inv-lbl" }, label("přetáhni sem modul z lodi nebo z nákladu (i víc najednou)")),
-          jetList,
-          jetMod ? cancelBtn() : null,
-        );
-
-        /* --- dole: náklad (hexy modulů v nákladu + volná místa = cíl pro zvednutí) --- */
-        const cargoRow = h("div", { class: "inv-cargo" }, h("div", { class: "inv-cap" }, label(`Náklad ${cargo.length}/${cap}`)));
-        const dragOut: { el: Element; mod: ModuleInstance }[] = [];
-        for (const x of cargo) {
-          const el = moduleStateHex(x, { r: 26, sub: jetIds.includes(x.id) ? "VYHODIT" : moduleHp(x) < moduleMaxHp(x.type) ? `${moduleHp(x)}/${moduleMaxHp(x.type)}` : undefined, subColor: jetIds.includes(x.id) ? "#fca5a5" : undefined, selected: jetIds.includes(x.id), title: `${MODULES[x.type].name} v nákladu (nefunguje, jen váží) – přetáhni na vyhazovací slot` });
-          el.classList.add("inv-drag");
-          cargoRow.append(el);
-          dragOut.push({ el, mod: x });
-        }
-        const pickedToCargo = pickTgt && !installSlot ? (tgtDebris ? debrisModule(tgtDebris) : null) : undefined;
-        for (let i = cargo.length; i < cap; i++) {
-          if (i === cargo.length && pickTgt && !installSlot) {
-            cargoRow.append(
-              h(
-                "div",
-                { class: "inv-planned" },
-                pickedToCargo ? moduleStateHex(pickedToCargo, { r: 26, sub: "ZVEDNOUT", subColor: "#86efac", selected: true }) : moduleStateHex(null, { r: 26, empty: tgtStation ? "STANICE" : "?", selected: true }),
-                h("div", { class: "inv-lbl ok" }, label(tgtStation ? "nabere se náhodný modul ze stanice" : "zvedne se v tomto kole")),
-                cancelBtn(),
-              ),
-            );
-          } else cargoRow.append(h("div", { class: "inv-free", dataset: { drop: "cargo" } }, moduleStateHex(null, { r: 26, empty: "VOLNÉ", title: "Volné místo v nákladu – přetáhni sem trosky z dosahu" })));
-        }
-        if (cap <= 0) cargoRow.append(h("div", { class: "inv-none" }, label("loď nemá nákladový prostor")));
-
-        const pop = h("div", { class: `cargo-pop inv-pop ${popClass(`cargo:${ship.id}`)}` }, h("div", { class: "inv-title" }, icon("cargo", "#7dd3fc", 12), " ", label("Inventář · přetahuj moduly")), h("div", { class: "inv-body" }, reach, h("div", { class: "inv-mid" }, lo, cargoRow), jetBox));
-
-        /* --- tažení: moduly lodi / nákladu → vyhazovací slot; trosky → náklad / volný slot --- */
-        const targetOf = (el: Element | null): { kind: "jettison" | "cargo" | "slot" | "ship"; slot?: SlotId; el: Element } | null => {
-          const drop = el?.closest?.("[data-drop]");
-          if (drop) return { kind: drop.getAttribute("data-drop") as "jettison" | "cargo", el: drop };
-          const g = el?.closest?.("[data-slot]");
-          if (g && g.classList.contains("empty") && pop.contains(g)) return { kind: "slot", slot: g.getAttribute("data-slot") as SlotId, el: g };
-          const dia = el?.closest?.(".inv-mid");
-          if (dia && pop.contains(dia)) return { kind: "ship", el: dia };
-          return null;
-        };
-        const setJet = (ids: string[]) => cb.setOrders(ship.id, { action: ids.length ? { type: "jettison", moduleIds: ids } : undefined });
-        const mark = (t: ReturnType<typeof targetOf>, ok: boolean) => {
-          pop.querySelectorAll(".drop-target, .drop-bad").forEach((x) => x.classList.remove("drop-target", "drop-bad"));
-          if (t) t.el.classList.add(ok ? "drop-target" : "drop-bad");
-        };
-        for (const g of lo.querySelectorAll<SVGGElement>(".lo-g.mod[data-slot]")) {
-          const sl = g.getAttribute("data-slot") as SlotId;
-          const mod = ship.loadout.modules.find((x) => occupiedSlots(x).includes(sl));
-          if (mod) dragOut.push({ el: g, mod });
-        }
-        for (const { el, mod } of dragOut) {
-          el.classList.add("inv-drag");
-          el.addEventListener("pointerdown", (ev) =>
-            dragHex(
-              ev as PointerEvent,
-              () => moduleStateHex(mod, { r: 26 }),
-              (under) => {
-                const t = targetOf(under);
-                if (t?.kind === "jettison" && !jetIds.includes(mod.id)) setJet([...jetIds, mod.id]);
-              },
-              (under) => {
-                const t = targetOf(under);
-                mark(t, t?.kind === "jettison");
-              },
-            ),
-          );
-        }
-        // z vyhazovacího slotu zpět na loď / do nákladu = rozmyslet si to (modul je pořád nainstalovaný, opravář netřeba)
-        for (const { el, mod } of dragBack) {
-          el.addEventListener("pointerdown", (ev) =>
-            dragHex(
-              ev as PointerEvent,
-              () => moduleStateHex(mod, { r: 26 }),
-              (under) => {
-                const t = targetOf(under);
-                if (t && t.kind !== "jettison") setJet(jetIds.filter((x) => x !== mod.id));
-              },
-              (under) => {
-                const t = targetOf(under);
-                mark(t, !!t && t.kind !== "jettison");
-              },
-            ),
-          );
-        }
-        for (const { el, id, mod } of dragIn) {
-          el.addEventListener("pointerdown", (ev) =>
-            dragHex(
-              ev as PointerEvent,
-              () => (mod ? moduleStateHex(mod, { r: 26 }) : moduleStateHex(null, { r: 26, empty: "STANICE" })),
-              (under) => {
-                const t = targetOf(under);
-                if (t?.kind === "cargo") cb.setOrders(ship.id, { action: { type: "pickup", targetId: id } });
-                else if (t?.kind === "slot" && mod && canInstall && t.slot) cb.setOrders(ship.id, { action: { type: "pickup", targetId: id, installSlot: t.slot } });
-                else if (t?.kind === "slot" && !canInstall) cb.setOrders(ship.id, {}); // jen překreslit (zůstane rada „chybí droid opravář“)
-              },
-              (under) => {
-                const t = targetOf(under);
-                mark(t, t?.kind === "cargo" || (t?.kind === "slot" && !!mod && canInstall));
-              },
-            ),
-          );
-        }
-        /* --- naplánované zvednutí + nasazení: modul se ukáže ve volném slotu (po vykreslení, podle polohy hexu) --- */
-        if (installSlot && tgtDebris) {
-          const mod = debrisModule(tgtDebris);
-          requestAnimationFrame(() => {
-            const g = lo.querySelector<SVGGElement>(`[data-slot="${installSlot}"]`);
-            const dia = lo.querySelector<HTMLElement>(".lo-diagram");
-            if (!g || !dia) return;
-            const rb = g.getBoundingClientRect();
-            const rd = dia.getBoundingClientRect();
-            const ov = h(
-              "div",
-              { class: "inv-installed", style: `left:${rb.left - rd.left + rb.width / 2}px;top:${rb.top - rd.top + rb.height / 2}px` },
-              moduleStateHex(mod, { r: 42, sub: "NASADIT", subColor: "#86efac", selected: true, title: `${MODULES[mod.type].name}: zvedne se a opravář ho nasadí do slotu ${slotName(installSlot)} (${REPAIR.installCost} technologie)` }),
-              h("div", { class: "inv-lbl ok" }, label(`zvedne se a opravář ho nasadí (${REPAIR.installCost} tech)`)),
-              cancelBtn(),
-            );
-            dia.append(ov);
-          });
-        }
-        holder.append(pop);
-      }
-      row.append(holder);
     }
     if (grp.label === "Speciální") {
       // Komunikace se stanicí: funkční stanice v dohledu → objednávka modulu (1 akce, cena jako v obchodě)
@@ -1394,6 +1163,7 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
       },
       icon("wrench", "currentColor", 22),
       h("span", { class: "lbl" }, label("Opravář")),
+      (ship.autoRepair ?? 0) > 0 ? h("span", { class: "reset-strip" }, label(`oprava ${ship.autoRepair}`)) : null,
       stormed ? h("span", { class: "sb" }, "⚡") : null,
       rDestroyed ? h("span", { class: "dead-x" }, "✕") : null,
     );
@@ -1409,12 +1179,14 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
         const can = avail && tech >= c;
         return sub(name, ic, c, kind === k, can, { icon: ic, iconColor: "#c084fc", title: `Opravář – ${name}`, fx: [], note, ...(tech < c ? { warn: "Nelze: nedostatek technologie." } : !avail ? { warn: "Nelze: není co dělat." } : {}) }, () => cb.repairMode(ship.id, kind === k ? null : k));
       };
+      const running = ship.autoRepair ?? 0;
       subs = [
         tab("module", "wrench", "Modul", fixable.length > 0, `plně opraví vybraný modul (i zničený) · ${REPAIR.moduleCost} body technologie`),
         tab("ammo", "torpedo", "Munice", ammoable.length > 0, `vyrobí 1 náboj do torpédometu nebo min · ${REPAIR.ammoCost} body technologie`),
         tab("hull", "hull", "Trup", hullAdd > 0, `opraví trup o ${REPAIR.hullPct} % maxima (${Math.max(0, hullAdd)}) · ${REPAIR.hullCost} body technologie`),
-        tab("install", "cargo", "Nasadit", cargo.length > 0, `nasadí modul z nákladu do libovolného slotu (obsazený se vymění) · ${REPAIR.installCost} bod technologie`),
+        tab("auto", "hull", "Oprava", running <= 0 && ship.hull < ship.stats.hull, `pasivní oprava: ${REPAIR.autoTurns} kola po ${REPAIR.autoPct} % trupu za kolo (jen dokud opravář funguje) · ${REPAIR.autoCost} body technologie${running > 0 ? ` · už běží (zbývá ${running} kol)` : ""}`),
       ];
+      // nasazení, přesun a odpojení modulů se dělá přetahováním v INVENTÁŘI
       if (kind === "module") {
         const hexes = h("div", { class: "dr-hexes" }, ...fixable.map((x) => moduleStateHex(x, { sub: moduleHp(x) <= 0 ? "ZNIČEN" : `${moduleHp(x)}/${moduleMaxHp(x.type)}`, title: `${MODULES[x.type].name} (${slotName(x.slot)}): opravit ${moduleHp(x)} → ${moduleMaxHp(x.type)} za ${REPAIR.moduleCost} body technologie`, onClick: locked ? undefined : () => cb.repair(ship.id, { kind: "module", moduleId: x.id }) })));
         panel = panelEl("Opravit modul – který?", fixable.length ? hexes : h("div", { class: "muted" }, label("žádný poškozený modul")));
@@ -1427,19 +1199,13 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
           h("div", { class: "snote" }, label(`trup ${ship.hull} → `), h("b", { style: "color:#fbbf24" }, `${ship.hull + Math.max(0, hullAdd)}`), label(` / ${ship.stats.hull} · +${Math.max(0, hullAdd)}`)),
           h("button", { class: "px seg stab on go", disabled: locked || hullAdd <= 0, onclick: () => cb.repair(ship.id, { kind: "hull" }) }, label("Opravit trup"), costPipsAll({ tech: REPAIR.hullCost }, false, `${REPAIR.hullCost} body technologie`)),
         );
-      } else if (kind === "install") {
-        const picked = cargo.find((x) => x.id === m.repairCargoId);
-        if (!picked) {
-          const hexes = h("div", { class: "dr-hexes" }, ...cargo.map((x) => moduleStateHex(x, { sub: moduleHp(x) < moduleMaxHp(x.type) ? `${moduleHp(x)}/${moduleMaxHp(x.type)}` : undefined, title: `${MODULES[x.type].name} – nasadit`, onClick: locked ? undefined : () => cb.repairPickCargo(ship.id, x.id) })));
-          panel = panelEl("Nasadit z nákladu – který modul?", cargo.length ? hexes : h("div", { class: "muted" }, label("náklad je prázdný")));
-        } else {
-          const slots = hullOf(ship.loadout).slots.map((s) => s.id);
-          const comb = slotHoneycomb(slots, 30, (sl) => {
-            const cur = ship.loadout.modules.find((x) => occupiedSlots(x).includes(sl));
-            return moduleStateHex(cur ?? null, { r: 30, sub: cur ? "VYMĚNIT" : undefined, subColor: "#cbd5e1", empty: "VOLNÉ", title: cur ? `${slotName(sl)}: vyměnit za ${MODULES[cur.type].name} (ten jde do nákladu)` : `${slotName(sl)}: volný slot`, onClick: locked ? undefined : () => cb.repair(ship.id, { kind: "install", moduleId: picked.id, slot: sl }) });
-          });
-          panel = panelEl(`${MODULES[picked.type].name} → kam?`, comb, h("button", { class: "px tiny", title: "Jiný modul", onclick: () => cb.repairPickCargo(ship.id, null) }, label("✕ jiný modul")));
-        }
+      } else if (kind === "auto") {
+        const add = Math.min(Math.max(1, Math.round((ship.stats.hull * REPAIR.autoPct) / 100)), ship.stats.hull - ship.hull);
+        panel = panelEl(
+          "Pasivní oprava",
+          h("div", { class: "snote" }, label(`trup ${ship.hull} / ${ship.stats.hull} · +${Math.max(0, add)} za kolo, ${REPAIR.autoTurns} kola`)),
+          h("button", { class: "px seg stab on go", disabled: locked, onclick: () => cb.repair(ship.id, { kind: "auto" }) }, label("Zapnout opravu"), costPipsAll({ tech: REPAIR.autoCost }, false, `${REPAIR.autoCost} body technologie`)),
+        );
       }
     }
     row(main, subs, panel, `repair:${ship.id}`);
@@ -1452,18 +1218,16 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
     const open = !!m.hackOpen && !why;
     const kind = m.hackKind ?? null;
     const sel = m.hackSel ?? null;
-    const running = ship.autoRepair ?? 0;
     const main = h(
       "button",
       {
         class: `px bb-weapon droid-btn ${open ? "on" : ""} ${stormed ? "stormed" : ""} ${hDestroyed ? "destroyed" : ""}`,
         disabled: locked || !!why,
-        ...tipAttr({ icon: "hack", iconColor: "#c084fc", title: "Droid – hacker", fx: [], note: `${techNote} · v bouři nefunguje${running > 0 ? ` · pasivní oprava běží (${running} kol)` : ""}`, ...(hDestroyed ? { warn: "ZNIČENO – modul nefunguje" } : why ? { warn: `Nelze: ${why}.` } : {}) }),
+        ...tipAttr({ icon: "hack", iconColor: "#c084fc", title: "Droid – hacker", fx: [], note: `${techNote} · v bouři nefunguje`, ...(hDestroyed ? { warn: "ZNIČENO – modul nefunguje" } : why ? { warn: `Nelze: ${why}.` } : {}) }),
         onclick: () => cb.hackToggle(ship.id),
       },
       icon("hack", "currentColor", 22),
       h("span", { class: "lbl" }, label("Hacker")),
-      running > 0 ? h("span", { class: "reset-strip" }, label(`oprava ${running}`)) : null,
       stormed ? h("span", { class: "sb" }, "⚡") : null,
       hDestroyed ? h("span", { class: "dead-x" }, "✕") : null,
     );
@@ -1480,7 +1244,6 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
       subs = [
         tab("mine", "mine", "Mina", anyOrdnance, `mina se stane tvou (jde nastavit odpočet nebo odpálit na startu kola); torpédu určíš nový cíl a dostane +${HACK.torpedoLife} kola života · ${HACK.ordnanceCost} body technologie`, "Nelze: v dohledu není žádná mina ani torpédo."),
         tab("module", "scan", "Modul", anyEnemy, `vybraný modul cizí lodi na toto kolo nefunguje (zbraň nevystřelí, štít nechrání, droid/skener nejde použít); oběť se to dozví až při vyhodnocení · ${HACK.moduleCost} body technologie`, "Nelze: v dohledu není cizí loď."),
-        tab("repair", "hull", "Oprava", running <= 0 && ship.hull < ship.stats.hull, `${HACK.repairTurns} kola po ${HACK.repairPct} % trupu za kolo (jen když hacker funguje) · ${HACK.repairCost} body technologie`, running > 0 ? `Nelze: oprava už běží (zbývá ${running} kol).` : "Nelze: trup je nepoškozený."),
       ];
       if (kind === "mine" || kind === "torpedo") {
         if (!sel) panel = panelEl("Mina / torpédo", h("div", { class: "warn snote" }, label("klikni na minu nebo torpédo v dohledu")));
@@ -1513,15 +1276,308 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
             panel = panelEl(`${victim.name ?? "loď"} – který modul vypnout?`, hexes, h("button", { class: "px tiny", title: "Jiná loď", onclick: () => cb.hackMode(ship.id, "module") }, label("✕ jiná loď")));
           }
         }
-      } else if (kind === "repair") {
-        const add = Math.min(Math.max(1, Math.round((ship.stats.hull * HACK.repairPct) / 100)), ship.stats.hull - ship.hull);
-        panel = panelEl(
-          "Pasivní oprava",
-          h("div", { class: "snote" }, label(`trup ${ship.hull} / ${ship.stats.hull} · +${Math.max(0, add)} za kolo, ${HACK.repairTurns} kola`)),
-          h("button", { class: "px seg stab on go", disabled: locked, onclick: () => cb.hack(ship.id, { kind: "repair" }) }, label("Zapnout opravu"), costPipsAll({ tech: HACK.repairCost }, false, `${HACK.repairCost} body technologie`)),
-        );
       }
     }
     row(main, subs, panel, `hack:${ship.id}`);
   }
+}
+
+/* ===================== INVENTÁŘ (pravý okraj mapy pod droidy) ===================== */
+
+/**
+ * Tlačítko INVENTÁŘ + okénko s nákresem lodi. Všechno tažením: trosky v dosahu → náklad (zvednout) nebo volný slot
+ * (zvednout + nasadit opravářem); náklad → slot (nasadit / vyměnit); modul lodi → náklad (odpojit) nebo jiný slot (přesun);
+ * modul lodi / nákladu → vyhazovací oblast (vyhodit, i víc najednou). Úkony opraváře se dějí hned a stojí technologii.
+ */
+export function renderInventoryBar(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks) {
+  clear(root);
+  if (m.state.status === "finished") return;
+  const my = m.state.ships.filter((s) => s.alive && s.ownerId === m.myId);
+  const ship = my.find((s) => s.id === m.selectedShipId) ?? my[0];
+  if (!ship) return;
+  const o = m.orders.get(ship.id) ?? defaultOrders(ship);
+  const locked = m.submitted || m.animating;
+  const acts = actionList(ship, o);
+  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false, stop: false };
+  const jetOn = o.action?.type === "jettison";
+  const pickTgt = o.action?.type === "pickup" ? o.action.targetId : undefined;
+  const installSlot = o.action?.type === "pickup" ? o.action.installSlot : undefined;
+  const cargoActive = jetOn || !!pickTgt;
+  const cargoSpent = acts.filter((a) => a.id === "jettison" || a.id === "pickup").length;
+  const cargoDone = cargoActive && !m.cargoOpen; // akce zvolená, okénko zavřené = hotovo, stisk = reset
+  const cargo = ship.loadout.cargo ?? [];
+  const cap = cargoCapacity(ship.loadout);
+  const canInstall = !repairBlocked(m.state, ship);
+  const tech = ship.techPoints;
+  const reserved = reservedTech(o);
+  const jetIds = o.action?.type === "jettison" ? o.action.moduleIds : [];
+  const jetMods = jetIds.map((id) => ship.loadout.modules.find((x) => x.id === id) ?? cargo.find((x) => x.id === id)).filter((x): x is ModuleInstance => !!x);
+  const tgtDebris = pickTgt ? m.state.debris.find((d) => d.id === pickTgt) : undefined;
+  const tgtStation = pickTgt ? (m.state.stations ?? []).find((x) => x.id === pickTgt) : undefined;
+  const holder = h("div", { class: `scan-holder ${m.cargoOpen ? "stack" : ""}` });
+  root.append(h("div", { class: "cap" }, label("Loď")));
+  holder.append(
+    h(
+      "button",
+      {
+        class: `px bb-weapon ${cargoActive && !cargoDone ? "on" : ""} ${cargoDone ? "done" : ""} ${cargoSpent > 0 ? "spent" : ""} ${m.cargoOpen ? "open" : ""}`,
+        disabled: locked,
+        ...tipAttr({
+          icon: "cargo",
+          iconColor: "#94a3b8",
+          title: "Inventář",
+          cost: { actions: 1 },
+          fx: [
+            { icon: "debris", text: "modul lodi / nákladu → vyhazovací oblast = vyhodit (trosky)" },
+            { icon: "cargo", text: `trosky v dosahu ${CARGO.range} → náklad = zvednout (1 akce)` },
+            { icon: "wrench", text: `s opravářem: trosky / náklad → slot = nasadit, slot → náklad = odpojit, slot → slot = přesun (${REPAIR.installCost} tech, hned)` },
+          ],
+          note: cargoDone ? `${jetOn ? "vyhození" : installSlot ? "zvednutí a nasazení" : "zvednutí"} platí · stisk = reset` : "klik vedle okénko zavře a volba platí",
+        }),
+        onclick: () => (cargoDone ? cb.cancelAction(ship.id) : cb.cargoToggle(ship.id)),
+      },
+      costPips(1, cargoSpent > 0 ? "spent" : "red", "stojí 1 akci (jen vyhození / zvednutí)"),
+      icon("cargo", "currentColor", 22),
+      h("span", { class: "lbl" }, label("Inventář")),
+      cargoDone ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
+    ),
+  );
+  if (m.cargoOpen && !locked) {
+    const sp = cur.speed;
+    const near = m.state.debris.filter((d) => dist(ship, d) <= CARGO.range).sort((a, b) => dist(ship, a) - dist(ship, b));
+    const stn = stationInPickupRange(m.state, ship);
+    const debrisModule = (d: Debris): ModuleInstance => d.module ?? { id: d.id, type: d.type, slot: "front", ammo: MODULES[d.type].ammo };
+    const cancelBtn = () => h("button", { class: "px tiny inv-cancel", title: "Zrušit", onclick: () => cb.setOrders(ship.id, { action: undefined }) }, "✕ ", label("zrušit"));
+    const slotName = (id: SlotId) => hullOf(ship.loadout).slots.find((x) => x.id === id)?.name ?? id;
+    const hpSub = (x: ModuleInstance) => (moduleHp(x) <= 0 ? "ZNIČEN" : moduleHp(x) < moduleMaxHp(x.type) ? `${moduleHp(x)}/${moduleMaxHp(x.type)}` : undefined);
+    const techOk = tech - reserved >= REPAIR.installCost;
+    const immediateOk = canInstall && techOk; // nasadit / odpojit / přesunout hned (opravář + technologie)
+
+    /* --- hlavička: název, technologie s cenou --- */
+    const tpips = h("div", { class: "apip yellow" });
+    for (let i = 0; i < ship.stats.techMax; i++) tpips.append(h("i", { class: i < tech - reserved ? "on" : i < tech ? "plan" : "" }));
+    const head = h(
+      "div",
+      { class: "inv-title" },
+      icon("cargo", "#7dd3fc", 12),
+      label("Inventář · přetahuj moduly"),
+      h("div", { class: "inv-tech", title: `Technologie ${tech}/${ship.stats.techMax}${reserved ? ` (v plánu −${reserved})` : ""} · nasazení, odpojení a přesun modulu opravářem stojí ${REPAIR.installCost} bod a provedou se hned` }, label(`Technologie ${tech}/${ship.stats.techMax}`), tpips, h("span", { class: "cost" }, label("· nasazení / přesun / odpojení = "), h("i", { class: "tp" }), ` ${REPAIR.installCost}`)),
+    );
+
+    /* --- vlevo: trosky (a stanice) v dosahu – tažením do lodi --- */
+    const reachList = h("div", { class: "inv-list" });
+    const dragIn: { el: SVGSVGElement; id: string; mod: ModuleInstance | null }[] = [];
+    for (const d of near) {
+      const mod = debrisModule(d);
+      const planned = pickTgt === d.id;
+      const el = moduleStateHex(mod, { r: 26, sub: planned ? (installSlot ? "NASADIT" : "ZVEDNOUT") : hpSub(mod), subColor: planned ? "#86efac" : undefined, selected: planned, title: `${MODULES[mod.type].name} · ${Math.round(dist(ship, d))} / ${CARGO.range} · přetáhni do nákladu${canInstall ? " nebo na volný slot" : ""}` });
+      el.classList.add("inv-drag");
+      reachList.append(el);
+      dragIn.push({ el, id: d.id, mod });
+    }
+    if (stn) {
+      const planned = pickTgt === stn.id;
+      const el = moduleStateHex(null, { r: 26, empty: planned ? "ZVEDNOUT" : "STANICE", selected: planned, title: `Stanice: nabere náhodný modul ze zásoby (${stn.stock}) – přetáhni do nákladu` });
+      el.classList.add("inv-drag");
+      reachList.append(el);
+      dragIn.push({ el, id: stn.id, mod: null });
+    }
+    if (!near.length && !stn) reachList.append(h("div", { class: "inv-none" }, label("nic v dosahu")));
+    const reach = h("div", { class: "inv-reach" }, h("div", { class: "inv-cap" }, label(`V dosahu${near.length + (stn ? 1 : 0) ? ` · ${near.length + (stn ? 1 : 0)}` : ""}`)), reachList);
+
+    /* --- uprostřed: nákres lodi (jen k tažení) --- */
+    const lo = renderLoadout({ loadout: ship.loadout, team: ship.team, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: false, selectedId: jetMods[0]?.id });
+    for (const g of lo.querySelectorAll<SVGGElement>(".lo-g.mod[data-slot]")) {
+      const sl = g.getAttribute("data-slot") as SlotId;
+      const mod = ship.loadout.modules.find((x) => occupiedSlots(x).includes(sl));
+      if (mod && jetIds.includes(mod.id)) g.classList.add("sel");
+    }
+
+    /* --- vpravo: vyhazovací oblast (všechny vyhazované moduly; tažením zpět na loď = zrušit) --- */
+    const jetList = h("div", { class: "inv-list" });
+    const dragBack: { el: Element; mod: ModuleInstance }[] = [];
+    for (const x of jetMods) {
+      const el = moduleStateHex(x, { r: 26, sub: "VYHODIT", subColor: "#fca5a5", title: `${MODULES[x.type].name} se vyhodí na začátku kola – přetáhni zpět na loď = rozmyslet si to` });
+      el.classList.add("inv-drag");
+      jetList.append(el);
+      dragBack.push({ el, mod: x });
+    }
+    jetList.append(moduleStateHex(null, { r: 26, empty: jetMods.length ? "DALŠÍ" : "SEM", title: "Přetáhni sem modul z lodi nebo z nákladu" }));
+    const jetBox = h(
+      "div",
+      { class: `inv-jet ${jetMods.length ? "has" : ""}`, dataset: { drop: "jettison" } },
+      h("div", { class: "inv-cap" }, label(`Vyhodit${jetMods.length ? ` · ${jetMods.length}` : ""}`)),
+      jetMods.length ? h("div", { class: "inv-lbl ok" }, label("vyhodí se na začátku kola · zpět na loď = zrušit")) : h("div", { class: "inv-lbl" }, label("přetáhni sem modul z lodi nebo z nákladu (i víc najednou)")),
+      jetList,
+      jetMods.length ? cancelBtn() : null,
+    );
+
+    /* --- dole: náklad (hexy modulů v nákladu + volná místa = cíl pro zvednutí / odpojení) --- */
+    const cargoRow = h("div", { class: "inv-cargo", dataset: { drop: "cargo" } }, h("div", { class: "inv-cap" }, label(`Náklad ${cargo.length}/${cap}`)));
+    const dragCargo: { el: Element; mod: ModuleInstance }[] = [];
+    for (const x of cargo) {
+      const el = moduleStateHex(x, { r: 26, sub: jetIds.includes(x.id) ? "VYHODIT" : hpSub(x), subColor: jetIds.includes(x.id) ? "#fca5a5" : undefined, selected: jetIds.includes(x.id), title: `${MODULES[x.type].name} v nákladu (nefunguje, jen váží) – přetáhni na slot lodi = nasadit${canInstall ? "" : " (chybí opravář)"}, na vyhazovací oblast = vyhodit` });
+      el.classList.add("inv-drag");
+      cargoRow.append(el);
+      dragCargo.push({ el, mod: x });
+    }
+    const pickedToCargo = pickTgt && !installSlot ? (tgtDebris ? debrisModule(tgtDebris) : null) : undefined;
+    for (let i = cargo.length; i < cap; i++) {
+      if (i === cargo.length && pickTgt && !installSlot) {
+        cargoRow.append(
+          h(
+            "div",
+            { class: "inv-planned" },
+            pickedToCargo ? moduleStateHex(pickedToCargo, { r: 26, sub: "ZVEDNOUT", subColor: "#86efac", selected: true }) : moduleStateHex(null, { r: 26, empty: tgtStation ? "STANICE" : "?", selected: true }),
+            h("div", { class: "inv-lbl ok" }, label(tgtStation ? "nabere se náhodný modul ze stanice" : "zvedne se v tomto kole")),
+            cancelBtn(),
+          ),
+        );
+      } else cargoRow.append(h("div", { class: "inv-free" }, moduleStateHex(null, { r: 26, empty: "VOLNÉ", title: "Volné místo v nákladu – přetáhni sem trosky z dosahu (zvednout) nebo modul lodi (odpojit, opravář)" })));
+    }
+    if (cap <= 0) cargoRow.append(h("div", { class: "inv-none" }, label("loď nemá nákladový prostor")));
+
+    /* --- dole: checklist --- */
+    const ck = (ok: boolean) => h("i", { class: `ck ${ok ? "on" : "off"}` }, ok ? "✓" : "✕");
+    const cargoFree = cargo.length < cap;
+    const check = h(
+      "div",
+      { class: "inv-check" },
+      h("span", {}, label("dosah: "), h("b", {}, String(CARGO.range))),
+      h("span", {}, label("rychlost: "), h("b", {}, String(sp)), ck(sp <= CARGO.maxSpeed), h("span", { class: sp <= CARGO.maxSpeed ? "ok" : "bad" }, label(sp <= CARGO.maxSpeed ? "OK" : `zpomal na ≤ ${CARGO.maxSpeed}`))),
+      h("span", {}, label("opravář "), ck(canInstall), h("span", { class: canInstall ? "ok" : "bad" }, label(canInstall ? "OK, lze i nasadit" : "lze přesunout jen do nákladu"))),
+      h("span", {}, label("náklad: "), h("b", {}, `${cargo.length}/${cap}`), ck(cargoFree), h("span", { class: cargoFree ? "ok" : "bad" }, label(cargoFree ? "místo" : "plný"))),
+    );
+
+    const pop = h("div", { class: `cargo-pop inv-pop ${popClass(`cargo:${ship.id}`)}` }, head, h("div", { class: "inv-body" }, reach, h("div", { class: "inv-mid" }, lo, cargoRow), jetBox), check);
+
+    /* --- tažení --- */
+    const targetOf = (el: Element | null): { kind: "jettison" | "cargo" | "slot" | "ship"; slot?: SlotId; empty?: boolean; el: Element } | null => {
+      const g = el?.closest?.("[data-slot]");
+      if (g && pop.contains(g)) return { kind: "slot", slot: g.getAttribute("data-slot") as SlotId, empty: g.classList.contains("empty"), el: g };
+      const drop = el?.closest?.("[data-drop]");
+      if (drop) return { kind: drop.getAttribute("data-drop") as "jettison" | "cargo", el: drop };
+      const dia = el?.closest?.(".inv-mid");
+      if (dia && pop.contains(dia)) return { kind: "ship", el: dia };
+      return null;
+    };
+    const mark = (t: ReturnType<typeof targetOf>, ok: boolean) => {
+      pop.querySelectorAll(".drop-target, .drop-bad").forEach((x) => x.classList.remove("drop-target", "drop-bad"));
+      if (t) t.el.classList.add(ok ? "drop-target" : "drop-bad");
+    };
+    const setJet = (ids: string[]) => cb.setOrders(ship.id, { action: ids.length ? { type: "jettison", moduleIds: ids } : undefined });
+    const noRepair = () => showTip(canInstall ? `nedostatek technologie (${tech - reserved}/${REPAIR.installCost})` : "chybí funkční droid opravář – modul jde jen vyhodit");
+    // moduly lodi: → vyhodit, → náklad (odpojit), → jiný slot (přesun / prohození)
+    for (const g of lo.querySelectorAll<SVGGElement>(".lo-g.mod[data-slot]")) {
+      const sl = g.getAttribute("data-slot") as SlotId;
+      const mod = ship.loadout.modules.find((x) => occupiedSlots(x).includes(sl));
+      if (!mod) continue;
+      g.classList.add("inv-drag");
+      g.addEventListener("pointerdown", (ev) =>
+        dragHex(
+          ev as PointerEvent,
+          () => moduleStateHex(mod, { r: 26 }),
+          (under) => {
+            const t = targetOf(under);
+            if (t?.kind === "jettison") {
+              if (!jetIds.includes(mod.id)) setJet([...jetIds, mod.id]);
+            } else if (t?.kind === "cargo") {
+              if (!immediateOk) noRepair();
+              else if (!cargoFree) showTip("náklad je plný");
+              else cb.repair(ship.id, { kind: "uninstall", moduleId: mod.id });
+            } else if (t?.kind === "slot" && t.slot && !occupiedSlots(mod).includes(t.slot)) {
+              if (!immediateOk) noRepair();
+              else cb.repair(ship.id, { kind: "move", moduleId: mod.id, slot: t.slot });
+            }
+          },
+          (under) => {
+            const t = targetOf(under);
+            mark(t, t?.kind === "jettison" || (t?.kind === "cargo" && immediateOk && cargoFree) || (t?.kind === "slot" && immediateOk && !!t.slot && !occupiedSlots(mod).includes(t.slot)));
+          },
+        ),
+      );
+    }
+    // náklad: → vyhodit, → slot (nasadit / vyměnit)
+    for (const { el, mod } of dragCargo) {
+      el.addEventListener("pointerdown", (ev) =>
+        dragHex(
+          ev as PointerEvent,
+          () => moduleStateHex(mod, { r: 26 }),
+          (under) => {
+            const t = targetOf(under);
+            if (t?.kind === "jettison") {
+              if (!jetIds.includes(mod.id)) setJet([...jetIds, mod.id]);
+            } else if (t?.kind === "slot" && t.slot) {
+              if (!immediateOk) noRepair();
+              else cb.repair(ship.id, { kind: "install", moduleId: mod.id, slot: t.slot });
+            }
+          },
+          (under) => {
+            const t = targetOf(under);
+            mark(t, t?.kind === "jettison" || (t?.kind === "slot" && immediateOk));
+          },
+        ),
+      );
+    }
+    // z vyhazovací oblasti zpět na loď / do nákladu = rozmyslet si to (modul je pořád nainstalovaný, opravář netřeba)
+    for (const { el, mod } of dragBack) {
+      el.addEventListener("pointerdown", (ev) =>
+        dragHex(
+          ev as PointerEvent,
+          () => moduleStateHex(mod, { r: 26 }),
+          (under) => {
+            const t = targetOf(under);
+            if (t && t.kind !== "jettison") setJet(jetIds.filter((x) => x !== mod.id));
+          },
+          (under) => {
+            const t = targetOf(under);
+            mark(t, !!t && t.kind !== "jettison");
+          },
+        ),
+      );
+    }
+    // trosky: → náklad (zvednout), → volný slot (zvednout + nasadit opravářem)
+    for (const { el, id, mod } of dragIn) {
+      el.addEventListener("pointerdown", (ev) =>
+        dragHex(
+          ev as PointerEvent,
+          () => (mod ? moduleStateHex(mod, { r: 26 }) : moduleStateHex(null, { r: 26, empty: "STANICE" })),
+          (under) => {
+            const t = targetOf(under);
+            if (t?.kind === "cargo") cb.setOrders(ship.id, { action: { type: "pickup", targetId: id } });
+            else if (t?.kind === "slot" && t.empty && mod) {
+              if (!canInstall) noRepair();
+              else cb.setOrders(ship.id, { action: { type: "pickup", targetId: id, installSlot: t.slot } });
+            }
+          },
+          (under) => {
+            const t = targetOf(under);
+            mark(t, t?.kind === "cargo" || (t?.kind === "slot" && !!t.empty && !!mod && canInstall));
+          },
+        ),
+      );
+    }
+    /* --- naplánované zvednutí + nasazení: modul se ukáže ve volném slotu (po vykreslení, podle polohy hexu) --- */
+    if (installSlot && tgtDebris) {
+      const mod = debrisModule(tgtDebris);
+      requestAnimationFrame(() => {
+        const g = lo.querySelector<SVGGElement>(`[data-slot="${installSlot}"]`);
+        const dia = lo.querySelector<HTMLElement>(".lo-diagram");
+        if (!g || !dia) return;
+        const rb = g.getBoundingClientRect();
+        const rd = dia.getBoundingClientRect();
+        dia.append(
+          h(
+            "div",
+            { class: "inv-installed", style: `left:${rb.left - rd.left + rb.width / 2}px;top:${rb.top - rd.top + rb.height / 2}px` },
+            moduleStateHex(mod, { r: 42, sub: "NASADIT", subColor: "#86efac", selected: true, title: `${MODULES[mod.type].name}: zvedne se a opravář ho nasadí do slotu ${slotName(installSlot)} (${REPAIR.installCost} technologie)` }),
+            h("div", { class: "inv-lbl ok" }, label(`zvedne se a opravář ho nasadí (${REPAIR.installCost} tech)`)),
+            cancelBtn(),
+          ),
+        );
+      });
+    }
+    holder.append(pop);
+  }
+  root.append(holder);
 }

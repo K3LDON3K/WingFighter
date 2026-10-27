@@ -21,6 +21,7 @@ import {
   hullLargePairs,
   hullOf,
   largePair,
+  moveModule as moveModuleShared,
   loadoutWeight,
   maxSpeedFor,
   MODULE_TYPES,
@@ -286,7 +287,7 @@ function switchHull(loadout: ShipLoadout, hullId: string): ShipLoadout {
 /** Právě proběhlo tažení modulu – následný klik se ignoruje. */
 let dragMoved = false;
 /** Krátká zpráva pod kurzorem (důvod, proč přesun nejde). */
-function showTip(text: string): void {
+export function showTip(text: string): void {
   document.querySelector(".lo-dragtip")?.remove();
   const el = h("div", { class: "lo-dragtip" }, text);
   document.body.append(el);
@@ -377,7 +378,8 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
     rot: f === "right" ? 90 : f === "back" ? 180 : f === "left" ? 270 : 0,
   });
   /** Přesun modulu do slotu (volný = přesun, obsazený = prohození); vrací novou sestavu nebo text chyby. */
-  const moveModule = (m: ModuleInstance, target: SlotId): ShipLoadout | string => {
+  const moveModule = (m: ModuleInstance, target: SlotId): ShipLoadout | string => moveModuleShared(loadout, m, target);
+  const _moveModuleOld = (m: ModuleInstance, target: SlotId): ShipLoadout | string => {
     const def = MODULES[m.type];
     const occOf = (x: ModuleInstance) => occupiedSlots(x);
     const other = loadout.modules.find((x) => x.id !== m.id && occOf(x).includes(target));

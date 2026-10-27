@@ -179,11 +179,11 @@ export const SCANNER = {
 /** Droid – pilot (mutovatelné kvůli ladění): ceny funkcí v technologii, regenerace stresu s autopilotem. */
 export const DROID = { overdriveCost: 3, autopilotCost: 2, autopilotRegen: 2 };
 /** Droid – opravář: ceny úkonů v bodech technologie; hullPct = oprava trupu v % maxima (ladí se). */
-export const REPAIR = { moduleCost: 4, ammoCost: 2, hullCost: 3, hullPct: 25, installCost: 1 };
+export const REPAIR = { moduleCost: 4, ammoCost: 2, hullCost: 3, hullPct: 25, installCost: 1, autoCost: 4, autoPct: 5, autoTurns: 4 };
 /** Vesmírná stanice (ladění): trup, energetický štít a jeho dobíjení za kolo, zásoba modulů, okruh sběru, výbuch při zničení, odměna. */
 export const STATION = { radius: 60, hull: 2000, shields: 200, shieldRegen: 20, stock: 3, pickupRange: 170, dropDist: 120, blastRadius: 150, blastDamage: 60, reward: 100 };
 /** Droid – hacker: ceny v technologii; pasivní oprava trupu % maxima za kolo po N kol; torpédu přidá kola života. */
-export const HACK = { ordnanceCost: 2, moduleCost: 3, repairCost: 4, repairPct: 5, repairTurns: 4, torpedoLife: 2 };
+export const HACK = { ordnanceCost: 2, moduleCost: 3, torpedoLife: 2 };
 /** Technologie: body na celou bitvu (nedobíjí se); utrácí je skener. Mutovatelné kvůli ladění. */
 export const TECH = { max: 6 };
 

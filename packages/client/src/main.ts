@@ -103,7 +103,7 @@ import { renderLoadout } from "./loadout-ui.ts";
 import { actionById, stoppedNow } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
-import { DIFFICULTY_COLOR, renderBottomBar, renderDroidBar, shieldInHand, updateManeuverPanel } from "./game/planning.ts";
+import { DIFFICULTY_COLOR, renderBottomBar, renderDroidBar, renderInventoryBar, shieldInHand, updateManeuverPanel } from "./game/planning.ts";
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
@@ -652,6 +652,7 @@ let sideEl: HTMLElement | null = null;
 let barEl: HTMLElement | null = null;
 let subEl: HTMLElement | null = null;
 let droidEl: HTMLElement | null = null;
+let invEl: HTMLElement | null = null;
 let hudEl: HTMLElement | null = null;
 let overlayEl: HTMLElement | null = null;
 let menuEl: HTMLElement | null = null;
@@ -679,6 +680,7 @@ function mountGame() {
   subEl = h("div", { class: "subbar" });
   sideEl = h("div", { class: "maplog" });
   droidEl = h("div", { class: "droidbar" });
+  invEl = h("div", { class: "invbar" });
   mapEl = h(
     "div",
     { class: "map" },
@@ -687,7 +689,7 @@ function mountGame() {
     h("div", { class: "hint mouse-only" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ"),
     h("div", { class: "hint touch-only" }, "TÁHNOUT Z VLASTNÍ LODI = DRÁHA (PAK ✓ / ✕) · ŤUKNOUT NA NEPŘÍTELE = CÍL · TÁHNOUT = POSUN · 2 PRSTY = ZOOM · PODRŽET = INFO"),
     sideEl,
-    droidEl,
+    h("div", { class: "sidestack" }, droidEl, invEl),
     h(
       "div",
       { class: "map-zoom" },
@@ -758,7 +760,7 @@ function unmountGame() {
   cancelAnimationFrame(raf);
   inputAbort.abort();
   resizeObs?.disconnect();
-  canvas = renderer = cam = sideEl = barEl = subEl = droidEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = null;
+  canvas = renderer = cam = sideEl = barEl = subEl = droidEl = invEl = hudEl = overlayEl = mapEl = tooltipEl = tuneEl = toastEl = menuEl = null;
   render();
 }
 
@@ -1725,6 +1727,7 @@ function renderSide() {
     } satisfies Parameters<typeof renderBottomBar>[2];
   renderBottomBar(barEl, planModel, planCb, subEl ?? undefined);
   if (droidEl) renderDroidBar(droidEl, planModel, planCb);
+  if (invEl) renderInventoryBar(invEl, planModel, planCb);
   document.getElementById("inv-btn")?.classList.toggle("on", game.inventoryOpen);
   if (game.inventoryOpen) {
     sideEl.append(
