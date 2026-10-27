@@ -319,11 +319,11 @@ export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: Plannin
   clear(root);
   if (sub) clear(sub);
   popsNow.clear();
-  try {
-    renderBottomBarInner(root, m, cb, sub);
-  } finally {
-    openPops = new Set(popsNow);
-  }
+  renderBottomBarInner(root, m, cb, sub);
+}
+/** Po vykreslení lišty i postranních segmentů: zapamatovat otevřená okénka (ať se při překreslení znovu neanimují). */
+export function finishPops() {
+  openPops = new Set(popsNow);
 }
 
 function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks, sub?: HTMLElement) {
@@ -1526,8 +1526,9 @@ function renderShieldButton(root: HTMLElement, m: PlanningModel, cb: PlanningCal
   }
   /* ---- segmentový štít ---- */
   const planned = o.action?.type === "shield" ? o.action.segments : undefined;
-  const inHand = shieldInHand(ship, o);
-  const editing = !!planned && !locked && !!m.shieldEdit; // okénko −/+ otevřené; klik vedle = potvrdit
+  const segsNow = planned ?? ship.segments;
+  const inHand = planned ? shieldInHand(ship, o) : 0;
+  const editing = !locked && !!m.shieldEdit; // okénko −/+ otevřené (akce vznikne až změnou); klik vedle = zavřít
   const rechargeMode = !!m.rechargeOpen && !locked;
   const changed = !!planned && planned.some((v, i) => v !== ship.segments[i]);
   const act = ACTIONS.find((x) => x.id === "shield")!;
@@ -1574,9 +1575,9 @@ function renderShieldButton(root: HTMLElement, m: PlanningModel, cb: PlanningCal
       slots,
       h("div", { class: "muted snote" }, label(picked > 0 ? "potvrď tlačítkem DOBÍT nahoře" : "klik na + dá bod do segmentu")),
     );
-  } else if (editing && planned) {
+  } else if (editing) {
     const btn = (seg: number, d: 1 | -1) => {
-      const v = planned[seg];
+      const v = segsNow[seg];
       const can = d < 0 ? v > 0 : inHand > 0 && v < RULES.segmentMax;
       return h("button", { class: "px sbtn", disabled: !can, title: d < 0 ? `${SEGMENT_NAMES[seg]}: odebrat bod` : inHand <= 0 ? "nejdřív bod někde odeber" : `${SEGMENT_NAMES[seg]}: přidat bod (max. ${RULES.segmentMax})`, onclick: () => cb.shieldDelta(ship.id, seg, d) }, icon(d < 0 ? "minus" : "plus", "currentColor", 12));
     };
@@ -1584,7 +1585,7 @@ function renderShieldButton(root: HTMLElement, m: PlanningModel, cb: PlanningCal
     const total = ship.segments.reduce((a, b) => a + b, 0);
     const slots = h("div", { class: "hand-slots", title: inHand > 0 ? `${inHand} bodů v ruce – polož je tlačítkem +` : "body štítu v ruce (odebrané, ještě nepoložené)" });
     for (let i = 0; i < total; i++) slots.append(h("i", { class: i < inHand ? "on" : "" }));
-    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, 84, stormed);
+    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, segsNow, 84, stormed);
     pop = h(
       "div",
       { class: `shield-pop big ${popClass(`shield:${ship.id}`)}` },

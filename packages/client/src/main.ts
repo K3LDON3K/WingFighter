@@ -103,7 +103,7 @@ import { renderLoadout } from "./loadout-ui.ts";
 import { actionById, stoppedNow } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
-import { DIFFICULTY_COLOR, renderBottomBar, renderDroidBar, renderInventoryBar, shieldInHand, updateManeuverPanel } from "./game/planning.ts";
+import { DIFFICULTY_COLOR, finishPops, renderBottomBar, renderDroidBar, renderInventoryBar, shieldInHand, updateManeuverPanel } from "./game/planning.ts";
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
@@ -1519,8 +1519,8 @@ function renderSide() {
         const g = game!;
         const o = g.orders.get(id);
         const ship = g.state.ships.find((x) => x.id === id);
-        if (!o || !ship || o.action?.type !== "shield") return;
-        const segs = [...o.action.segments] as Segments;
+        if (!o || !ship) return;
+        const segs = [...(o.action?.type === "shield" ? o.action.segments : ship.segments)] as Segments;
         const next = segs[seg] + d;
         if (next < 0 || next > RULES.segmentMax) return;
         if (d > 0 && shieldInHand(ship, o) <= 0) return;
@@ -1528,8 +1528,7 @@ function renderSide() {
         // návrat na původní rozložení = akce se sama vypne (tlačítka zmizí)
         sfx("click");
         const same = segs.every((v, i) => v === ship.segments[i]);
-        g.orders.set(id, same ? { ...o, action: undefined } : { ...o, action: { type: "shield", segments: segs } });
-        if (same) g.shieldEdit = false;
+        g.orders.set(id, same ? { ...o, action: undefined } : { ...o, action: { type: "shield", segments: segs } }); // okénko zůstává otevřené
         renderSide();
       },
       shieldConfirm: (id) => {
@@ -1651,9 +1650,7 @@ function renderSide() {
           g.rechargeOpen = true;
         } else {
           g.rechargeOpen = false;
-          const o = g.orders.get(id);
-          if (o?.action?.type === "shield") g.shieldEdit = true;
-          else chooseIcon(id, "shield"); // zvolí akci a otevře −/+
+          g.shieldEdit = true; // otevře −/+; akce vznikne až první změnou
         }
         renderSide();
       },
@@ -1728,6 +1725,7 @@ function renderSide() {
   renderBottomBar(barEl, planModel, planCb, subEl ?? undefined);
   if (droidEl) renderDroidBar(droidEl, planModel, planCb);
   if (invEl) renderInventoryBar(invEl, planModel, planCb);
+  finishPops();
   document.getElementById("inv-btn")?.classList.toggle("on", game.inventoryOpen);
   if (game.inventoryOpen) {
     sideEl.append(
