@@ -782,9 +782,9 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           "div",
           { class: "inv-reach" },
           h("div", { class: "inv-cap" }, label(`V dosahu${near.length + (stn ? 1 : 0) ? ` · ${near.length + (stn ? 1 : 0)}` : ""}`)),
-          reachList,
           h("div", { class: `inv-lbl ${sp > CARGO.maxSpeed ? "warn" : ""}` }, label(sp > CARGO.maxSpeed ? `rychlost ${sp} > ${CARGO.maxSpeed} – zpomal, jinak se nezvedne` : `dosah ${CARGO.range} · rychlost ${sp} ok`)),
           h("div", { class: `inv-lbl ${canInstall ? "ok" : "warn"}` }, icon("wrench", canInstall ? "#86efac" : "#fca5a5", 10), " ", label(canInstall ? "lze i nasadit – opravář na palubě" : "nelze nasadit – chybí droid opravář")),
+          reachList,
         );
 
         /* --- uprostřed: nákres lodi (jen k tažení) --- */
@@ -795,8 +795,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           "div",
           { class: `inv-jet ${jetMod ? "has" : ""}`, dataset: { drop: "jettison" } },
           h("div", { class: "inv-cap" }, label("Vyhodit")),
-          jetMod ? moduleStateHex(jetMod, { r: 26, sub: "VYHODIT", subColor: "#fca5a5", title: `${MODULES[jetMod.type].name} se vyhodí na začátku kola` }) : moduleStateHex(null, { r: 26, empty: "SEM", title: "Přetáhni sem modul z lodi nebo z nákladu" }),
           jetMod ? h("div", { class: "inv-lbl ok" }, label("vyhodí se na začátku kola")) : h("div", { class: "inv-lbl" }, label("přetáhni sem modul z lodi nebo z nákladu")),
+          jetMod ? moduleStateHex(jetMod, { r: 26, sub: "VYHODIT", subColor: "#fca5a5", title: `${MODULES[jetMod.type].name} se vyhodí na začátku kola` }) : moduleStateHex(null, { r: 26, empty: "SEM", title: "Přetáhni sem modul z lodi nebo z nákladu" }),
           jetMod ? cancelBtn() : null,
         );
 
