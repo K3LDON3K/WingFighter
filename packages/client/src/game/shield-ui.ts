@@ -1,4 +1,5 @@
 import { RULES, type Segments, type ShieldType } from "@wingfighter/shared";
+import { BATTLESHIP_TEMPLATE, fighterTemplate, shipPalette } from "./sprites.ts";
 
 /** Barvy štítů: podle síly (celolodní) a podle bodů segmentu. */
 export const SHIELD_BLUE = "#3b82f6";
@@ -25,6 +26,9 @@ export interface BubbleShip {
   maxShields: number;
   shieldEff: number;
   segments: Segments;
+  /** Trup a tým – nákres lodi uprostřed odpovídá skutečné lodi (stíhač podle týmu / bitevník). */
+  hullId?: string;
+  team?: number;
 }
 
 const FIGHTER = ["..GG............", "..GPG...........", "..GPPG..........", "EEDPPPG.........", "..GPPPPGGG......", "...GPPPPPPGGGG..", "EEDDPWWPPPPPPPGG", "EEDDPWWPPPPPPPGG", "...GPPPPPPGGGG..", "..GPPPPGGG......", "EEDPPPG.........", "..GPPG..........", "..GPG...........", "..GG............"];
@@ -118,12 +122,15 @@ export function shieldBubble(ship: BubbleShip, teamColor: string, planned?: Segm
     }
   }
 
-  // loď (šablona míří doprava → otočíme o −90°, aby mířila nahoru), 1 px = 2.6 px
+  // loď (šablona míří doprava → otočíme o −90°, aby mířila nahoru); stejná šablona a paleta jako sprite na mapě
   const g = document.createElementNS(NS, "g");
-  const s = 2.6;
-  g.setAttribute("transform", `translate(${cx - (14 * s) / 2}, ${cy + (16 * s) / 2}) rotate(-90)`);
-  const pal: Record<string, string> = { P: teamColor, G: "#9aa3ad", D: "#4b5563", W: "#dbeafe", E: "#fb923c" };
-  FIGHTER.forEach((row, y) =>
+  const tpl = ship.hullId === "battleship" ? BATTLESHIP_TEMPLATE : ship.team !== undefined ? fighterTemplate(ship.team).template : FIGHTER;
+  const W = tpl[0].length;
+  const H = tpl.length;
+  const s = Math.min(46 / W, 46 / H);
+  g.setAttribute("transform", `translate(${cx - (H * s) / 2}, ${cy + (W * s) / 2}) rotate(-90)`);
+  const pal = shipPalette(teamColor);
+  tpl.forEach((row, y) =>
     [...row].forEach((c, x) => {
       if (pal[c]) g.append(rect(x * s, y * s, s, s, pal[c]));
     }),

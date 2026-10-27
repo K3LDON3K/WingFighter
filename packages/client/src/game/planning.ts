@@ -365,7 +365,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const teamColor = TEAM_COLORS[ship.team];
   const stormed = inStorm(m.state, ship);
   const bubbleSize = 106;
-  const bubble = h("div", { class: "bubble-box", title: ship.shieldType === "whole" ? `Energetický štít: zásoba ${ship.shields}/${ship.stats.shields}${RULES.shieldRecharge > 0 ? `, dobíjí se +${RULES.shieldRecharge} za kolo` : ""}${RULES.wholeEffDrop > 0 ? `, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : ""}. Lasery pole jen vybíjejí; projektily prorazí ${RULES.wholePiercePct} % do trupu.` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Projektil zachytí segment celý za 1 bod; laser ubere 1 bod a ${RULES.segmentPassPct} % pronikne do trupu; při 0 jde vše do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, planned, bubbleSize, stormed));
+  const bubble = h("div", { class: "bubble-box", title: ship.shieldType === "whole" ? `Energetický štít: zásoba ${ship.shields}/${ship.stats.shields}${RULES.shieldRecharge > 0 ? `, dobíjí se +${RULES.shieldRecharge} za kolo` : ""}${RULES.wholeEffDrop > 0 ? `, účinnost ${ship.shieldEff} % (po každém zásahu −${RULES.wholeEffDrop} %)` : ""}. Lasery pole jen vybíjejí; projektily prorazí ${RULES.wholePiercePct} % do trupu.` : `Segmentový štít (předek / pravobok / záď / levobok): ${ship.segments.join(" / ")}. Projektil zachytí segment celý za 1 bod; laser ubere 1 bod a ${RULES.segmentPassPct} % pronikne do trupu; při 0 jde vše do trupu.` }, shieldBubble({ ...ship, maxShields: ship.stats.shields, hullId: ship.loadout.hullId }, teamColor, planned, bubbleSize, stormed));
   const shieldBox = h("div", { class: "shield-box" }, bubble);
   const shieldPopOpen = false; // štít je v segmentu LOĎ vpravo (renderInventoryBar)
   const vgauge = (n: number, val: number, color: string, dark: string, name: string, num: string | Node, title: string, blockedFrom = n) => {
@@ -1564,7 +1564,7 @@ function renderShieldButton(root: HTMLElement, m: PlanningModel, cb: PlanningCal
     };
     const slots = h("div", { class: "hand-slots y", title: `${RULES.rechargeSegments - picked} ${RULES.rechargeSegments - picked === 1 ? "bod" : "body"} k rozdělení` });
     for (let i = 0; i < RULES.rechargeSegments; i++) slots.append(h("i", { class: i < RULES.rechargeSegments - picked ? "on" : "" }));
-    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, preview, 84, stormed);
+    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields, hullId: ship.loadout.hullId }, teamColor, preview, 84, stormed);
     pop = h(
       "div",
       { class: `shield-pop big ${popClass(`shield:${ship.id}`)}` },
@@ -1585,7 +1585,7 @@ function renderShieldButton(root: HTMLElement, m: PlanningModel, cb: PlanningCal
     const total = ship.segments.reduce((a, b) => a + b, 0);
     const slots = h("div", { class: "hand-slots", title: inHand > 0 ? `${inHand} bodů v ruce – polož je tlačítkem +` : "body štítu v ruce (odebrané, ještě nepoložené)" });
     for (let i = 0; i < total; i++) slots.append(h("i", { class: i < inHand ? "on" : "" }));
-    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields }, teamColor, segsNow, 84, stormed);
+    const popBubble = shieldBubble({ ...ship, maxShields: ship.stats.shields, hullId: ship.loadout.hullId }, teamColor, segsNow, 84, stormed);
     pop = h(
       "div",
       { class: `shield-pop big ${popClass(`shield:${ship.id}`)}` },

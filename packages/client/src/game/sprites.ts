@@ -62,7 +62,7 @@ function paint(template: string[], palette: Record<string, string>): HTMLCanvasE
 }
 
 /** Společná paleta: P tělo (barva týmu), S tmavší spára, L světlejší nástavba, G hrana, D tmavý kov, K černé sání, W okno, E plamen, Y jádro plamene. */
-function shipPalette(teamColor: string): Record<string, string> {
+export function shipPalette(teamColor: string): Record<string, string> {
   return { P: teamColor, S: shade(teamColor, 0.72), L: shade(teamColor, 1.35), G: "#9aa3ad", D: "#4b5563", K: "#1f2937", W: "#dbeafe", E: "#fb923c", Y: "#fde68a" };
 }
 
