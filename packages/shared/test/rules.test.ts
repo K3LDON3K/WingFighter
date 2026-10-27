@@ -1358,6 +1358,23 @@ describe("náraz do asteroidu / komety", () => {
 });
 
 describe("droid – opravář", () => {
+  it("opravený (jediný) štít nabíhá jen na polovinu", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    me.loadout.modules = [newModule("shield-segment", "front", "s1"), newModule("repair", "left", "r1")];
+    me.loadout.modules[0].hp = 0; // zničený štít
+    me.loadout = normalizeShields(me.loadout);
+    refreshShip(me);
+    me.shieldType = "none";
+    me.segments = [0, 0, 0, 0];
+    me.techPoints = 6;
+    const r = applyRepair(g, me, { kind: "module", moduleId: "s1" });
+    expect(r.error).toBeUndefined();
+    expect(me.shieldType).toBe("segment");
+    const full = RULES.segmentHp * me.stats.segmentModules;
+    expect(me.segments).toEqual([1, 1, 1, 1].map(() => Math.ceil(full / 2)));
+  });
   it("oprava modulu, munice, trupu a instalace z nákladu (hned, za technologii); v bouři ne", () => {
     const g = game();
     const me = place(g, "ship-p1-0", 500, 500, 0);

@@ -974,9 +974,10 @@ function buildOverlay(view: ViewModel): Overlay {
           }
         }
       }
-      if (o.action?.type === "pickup") {
+      if (o.action?.type === "pickup" || g.cargoOpen) {
+        // okruh sběru trosek: při naplánovaném zvednutí i vždy, když je otevřený inventář
         overlay.rangeCircle = { radius: CARGO.range, label: `zvednutí nákladu · dosah ${CARGO.range} · rychlost ≤ ${CARGO.maxSpeed}` };
-        if (o.action.targetId) overlay.targetId = o.action.targetId;
+        if (o.action?.type === "pickup" && o.action.targetId) overlay.targetId = o.action.targetId;
       }
       if (o.special?.type === "mine") {
         const side = mineSideOf(mineModule(ship)?.facing);

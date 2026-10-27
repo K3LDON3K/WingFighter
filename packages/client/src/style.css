@@ -2343,7 +2343,11 @@ body.touch .game canvas {
   top: -6px;
   line-height: 0;
 }
-.bb-weapon.done .reset-strip {
+.droidbar .bb-weapon:has(.reset-strip) {
+  padding-bottom: 10px;
+}
+.bb-weapon.done .reset-strip,
+.droidbar .bb-weapon .reset-strip {
   position: absolute;
   left: 0;
   right: 0;
@@ -5667,6 +5671,19 @@ body.drag-on * {
 }
 
 /* ---- INVENTÁŘ (okénko nad tlačítkem): vlevo trosky v dosahu, uprostřed loď + náklad, vpravo vyhazovací slot; všechno tažením ---- */
+.invbar .cargo-pop.inv-pop {
+  /* okno je vysoké → kotví se na střed obrazovky, ne na tlačítko INVENTÁŘ;
+     .sidestack má transform, takže je pro fixed potomka containing block (střed stacku = střed mapy) */
+  position: fixed;
+  top: 50%;
+  right: calc(100% + 14px);
+  transform: translateY(-50%);
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+}
+.invbar .cargo-pop.inv-pop::after {
+  display: none;
+}
 .cargo-pop.inv-pop {
   max-width: none;
   width: max-content;

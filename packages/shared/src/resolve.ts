@@ -2159,7 +2159,13 @@ export function applyRepair(state: GameState, ship: Ship, order: RepairOrder): {
       m.hp = undefined;
       delete m.repair;
       ship.techPoints -= cost;
+      const hadShield = ship.shieldType;
       syncShields(ship);
+      if (hadShield === "none" && ship.shieldType !== "none") {
+        // opravený štít nenabíhá plný – jen na polovinu (zbytek se dobije / dokoupí technologií)
+        ship.segments = ship.segments.map((v) => Math.ceil(v / 2)) as Segments;
+        ship.shields = Math.ceil(ship.shields / 2);
+      }
       return { event: { ...base, techPoints: ship.techPoints, moduleId: m.id, moduleType: m.type, amount: max - hp } };
     }
     case "ammo": {

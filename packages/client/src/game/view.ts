@@ -19,6 +19,7 @@ export interface ViewShip extends Pose {
   stressMax: number;
   /** Náš tým má skenem přístup do systémů lodi (jde hackovat) – značka skeneru u jména. */
   scanned?: boolean;
+  hacked?: boolean; // nějaký modul lodi je hacknutý (vidí jen tým hackera, fog to oběti odstraní)
   /** Trup (pro výběr spritu). */
   hullId: string;
   radius: number;
@@ -119,6 +120,7 @@ export function shipToView(s: Ship, scanned = false): ViewShip {
     stressPoints: s.stressPoints,
     stressMax: s.stats.stressMax,
     scanned,
+    hacked: s.loadout.modules.some((m) => !!m.hacked),
     hullId: s.loadout.hullId,
     radius: s.stats.radius,
     colliders: s.stats.colliders,

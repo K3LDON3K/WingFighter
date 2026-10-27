@@ -104,6 +104,8 @@ export const ACTIONS: ActionOption[] = [
     disabled: (ship, _s, o) => {
       const prof = profileFor(ship, o);
       const cur = parseManeuverId(o.maneuverId);
+      // loď už stojí (např. po nárazu) a zůstává stát: tlačítko není „stisknuté“, zastavovat není co
+      if (ship.speed === 0 && (!cur || cur.speed === 0)) return "loď už stojí";
       if (cur?.speed === 0 || cur?.stop) return noAp(ship, o, true);
       if (cur?.koiogran) return "s otočkou 180° zastavit nejde";
       const atEnd = !!cur && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0);
@@ -114,9 +116,9 @@ export const ACTIONS: ActionOption[] = [
       if (effStressCost(man, o) > ship.stressPoints) return `chybí stres (zastavení stojí ${effStressCost(man, o)})`;
       return noAp(ship, o, false);
     },
-    active: (o) => {
+    active: (o, ship) => {
       const cur = parseManeuverId(o.maneuverId);
-      return cur?.speed === 0 || !!cur?.stop;
+      return (cur?.speed === 0 && ship.speed !== 0) || !!cur?.stop;
     },
     apply: (o, ship) => {
       const profile = profileFor(ship, o);
