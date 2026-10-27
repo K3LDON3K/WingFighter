@@ -1449,6 +1449,21 @@ describe("droid – hacker", () => {
     const laser = foe.loadout.modules.find((m) => m.type === "laser")!;
     expect(hackBlocked(g, me)).toBeUndefined();
     const seen = stateForTeam(g, 0, new Map());
+    // bez skenu a se štítem hack nejde; po skenu lodi (kýmkoliv z týmu) ano – a přístup vidí jen tým skenujícího
+    expect(applyHack(g, seen, me, { kind: "module", shipId: foe.id, moduleId: laser.id }).error).toMatch(/naskenovan/);
+    // loď bez funkčního štítu jde hackovat i bez skenu
+    const g2 = structuredClone(g);
+    const foe2 = g2.ships.find((s) => s.id === foe.id)!;
+    foe2.loadout.modules = foe2.loadout.modules.filter((m) => !m.type.startsWith("shield"));
+    refreshShip(foe2);
+    expect(applyHack(g2, stateForTeam(g2, 0, new Map()), g2.ships.find((s) => s.id === me.id)!, { kind: "module", shipId: foe.id, moduleId: laser.id }).error).toBeUndefined();
+    me.loadout.modules.push(newModule("scanner", "right", "sc1"));
+    refreshShip(me);
+    expect(applyScan(g, me, "sc1", "ship", foe.id).error).toBeUndefined();
+    expect(g.scanAccess?.[foe.id]).toEqual([0]);
+    expect(stateForTeam(g, 1, new Map()).scanAccess?.[foe.id]).toBeUndefined();
+    expect(stateForTeam(g, 0, new Map()).scanAccess?.[foe.id]).toEqual([0]);
+    me.techPoints = 6;
     const r0 = applyHack(g, seen, me, { kind: "module", shipId: foe.id, moduleId: laser.id });
     expect(r0.error).toBeUndefined();
     expect(me.techPoints).toBe(6 - HACK.moduleCost);
@@ -1473,6 +1488,7 @@ describe("droid – hacker", () => {
     refreshShip(me);
     me.techPoints = 6;
     const shield = foe.loadout.modules.find((m) => m.type.startsWith("shield"))!;
+    g.scanAccess = { [foe.id]: [0] }; // loď naskenovaná týmem hackera
     const seen = stateForTeam(g, 0, new Map());
     expect(applyHack(g, seen, me, { kind: "module", shipId: foe.id, moduleId: shield.id }).error).toBeUndefined();
     const hullBefore = foe.hull;

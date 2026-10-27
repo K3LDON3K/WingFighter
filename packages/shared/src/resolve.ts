@@ -2078,6 +2078,9 @@ export function applyScan(state: GameState, ship: Ship, moduleId: string, mode: 
     ship.techPoints -= cost;
     const st = statsOf(state, ship.ownerId);
     if (st) st.scans++;
+    // sken = přístup do systémů lodi pro celý tým (do konce bitvy) → jde ji hackovat
+    const acc = state.scanAccess ?? (state.scanAccess = {});
+    acc[target.id] = [...new Set([...(acc[target.id] ?? []), ship.team])];
     return { target };
   }
   if (inStorm(state, ship)) return { error: "bouře ruší skener" };
@@ -2239,6 +2242,18 @@ export function applyRepair(state: GameState, ship: Ship, order: RepairOrder): {
 export function hackerModule(ship: Ship): ModuleInstance | undefined {
   return ship.loadout.modules.find((m) => m.type === "hacker" && moduleUsable(m));
 }
+/** Má loď funkční štít (modul funguje a má aspoň nějakou energii / segment)? Bez štítu jde hackovat i bez skenu. */
+export function shieldsUp(ship: Ship): boolean {
+  const act = activeShield(ship.loadout);
+  if (!act || act.hacked) return false;
+  if (ship.shieldType === "whole") return ship.shields > 0;
+  if (ship.shieldType === "segment") return ship.segments.some((v) => v > 0);
+  return false;
+}
+/** Smí tým hackovat moduly lodi: naskenovaná (přístup do systémů) nebo bez funkčního štítu. */
+export function hackAccess(state: GameState, team: number, victim: Ship): boolean {
+  return !!state.scanAccess?.[victim.id]?.includes(team) || !shieldsUp(victim);
+}
 export function hackCost(kind: HackOrder["kind"]): number {
   return kind === "module" ? HACK.moduleCost : HACK.ordnanceCost;
 }
@@ -2293,6 +2308,7 @@ export function applyHack(state: GameState, seen: GameState, ship: Ship, order: 
       if (!victim || victim.team === ship.team) return { error: "cíl musí být živá cizí loď" };
       if (!seen.ships.some((x) => x.id === victim.id)) return { error: "loď není v dohledu" };
       if (inStorm(state, victim)) return { error: "bouře ruší hack" };
+      if (!hackAccess(state, ship.team, victim)) return { error: "loď není naskenovaná a má funkční štít" };
       const mod = victim.loadout.modules.find((m) => m.id === order.moduleId);
       if (!mod) return { error: "takový modul loď nemá" };
       if (!moduleWorking(mod)) return { error: "modul je už zničený" };

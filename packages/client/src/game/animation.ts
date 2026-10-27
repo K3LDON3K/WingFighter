@@ -393,7 +393,7 @@ export class TurnAnimation {
         // cizí loď, která vletěla do dohledu během kola: zobrazíme ji od začátku její dráhy
         const src = this.result.state.ships.find((x) => x.id === tw.id);
         if (src) {
-          const ns = shipToView(src);
+          const ns = shipToView(src, !!this.result.state.scanAccess?.[src.id]?.length);
           this.view.ships.push(ns);
           ent = ns;
         }

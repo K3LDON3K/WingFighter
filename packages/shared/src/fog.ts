@@ -70,6 +70,8 @@ export function stateForTeam(state: GameState, team: number, memory: AsteroidMem
     comets: (state.comets ?? []).filter((c) => cometSeen(eyes, c)),
     storms: (state.storms ?? []).filter((st) => st.blobs.some((b) => seenBy(eyes, b, b.r))),
     asteroids: [...memory.values()].map((a) => structuredClone(a)),
+    // přístup skenem vidí jen tým, který ho má (oběť se nedozví, že je „v systému“)
+    scanAccess: Object.fromEntries(Object.entries(state.scanAccess ?? {}).filter(([, teams]) => teams.includes(team))),
   };
 }
 

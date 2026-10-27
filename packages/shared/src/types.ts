@@ -571,6 +571,8 @@ export interface GameState {
   revealTeams?: number[];
   /** Předpověď manévrů botů (skener): hráč → poslední kolo, ve kterém ji vidí. */
   botPredict?: Record<string, number>;
+  /** Přístup do systémů lodi získaný skenem (do konce bitvy): id lodi → týmy, které ji smí hackovat. */
+  scanAccess?: Record<string, number[]>;
   /** Statistiky hráčů (klíč = id hráče). */
   stats?: Record<string, PlayerStats>;
   status: "planning" | "finished";

@@ -1011,6 +1011,11 @@ export class Renderer {
     ctx.fillStyle = "rgba(248,250,252,0.9)";
     const top = s.radius + SHIELD_GAP + 4; // nad štítem
     ctx.fillText(s.name, s.x, s.y - top - 10);
+    if (s.scanned) {
+      // naskenovaná cizí loď: malá značka skeneru vedle jména (tým s přístupem ji může hackovat)
+      const tw = ctx.measureText(s.name).width;
+      this.drawPixelIcon("scan", s.x + tw / 2 + 10, s.y - top - 14, 1.2, "#a5f3fc");
+    }
     const bw = 34;
     const bx = s.x - bw / 2;
     const by = s.y - top - 6;

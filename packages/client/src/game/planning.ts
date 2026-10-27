@@ -57,6 +57,7 @@ import {
   botPredictActive,
   HACK,
   hackerModule,
+  hackAccess,
   hackBlocked,
   hackCost,
   type HackOrder,
@@ -1127,7 +1128,9 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
     let panel: HTMLElement | null = null;
     if (open) {
       const anyOrdnance = m.state.mines.length > 0 || m.state.torpedoes.length > 0;
-      const anyEnemy = m.state.ships.some((x) => x.alive && x.team !== ship.team);
+      // hack modulu: jen loď, do které má tým skenem přístup, nebo loď bez funkčního štítu (a ne v bouři)
+      const hackable = (x: Ship) => x.alive && x.team !== ship.team && hackAccess(m.state, ship.team, x) && !inStorm(m.state, x);
+      const anyEnemy = m.state.ships.some(hackable);
       const tab = (k: HackOrder["kind"], ic: string, name: string, avail: boolean, note: string, warn?: string) => {
         const c = hackCost(k);
         const can = avail && tech >= c;
@@ -1135,7 +1138,7 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
       };
       subs = [
         tab("mine", "mine", "Mina", anyOrdnance, `mina se stane tvou (jde nastavit odpočet nebo odpálit na startu kola); torpédu určíš nový cíl a dostane +${HACK.torpedoLife} kola života · ${HACK.ordnanceCost} body technologie`, "Nelze: v dohledu není žádná mina ani torpédo."),
-        tab("module", "scan", "Modul", anyEnemy, `vybraný modul cizí lodi na toto kolo nefunguje (zbraň nevystřelí, štít nechrání, droid/skener nejde použít); oběť se to dozví až při vyhodnocení · ${HACK.moduleCost} body technologie`, "Nelze: v dohledu není cizí loď."),
+        tab("module", "scan", "Modul", anyEnemy, `vybraný modul cizí lodi na toto kolo nefunguje (zbraň nevystřelí, štít nechrání, droid/skener nejde použít); jde jen u lodi, kterou někdo z týmu naskenoval (značka skeneru u jména), nebo u lodi bez funkčního štítu; oběť se to dozví až při vyhodnocení · ${HACK.moduleCost} body technologie`, "Nelze: v dohledu není hacknutelná loď (naskenovaná, nebo bez funkčního štítu)."),
       ];
       if (kind === "mine" || kind === "torpedo") {
         if (!sel) panel = panelEl("Mina / torpédo", h("div", { class: "warn snote" }, label("klikni na minu nebo torpédo v dohledu")));
@@ -1150,10 +1153,11 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
           panel = panelEl(`Mina ${mine?.team === ship.team ? "(vlastní)" : "(cizí)"} – odpočet`, opts);
         } else panel = panelEl("Torpédo", h("div", { class: "warn snote" }, icon("torpedo", "#fb923c", 12), label(" torpédo vybráno – klikni na nový cíl (loď nebo torpédo)")), h("button", { class: "px tiny", title: "Jiné torpédo", onclick: () => cb.hackMode(ship.id, "mine") }, label("✕ jiné torpédo")));
       } else if (kind === "module") {
-        if (!sel || sel.kind !== "ship") panel = panelEl("Modul cizí lodi", h("div", { class: "warn snote" }, label("klikni na cizí loď v dohledu")));
+        if (!sel || sel.kind !== "ship") panel = panelEl("Modul cizí lodi", h("div", { class: "warn snote" }, label("klikni na naskenovanou loď (značka skeneru) nebo loď bez štítu")));
         else {
           const victim = m.state.ships.find((x) => x.id === sel.id);
           if (!victim) panel = panelEl("Modul cizí lodi", h("div", { class: "muted" }, label("loď už není v dohledu")));
+          else if (!hackable(victim)) panel = panelEl(`${victim.name ?? "loď"}`, h("div", { class: "warn snote" }, label(inStorm(m.state, victim) ? "loď je v bouři – hack nejde" : "není naskenovaná a má funkční štít – nejdřív ji někdo z týmu musí skenovat")), h("button", { class: "px tiny", title: "Jiná loď", onclick: () => cb.hackMode(ship.id, "module") }, label("✕ jiná loď")));
           else {
             const vslot = (id: SlotId) => hullOf(victim.loadout).slots.find((x) => x.id === id)?.name ?? id;
             const hexes = h(

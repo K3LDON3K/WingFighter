@@ -17,6 +17,8 @@ export interface ViewShip extends Pose {
   roll?: number;
   stressPoints: number;
   stressMax: number;
+  /** Náš tým má skenem přístup do systémů lodi (jde hackovat) – značka skeneru u jména. */
+  scanned?: boolean;
   /** Trup (pro výběr spritu). */
   hullId: string;
   radius: number;
@@ -99,7 +101,7 @@ export interface ViewModel {
   effects: Effect[];
 }
 
-export function shipToView(s: Ship): ViewShip {
+export function shipToView(s: Ship, scanned = false): ViewShip {
   return {
     id: s.id,
     team: s.team,
@@ -116,6 +118,7 @@ export function shipToView(s: Ship): ViewShip {
     segments: [...s.segments] as Segments,
     stressPoints: s.stressPoints,
     stressMax: s.stats.stressMax,
+    scanned,
     hullId: s.loadout.hullId,
     radius: s.stats.radius,
     colliders: s.stats.colliders,
@@ -140,7 +143,7 @@ export function mineToView(m: Mine): ViewMine {
 
 export function viewFromState(state: GameState): ViewModel {
   return {
-    ships: state.ships.filter((s) => s.alive).map(shipToView),
+    ships: state.ships.filter((s) => s.alive).map((s) => shipToView(s, !!state.scanAccess?.[s.id]?.length)),
     torpedoes: state.torpedoes.map(torpedoToView),
     debris: (state.debris ?? []).map((d) => ({ ...d })),
     comets: (state.comets ?? []).map(cometToView),
