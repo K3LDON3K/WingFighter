@@ -44,8 +44,11 @@ export type ActionOrder =
   | { type: "shield"; segments: Segments }
   /** Vyhození modulu z lodi nebo z nákladu (odlehčení) – modul zůstane jako trosky, které jde sestřelit za odměnu. */
   | { type: "jettison"; moduleId: string }
-  /** Zvednutí nákladu (trosek) v dosahu kolem lodi do nákladového prostoru; před pohybem, rychlost ≤ limit. */
-  | { type: "pickup"; targetId?: string }
+  /**
+   * Zvednutí nákladu (trosek) v dosahu kolem lodi do nákladového prostoru; před pohybem, rychlost ≤ limit.
+   * `installSlot`: zvednutý modul hned nasadí droid opravář do daného (volného) slotu za technologii (cena jako Nasadit).
+   */
+  | { type: "pickup"; targetId?: string; installSlot?: SlotId }
   /** Otočení na místě (jen stojící loď, rychlost 0): nový kurz před pohybem. */
   | { type: "turn"; heading: number }
   /** Komunikace s funkční stanicí v dohledu: objednávka modulu (cena jako v obchodě); stanice ho vypustí jako trosky směrem k volajícímu. */

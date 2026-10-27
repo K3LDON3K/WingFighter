@@ -467,6 +467,10 @@ export function droidModule(ship: Ship): ModuleInstance | undefined {
 export function droidCost(o: Pick<ShipOrders, "droid"> | undefined): number {
   return (o?.droid?.overdrive ? DROID.overdriveCost : 0) + (o?.droid?.autopilot ? DROID.autopilotCost : 0);
 }
+/** Technologie zamluvená plánem (odečte se až při vyhodnocení): droid pilot + nasazení zvednutého modulu opravářem. */
+export function reservedTech(o: Pick<ShipOrders, "droid" | "action"> | undefined): number {
+  return droidCost(o) + (o?.action?.type === "pickup" && o.action.installSlot ? REPAIR.installCost : 0);
+}
 /**
  * Stres za manévr s ohledem na droida: overdrive = červený/nebezpečný bez stresu, autopilot = zelený vrací víc.
  * Záporná hodnota = regenerace.
@@ -522,7 +526,8 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
   if (o.action?.type === "evade") out.push({ id: "evade", label: "úhybný manévr" });
   if (o.action?.type === "shield") out.push({ id: "shield", label: "úprava štítu" });
   if (o.action?.type === "jettison") out.push({ id: "jettison", label: "vyhození modulu" });
-  if (o.action?.type === "pickup") out.push({ id: "pickup", label: "zvednutí nákladu" });
+  // zvednutí bez cíle (nic v dosahu) akci nestojí – a nic se nestane
+  if (o.action?.type === "pickup" && o.action.targetId) out.push({ id: "pickup", label: "zvednutí nákladu" });
   if (o.action?.type === "comm") out.push({ id: "comm", label: "komunikace se stanicí" });
   if (o.action?.type === "turn") out.push({ id: "turn", label: "otočení na místě" });
   for (const sh of shotsOf(ship, o)) {
@@ -637,6 +642,9 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     } else if (raw.action?.type === "pickup") {
       const tid = raw.action.targetId;
       action = { type: "pickup", targetId: typeof tid === "string" && (state.debris.some((d) => d.id === tid) || isStationId(state, tid)) ? tid : undefined };
+      // zvednout a hned nasadit opravářem: jen trosky (ne stanice), volný slot trupu, funkční opravář
+      const sl = (raw.action as { installSlot?: string }).installSlot;
+      if (action.targetId && !isStationId(state, action.targetId) && typeof sl === "string" && hullOf(ship.loadout).slots.some((x) => x.id === sl) && !ship.loadout.modules.some((x) => occupiedSlots(x).includes(sl as SlotId)) && repairModule(ship)) action.installSlot = sl as SlotId;
     } else if (raw.action?.type === "turn") {
       const hd = raw.action.heading;
       // otočení na místě: loď stojí (rychlost 0), nebo v tomto kole zastaví hned (manévr rychlostí 0)
@@ -1075,7 +1083,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const claims = new Map<string, { ship: Ship; speed: number; d: number }[]>();
     for (const ship of state.ships) {
       const o = orders.get(ship.id);
-      if (!ship.alive || o?.action?.type !== "pickup") continue;
+      if (!ship.alive || o?.action?.type !== "pickup" || !o.action.targetId) continue;
       const wantId = o.action.targetId;
       const speed = parseManeuverId(o.maneuverId)?.speed ?? ship.speed;
       const cap = cargoCapacity(ship.loadout);
@@ -1103,7 +1111,10 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
         }
         continue;
       }
-      if (held >= cap) {
+      // zvednout a nasadit: modul jde rovnou do slotu, náklad nemusí mít místo (jen s funkčním opravářem a technologií)
+      const instSlot = o.action.installSlot;
+      const installing = !!instSlot && !repairBlocked(state, ship) && ship.techPoints >= REPAIR.installCost && !ship.loadout.modules.some((x) => occupiedSlots(x).includes(instSlot));
+      if (held >= cap && !installing) {
         fail("full");
         continue;
       }
@@ -1130,6 +1141,13 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       refreshShip(winner.ship);
       picked.add(debrisId);
       events.push({ type: "pickup", shipId: winner.ship.id, debrisId, x: deb.x, y: deb.y, ok: true, module: mod });
+      // zvednout a nasadit opravářem (za technologii); když to nejde, modul zůstane v nákladu
+      const wo = orders.get(winner.ship.id);
+      const slot = wo?.action?.type === "pickup" ? wo.action.installSlot : undefined;
+      if (slot) {
+        const r = applyRepair(state, winner.ship, { kind: "install", moduleId: mod.id, slot });
+        if (r.event) events.push(r.event);
+      }
       for (const l of list.slice(1)) events.push({ type: "pickup", shipId: l.ship.id, debrisId, x: deb.x, y: deb.y, ok: false, reason: "lost", winnerId: winner.ship.id });
     }
     state.debris = state.debris.filter((d) => !picked.has(d.id));

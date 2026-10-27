@@ -681,7 +681,7 @@ export class TurnAnimation {
       }
       case "spawnTorpedo":
         v.torpedoes.push(torpedoToView(e.torpedo));
-        v.effects.push({ kind: "launch", x: e.torpedo.x, y: e.torpedo.y, heading: e.torpedo.heading, color: TEAM_COLORS[e.torpedo.team], start: now, duration: 700 });
+        v.effects.push({ kind: "launch", x: e.torpedo.x, y: e.torpedo.y, heading: e.torpedo.heading, color: TEAM_COLORS[e.torpedo.team], start: now, duration: 350 });
         break;
       case "spawnComet":
         if (!v.comets.some((c) => c.id === e.comet.id)) v.comets.push(cometToView(e.comet));

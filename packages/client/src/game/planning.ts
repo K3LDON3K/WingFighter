@@ -5,6 +5,7 @@ import {
   moduleMaxHp,
   moduleWorking,
   type ModuleInstance,
+  type Debris,
   RULES,
   COMET,
   CARGO,
@@ -42,7 +43,7 @@ import {
   makeManeuver,
   effEvadeCost,
   droidModule,
-  droidCost,
+  reservedTech,
   DROID,
   REPAIR,
   hullOf,
@@ -288,8 +289,13 @@ function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLEle
     h("div", { class: "man-angle" }, `${Math.abs(cur.angle)}°${cur.koiogran ? " +180°" : ""}`),
     h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && maneuverStress(man) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
     h("div", { class: "spacer" }),
-    h("button", { class: "px tiny qbtn", title: "Nápověda: rychlosti, úhly, barvy manévrů, zastavení a otočení", onclick: () => infoDialog({ title: "Manévry – nápověda", body: maneuverHelp(ship), wide: true }) }, "?"),
-    h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
+    // dole vedle sebe: otazník nápovědy a klávesa mezerník
+    h(
+      "div",
+      { class: "man-foot" },
+      h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
+      h("button", { class: "px tiny qbtn", title: "Nápověda: rychlosti, úhly, barvy manévrů, zastavení a otočení", onclick: () => infoDialog({ title: "Manévry – nápověda", body: maneuverHelp(ship), wide: true }) }, "?"),
+    ),
   );
 }
 
@@ -482,19 +488,6 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     h("div", { class: "bb-shipbody" }, shieldBox, right),
   );
 
-  /** Vysouvací inventář nad tlačítkem VYHODIT: klik na modul = vybrat k vyhození. */
-  let jettisonPop: HTMLElement | null = null;
-  if (o.action?.type === "jettison" && !locked) {
-    const curId = o.action.moduleId;
-    const chosen = ship.loadout.modules.find((x) => x.id === curId) ?? (ship.loadout.cargo ?? []).find((x) => x.id === curId);
-    jettisonPop = h(
-      "div",
-      { class: "jettison-pop" },
-      h("div", { class: "jp-head" }, icon("debris", "#7dd3fc", 12), label(chosen ? `vyhodit: ${MODULES[chosen.type].name}` : "klikni na modul, který vyhodíš")),
-      renderLoadout({ loadout: ship.loadout, team: ship.team, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.setOrders(ship.id, { action: { type: "jettison", moduleId: id } }) }),
-    );
-  }
-
   /* ---- 1b. výzbroj: munice každého modulu ---- */
   // všechny moduly: zbraně s municí, ostatní jen se stavem; každý má ukazatel životů (zničený = červený, nefunguje)
   const ammoMods = [...ship.loadout.modules].sort((a, b) => Number(b.ammo !== undefined || b.type === "laser") - Number(a.ammo !== undefined || a.type === "laser"));
@@ -555,7 +548,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   for (let i = 0; i < ship.stats.stressMax; i++) spips.append(h("i", { class: i < ship.stressPoints ? "on" : "" }));
   const inStormNow = inStorm(m.state, ship);
   const tpips = h("div", { class: `apip yellow ${inStormNow ? "storm" : ""}` });
-  const reserved = droidCost(o); // v plánu (droid) – odečte se při SPUSTIT KOLO
+  const reserved = reservedTech(o); // v plánu (droid, zvednout + nasadit) – odečte se při SPUSTIT KOLO
   for (let i = 0; i < ship.stats.techMax; i++) tpips.append(h("i", { class: i < ship.techPoints - reserved ? "on" : i < ship.techPoints ? "plan" : "" }));
   const resources = h(
     "div",
@@ -718,25 +711,20 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       else row.append(wbtn);
     }
     if (grp.label === "Loď") {
-      // spojené tlačítko NÁKLAD: vyhodit modul / zvednout náklad
-      const jet = ACTIONS.find((x) => x.id === "jettison")!;
-      const pick = ACTIONS.find((x) => x.id === "pickup")!;
+      // INVENTÁŘ: okénko s nákresem lodi – přetahováním se vyhazuje (vyhazovací slot) a zvedá (trosky v dosahu → náklad / volný slot s opravářem)
       const jetOn = o.action?.type === "jettison";
-      const pickOn = o.action?.type === "pickup";
-      const cargoActive = jetOn || pickOn;
+      const pickTgt = o.action?.type === "pickup" ? o.action.targetId : undefined;
+      const installSlot = o.action?.type === "pickup" ? o.action.installSlot : undefined;
+      const cargoActive = jetOn || !!pickTgt;
       const cargoSpent = dotsFor("jettison") + dotsFor("pickup");
-      const whyJet = jet.disabled(ship, m.state, o);
-      const whyPick = pick.disabled(ship, m.state, o);
-      const sub = (a: typeof jet, on: boolean, why: string | null, lbl: string) =>
-        h(
-          "button",
-          { class: `px bb-weapon sm ${on ? "on" : ""}`, disabled: locked || (!!why && !on), ...tipAttr(actionTip(a.id, ship, o, man, on ? null : why)), onclick: () => cb.chooseAction(ship.id, a.id) },
-          costPips(1, on ? "spent" : "red", "stojí 1 akci"),
-          icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
-          h("span", { class: "lbl" }, label(lbl)),
-        );
       const cargoDone = cargoActive && !m.cargoOpen; // akce zvolená, okénko zavřené = hotovo, stisk = reset
+      const cargo = ship.loadout.cargo ?? [];
+      const cap = cargoCapacity(ship.loadout);
+      const canInstall = !repairBlocked(m.state, ship);
       const holder = h("div", { class: `scan-holder ${m.cargoOpen ? "stack" : ""}` });
+      const jetMod = jetOn ? (ship.loadout.modules.find((x) => x.id === (o.action as { moduleId: string }).moduleId) ?? cargo.find((x) => x.id === (o.action as { moduleId: string }).moduleId)) : undefined;
+      const tgtDebris = pickTgt ? m.state.debris.find((d) => d.id === pickTgt) : undefined;
+      const tgtStation = pickTgt ? (m.state.stations ?? []).find((x) => x.id === pickTgt) : undefined;
       holder.append(
         h(
           "button",
@@ -746,49 +734,170 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             ...tipAttr({
               icon: "cargo",
               iconColor: "#94a3b8",
-              title: "Náklad",
+              title: "Inventář",
               cost: { actions: 1 },
               fx: [
-                { icon: "debris", text: "vyhodit modul z lodi / nákladu" },
-                { icon: "cargo", text: `zvednout trosky do ${CARGO.range}` },
+                { icon: "debris", text: "přetáhni modul lodi / nákladu na vyhazovací slot = vyhodit (trosky)" },
+                { icon: "cargo", text: `přetáhni trosky v dosahu ${CARGO.range} do nákladu = zvednout` },
+                { icon: "wrench", text: "s droidem opravářem i rovnou na volný slot = zvednout a nasadit" },
               ],
-              note: cargoDone ? `${jetOn ? "vyhození" : "zvednutí"} platí · stisk = reset` : "klik vedle okénko zavře a volba platí",
+              note: cargoDone ? `${jetOn ? "vyhození" : installSlot ? "zvednutí a nasazení" : "zvednutí"} platí · stisk = reset` : "klik vedle okénko zavře a volba platí",
             }),
             onclick: () => (cargoDone ? cb.cancelAction(ship.id) : cb.cargoToggle(ship.id)),
           },
           costPips(1, cargoSpent > 0 ? "spent" : "red", "stojí 1 akci"),
           icon("cargo", "currentColor", 22),
-          h("span", { class: "lbl" }, label(jetOn ? "Vyhodit" : pickOn ? "Zvednout" : "Náklad")),
+          h("span", { class: "lbl" }, label("Inventář")),
           cargoDone ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
         ),
       );
       if (m.cargoOpen && !locked) {
-        const pop = h("div", { class: `cargo-pop ${jetOn ? "wide" : ""} ${popClass(`cargo:${ship.id}`)}` }, h("div", { class: "cargo-tabs" }, sub(jet, jetOn, whyJet, "Vyhodit"), sub(pick, pickOn, whyPick, "Zvednout")));
-        if (jetOn) {
-          const curId = o.action?.type === "jettison" ? o.action.moduleId : undefined;
-          const chosen = ship.loadout.modules.find((x) => x.id === curId) ?? (ship.loadout.cargo ?? []).find((x) => x.id === curId);
-          pop.append(
-            chosen
-              ? h("div", { class: "jp-head ok" }, icon("check", "#4ade80", 12), label(`vyhodí se: ${MODULES[chosen.type].name}`), h("span", { class: "muted" }, label("· na začátku kola · jiný modul = klik")))
-              : h("div", { class: "jp-head warn" }, icon("debris", "#fbbf24", 12), label("klikni na modul, který vyhodíš")),
-            renderLoadout({ loadout: ship.loadout, team: ship.team, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: true, selectedId: curId, onSelect: (id) => cb.jettisonChosen(ship.id, id) }),
+        const sp = cur.speed;
+        const near = m.state.debris.filter((d) => dist(ship, d) <= CARGO.range).sort((a, b) => dist(ship, a) - dist(ship, b));
+        const stn = stationInPickupRange(m.state, ship);
+        const debrisModule = (d: Debris): ModuleInstance => d.module ?? { id: d.id, type: d.type, slot: "front", ammo: MODULES[d.type].ammo };
+        const cancelBtn = () => h("button", { class: "px tiny inv-cancel", title: "Zrušit", onclick: () => cb.setOrders(ship.id, { action: undefined }) }, "✕ ", label("zrušit"));
+        const slotName = (id: SlotId) => hullOf(ship.loadout).slots.find((x) => x.id === id)?.name ?? id;
+
+        /* --- vlevo: trosky (a stanice) v dosahu – tažením do lodi --- */
+        const reachList = h("div", { class: "inv-list" });
+        const dragIn: { el: SVGSVGElement; id: string; mod: ModuleInstance | null }[] = [];
+        for (const d of near) {
+          const mod = debrisModule(d);
+          const planned = pickTgt === d.id;
+          const el = moduleStateHex(mod, { r: 26, sub: planned ? (installSlot ? "NASADIT" : "ZVEDNOUT") : moduleHp(mod) < moduleMaxHp(mod.type) ? `${moduleHp(mod)}/${moduleMaxHp(mod.type)}` : undefined, subColor: planned ? "#86efac" : undefined, selected: planned, title: `${MODULES[mod.type].name} · ${Math.round(dist(ship, d))} / ${CARGO.range} · přetáhni do nákladu${canInstall ? " nebo na volný slot" : ""}` });
+          el.classList.add("inv-drag");
+          reachList.append(el);
+          dragIn.push({ el, id: d.id, mod });
+        }
+        if (stn) {
+          const planned = pickTgt === stn.id;
+          const el = moduleStateHex(null, { r: 26, empty: planned ? "ZVEDNOUT" : "STANICE", selected: planned, title: `Stanice: nabere náhodný modul ze zásoby (${stn.stock}) – přetáhni do nákladu` });
+          el.classList.add("inv-drag");
+          reachList.append(el);
+          dragIn.push({ el, id: stn.id, mod: null });
+        }
+        if (!near.length && !stn) reachList.append(h("div", { class: "inv-none" }, label("nic v dosahu")));
+        const reach = h(
+          "div",
+          { class: "inv-reach" },
+          h("div", { class: "inv-cap" }, label(`V dosahu${near.length + (stn ? 1 : 0) ? ` · ${near.length + (stn ? 1 : 0)}` : ""}`)),
+          reachList,
+          h("div", { class: `inv-lbl ${sp > CARGO.maxSpeed ? "warn" : ""}` }, label(sp > CARGO.maxSpeed ? `rychlost ${sp} > ${CARGO.maxSpeed} – zpomal, jinak se nezvedne` : `dosah ${CARGO.range} · rychlost ${sp} ok`)),
+          h("div", { class: `inv-lbl ${canInstall ? "ok" : "warn"}` }, icon("wrench", canInstall ? "#86efac" : "#fca5a5", 10), " ", label(canInstall ? "lze i nasadit – opravář na palubě" : "nelze nasadit – chybí droid opravář")),
+        );
+
+        /* --- uprostřed: nákres lodi (jen k tažení) --- */
+        const lo = renderLoadout({ loadout: ship.loadout, team: ship.team, readonly: true, hideHead: true, budget: m.state.tuning.startBudget, allowed: m.state.settings.allowedModules, compact: true, showCargo: false, selectedId: jetMod?.id });
+
+        /* --- vpravo: vyhazovací slot --- */
+        const jetBox = h(
+          "div",
+          { class: `inv-jet ${jetMod ? "has" : ""}`, dataset: { drop: "jettison" } },
+          h("div", { class: "inv-cap" }, label("Vyhodit")),
+          jetMod ? moduleStateHex(jetMod, { r: 26, sub: "VYHODIT", subColor: "#fca5a5", title: `${MODULES[jetMod.type].name} se vyhodí na začátku kola` }) : moduleStateHex(null, { r: 26, empty: "SEM", title: "Přetáhni sem modul z lodi nebo z nákladu" }),
+          jetMod ? h("div", { class: "inv-lbl ok" }, label("vyhodí se na začátku kola")) : h("div", { class: "inv-lbl" }, label("přetáhni sem modul z lodi nebo z nákladu")),
+          jetMod ? cancelBtn() : null,
+        );
+
+        /* --- dole: náklad (hexy modulů v nákladu + volná místa = cíl pro zvednutí) --- */
+        const cargoRow = h("div", { class: "inv-cargo" }, h("div", { class: "inv-cap" }, label(`Náklad ${cargo.length}/${cap}`)));
+        const dragOut: { el: Element; mod: ModuleInstance }[] = [];
+        for (const x of cargo) {
+          const el = moduleStateHex(x, { r: 26, sub: jetMod?.id === x.id ? "VYHODIT" : moduleHp(x) < moduleMaxHp(x.type) ? `${moduleHp(x)}/${moduleMaxHp(x.type)}` : undefined, subColor: jetMod?.id === x.id ? "#fca5a5" : undefined, selected: jetMod?.id === x.id, title: `${MODULES[x.type].name} v nákladu (nefunguje, jen váží) – přetáhni na vyhazovací slot` });
+          el.classList.add("inv-drag");
+          cargoRow.append(el);
+          dragOut.push({ el, mod: x });
+        }
+        const pickedToCargo = pickTgt && !installSlot ? (tgtDebris ? debrisModule(tgtDebris) : null) : undefined;
+        for (let i = cargo.length; i < cap; i++) {
+          if (i === cargo.length && pickTgt && !installSlot) {
+            cargoRow.append(
+              h(
+                "div",
+                { class: "inv-planned" },
+                pickedToCargo ? moduleStateHex(pickedToCargo, { r: 26, sub: "ZVEDNOUT", subColor: "#86efac", selected: true }) : moduleStateHex(null, { r: 26, empty: tgtStation ? "STANICE" : "?", selected: true }),
+                h("div", { class: "inv-lbl ok" }, label(tgtStation ? "nabere se náhodný modul ze stanice" : "zvedne se v tomto kole")),
+                cancelBtn(),
+              ),
+            );
+          } else cargoRow.append(h("div", { class: "inv-free", dataset: { drop: "cargo" } }, moduleStateHex(null, { r: 26, empty: "VOLNÉ", title: "Volné místo v nákladu – přetáhni sem trosky z dosahu" })));
+        }
+        if (cap <= 0) cargoRow.append(h("div", { class: "inv-none" }, label("loď nemá nákladový prostor")));
+
+        const pop = h("div", { class: `cargo-pop inv-pop ${popClass(`cargo:${ship.id}`)}` }, h("div", { class: "inv-title" }, icon("cargo", "#7dd3fc", 12), " ", label("Inventář · přetahuj moduly")), h("div", { class: "inv-body" }, reach, h("div", { class: "inv-mid" }, lo, cargoRow), jetBox));
+
+        /* --- tažení: moduly lodi / nákladu → vyhazovací slot; trosky → náklad / volný slot --- */
+        const targetOf = (el: Element | null): { kind: "jettison" | "cargo" | "slot"; slot?: SlotId; el: Element } | null => {
+          const drop = el?.closest?.("[data-drop]");
+          if (drop) return { kind: drop.getAttribute("data-drop") as "jettison" | "cargo", el: drop };
+          const g = el?.closest?.("[data-slot]");
+          if (g && g.classList.contains("empty") && pop.contains(g)) return { kind: "slot", slot: g.getAttribute("data-slot") as SlotId, el: g };
+          return null;
+        };
+        const mark = (t: ReturnType<typeof targetOf>, ok: boolean) => {
+          pop.querySelectorAll(".drop-target, .drop-bad").forEach((x) => x.classList.remove("drop-target", "drop-bad"));
+          if (t) t.el.classList.add(ok ? "drop-target" : "drop-bad");
+        };
+        for (const g of lo.querySelectorAll<SVGGElement>(".lo-g.mod[data-slot]")) {
+          const sl = g.getAttribute("data-slot") as SlotId;
+          const mod = ship.loadout.modules.find((x) => occupiedSlots(x).includes(sl));
+          if (mod) dragOut.push({ el: g, mod });
+        }
+        for (const { el, mod } of dragOut) {
+          el.classList.add("inv-drag");
+          el.addEventListener("pointerdown", (ev) =>
+            dragHex(
+              ev as PointerEvent,
+              () => moduleStateHex(mod, { r: 26 }),
+              (under) => {
+                const t = targetOf(under);
+                if (t?.kind === "jettison") cb.setOrders(ship.id, { action: { type: "jettison", moduleId: mod.id } });
+              },
+              (under) => {
+                const t = targetOf(under);
+                mark(t, t?.kind === "jettison");
+              },
+            ),
           );
-        } else if (pickOn) {
-          const wantId = o.action?.type === "pickup" ? o.action.targetId : undefined;
-          const tgt = wantId ? (m.state.debris ?? []).find((d) => d.id === wantId) : undefined;
-          const sp = cur.speed;
-          const near = (m.state.debris ?? []).some((d) => dist(ship, d) <= CARGO.range);
-          const stnNear = stationInPickupRange(m.state, ship);
-          const stnTgt = wantId ? (m.state.stations ?? []).find((x) => x.id === wantId) : undefined;
-          pop.append(
-            tgt
-              ? h("div", { class: "jp-head ok" }, icon("check", "#4ade80", 12), label(`zvedne se: ${MODULES[tgt.type].name}`), h("span", { class: "muted" }, label(`· ${Math.round(dist(ship, tgt))} / ${CARGO.range}`)))
-              : stnTgt
-                ? h("div", { class: "jp-head ok" }, icon("check", "#4ade80", 12), label(`nabere se náhodný modul ze stanice`), h("span", { class: "muted" }, label(`· zásoba ${stnTgt.stock}${stnTgt.stock <= 0 ? " – prázdná!" : ""}`)))
-                : h("div", { class: "jp-head warn" }, icon("cargo", "#fbbf24", 12), label(near ? "klikni na trosky v dosahu" : stnNear ? "klikni na stanici = nabrat náhodný modul" : "v dosahu nejsou žádné trosky ani stanice – akce se nevykoná")),
-            h("div", { class: `cargo-note ${sp > CARGO.maxSpeed ? "warn" : "muted"}` }, label(sp > CARGO.maxSpeed ? `rychlost ${sp} > ${CARGO.maxSpeed} – zpomal, jinak se nezvedne` : `dosah ${CARGO.range} · rychlost ${sp} ok · po střelbě, před pohybem`)),
+        }
+        for (const { el, id, mod } of dragIn) {
+          el.addEventListener("pointerdown", (ev) =>
+            dragHex(
+              ev as PointerEvent,
+              () => (mod ? moduleStateHex(mod, { r: 26 }) : moduleStateHex(null, { r: 26, empty: "STANICE" })),
+              (under) => {
+                const t = targetOf(under);
+                if (t?.kind === "cargo") cb.setOrders(ship.id, { action: { type: "pickup", targetId: id } });
+                else if (t?.kind === "slot" && mod && canInstall && t.slot) cb.setOrders(ship.id, { action: { type: "pickup", targetId: id, installSlot: t.slot } });
+                else if (t?.kind === "slot" && !canInstall) cb.setOrders(ship.id, {}); // jen překreslit (zůstane rada „chybí droid opravář“)
+              },
+              (under) => {
+                const t = targetOf(under);
+                mark(t, t?.kind === "cargo" || (t?.kind === "slot" && !!mod && canInstall));
+              },
+            ),
           );
-        } else pop.append(h("div", { class: "muted cargo-note" }, label(`náklad ${(ship.loadout.cargo ?? []).length}/${cargoCapacity(ship.loadout)}`)));
+        }
+        /* --- naplánované zvednutí + nasazení: modul se ukáže ve volném slotu (po vykreslení, podle polohy hexu) --- */
+        if (installSlot && tgtDebris) {
+          const mod = debrisModule(tgtDebris);
+          requestAnimationFrame(() => {
+            const g = lo.querySelector<SVGGElement>(`[data-slot="${installSlot}"]`);
+            const dia = lo.querySelector<HTMLElement>(".lo-diagram");
+            if (!g || !dia) return;
+            const rb = g.getBoundingClientRect();
+            const rd = dia.getBoundingClientRect();
+            const ov = h(
+              "div",
+              { class: "inv-installed", style: `left:${rb.left - rd.left + rb.width / 2}px;top:${rb.top - rd.top + rb.height / 2}px` },
+              moduleStateHex(mod, { r: 42, sub: "NASADIT", subColor: "#86efac", selected: true, title: `${MODULES[mod.type].name}: zvedne se a opravář ho nasadí do slotu ${slotName(installSlot)} (${REPAIR.installCost} technologie)` }),
+              h("div", { class: "inv-lbl ok" }, label(`zvedne se a opravář ho nasadí (${REPAIR.installCost} tech)`)),
+              cancelBtn(),
+            );
+            dia.append(ov);
+          });
+        }
         holder.append(pop);
       }
       row.append(holder);
@@ -992,14 +1101,16 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     if (chosen) {
       const after = { ...ship.loadout, modules: ship.loadout.modules.filter((x) => x.id !== cur), cargo: (ship.loadout.cargo ?? []).filter((x) => x.id !== cur) };
       details.append(h("span", { class: "odds", style: "color:#4ade80" }, label(`✔ vyhodí se: ${MODULES[chosen.type].name}`)), h("span", { class: "muted" }, label(`· váha ${loadoutWeight(ship.loadout)} → ${loadoutWeight(after)} · max. rychlost ${profileOf(ship.loadout).maxSpeed} → ${profileOf(after).maxSpeed}`)));
-    } else details.append(h("span", { class: "warn" }, label("↑ vyber modul v okénku nad tlačítkem – jinak se nic nevyhodí")));
+    } else details.append(h("span", { class: "warn" }, label("↑ přetáhni modul na vyhazovací slot v inventáři – jinak se nic nevyhodí")));
   } else if (o.action?.type === "pickup") {
     const wantId = o.action.targetId;
     const tgt = wantId ? (m.state.debris ?? []).find((d) => d.id === wantId) : undefined;
     const sp = cur.speed;
     details.append(icon("cargo", "#a7f3d0"));
-    if (tgt) details.append(h("span", { class: "txt" }, `zvednout: ${MODULES[tgt.type].name}`), h("span", { class: "muted" }, label(`· ${Math.round(dist(ship, tgt))} / ${CARGO.range}`)));
-    else details.append(h("span", { class: "warn" }, label("klikni na trosky v dosahu")));
+    const stnTgt = wantId ? (m.state.stations ?? []).find((x) => x.id === wantId) : undefined;
+    if (tgt) details.append(h("span", { class: "txt" }, `zvednout${o.action.installSlot ? " + nasadit" : ""}: ${MODULES[tgt.type].name}`), h("span", { class: "muted" }, label(`· ${Math.round(dist(ship, tgt))} / ${CARGO.range}`)));
+    else if (stnTgt) details.append(h("span", { class: "txt" }, "nabrat náhodný modul ze stanice"));
+    else details.append(h("span", { class: "warn" }, label("nic v dosahu – akce se nepočítá; přetáhni trosky do nákladu v inventáři")));
     if (sp > CARGO.maxSpeed) details.append(h("span", { class: "warn" }, label(`rychlost ${sp} > ${CARGO.maxSpeed} – nezvedne!`)));
     else details.append(h("span", { class: "muted" }, label(`· rychlost ${sp} ok · po střelbě, před pohybem`)));
   } else if (o.action?.type === "shield") {
@@ -1095,6 +1206,53 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   root.append(status, weapons, actions, maneuver, pilot, go);
 }
 
+/**
+ * Tažení hexu (myš i dotyk): po 6 px se objeví duch pod kurzorem; `onDrop` dostane element pod kurzorem při puštění,
+ * `over` se volá při pohybu (zvýraznění cíle). Pouhý klik nic nedělá.
+ */
+function dragHex(ev: PointerEvent, ghostOf: () => SVGSVGElement, onDrop: (under: Element | null) => void, over?: (under: Element | null) => void) {
+  if (ev.pointerType === "mouse" && ev.button !== 0) return;
+  ev.preventDefault();
+  const start = { x: ev.clientX, y: ev.clientY };
+  let ghost: SVGSVGElement | null = null;
+  let moved = false;
+  const under = (e: PointerEvent) => {
+    if (ghost) ghost.style.display = "none";
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (ghost) ghost.style.display = "";
+    return el;
+  };
+  const onMove = (e: PointerEvent) => {
+    if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) return;
+    if (!moved) {
+      moved = true;
+      ghost = ghostOf();
+      ghost.classList.add("drag-ghost-html");
+      document.body.append(ghost);
+      document.body.classList.add("drag-on");
+    }
+    const w = ghost!.width.baseVal.value;
+    const hh = ghost!.height.baseVal.value;
+    ghost!.style.left = `${e.clientX - w / 2}px`;
+    ghost!.style.top = `${e.clientY - hh / 2}px`;
+    over?.(under(e));
+  };
+  const onUp = (e: PointerEvent) => {
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
+    if (!moved) return;
+    const el = under(e);
+    ghost?.remove();
+    document.body.classList.remove("drag-on");
+    over?.(null);
+    onDrop(el);
+  };
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
+}
+
 /* ===================== svislá lišta droidů (pravý okraj mapy) ===================== */
 
 /** Plástev hexů slotů lodi (stejné rozložení jako v nákresu): `render(slot)` vrátí hex pro daný slot. */
@@ -1153,7 +1311,7 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
   if (has("droid")) {
     const dDestroyed = !droidModule(ship);
     const od = o.droid ?? {};
-    const planned = droidCost(o);
+    const planned = reservedTech(o);
     const anyOn = !!od.overdrive || !!od.autopilot;
     const open = !!m.droidOpen && !stormed && !dDestroyed;
     const canOver = od.overdrive || tech - planned >= DROID.overdriveCost;

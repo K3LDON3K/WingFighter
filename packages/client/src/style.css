@@ -534,7 +534,7 @@ h3,
 /* ---- spodní lišta (pevné rozměry) ---- */
 .bottombar {
   display: grid;
-  grid-template-columns: 196px 136px 1fr 84px 84px 96px;
+  grid-template-columns: 196px 136px 1fr 100px 84px 96px;
   gap: 6px;
   height: 172px;
   padding: 6px;
@@ -643,7 +643,7 @@ h3,
 }
 .man-diff {
   font-size: 14px;
-  height: 10px;
+  line-height: 1.05;
 }
 .spacer {
   flex: 1;
@@ -4895,10 +4895,19 @@ button.start-chip.on:hover:not(:disabled) {
   justify-content: center;
   gap: 6px;
 }
+.man-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.man-foot .keycap {
+  margin-top: 0;
+}
 .bb-maneuver .qbtn {
   width: 22px;
   height: 18px;
-  margin: 2px auto 0;
+  margin: 0;
   padding: 0;
   font-size: 11px;
   line-height: 1;
@@ -5500,4 +5509,171 @@ body.drag-on * {
 }
 .mod-hex.dim {
   opacity: 0.4;
+}
+
+/* ---- INVENTÁŘ (okénko nad tlačítkem): vlevo trosky v dosahu, uprostřed loď + náklad, vpravo vyhazovací slot; všechno tažením ---- */
+.cargo-pop.inv-pop {
+  max-width: none;
+  width: max-content;
+  padding: 8px 10px;
+  gap: 6px;
+}
+.inv-title {
+  font-size: 12px;
+  color: #7dd3fc;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+}
+.inv-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.inv-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.inv-pop .loadout.compact {
+  width: auto;
+}
+.inv-pop .lo-svg {
+  width: 400px;
+  height: auto;
+}
+.inv-reach,
+.inv-jet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: rgba(5, 7, 15, 0.55);
+  border: 2px solid #1e293b;
+  width: 150px;
+  align-self: flex-start;
+}
+.inv-jet {
+  border-color: #3b1d1d;
+  width: 120px;
+}
+.inv-jet.has {
+  border-color: #f87171;
+}
+.inv-jet.drop-target {
+  border-color: #fde68a;
+  background: rgba(127, 29, 29, 0.5);
+}
+.inv-cap {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #cbd5e1;
+}
+.inv-lbl {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.inv-lbl.ok {
+  color: #86efac;
+}
+.inv-lbl.warn {
+  color: #fca5a5;
+}
+/* seznam v dosahu: dva sloupce, při mnoha troskách posuvný */
+.inv-list {
+  display: grid;
+  grid-template-columns: repeat(2, 58px);
+  gap: 3px;
+  max-height: 290px;
+  overflow-y: auto;
+  justify-content: center;
+  padding: 2px;
+}
+.inv-list .mod-hex {
+  width: 58px;
+  height: auto;
+}
+.inv-none {
+  font-size: 10px;
+  color: #64748b;
+  padding: 6px 0;
+}
+.inv-cargo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 2px solid #334155;
+  background: rgba(5, 7, 15, 0.4);
+}
+.inv-free.drop-target .mod-hex polygon,
+.inv-list .mod-hex.sel polygon:first-of-type {
+  stroke: #4ade80;
+}
+.inv-free.drop-target {
+  filter: drop-shadow(0 0 4px #4ade80);
+}
+.inv-planned {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 2px solid #4ade80;
+  padding: 2px 6px;
+}
+.inv-planned .inv-lbl {
+  max-width: 120px;
+}
+.inv-cancel {
+  font-size: 10px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.inv-drag {
+  cursor: grab;
+  touch-action: none;
+}
+.lo-svg .lo-g.inv-drag {
+  cursor: grab;
+}
+/* zvolený (vyhazovaný) modul v plástvi: červeně čárkovaně */
+.inv-pop .lo-g.sel polygon {
+  stroke: #f87171 !important;
+  stroke-dasharray: 4 4;
+}
+/* volný slot jako cíl tažení */
+.inv-pop .lo-g.empty.drop-target polygon {
+  stroke: #4ade80 !important;
+  stroke-dasharray: none;
+  fill: rgba(74, 222, 128, 0.15);
+}
+.inv-pop .lo-g.empty.drop-bad polygon {
+  stroke: #f87171 !important;
+}
+/* naplánované zvednutí + nasazení: hex přes volný slot (střed = střed slotu) */
+.inv-installed {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  z-index: 4;
+}
+.inv-installed .inv-lbl {
+  background: rgba(5, 7, 15, 0.85);
+  border: 1px solid #4ade80;
+  padding: 2px 4px;
+  max-width: 140px;
+}
+.inv-pop .lo-diagram {
+  position: relative;
 }

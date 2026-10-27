@@ -1715,6 +1715,28 @@ describe("náklad", () => {
     expect(r.state.debris.some((d) => d.module?.id === "c0")).toBe(true);
     // sanitizace: zvednutí je 1 akce
     expect(actionCost(g.ships[0], noFire(me.id, "m2a0", { type: "pickup", targetId: "d1" }))).toBe(1);
+    // zvednutí bez cíle (nic v dosahu) akci nestojí a při vyhodnocení se nic nestane
+    expect(actionCost(g.ships[0], noFire(me.id, "m2a0", { type: "pickup" }))).toBe(0);
+    const r5 = resolveTurn(g, [noFire(me.id, "m1a0", { type: "pickup" }), noFire(foe.id, "m1a0")], createRng(1));
+    expect(r5.events.some((e) => e.type === "pickup")).toBe(false);
+
+    // zvednout + nasadit opravářem: modul jde rovnou do volného slotu (za technologii), náklad může být plný
+    const g6 = structuredClone(g);
+    const me6 = g6.ships[0];
+    me6.loadout.modules = me6.loadout.modules.filter((x) => x.slot !== "back");
+    me6.loadout.modules.push({ id: "rep", type: "repair", slot: "left" });
+    me6.loadout.cargo = [{ id: "c0", type: "mine", slot: "front", ammo: 2 }];
+    me6.techPoints = 3;
+    const san = sanitizeOrders(g6, "p1", [noFire(me.id, "m1a0", { type: "pickup", targetId: "d1", installSlot: "back" })]);
+    expect(san[0].action).toEqual({ type: "pickup", targetId: "d1", installSlot: "back" });
+    r = resolveTurn(g6, [san[0], noFire(foe.id, "m3a0")], createRng(1));
+    expect(r.state.ships[0].loadout.modules.some((x) => x.id === "sc-x" && x.slot === "back")).toBe(true);
+    expect(r.state.ships[0].loadout.cargo?.length).toBe(1);
+    expect(r.state.ships[0].techPoints).toBe(2);
+    // bez opraváře se installSlot zahodí (obyčejné zvednutí)
+    const g7 = structuredClone(g);
+    const san7 = sanitizeOrders(g7, "p1", [noFire(me.id, "m1a0", { type: "pickup", targetId: "d1", installSlot: "back" })]);
+    expect((san7[0].action as { installSlot?: string }).installSlot).toBeUndefined();
   });
 });
 

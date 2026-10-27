@@ -1388,27 +1388,21 @@ export class Renderer {
         break;
       }
       case "launch": {
-        // záblesk u přídě + oblak výfuku, který se roztahuje dozadu
+        // krátký záblesk motoru torpéda + pár jisker dozadu (žádný rozpínající se kruh – vypadalo to jako výbuch)
         const f = forward(e.heading);
         ctx.save();
         ctx.globalAlpha = (1 - t) * 0.9;
         ctx.fillStyle = "#fff7ed";
         ctx.beginPath();
-        ctx.arc(e.x, e.y, 4 + 10 * t, 0, Math.PI * 2);
+        ctx.arc(e.x - f.x * 4, e.y - f.y * 4, 2 + 2 * (1 - t), 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = (1 - t) * 0.5;
-        ctx.fillStyle = "#cbd5e1";
-        for (let i = 0; i < 5; i++) {
-          const d = 8 + 40 * t * (0.5 + i / 5);
-          const sz = 3 + 4 * t;
-          ctx.fillRect(e.x - f.x * d - sz / 2 + ((i % 2) - 0.5) * 6 * f.y, e.y - f.y * d - sz / 2 - ((i % 2) - 0.5) * 6 * f.x, sz, sz);
+        ctx.globalAlpha = (1 - t) * 0.6;
+        ctx.fillStyle = e.color;
+        for (let i = 0; i < 4; i++) {
+          const d = 6 + 18 * t * (0.5 + i / 4);
+          const sz = 2;
+          ctx.fillRect(e.x - f.x * d - sz / 2 + ((i % 2) - 0.5) * 4 * f.y, e.y - f.y * d - sz / 2 - ((i % 2) - 0.5) * 4 * f.x, sz, sz);
         }
-        ctx.strokeStyle = e.color;
-        ctx.globalAlpha = 1 - t;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, 6 + 18 * t, 0, Math.PI * 2);
-        ctx.stroke();
         ctx.restore();
         break;
       }
