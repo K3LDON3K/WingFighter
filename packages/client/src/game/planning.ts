@@ -203,7 +203,6 @@ const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: 
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
   { label: "Pohyb", ids: ["move", "stop", "evade", "koiogran"] },
-  { label: "Speciální", ids: [] },
 ];
 const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
 const ACTION_ICON: Record<string, string> = { pickup: "cargo", move: "pen", stop: "stop", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
@@ -502,7 +501,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   for (const grp of ACTION_GROUPS) {
     const avail = grp.ids.map((id) => ACTIONS.find((x) => x.id === id)!).filter((a) => actionAvailable(a, ship));
     // skupina bez dostupných akcí se neukazuje; Loď = NÁKLAD (vyhodit / zvednout), Speciální = štít, skener, droid
-    if (avail.length === 0 && !(grp.label === "Speciální" && scannerModule(ship.loadout))) continue;
+    if (avail.length === 0) continue;
     const box = h("div", { class: "act-group" }, h("span", { class: "act-cap" }, label(grp.label)));
     const row = h("div", { class: "act-row" });
     for (const a of avail) {
@@ -683,40 +682,6 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           }
           pop.append(list);
           holder.append(pop);
-        }
-        row.append(holder);
-      }
-      const sc = scannerModule(ship.loadout);
-      if (sc) {
-        const tech = ship.techPoints;
-        const holder = h("div", { class: "scan-holder" });
-        holder.append(
-          h(
-            "button",
-            {
-              class: `px bb-weapon scan-btn ${m.scanOpen && !stormed ? "on" : ""} ${stormed ? "stormed" : ""} ${tech < SCANNER.shipCost ? "cool" : ""}`,
-              disabled: locked || stormed || tech < Math.min(SCANNER.shipCost, SCANNER.deepCost),
-              ...tipAttr({ ...actionTip("scanner", ship, o, man), note: `technologie ${tech}/${ship.stats.techMax} · nebere akci · v bouři nefunguje`, ...(tech < Math.min(SCANNER.shipCost, SCANNER.deepCost) ? { warn: "Nelze: nedostatek technologie." } : {}) }),
-              onclick: () => cb.scanToggle(ship.id),
-            },
-            icon("scan", "currentColor", 22),
-            h("span", { class: "lbl" }, label("Skener")),
-            stormed ? h("span", { class: "sb" }, "⚡") : null,
-          ),
-        );
-        if (m.scanOpen && !stormed) {
-          const predictOn = botPredictActive(m.state, m.myId);
-          // dvě tlačítka vyjedou nad tlačítko skeneru (přes okraj lišty), stejně velká jako ono
-          const cost = (n: number) => costPipsAll({ tech: n }, false, `${n} ${n === 1 ? "bod" : "body"} technologie (nebere akci)`);
-          holder.append(
-            h(
-              "div",
-              { class: `scan-pop ${popClass(`scan:${ship.id}`)}` },
-              h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || tech < SCANNER.shipCost, ...tipAttr({ ...actionTip("scan-ship", ship, o, man), ...(tech < SCANNER.shipCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(SCANNER.shipCost)),
-              h("button", { class: "px bb-weapon sm", disabled: locked || tech < SCANNER.deepCost, ...tipAttr({ ...actionTip("scan-deep", ship, o, man), ...(tech < SCANNER.deepCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(SCANNER.deepCost)),
-              h("button", { class: `px bb-weapon sm ${predictOn ? "done" : ""}`, disabled: locked || predictOn || tech < SCANNER.predictCost, ...tipAttr({ ...actionTip("scan-predict", ship, o, man), ...(predictOn ? { note: `předpověď běží do kola ${m.state.botPredict?.[m.myId] ?? 0}` } : tech < SCANNER.predictCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scan(ship.id, "predict") }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Manévry")), predictOn ? h("span", { class: "reset-strip" }, label("běží")) : cost(SCANNER.predictCost)),
-            ),
-          );
         }
         row.append(holder);
       }
@@ -1212,6 +1177,7 @@ export function renderInventoryBar(root: HTMLElement, m: PlanningModel, cb: Plan
   const tgtStation = pickTgt ? (m.state.stations ?? []).find((x) => x.id === pickTgt) : undefined;
   root.append(h("div", { class: "cap" }, label("Loď")));
   renderShieldButton(root, m, cb, ship, o, locked);
+  renderScannerButton(root, m, cb, ship, o, locked);
   const holder = h("div", { class: `scan-holder ${m.cargoOpen ? "stack" : ""}` });
   holder.append(
     h(
@@ -1634,4 +1600,45 @@ function renderShieldButton(root: HTMLElement, m: PlanningModel, cb: PlanningCal
     ),
   );
   root.append(holder);
+}
+
+/** Tlačítko SKENER v segmentu LOĎ: podtlačítka (sken lodi · hluboký sken · manévry botů) vyjedou vlevo. */
+function renderScannerButton(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks, ship: Ship, o: ShipOrders, locked: boolean) {
+  const man = resolveManeuver(profileFor(ship, o), o.maneuverId, ship.speed);
+  const stormed = inStorm(m.state, ship);
+  const row = root;
+  const sc = scannerModule(ship.loadout);
+  if (sc) {
+        const tech = ship.techPoints;
+        const holder = h("div", { class: "scan-holder" });
+        holder.append(
+          h(
+            "button",
+            {
+              class: `px bb-weapon scan-btn ${m.scanOpen && !stormed ? "on" : ""} ${stormed ? "stormed" : ""} ${tech < SCANNER.shipCost ? "cool" : ""}`,
+              disabled: locked || stormed || tech < Math.min(SCANNER.shipCost, SCANNER.deepCost),
+              ...tipAttr({ ...actionTip("scanner", ship, o, man), note: `technologie ${tech}/${ship.stats.techMax} · nebere akci · v bouři nefunguje`, ...(tech < Math.min(SCANNER.shipCost, SCANNER.deepCost) ? { warn: "Nelze: nedostatek technologie." } : {}) }),
+              onclick: () => cb.scanToggle(ship.id),
+            },
+            icon("scan", "currentColor", 22),
+            h("span", { class: "lbl" }, label("Skener")),
+            stormed ? h("span", { class: "sb" }, "⚡") : null,
+          ),
+        );
+        if (m.scanOpen && !stormed) {
+          const predictOn = botPredictActive(m.state, m.myId);
+          // dvě tlačítka vyjedou nad tlačítko skeneru (přes okraj lišty), stejně velká jako ono
+          const cost = (n: number) => costPipsAll({ tech: n }, false, `${n} ${n === 1 ? "bod" : "body"} technologie (nebere akci)`);
+          holder.append(
+            h(
+              "div",
+              { class: `scan-pop ${popClass(`scan:${ship.id}`)}` },
+              h("button", { class: `px bb-weapon sm ${m.scanPick ? "on" : ""}`, disabled: locked || tech < SCANNER.shipCost, ...tipAttr({ ...actionTip("scan-ship", ship, o, man), ...(tech < SCANNER.shipCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scanPickTarget(ship.id, !m.scanPick) }, icon("ship", "currentColor", 22), h("span", { class: "lbl" }, label("Sken lodi")), cost(SCANNER.shipCost)),
+              h("button", { class: "px bb-weapon sm", disabled: locked || tech < SCANNER.deepCost, ...tipAttr({ ...actionTip("scan-deep", ship, o, man), ...(tech < SCANNER.deepCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scan(ship.id, "deep") }, icon("deep", "currentColor", 22), h("span", { class: "lbl" }, label("Vesmír")), cost(SCANNER.deepCost)),
+              h("button", { class: `px bb-weapon sm ${predictOn ? "done" : ""}`, disabled: locked || predictOn || tech < SCANNER.predictCost, ...tipAttr({ ...actionTip("scan-predict", ship, o, man), ...(predictOn ? { note: `předpověď běží do kola ${m.state.botPredict?.[m.myId] ?? 0}` } : tech < SCANNER.predictCost ? { warn: "Nelze: nedostatek technologie." } : {}) }), onclick: () => cb.scan(ship.id, "predict") }, icon("turn", "currentColor", 22), h("span", { class: "lbl" }, label("Manévry")), predictOn ? h("span", { class: "reset-strip" }, label("běží")) : cost(SCANNER.predictCost)),
+            ),
+          );
+        }
+        row.append(holder);
+      }
 }

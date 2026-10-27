@@ -5947,3 +5947,27 @@ body.drag-on * {
   padding: 1px 8px;
   white-space: nowrap;
 }
+/* skener v segmentu LOĎ: podtlačítka vyjedou vlevo (sloupec), jako u droidů */
+.invbar .scan-holder .scan-pop {
+  bottom: auto;
+  left: auto;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  flex-direction: column;
+  gap: 4px;
+  animation: flyin 0.22s steps(4, end) both;
+}
+.invbar .scan-holder .scan-pop::after {
+  left: auto;
+  bottom: auto;
+  right: -12px;
+  top: 50%;
+  width: 12px;
+  height: 4px;
+  margin: -2px 0 0;
+}
+.invbar .scan-holder .scan-pop .bb-weapon {
+  width: 72px;
+  height: 52px;
+}
