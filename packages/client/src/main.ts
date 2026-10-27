@@ -517,6 +517,16 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
     const clamped = Math.sign(angle) * Math.min(Math.abs(angle), max);
     man = makeManeuver(profile, speed, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, koiogran, ship.speed, st);
   }
+  if (!man) {
+    // rychlost mimo možnosti motoru (např. bitevník z 0 jen na 1, příliš velká změna rychlosti): vzít nejbližší povolenou směrem k současné rychlosti
+    const dir = Math.sign(ship.speed - speed) || -1;
+    for (let sp = speed + dir; sp >= 0 && sp <= profile.maxSpeed && sp !== ship.speed + dir; sp += dir) {
+      const max = profile.maxAngle[sp] ?? 0;
+      const clamped = Math.sign(angle) * Math.min(Math.abs(angle), max);
+      man = makeManeuver(profile, sp, Math.round(clamped / ANGLE_STEP) * ANGLE_STEP, koiogran, ship.speed, st && sp >= 1 && sp <= profile.stopMax);
+      if (man) break;
+    }
+  }
   if (!man) return false;
   // bez volných stresových bodů se manévr vůbec nenabízí (dřív šel vybrat a jen se neprovedl)
   if (effStressCost(man, o) > ship.stressPoints) return false;
