@@ -1167,7 +1167,7 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
         onclick: () => cb.droidToggle(ship.id),
       },
       icon("bot", "currentColor", 22),
-      h("span", { class: "lbl" }, label("Droid")),
+      h("span", { class: "lbl" }, label("Pilot")),
       anyOn ? costPipsAll({ tech: planned }, true, `v plánu: ${planned} technologie`) : null,
       anyOn && !open ? h("span", { class: "reset-strip" }, label(`${[od.overdrive ? "overdrive" : "", od.autopilot ? "autopilot" : ""].filter(Boolean).join(" + ")}`)) : null,
       stormed ? h("span", { class: "sb" }, "⚡") : null,
