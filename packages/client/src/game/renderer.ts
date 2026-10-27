@@ -433,9 +433,9 @@ export class Renderer {
   private drawHitboxes(view: ViewModel) {
     const ctx = this.ctx;
     ctx.save();
-    ctx.strokeStyle = "rgba(248,113,113,0.9)";
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = "rgba(248,113,113,0.95)";
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([5, 3]);
     for (const t of view.torpedoes) {
       ctx.beginPath();
       ctx.arc(t.x, t.y, TORPEDO.radius, 0, Math.PI * 2);
@@ -540,8 +540,8 @@ export class Renderer {
     // ladění: kolizní obrys (o pár % menší než obrázek)
     const ctx = this.ctx;
     ctx.save();
-    ctx.strokeStyle = "rgba(248,113,113,0.9)";
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(248,113,113,0.95)";
+    ctx.lineWidth = 2.5;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
     const n = a.profile.length;
@@ -915,18 +915,6 @@ export class Renderer {
     const hovered = overlay.hoverId === s.id;
     const targeted = overlay.targetId === s.id;
 
-    if (overlay.showHitboxes) {
-      // ladění: kolizní model (kruhy v souřadnicích lodi)
-      ctx.save();
-      ctx.strokeStyle = "rgba(74,222,128,0.85)";
-      ctx.lineWidth = 1;
-      for (const c of shipCircles(s, s.colliders)) {
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
     const weapons = overlay.targetWeapons?.[s.id];
     if (weapons?.length) this.marks.push({ x: s.x, y: s.y, r: s.radius, weapons });
     else if (targeted || ((selected || hovered) && overlay.showSelectRing)) {
@@ -1001,6 +989,20 @@ export class Renderer {
     }
     // vybraná vlastní loď: pulzující bílý překryv siluety (varianta A)
     if (selected && s.alive) drawSprite(ctx, this.sprites.shipSilhouette(s.hullId, s.team), s.x, s.y, s.heading, 0.3 + 0.2 * Math.sin(now / 260));
+    if (overlay.showHitboxes) {
+      // ladění: kolizní model (kruhy v souřadnicích lodi) – přes sprite, ať je vidět
+      ctx.save();
+      ctx.strokeStyle = "rgba(74,222,128,0.95)";
+      ctx.fillStyle = "rgba(74,222,128,0.12)";
+      ctx.lineWidth = 2;
+      for (const c of shipCircles(s, s.colliders)) {
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     if (this.stormsRef && pointInStorm(this.stormsRef, s)) drawStormSparks(ctx, s.x, s.y, s.radius, now);
 
     ctx.save();
