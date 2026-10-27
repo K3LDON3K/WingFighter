@@ -16,6 +16,7 @@ import {
   FACING_NAMES,
   inStorm,
   SCANNER,
+  STATION,
   scannerModule,
   shieldRechargeBlocked,
   shieldRechargeRoom,
@@ -62,6 +63,15 @@ import {
   hackCost,
   type HackOrder,
   type ModuleType,
+  type AmmoType,
+  AMMO_TYPES,
+  storeModules,
+  storeCapacity,
+  storeAmmo,
+  storeRoom,
+  storeRefillCost,
+  storeRepairUnit,
+  weaponAmmo,
   MODULE_TYPES,
   stationInPickupRange,
   type RepairOrder,
@@ -97,7 +107,7 @@ export interface PlanningCallbacks {
   cancelAction(shipId: string): void;
   /** Komunikace se stanicí: okénko, objednávka modulu. */
   commToggle(shipId: string): void;
-  commOrder(shipId: string, stationId: string, moduleType: ModuleType): void;
+  commOrder(shipId: string, stationId: string, moduleType: ModuleType | undefined, ammoType?: AmmoType): void;
   aim(shipId: string): void;
   /** ✕ pod MANÉVR: při kreslení vrátí původní dráhu, jinak nastaví rovně stejnou rychlostí (zdarma). */
   cancelManeuver(shipId: string): void;
@@ -425,7 +435,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
 
   /* ---- 1b. výzbroj: munice každého modulu ---- */
   // všechny moduly: zbraně s municí, ostatní jen se stavem; každý má ukazatel životů (zničený = červený, nefunguje)
-  const ammoMods = [...ship.loadout.modules].sort((a, b) => Number(b.ammo !== undefined || b.type === "laser") - Number(a.ammo !== undefined || a.type === "laser"));
+  const ammoMods = [...ship.loadout.modules].sort((a, b) => Number(b.ammo !== undefined || b.type === "laser" || b.type === "ammostore") - Number(a.ammo !== undefined || a.type === "laser" || a.type === "ammostore"));
   // víc než 4 moduly: kompaktní řádky (nižší dlaždice, munice číslem), aby se vešly všechny
   const many = ammoMods.length > 4;
   const weapons = h("div", { class: `pnl bb-ammo ${many ? "compact" : ""}` }, h("div", { class: "ttl" }, label("Výzbroj")));
@@ -454,7 +464,9 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     const nameFull = `${def.name}${typeCount[md.type] > 1 ? ` ${counters[md.type]}` : ""}${md.facing ? ` – ${FACING_NAMES[md.facing]}` : ""}`;
     const hp = moduleHp(md);
     const hpTxt = broken ? "ZNIČENÝ – nefunguje" : `životy ${hp}/${moduleMaxHp(md.type)}`;
-    const ammoTxt = md.type === "laser" ? "bez munice (střílí každé kolo)" : md.ammo !== undefined ? `munice ${left}/${max}` : "";
+    const stA = def.ammo ? storeAmmo(ship.loadout, md.type as AmmoType) : 0;
+    const storeTxt = md.type === "ammostore" ? AMMO_TYPES.filter((t) => storeCapacity(ship.loadout, t) > 0 || (md.store?.[t] ?? 0) > 0).map((t) => `${MODULES[t].name} ${md.store?.[t] ?? 0}/${storeCapacity(ship.loadout, t)}`).join(" · ") : "";
+    const ammoTxt = md.type === "laser" ? "bez munice (střílí každé kolo)" : md.type === "ammostore" ? `sklad: ${storeTxt || "bez zbraní s municí"}` : md.ammo !== undefined ? `munice ${left}/${max}${stA ? ` + ${stA} ve skladu` : ""}` : "";
     const tile = h("span", { class: `wtile ${broken ? "dead" : ""}` }, icon(def.icon, broken ? "#f87171" : (WEAPON_COL[md.type] ?? "#e2e8f0"), 12), md.facing ? h("span", { class: "wfac" }, FACING_GLYPH[md.facing]) : null);
     const icons = h("span", { class: "ammo-icons" });
     if (!broken) {
@@ -467,6 +479,12 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     if (many && !broken && md.ammo !== undefined && md.type !== "laser") {
       // kompaktní řádek: munice číslem místo ikon
       icons.replaceChildren(h("span", { class: "ammo-num", style: `color:${left === 0 ? "#f87171" : "#e2e8f0"}` }, `${left}/${max}`));
+    }
+    if (!broken && md.ammo !== undefined && stA > 0) icons.append(h("span", { class: "ammo-num", style: "color:#fbbf24", title: `+${stA} ve skladu munice` }, `+${stA}`));
+    if (md.type === "ammostore") {
+      // sklad: rozpis po druzích (zkratka a počet)
+      icons.replaceChildren(...AMMO_TYPES.filter((t) => storeCapacity(ship.loadout, t) > 0 || (md.store?.[t] ?? 0) > 0).map((t) => h("span", { class: "ammo-num", style: `color:${broken ? "#f87171" : (md.store?.[t] ?? 0) > 0 ? "#fbbf24" : "#64748b"}` }, `${MODULES[t].short} ${broken ? 0 : md.store?.[t] ?? 0}`)));
+      if (!icons.childElementCount) icons.append(h("span", { class: "muted" }, "–"));
     }
     weapons.append(h("div", { class: `ammo-row ${broken ? "broken" : ""}`, title: `${nameFull}\n${hpTxt}${ammoTxt ? `\n${ammoTxt}` : ""}` }, hpGauge(md), tile, icons));
   }
@@ -517,7 +535,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           const on = !!shot;
           const isActive = on && m.activeShot === mod.id;
           const destroyed = !moduleWorking(mod);
-          const noAmmo = type === "mg" && (mod.ammo ?? 0) <= 0;
+          const noAmmo = type === "mg" && weaponAmmo(ship.loadout, mod) <= 0;
+          const stAmmo = MODULES[type].ammo ? storeAmmo(ship.loadout, type as AmmoType) : 0;
           const noAp = !on && actionCost(ship, o) >= actionPointsOf(ship);
           const why = destroyed ? "ZNIČENO – modul nefunguje" : stormOff ? "systém je v bouři mimo provoz" : noAmmo ? "došly náboje" : noAp ? `žádná volná akce (max. ${actionPointsOf(ship)} za kolo)` : null;
           const name = `${MODULES[type].name}${mods.length > 1 ? ` ${i + 1}` : ""} · ${FACING_NAMES[mod.facing ?? "front"]}`;
@@ -537,7 +556,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             },
             costPipsAll({ actions: 1 }, on, "stojí 1 akci"),
             icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
-            h("span", { class: "lbl" }, label(small ? `${i + 1}` : type === "laser" ? "Lasery" : "Kulomet"), h("span", { class: "wfac" }, FACING_GLYPH[mod.facing ?? "front"]), small ? h("span", { class: "wammo" }, mod.ammo !== undefined ? ` ${mod.ammo}` : "") : null),
+            h("span", { class: "lbl" }, label(small ? `${i + 1}` : type === "laser" ? "Lasery" : "Kulomet"), h("span", { class: "wfac" }, FACING_GLYPH[mod.facing ?? "front"]), small ? h("span", { class: "wammo" }, mod.ammo !== undefined ? ` ${mod.ammo}${stAmmo ? `+${stAmmo}` : ""}` : "") : null),
             on ? h("span", { class: "shot-tick" }, "✓") : null,
             stormOff ? h("span", { class: "sb" }, "⚡") : null,
             destroyed ? h("span", { class: "dead-x" }, "✕") : null,
@@ -643,49 +662,6 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         );
       row.append(wbtn);
     }
-    if (grp.label === "Speciální") {
-      // Komunikace se stanicí: funkční stanice v dohledu → objednávka modulu (1 akce, cena jako v obchodě)
-      const stnComm = (m.state.stations ?? []).filter((x) => !x.broken && dist(ship, x) <= ship.stats.vision + x.radius);
-      if (stnComm.length) {
-        const commOn = o.action?.type === "comm";
-        const credits = m.state.players.find((p) => p.id === m.myId)?.credits ?? 0;
-        const allowed = m.state.settings.allowedModules ?? {};
-        const busy = stnComm.every((x) => x.orderedTurn === m.state.turn);
-        const holder = h("div", { class: `scan-holder ${m.commOpen ? "stack" : ""}` });
-        const cur = commOn ? (o.action as { moduleType: ModuleType }).moduleType : undefined;
-        holder.append(
-          h(
-            "button",
-            {
-              class: `px bb-weapon ${commOn ? "done" : ""} ${m.commOpen ? "on open" : ""} ${dotsFor("comm") ? "spent" : ""}`,
-              disabled: locked || busy,
-              ...tipAttr({ icon: "scan", iconColor: "#a5f3fc", title: "Komunikace se stanicí", cost: { actions: 1 }, fx: [{ icon: "credits", text: "objednáš modul za cenu z obchodu" }, { icon: "debris", text: "stanice ho vypustí jako trosky směrem k tobě – sebrat ho může kdokoliv" }], note: busy ? "stanice už tento kolo objednávku vyřídila" : `kredity ${credits} · 1 objednávka na stanici za kolo · funkční stanice v dohledu: ${stnComm.length}`, ...(busy ? { warn: "Nelze: linka obsazena." } : {}) }),
-              onclick: () => (commOn && !m.commOpen ? cb.cancelAction(ship.id) : cb.commToggle(ship.id)),
-            },
-            costPips(1, dotsFor("comm") ? "spent" : "red", "stojí 1 akci"),
-            icon("scan", "currentColor", 22),
-            h("span", { class: "lbl" }, label(commOn ? "Objednáno" : "Komunikace")),
-            commOn && !m.commOpen ? h("span", { class: "reset-strip" }, label(`${MODULES[cur!].short} ↺`)) : null,
-          ),
-        );
-        if (m.commOpen && !locked) {
-          const pop = h("div", { class: "cargo-pop comm-pop" });
-          pop.append(h("div", { class: "jp-head" }, icon("credits", "#fbbf24", 12), label(`kredity ${credits} · stanice vypustí modul k tobě na konci kola`)));
-          const list = h("div", { class: "comm-list" });
-          for (const t of MODULE_TYPES) {
-            if (allowed[t] === 0) continue;
-            const def = MODULES[t];
-            const can = credits >= def.price;
-            list.append(
-              h("button", { class: `px rmod ${cur === t ? "on" : ""}`, disabled: !can, title: can ? `${def.name}: objednat za ${def.price} kreditů` : `${def.name}: nedostatek kreditů (${def.price})`, onclick: () => cb.commOrder(ship.id, stnComm[0].id, t) }, icon(def.icon, moduleColor(t), 14), h("span", { class: "lbl" }, label(def.name)), h("span", { class: "rx" }, icon("credits", "#fbbf24", 10), ` ${def.price}`)),
-            );
-          }
-          pop.append(list);
-          holder.append(pop);
-        }
-        row.append(holder);
-      }
-    }
     box.append(row);
     (grp.label === "Zbraně" ? rowTop : rowBot).append(box);
   }
@@ -701,7 +677,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
       { class: "segs-btn", title: `Ze kterého modulu (${MODULES[type].name}) – jeden za akci` },
       ...mods.map((m, i) =>
         moduleWorking(m)
-          ? seg(`${i + 1}${FACING_GLYPH[m.facing ?? "front"]}${m.ammo !== undefined ? `·${m.ammo}` : ""}`, m.id === currentId, `${MODULES[type].name} ${i + 1} – ${FACING_NAMES[m.facing ?? "front"]}${m.ammo !== undefined ? ` (munice ${m.ammo})` : ""}`, () => onPick(m.id))
+          ? seg(`${i + 1}${FACING_GLYPH[m.facing ?? "front"]}${m.ammo !== undefined ? `·${m.ammo}${MODULES[type].ammo && storeAmmo(ship.loadout, type as AmmoType) ? `+${storeAmmo(ship.loadout, type as AmmoType)}` : ""}` : ""}`, m.id === currentId, `${MODULES[type].name} ${i + 1} – ${FACING_NAMES[m.facing ?? "front"]}${m.ammo !== undefined ? ` (munice ${m.ammo})` : ""}`, () => onPick(m.id))
           : h("button", { class: "px seg destroyed", disabled: true, title: `${MODULES[type].name} ${i + 1} – ${FACING_NAMES[m.facing ?? "front"]}: ZNIČENÝ – nefunguje` }, `${i + 1}${FACING_GLYPH[m.facing ?? "front"]}`, h("span", { class: "dead-x" }, "✕")),
       ),
     );
@@ -1030,6 +1006,8 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
     if (open) {
       const fixable = repairableModules(ship);
       const ammoable = ammoModules(ship);
+      // sklad munice: každý druh s volným místem zvlášť (+1 kus, náboje po dávce)
+      const storeable = storeModules(ship.loadout).flatMap((st) => AMMO_TYPES.filter((t) => (st.store?.[t] ?? 0) < storeCapacity(ship.loadout, t)).map((t) => ({ st, t })));
       const hullAdd = repairHullAmount(ship);
       const cargo = ship.loadout.cargo ?? [];
       const tab = (k: RepairOrder["kind"], ic: string, name: string, avail: boolean, note: string) => {
@@ -1040,7 +1018,7 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
       const running = ship.autoRepair ?? 0;
       subs = [
         tab("module", "wrench", "Modul", fixable.length > 0, `plně opraví vybraný modul (i zničený) · ${REPAIR.moduleCost} body technologie`),
-        tab("ammo", "torpedo", "Munice", ammoable.length > 0, `vyrobí 1 náboj do torpédometu nebo min · ${REPAIR.ammoCost} body technologie`),
+        tab("ammo", "torpedo", "Munice", ammoable.length + storeable.length > 0, `vyrobí 1 náboj do torpédometu nebo min (i do skladu munice; náboje do skladu po dávce) · ${REPAIR.ammoCost} body technologie`),
         tab("hull", "hull", "Trup", hullAdd > 0, `opraví trup o ${REPAIR.hullPct} % maxima (${Math.max(0, hullAdd)}) · ${REPAIR.hullCost} body technologie`),
         tab("auto", "hull", "Oprava", running <= 0 && ship.hull < ship.stats.hull, `pasivní oprava: ${REPAIR.autoTurns} kola po ${REPAIR.autoPct} % trupu za kolo (jen dokud opravář funguje) · ${REPAIR.autoCost} body technologie${running > 0 ? ` · už běží (zbývá ${running} kol)` : ""}`),
       ];
@@ -1050,7 +1028,8 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
         panel = panelEl("Opravit modul – který?", fixable.length ? hexes : h("div", { class: "muted" }, label("žádný poškozený modul")));
       } else if (kind === "ammo") {
         const hexes = h("div", { class: "dr-hexes" }, ...ammoable.map((x) => moduleStateHex(x, { sub: `${x.ammo ?? 0}/${MODULES[x.type].ammo}`, title: `${MODULES[x.type].name} (${slotName(x.slot)}): +1 náboj (${x.ammo ?? 0} → ${(x.ammo ?? 0) + 1}) za ${REPAIR.ammoCost} body technologie`, onClick: locked ? undefined : () => cb.repair(ship.id, { kind: "ammo", moduleId: x.id }) })));
-        panel = panelEl("Vyrobit náboj – kam?", ammoable.length ? hexes : h("div", { class: "muted" }, label("všechny zásobníky plné")));
+        for (const { st, t } of storeable) hexes.append(moduleStateHex({ ...st, type: t }, { sub: `SKLAD ${st.store?.[t] ?? 0}/${storeCapacity(ship.loadout, t)}`, subColor: "#fbbf24", title: `Sklad munice (${slotName(st.slot)}) – ${MODULES[t].name}: +${storeRepairUnit(t)} (${st.store?.[t] ?? 0} → ${Math.min(storeCapacity(ship.loadout, t), (st.store?.[t] ?? 0) + storeRepairUnit(t))}) za ${REPAIR.ammoCost} body technologie`, onClick: locked ? undefined : () => cb.repair(ship.id, { kind: "ammo", moduleId: st.id, ammoType: t }) }));
+        panel = panelEl("Vyrobit náboj – kam?", ammoable.length + storeable.length ? hexes : h("div", { class: "muted" }, label("všechny zásobníky plné")));
       } else if (kind === "hull") {
         panel = panelEl(
           "Opravit trup",
@@ -1178,6 +1157,7 @@ export function renderInventoryBar(root: HTMLElement, m: PlanningModel, cb: Plan
   root.append(h("div", { class: "cap" }, label("Loď")));
   renderShieldButton(root, m, cb, ship, o, locked);
   renderScannerButton(root, m, cb, ship, o, locked);
+  renderCommButton(root, m, cb, ship, o, locked);
   const holder = h("div", { class: `scan-holder ${m.cargoOpen ? "stack" : ""}` });
   holder.append(
     h(
@@ -1641,4 +1621,70 @@ function renderScannerButton(root: HTMLElement, m: PlanningModel, cb: PlanningCa
         }
         row.append(holder);
       }
+}
+
+/** Komunikace se stanicí (segment LOĎ): objednávka modulu (1 akce) a nákup munice do skladu (v okruhu sběru, 1 akce). */
+function renderCommButton(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks, ship: Ship, o: ShipOrders, locked: boolean) {
+  const acts = actionList(ship, o);
+  const spent = acts.some((a) => a.id === "comm");
+  const stnComm = (m.state.stations ?? []).filter((x) => !x.broken && dist(ship, x) <= ship.stats.vision + x.radius);
+  if (!stnComm.length) return;
+  const commOn = o.action?.type === "comm";
+  const credits = m.state.players.find((p) => p.id === m.myId)?.credits ?? 0;
+  const allowed = m.state.settings.allowedModules ?? {};
+  const busy = stnComm.every((x) => x.orderedTurn === m.state.turn);
+  const holder = h("div", { class: `scan-holder ${m.commOpen ? "stack" : ""}` });
+  const curMod = commOn && "moduleType" in o.action! ? o.action.moduleType : undefined;
+  const curAmmo = commOn && "ammoType" in o.action! ? o.action.ammoType : undefined;
+  // munice do skladu: loď v okruhu sběru stanice (rychlost ≤ 2) a nainstalovaný funkční sklad
+  const stores = storeModules(ship.loadout);
+  const stnNear = stnComm.find((x) => dist(ship, x) <= x.radius + STATION.pickupRange);
+  const ammoWhy = !stores.length ? "loď nemá nainstalovaný sklad munice" : !stnNear ? "loď není v okruhu sběru stanice" : ship.speed > CARGO.maxSpeed ? `loď je moc rychlá (max. ${CARGO.maxSpeed})` : null;
+  const stripTxt = curAmmo ? `${MODULES[curAmmo].short} → SKLAD ↺` : curMod ? `${MODULES[curMod].short} ↺` : "";
+  holder.append(
+    h(
+      "button",
+      {
+        class: `px bb-weapon ${commOn ? "done" : ""} ${m.commOpen ? "on open" : ""} ${spent ? "spent" : ""}`,
+        disabled: locked || (busy && !stores.length),
+        ...tipAttr({ icon: "scan", iconColor: "#a5f3fc", title: "Komunikace se stanicí", cost: { actions: 1 }, fx: [{ icon: "credits", text: "objednáš modul za cenu z obchodu" }, { icon: "debris", text: "stanice ho vypustí jako trosky směrem k tobě (zvedne kdokoliv)" }, { icon: "crate", text: "v okruhu sběru (rychlost ≤ 2): munice do skladu, naskladní se hned" }], note: `kredity ${credits} · stanice vyřídí 1 objednávku modulu za kolo`, ...(busy ? { warn: "Objednávky modulů: linka je v tomto kole obsazená." } : {}) }),
+        onclick: () => (commOn && !m.commOpen ? cb.cancelAction(ship.id) : cb.commToggle(ship.id)),
+      },
+      costPips(1, spent ? "spent" : "red", "stojí 1 akci"),
+      icon("scan", "currentColor", 22),
+      h("span", { class: "lbl" }, label(commOn ? "Objednáno" : "Komunikace")),
+      commOn && !m.commOpen ? h("span", { class: "reset-strip" }, label(stripTxt)) : null,
+    ),
+  );
+  if (m.commOpen && !locked) {
+    const pop = h("div", { class: `cargo-pop comm-pop ${popClass(`comm:${ship.id}`)}` });
+    pop.append(h("div", { class: "jp-head" }, icon("credits", "#fbbf24", 12), label(`kredity ${credits} · stanice vypustí modul k tobě na začátku kola`)));
+    const list = h("div", { class: "comm-list" });
+    for (const t of MODULE_TYPES) {
+      if (allowed[t] === 0) continue;
+      const def = MODULES[t];
+      const can = credits >= def.price && !busy;
+      list.append(
+        h("button", { class: `px rmod ${curMod === t ? "on" : ""}`, disabled: !can, title: busy ? `${def.name}: linka je v tomto kole obsazená` : can ? `${def.name}: objednat za ${def.price} kreditů` : `${def.name}: nedostatek kreditů (${def.price})`, onclick: () => cb.commOrder(ship.id, stnComm[0].id, t) }, icon(def.icon, moduleColor(t), 14), h("span", { class: "lbl" }, label(def.name)), h("span", { class: "rx" }, icon("credits", "#fbbf24", 10), ` ${def.price}`)),
+      );
+    }
+    pop.append(list);
+    // munice do skladu
+    pop.append(h("div", { class: "jp-head" }, icon("crate", "#fbbf24", 12), label("munice do skladu · naskladní se hned na začátku kola"), ammoWhy ? h("span", { class: "warn" }, label(` · ${ammoWhy}`)) : null));
+    const alist = h("div", { class: "comm-list" });
+    for (const t of AMMO_TYPES) {
+      const def = MODULES[t];
+      const cap = storeCapacity(ship.loadout, t) * stores.length;
+      if (!cap) continue;
+      const have = storeAmmo(ship.loadout, t);
+      const room = storeRoom(ship.loadout, t);
+      const price = storeRefillCost(ship.loadout, t);
+      const can = !ammoWhy && room > 0 && credits >= price;
+      const title = ammoWhy ? `${def.name}: ${ammoWhy}` : room <= 0 ? `${def.name}: sklad je plný` : credits < price ? `${def.name}: nedostatek kreditů (${price})` : `${def.name}: doplnit sklad o ${room} ks za ${price} kreditů`;
+      alist.append(h("button", { class: `px rmod ${curAmmo === t ? "on" : ""}`, disabled: !can, title, onclick: () => cb.commOrder(ship.id, (stnNear ?? stnComm[0]).id, undefined, t) }, icon(def.icon, moduleColor(t), 14), h("span", { class: "lbl" }, label(`${def.name} ${have}/${cap}`)), h("span", { class: "rx" }, icon("credits", "#fbbf24", 10), ` ${price}`)));
+    }
+    pop.append(alist);
+    holder.append(pop);
+  }
+  root.append(holder);
 }

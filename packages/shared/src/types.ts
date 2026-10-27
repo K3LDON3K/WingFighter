@@ -53,6 +53,7 @@ export type ActionOrder =
   | { type: "turn"; heading: number }
   /** Komunikace s funkční stanicí v dohledu: objednávka modulu (cena jako v obchodě); stanice ho vypustí jako trosky směrem k volajícímu. */
   | { type: "comm"; stationId: string; moduleType: ModuleType }
+  | { type: "comm"; stationId: string; ammoType: AmmoType }
   | { type: "barrelRoll"; side: Side };
 
 export type ShieldType = "whole" | "segment" | "none";
@@ -99,7 +100,7 @@ export type HackOrder =
 /** Úkon droida opraváře (provádí se hned, platí se technologií). */
 export type RepairOrder =
   | { kind: "module"; moduleId: string }
-  | { kind: "ammo"; moduleId: string }
+  | { kind: "ammo"; moduleId: string; ammoType?: AmmoType }
   | { kind: "hull" }
   | { kind: "install"; moduleId: string; slot: SlotId; facing?: Facing }
   /** Nainstalovaný modul do nákladu (odpojení). */
@@ -124,7 +125,9 @@ export interface DroidOrder {
 /** Sloty stíhače. */
 /** Sloty: stíhač příď/záď/levobok/pravobok; bitevník navíc levá a pravá gondola. */
 export type SlotId = "front" | "back" | "left" | "right" | "podLeft" | "podRight";
-export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg" | "droid" | "repair" | "hacker";
+export type ModuleType = "laser" | "torpedo" | "mine" | "shield-segment" | "shield-whole" | "scanner" | "mg" | "droid" | "repair" | "hacker" | "ammostore";
+/** Druhy munice (zbraně s municí) – sklad munice je nese navíc. */
+export type AmmoType = "torpedo" | "mine" | "mg";
 
 /** Trup lodi – nese moduly ve slotech. */
 export interface HullDef {
@@ -228,6 +231,8 @@ export interface ModuleInstance {
   repair?: boolean;
   /** Hacknutý na toto kolo (droid hacker protivníka): nevystřelí / nechrání / nejde použít. Vlastní tým to nevidí. */
   hacked?: boolean;
+  /** Sklad munice: zásoba navíc podle druhu (kapacita = munice nainstalovaných zbraní daného druhu). Spotřebovává se před municí ve zbrani; zničení skladu ji zničí. */
+  store?: Partial<Record<AmmoType, number>>;
   /** Zastaralé (skener dřív míval náboje a cooldown; teď čerpá technologii lodi). */
   charges?: number;
   cooldown?: number;
@@ -601,7 +606,7 @@ export type TurnEvent =
   /** Zvednutí nákladu: ok = zvednuto; jinak důvod (lost = předmět uchvátila jiná loď). */
   | { type: "pickup"; shipId: string; debrisId: string; x: number; y: number; ok: boolean; reason?: "lost" | "range" | "speed" | "full" | "gone"; winnerId?: string; module?: ModuleInstance }
   | { type: "credits"; playerId: string; delta: number; total: number; reason: "kill" | "survive" | "debris" | "comet" | "tail" | "station" }
-  | { type: "moduleDamage"; shipId: string; moduleId: string; moduleType: ModuleType; damage: number; hp: number; maxHp: number; broken: boolean }
+  | { type: "moduleDamage"; shipId: string; moduleId: string; moduleType: ModuleType; damage: number; hp: number; maxHp: number; broken: boolean; storeLost?: Partial<Record<AmmoType, number>> }
   /** Skener (vyhodnocuje se hned při plánování, ale zapisuje se do logu kola). */
   | { type: "scan"; shipId: string; mode: "ship" | "deep" | "cooldown" | "predict"; targetId?: string }
   /** Droid – pilot aktivoval funkce (technologie odečtena). */
@@ -614,7 +619,7 @@ export type TurnEvent =
   | { type: "stationHit"; stationId: string; shooterId?: string; damage: number; absorbed: number; hullAfter: number; shieldsAfter: number; x: number; y: number; t?: number }
   | { type: "stationDestroyed"; stationId: string; byId?: string; x: number; y: number; reward: number; t?: number }
   | { type: "stationPickup"; shipId: string; stationId: string; ok: boolean; reason?: "range" | "speed" | "full" | "empty"; module?: ModuleInstance; stockLeft: number }
-  | { type: "stationOrder"; shipId: string; stationId: string; ok: boolean; reason?: "range" | "broken" | "credits" | "busy" | "module"; moduleType: ModuleType; price: number; debris?: Debris }
+  | { type: "stationOrder"; shipId: string; stationId: string; ok: boolean; reason?: "range" | "broken" | "credits" | "busy" | "module" | "speed" | "store"; moduleType: ModuleType; price: number; debris?: Debris; ammoType?: AmmoType; amount?: number }
   | { type: "repair"; shipId: string; kind: RepairOrder["kind"]; cost: number; techPoints: number; moduleId?: string; moduleType?: ModuleType; amount?: number; slot?: SlotId; swappedType?: ModuleType; hullAfter?: number }
   /** Dobití štítu technologií (hned při plánování): energetický +amount, segmentový +segments po segmentech. */
   | { type: "shieldRecharge"; shipId: string; cost: number; techPoints: number; amount?: number; segments?: Segments; shieldsAfter: number; segmentsAfter: Segments }

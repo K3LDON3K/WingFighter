@@ -1,7 +1,7 @@
 import { VISION_REF } from "./fog.ts";
 import { BATTLESHIP_PROFILE, FIGHTER_PROFILE } from "./maneuvers.ts";
 import { CARGO, LASER, MG, RULES, TECH, TORPEDO } from "./constants.ts";
-import type { Facing, GameSettings, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, PilotMods, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
+import type { AmmoType, Facing, GameSettings, HullDef, ManeuverProfile, MineSide, ModuleDef, ModuleInstance, ModuleType, PilotDef, PilotMods, ShieldType, ShipLoadout, ShipStats, SlotId } from "./types.ts";
 
 /**
  * Lodě = trup + pilot + moduly ve slotech.
@@ -152,8 +152,67 @@ export const MODULES: Record<ModuleType, ModuleDef> = {
   repair: { id: "repair", name: "Droid – opravář", short: "OPRAV", icon: "wrench", size: "small", weight: 0.5, price: 140, hp: 15, description: "Palubní droid opravář (čerpá technologii, nebere akci, provádí se hned při plánování). Oprava modulu (4 body): plně opraví vybraný modul, i zničený. Munice (2 body): vyrobí 1 náboj do torpédometu nebo min. Oprava trupu (3 body): opraví 25 % maxima trupu. Instalace (1 bod): nasadí sebraný modul z nákladu do libovolného slotu; stojí-li tam modul, vymění se a jde do nákladu. Lze mít víc opravářů. V bouři nefunguje." },
   hacker: { id: "hacker", name: "Droid – hacker", short: "HACK", icon: "hack", size: "small", weight: 0.5, price: 140, hp: 15, description: "Palubní droid hacker (čerpá technologii, nebere akci, provádí se hned při plánování, cíle v dohledu týmu). Hack miny/torpéda (2 body): mina se stane tvou (jde nastavit odpočet nebo odpálit na startu kola), torpédu určíš nový cíl a dostane +2 kola života. Hack modulu (3 body): vybraný modul cizí lodi na toto kolo nefunguje – zbraň nevystřelí, štít nechrání, droid/skener nejde použít; oběť se to dozví až při vyhodnocení. Pasivní oprava (4 body): 4 kola po 5 % trupu za kolo (jen když hacker funguje). V bouři nefunguje." },
   "shield-whole": { id: "shield-whole", name: "Energetický štít", short: "ENE", icon: "shield", size: "small", weight: 2, price: 120, hp: 40, shieldType: "whole", shields: 80, description: "Pole kolem celé lodi, zásoba 80, každé kolo +5. Laser pole jen vybíjí – do trupu nejde nic, dokud zásoba stačí. Projektil (torpédo, mina, kulomet, srážka) pole prorazí: 30 % zranění jde do trupu vždy. Dobití technologií: 3 body → +40 zásoby. Nelze kombinovat se segmentovým." },
+  ammostore: { id: "ammostore", name: "Sklad munice", short: "SKLAD", icon: "crate", size: "small", weight: 1, price: 120, hp: 20, description: "Zásoba munice navíc: pro každý druh (torpéda, miny, náboje) pojme tolik, kolik nesou nainstalované zbraně toho druhu – loď tak veze 2× munice (každý další sklad +1×). Munici do skladu kupuješ zvlášť v hangáru nebo u funkční stanice (v jejím okruhu sběru, rychlost ≤ 2); opravář přidá 1 kus (náboje 10) za technologii. Střílí se nejdřív ze skladu, až pak z munice ve zbrani. Munice ve skladu váží jako ve zbrani. Zničení skladu zničí i munici v něm." },
 };
 export const MODULE_TYPES = Object.keys(MODULES) as ModuleType[];
+export const AMMO_TYPES: AmmoType[] = ["torpedo", "mine", "mg"];
+/** Kolik kusů daného druhu přidá opravář do skladu za jeden úkon (kulomet po dávkách). */
+export function storeRepairUnit(t: AmmoType): number {
+  return t === "mg" ? MG.burst : 1;
+}
+/** Sklady munice lodi (funkční; zničený sklad obsah ztratil). */
+export function storeModules(loadout: ShipLoadout, workingOnly = true): ModuleInstance[] {
+  return loadout.modules.filter((m) => m.type === "ammostore" && (!workingOnly || moduleWorking(m)));
+}
+/** Kapacita jednoho skladu pro daný druh = součet munice nainstalovaných zbraní toho druhu. */
+export function storeCapacity(loadout: ShipLoadout, t: AmmoType): number {
+  return loadout.modules.filter((m) => m.type === t).reduce((n, m) => n + (MODULES[m.type].ammo ?? 0), 0);
+}
+/** Munice daného druhu ve všech funkčních skladech. */
+export function storeAmmo(loadout: ShipLoadout, t: AmmoType): number {
+  return storeModules(loadout).reduce((n, m) => n + (m.store?.[t] ?? 0), 0);
+}
+/** Volné místo pro daný druh ve všech funkčních skladech. */
+export function storeRoom(loadout: ShipLoadout, t: AmmoType): number {
+  const cap = storeCapacity(loadout, t);
+  return storeModules(loadout).reduce((n, m) => n + Math.max(0, cap - (m.store?.[t] ?? 0)), 0);
+}
+/** Munice zbraně dostupná ke střelbě: ve zbrani + ve skladech. */
+export function weaponAmmo(loadout: ShipLoadout, m: ModuleInstance): number {
+  const own = m.ammo ?? 0;
+  return MODULES[m.type]?.ammo ? own + storeAmmo(loadout, m.type as AmmoType) : own;
+}
+/** Spotřebuje munici zbraně: nejdřív ze skladů, pak ze zbraně. Vrací, kolik se skutečně odebralo. */
+export function consumeAmmo(loadout: ShipLoadout, m: ModuleInstance, n: number): number {
+  let left = n;
+  const t = m.type as AmmoType;
+  for (const st of storeModules(loadout)) {
+    if (left <= 0) break;
+    const have = st.store?.[t] ?? 0;
+    const take = Math.min(have, left);
+    if (take > 0) { st.store = { ...st.store, [t]: have - take }; left -= take; }
+  }
+  const take = Math.min(m.ammo ?? 0, left);
+  m.ammo = (m.ammo ?? 0) - take;
+  left -= take;
+  return n - left;
+}
+/** Naskladní munici do skladů (po kapacitu). Vrací, kolik se vešlo. */
+export function addStoreAmmo(loadout: ShipLoadout, t: AmmoType, n: number): number {
+  const cap = storeCapacity(loadout, t);
+  let left = n;
+  for (const st of storeModules(loadout)) {
+    if (left <= 0) break;
+    const have = st.store?.[t] ?? 0;
+    const add = Math.min(Math.max(0, cap - have), left);
+    if (add > 0) { st.store = { ...st.store, [t]: have + add }; left -= add; }
+  }
+  return n - left;
+}
+/** Cena naplnění skladů daným druhem munice na plno. */
+export function storeRefillCost(loadout: ShipLoadout, t: AmmoType): number {
+  return Math.ceil(storeRoom(loadout, t) * (MODULES[t].ammoPrice ?? 0));
+}
 /** Zbraně – s nimi jde aktivně vyhrát (sestřelit soupeře). */
 export const WEAPON_TYPES: ModuleType[] = ["laser", "torpedo", "mine", "mg"];
 
@@ -171,6 +230,7 @@ export const MODULE_CATEGORY: Record<ModuleType, ModuleCategory> = {
   repair: "droid",
   hacker: "droid",
   scanner: "tech",
+  ammostore: "tech",
 };
 export const CATEGORY_LABEL: Record<ModuleCategory, string> = { weapon: "Zbraně", shield: "Štíty", droid: "Droidi", tech: "Technologie" };
 /** Druh zbraně: energetická (bez munice) nebo projektilová (má munici). */
@@ -321,14 +381,14 @@ export function applyLoadoutTrade(prev: ShipLoadout, next: ShipLoadout): { loado
   const prevAll = new Map<string, ModuleInstance>();
   for (const m of [...prev.modules, ...(prev.cargo ?? [])]) prevAll.set(m.id, m);
   let cost = 0;
-  const fix = (m: ModuleInstance): ModuleInstance | string => {
+  const fix = (m: ModuleInstance, inCargo = false): ModuleInstance | string => {
     const def = MODULES[m.type];
     if (!def) return `neznámý modul ${m.type}`;
     const old = prevAll.get(m.id);
     if (!old) {
-      // nákup: vždy nový, plný, nepoškozený
+      // nákup: vždy nový, plný, nepoškozený (sklad munice prázdný – munice se dokupuje zvlášť)
       cost += def.price;
-      return { ...m, ammo: def.ammo, hp: undefined, used: undefined, gift: undefined };
+      return { ...m, ammo: def.ammo, store: m.type === "ammostore" ? undefined : m.store, hp: undefined, used: undefined, gift: undefined };
     }
     if (old.type !== m.type) return "modul nelze změnit na jiný typ";
     const out: ModuleInstance = { ...m, hp: old.hp, used: old.used, gift: old.gift, repair: undefined };
@@ -349,6 +409,22 @@ export function applyLoadoutTrade(prev: ShipLoadout, next: ShipLoadout): { loado
       }
       out.ammo = Math.max(was, want); // munici nejde „odprodat“ – zůstává
     }
+    if (m.type === "ammostore") {
+      // sklad: dokoupení po kapacitu (podle zbraní v nové sestavě), nejde „odprodat“
+      const store: Partial<Record<AmmoType, number>> = {};
+      for (const t of AMMO_TYPES) {
+        const was = old.store?.[t] ?? 0;
+        const cap = inCargo ? was : Math.max(was, storeCapacity(next, t)); // v nákladu se s municí nemanipuluje
+        const want = Math.max(0, Math.min(cap, Math.round(m.store?.[t] ?? was)));
+        if (want > was) {
+          if (moduleBroken(old) && !repaired) return `${def.name}: zničený sklad nejde doplnit`;
+          cost += Math.ceil((want - was) * (MODULES[t].ammoPrice ?? 0));
+        }
+        const v = Math.max(was, want);
+        if (v > 0) store[t] = v;
+      }
+      out.store = Object.keys(store).length ? store : undefined;
+    } else out.store = undefined;
     prevAll.delete(m.id);
     return out;
   };
@@ -360,7 +436,7 @@ export function applyLoadoutTrade(prev: ShipLoadout, next: ShipLoadout): { loado
   }
   const cargo: ModuleInstance[] = [];
   for (const m of next.cargo ?? []) {
-    const r = fix(m);
+    const r = fix(m, true);
     if (typeof r === "string") return { loadout: prev, cost: 0, error: r };
     cargo.push(r);
   }
@@ -406,7 +482,10 @@ export function freeSlots(loadout: ShipLoadout): SlotId[] {
 /** Celková váha sestavy (včetně zbývající munice). */
 export function moduleWeight(m: ModuleInstance): number {
   const def = MODULES[m.type];
-  return def ? def.weight + (def.ammoWeight ?? 0) * (m.ammo ?? 0) : 0;
+  if (!def) return 0;
+  let w = def.weight + (def.ammoWeight ?? 0) * (m.ammo ?? 0);
+  if (m.type === "ammostore") for (const t of AMMO_TYPES) w += (MODULES[t].ammoWeight ?? 0) * (m.store?.[t] ?? 0);
+  return w;
 }
 
 /** Váha výbavy včetně nákladu. */
@@ -616,6 +695,7 @@ export function computeStats(loadout: ShipLoadout): ShipStats {
     if (m.type === "laser") stats.attack = LASER_DICE.value;
     if (m.type === "torpedo") stats.torpedoes += m.ammo ?? 0;
     if (m.type === "mine") stats.mines += m.ammo ?? 0;
+    if (m.type === "ammostore") { stats.torpedoes += m.store?.torpedo ?? 0; stats.mines += m.store?.mine ?? 0; }
   }
   // štít: funguje jen zapnutý (jeden)
   const act = activeShield(loadout);

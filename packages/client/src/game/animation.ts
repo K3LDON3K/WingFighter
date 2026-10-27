@@ -1,4 +1,4 @@
-import { CARGO, COMET, MODULES, MOVE_STEPS, SCANNER, TEAM_COLORS, type GameState, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
+import { CARGO, COMET, MODULES, MOVE_STEPS, SCANNER, TEAM_COLORS, type GameState, type ModuleType, type Pose, type TurnEvent, type TurnResult } from "@wingfighter/shared";
 import { cometToView, mineToView, shipToView, torpedoToView, viewFromState, type ViewModel } from "./view.ts";
 import { sfxAt } from "../sound.ts";
 
@@ -102,7 +102,7 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "repair": {
         const mt = e.moduleType ? MODULES[e.moduleType]?.name ?? e.moduleType : "";
         const what =
-          e.kind === "module" ? `opravil modul ${mt} (+${e.amount})` : e.kind === "ammo" ? `vyrobil náboj do ${mt}` : e.kind === "hull" ? `opravil trup o ${e.amount} → ${e.hullAfter}` : e.kind === "uninstall" ? `odpojil ${mt} do nákladu` : e.kind === "move" ? `přesunul ${mt}` : e.kind === "auto" ? "zapnul pasivní opravu trupu" : `nasadil ${mt}${e.swappedType ? ` (výměnou za ${MODULES[e.swappedType]?.name ?? e.swappedType})` : ""}`;
+          e.kind === "module" ? `opravil modul ${mt} (+${e.amount})` : e.kind === "ammo" ? `vyrobil ${e.amount && e.amount > 1 ? `${e.amount} ks` : "náboj"} do ${mt}` : e.kind === "hull" ? `opravil trup o ${e.amount} → ${e.hullAfter}` : e.kind === "uninstall" ? `odpojil ${mt} do nákladu` : e.kind === "move" ? `přesunul ${mt}` : e.kind === "auto" ? "zapnul pasivní opravu trupu" : `nasadil ${mt}${e.swappedType ? ` (výměnou za ${MODULES[e.swappedType]?.name ?? e.swappedType})` : ""}`;
         lines.push(`${name(e.shipId)}: opravář ${what} (−${e.cost} technologie, zbývá ${e.techPoints}).`);
         break;
       }
@@ -126,13 +126,14 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
         else lines.push(`${name(e.shipId)} vyhodil modul ${MODULES[e.debris.type]?.name ?? e.debris.type} (sestřelení = +${e.debris.value} kreditů).`);
         break;
       case "moduleDamage":
-        lines.push(e.broken ? `🔧 ${name(e.shipId)}: modul ${MODULES[e.moduleType]?.name ?? e.moduleType} je zničen – přestal fungovat.` : `${name(e.shipId)}: modul ${MODULES[e.moduleType]?.name ?? e.moduleType} poškozen (−${e.damage}, zbývá ${e.hp}/${e.maxHp}).`);
+        lines.push(e.broken ? `🔧 ${name(e.shipId)}: modul ${MODULES[e.moduleType]?.name ?? e.moduleType} je zničen – přestal fungovat.${e.storeLost ? ` Munice ve skladu je pryč (${Object.entries(e.storeLost).filter(([, v]) => (v ?? 0) > 0).map(([t, v]) => `${MODULES[t as ModuleType]?.short ?? t} ${v}`).join(", ")}).` : ""}` : `${name(e.shipId)}: modul ${MODULES[e.moduleType]?.name ?? e.moduleType} poškozen (−${e.damage}, zbývá ${e.hp}/${e.maxHp}).`);
         break;
       case "stationPickup":
         lines.push(e.ok ? `${name(e.shipId)} nabral ze stanice modul: ${e.module ? MODULES[e.module.type]?.name ?? e.module.type : "modul"} (ve stanici zbývá ${e.stockLeft}).` : `${name(e.shipId)} nenabral modul ze stanice – ${e.reason === "speed" ? `letěl rychleji než ${CARGO.maxSpeed}` : e.reason === "full" ? "nákladový prostor je plný" : e.reason === "empty" ? "zásoba stanice je prázdná" : "nebyl v okruhu sběru"}.`);
         break;
       case "stationOrder":
-        lines.push(e.ok ? `${name(e.shipId)} objednal ze stanice ${MODULES[e.moduleType]?.name ?? e.moduleType} za ${e.price} kreditů – stanice ho vypustila jako trosky.` : `${name(e.shipId)}: objednávka ze stanice selhala – ${e.reason === "broken" ? "stanice je rozbitá" : e.reason === "credits" ? "nedostatek kreditů" : e.reason === "busy" ? "linka obsazena (1 objednávka za kolo)" : e.reason === "range" ? "stanice není v dohledu" : "neplatný modul"}.`);
+        if (e.ammoType) lines.push(e.ok ? `${name(e.shipId)} naskladnil u stanice munici: ${MODULES[e.ammoType]?.name ?? e.ammoType} +${e.amount ?? 0} za ${e.price} kreditů.` : `${name(e.shipId)}: nákup munice u stanice selhal – ${e.reason === "broken" ? "stanice je rozbitá" : e.reason === "credits" ? "nedostatek kreditů" : e.reason === "range" ? "loď není v okruhu sběru stanice" : e.reason === "speed" ? "loď je moc rychlá (max. 2)" : "sklad je plný nebo zničený"}.`);
+        else lines.push(e.ok ? `${name(e.shipId)} objednal ze stanice ${MODULES[e.moduleType]?.name ?? e.moduleType} za ${e.price} kreditů – stanice ho vypustila jako trosky.` : `${name(e.shipId)}: objednávka ze stanice selhala – ${e.reason === "broken" ? "stanice je rozbitá" : e.reason === "credits" ? "nedostatek kreditů" : e.reason === "busy" ? "linka obsazena (1 objednávka za kolo)" : e.reason === "range" ? "stanice není v dohledu" : "neplatný modul"}.`);
         break;
       case "stationHit":
         lines.push(`${e.shooterId ? name(e.shooterId) + " zasáhl" : "Zásah"} stanici: −${e.damage}${e.absorbed ? ` (štít ${e.absorbed})` : ""}, trup ${e.hullAfter}, štít ${e.shieldsAfter}.`);

@@ -36,7 +36,7 @@ import {
   type Vec,
 } from "./geometry.ts";
 import { listManeuvers, makeManeuver, maneuverId, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
-import { activeShield, allowedFacings, cargoCapacity, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleUsable, moduleWorking, moveModule, MODULES, MODULE_CATEGORY, MODULE_TYPES, newModule, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
+import { activeShield, allowedFacings, addStoreAmmo, AMMO_TYPES, cargoCapacity, consumeAmmo, storeCapacity, storeModules, storeRefillCost, storeRepairUnit, storeRoom, weaponAmmo, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleUsable, moduleWorking, moveModule, MODULES, MODULE_CATEGORY, MODULE_TYPES, newModule, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
 
@@ -53,7 +53,7 @@ export function inBorderStorm(state: Pick<GameState, "width" | "height" | "borde
 function laserBlockedByStorm(state: GameState, a: Vec, b: Vec): boolean {
   return (state.storms?.length ?? 0) > 0 && (inStorm(state, a) || inStorm(state, b) || lineCrossesStorm(state.storms, a, b));
 }
-import type { Difficulty, DroidOrder, HackOrder, ManeuverProfile, ModuleInstance, ModuleType, RepairOrder } from "./types.ts";
+import type { AmmoType, Difficulty, DroidOrder, HackOrder, ManeuverProfile, ModuleInstance, ModuleType, RepairOrder } from "./types.ts";
 
 /** Pozice lodi natočená podle směru modulu (výseč laserů, výlet torpéda). */
 /** Odkud a kam modul míří: z pozice slotu na trupu, ve směru natočení modulu. */
@@ -289,7 +289,10 @@ function damageModule(ship: Ship, hullDamage: number, events: TurnEvent[], from?
   const hp = Math.max(0, moduleHp(target) - dmg);
   target.hp = hp;
   const broken = hp === 0;
-  events.push({ type: "moduleDamage", shipId: ship.id, moduleId: target.id, moduleType: target.type, damage: dmg, hp, maxHp: moduleMaxHp(target.type), broken });
+  // zničený sklad munice: munice v něm je pryč
+  let storeLost: ModuleInstance["store"];
+  if (broken && target.type === "ammostore" && target.store && Object.values(target.store).some((v) => (v ?? 0) > 0)) { storeLost = target.store; target.store = undefined; }
+  events.push({ type: "moduleDamage", shipId: ship.id, moduleId: target.id, moduleType: target.type, damage: dmg, hp, maxHp: moduleMaxHp(target.type), broken, ...(storeLost ? { storeLost } : {}) });
   if (broken) syncShields(ship);
 }
 
@@ -551,16 +554,16 @@ export function actionPointsOf(ship: Pick<Ship, "stats">): number {
 /** Je cíl (loď nebo torpédo) nepřátelský a existující? */
 /** Torpédový modul s municí (zadaný, nebo první s municí). */
 export function torpedoModule(ship: Ship, moduleId?: string) {
-  const mods = ship.loadout.modules.filter((m) => m.type === "torpedo" && (m.ammo ?? 0) > 0 && moduleUsable(m));
+  const mods = ship.loadout.modules.filter((m) => m.type === "torpedo" && weaponAmmo(ship.loadout, m) > 0 && moduleUsable(m));
   return mods.find((m) => m.id === moduleId) ?? mods[0];
 }
 /** Minový modul s municí. */
 export function mineModule(ship: Ship) {
-  return ship.loadout.modules.find((m) => m.type === "mine" && (m.ammo ?? 0) > 0 && moduleUsable(m));
+  return ship.loadout.modules.find((m) => m.type === "mine" && weaponAmmo(ship.loadout, m) > 0 && moduleUsable(m));
 }
 /** Kulometný modul s municí (zadaný, nebo první s municí). */
 export function mgModule(ship: Ship, moduleId?: string) {
-  const mods = ship.loadout.modules.filter((m) => m.type === "mg" && (m.ammo ?? 0) > 0 && moduleUsable(m));
+  const mods = ship.loadout.modules.filter((m) => m.type === "mg" && weaponAmmo(ship.loadout, m) > 0 && moduleUsable(m));
   return mods.find((m) => m.id === moduleId) ?? mods[0];
 }
 
@@ -658,7 +661,9 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     } else if (raw.action?.type === "comm") {
       const st = (state.stations ?? []).find((x) => x.id === (raw.action as { stationId?: string }).stationId);
       const mt = (raw.action as { moduleType?: string }).moduleType;
+      const at = (raw.action as { ammoType?: string }).ammoType;
       if (st && typeof mt === "string" && MODULE_TYPES.includes(mt as ModuleType) && (state.settings.allowedModules ?? {})[mt as ModuleType] !== 0) action = { type: "comm", stationId: st.id, moduleType: mt as ModuleType };
+      else if (st && typeof at === "string" && AMMO_TYPES.includes(at as AmmoType) && storeModules(ship.loadout).length) action = { type: "comm", stationId: st.id, ammoType: at as AmmoType };
     }
     let special = raw.special;
     if (special?.type === "torpedo") {
@@ -689,7 +694,7 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     for (const rs of rawShots) {
       if (!rs || typeof rs.moduleId !== "string" || seen.has(rs.moduleId)) continue;
       const mod = ship.loadout.modules.find((m) => m.id === rs.moduleId);
-      if (!mod || !moduleUsable(mod) || (mod.type !== "laser" && mod.type !== "mg") || (mod.type === "mg" && (mod.ammo ?? 0) <= 0)) continue;
+      if (!mod || !moduleUsable(mod) || (mod.type !== "laser" && mod.type !== "mg") || (mod.type === "mg" && weaponAmmo(ship.loadout, mod) <= 0)) continue;
       seen.add(mod.id);
       const tid = typeof rs.targetId === "string" ? (enemyTarget(state, ship, rs.targetId)?.id ?? state.debris.find((d) => d.id === rs.targetId)?.id ?? (state.comets ?? []).find((c) => c.id === rs.targetId)?.id ?? (state.stations ?? []).find((x) => x.id === rs.targetId && !x.broken)?.id) : undefined;
       shots.push(tid ? { moduleId: mod.id, targetId: tid } : { moduleId: mod.id });
@@ -1021,7 +1026,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const o = orders.get(ship.id)!;
     // každý kulomet střílí zvlášť (vlastní akce a cíl), z pozice modulu na trupu
     for (const { shot, mod } of shotsOfType(ship, o, "mg")) {
-    if ((mod.ammo ?? 0) <= 0) continue;
+    if (weaponAmmo(ship.loadout, mod) <= 0) continue;
     const aim = aimPose(ship, mod);
     const mgR = mgRange(ship);
     const inRange = (p: Vec) => dist(aim, p) <= mgR && inArc(aim, p, MG.halfArc) && !lineBlocked(obstacles(state), aim, p);
@@ -1045,8 +1050,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       }
     }
     if (!target) continue;
-    const shots = Math.min(MG.burst, mod.ammo ?? 0);
-    mod.ammo = (mod.ammo ?? 0) - shots;
+    const shots = consumeAmmo(ship.loadout, mod, Math.min(MG.burst, weaponAmmo(ship.loadout, mod))); // nejdřív ze skladu, pak ze zbraně
     refreshShip(ship);
     const victimShip = target.kind === "ship" ? shipById(state, target.id) : undefined;
     // kulomet: šance podle průměrné vzdálenosti zasažené části trupu (ne středu) × podíl trupu ve výseči
@@ -1170,9 +1174,31 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const o = orders.get(ship.id);
     if (!ship.alive || o?.action?.type !== "comm") continue;
     const stn = (state.stations ?? []).find((x) => x.id === (o.action as { stationId: string }).stationId);
-    const mt = (o.action as { moduleType: ModuleType }).moduleType;
-    const price = MODULES[mt]?.price ?? 0;
     const player = state.players.find((x) => x.id === ship.ownerId);
+    if ("ammoType" in o.action) {
+      // munice do skladu: loď v okruhu sběru stanice (rychlost ≤ 2), naskladní se hned, platí se jen to, co se vešlo
+      const at = o.action.ammoType;
+      const room = storeRoom(ship.loadout, at);
+      const price = storeRefillCost(ship.loadout, at);
+      const failA = (reason: "range" | "broken" | "credits" | "speed" | "store") => events.push({ type: "stationOrder", shipId: ship.id, stationId: stn?.id ?? "", ok: false, reason, moduleType: at, price, ammoType: at });
+      if (!stn) failA("broken");
+      else if (stn.broken) failA("broken");
+      else if (dist(ship, stn) > stn.radius + STATION.pickupRange) failA("range");
+      else if (ship.speed > CARGO.maxSpeed) failA("speed");
+      else if (room <= 0) failA("store");
+      else if ((player?.credits ?? 0) < price) failA("credits");
+      else {
+        const added = addStoreAmmo(ship.loadout, at, room);
+        refreshShip(ship);
+        player!.credits = (player!.credits ?? 0) - price;
+        events.push({ type: "credits", playerId: player!.id, delta: -price, total: player!.credits, reason: "station" });
+        events.push({ type: "stationOrder", shipId: ship.id, stationId: stn.id, ok: true, moduleType: at, price, ammoType: at, amount: added });
+        events.push({ type: "action", shipId: ship.id, action: o.action, ok: true });
+      }
+      continue;
+    }
+    const mt = o.action.moduleType;
+    const price = MODULES[mt]?.price ?? 0;
     const fail = (reason: "range" | "broken" | "credits" | "busy" | "module") => events.push({ type: "stationOrder", shipId: ship.id, stationId: stn?.id ?? "", ok: false, reason, moduleType: mt, price });
     if (!stn || !MODULES[mt]) fail("module");
     else if (stn.broken) fail("broken");
@@ -1226,7 +1252,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const target = enemyTarget(state, ship, o.special.targetId);
     const point = o.special.point;
     if (!target && !point) continue;
-    tmod.ammo = (tmod.ammo ?? 1) - 1;
+    consumeAmmo(ship.loadout, tmod, 1); // nejdřív ze skladu
     refreshShip(ship);
     const stT = statsOf(state, ship.ownerId);
     if (stT) stT.torpedoesFired++;
@@ -1260,7 +1286,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!ship.alive || o?.special?.type !== "mine") continue;
     const mmod = mineModule(ship);
     if (!mmod) continue;
-    mmod.ammo = (mmod.ammo ?? 1) - 1;
+    consumeAmmo(ship.loadout, mmod, 1); // nejdřív ze skladu
     refreshShip(ship);
     const stMi = statsOf(state, ship.ownerId);
     if (stMi) stMi.minesDropped++;
@@ -2171,6 +2197,19 @@ export function applyRepair(state: GameState, ship: Ship, order: RepairOrder): {
     case "ammo": {
       const m = ship.loadout.modules.find((x) => x.id === order.moduleId);
       if (!m) return { error: "takový modul loď nemá" };
+      if (m.type === "ammostore") {
+        // sklad: +1 kus zvoleného druhu (náboje po dávce), jen po kapacitu
+        const t = order.ammoType;
+        if (!t || !AMMO_TYPES.includes(t)) return { error: "zvol druh munice" };
+        if (!moduleWorking(m)) return { error: "sklad je zničený" };
+        const room = Math.max(0, storeCapacity(ship.loadout, t) - (m.store?.[t] ?? 0));
+        if (room <= 0) return { error: "sklad je pro tento druh plný" };
+        const add = Math.min(room, storeRepairUnit(t));
+        m.store = { ...m.store, [t]: (m.store?.[t] ?? 0) + add };
+        ship.techPoints -= cost;
+        refreshShip(ship);
+        return { event: { ...base, techPoints: ship.techPoints, moduleId: m.id, moduleType: t, amount: add } };
+      }
       const cap = MODULES[m.type]?.ammo ?? 0;
       if (!cap) return { error: "modul nemá munici" };
       if ((m.ammo ?? 0) >= cap) return { error: "zásobník je plný" };
@@ -2400,7 +2439,7 @@ export function mgPreview(state: GameState, ship: Ship, preferredTargetId?: stri
     if (cands.length) target = cands.reduce((b, e) => (dist(aim, e) < dist(aim, b) ? e : b));
   }
   if (!target) return undefined;
-  const shots = Math.min(MG.burst, mod.ammo ?? 0);
+  const shots = Math.min(MG.burst, weaponAmmo(ship.loadout, mod));
   const tShip = state.ships.find((x) => x.id === target!.id);
   const hitArea = tShip ? sectorHit(aim, mgR, MG.halfArc, tShip) : undefined;
   const coverage = hitArea ? hitArea.coverage : 1;

@@ -1,5 +1,7 @@
 import { type ModuleDef } from "@wingfighter/shared";
 import {
+  AMMO_TYPES,
+  storeCapacity,
   moduleBroken,
   TEAM_COLORS,
   moduleHp,
@@ -613,6 +615,11 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
       const base = box.y + box.h / 2 + 4 - (words.length - 1) * 6;
       words.forEach((w, i) => grp.append(svgEl("text", { x: box.x + box.w / 2, y: base + i * 12, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: "#f8fafc", "text-anchor": "middle" }, w)));
       if (ammo !== undefined && def.ammo) drawAmmo(grp, box, def, ammo, words.length);
+      if (m.type === "ammostore") {
+        // sklad: rozpis munice po druzích pod názvem (jen druhy, pro které má loď zbraň)
+        const parts = AMMO_TYPES.filter((t) => storeCapacity(loadout, t) > 0 || (m.store?.[t] ?? 0) > 0).map((t) => `${MODULES[t].short} ${broken ? 0 : m.store?.[t] ?? 0}/${storeCapacity(loadout, t)}`);
+        grp.append(svgEl("text", { x: box.x + box.w / 2, y: base + words.length * 12 + 1, "font-family": "Jersey", "font-size": 9, fill: broken ? "#fca5a5" : parts.length ? "#fbbf24" : "#64748b", "text-anchor": "middle" }, parts.length ? parts.join(" · ") : "BEZ ZBRANÍ"));
+      }
       if (hasFacing(m.type)) {
         // jen zvolené natočení (žlutá šipka na hraně hexu); změna se dělá v okénku modulu
         const f = m.facing ?? "front";
@@ -733,6 +740,39 @@ export function renderLoadout(opts: LoadoutEditorOptions): HTMLElement {
                 : null,
         ),
       );
+    }
+    // sklad munice: řádek na každý druh munice (kapacita = munice nainstalovaných zbraní), dokoupení za cenu kusu
+    if (m.type === "ammostore") {
+      const inCargo = !loadout.modules.some((x) => x.id === m.id);
+      const types = AMMO_TYPES.filter((t) => storeCapacity(loadout, t) > 0 || (m.store?.[t] ?? 0) > 0);
+      if (inCargo) rows.push(h("div", { class: "mp-row" }, h("span", { class: "mp-k" }, label("Sklad")), h("span", { class: "muted txt mp-note" }, "v nákladu nefunguje – nejdřív nainstalovat")));
+      else if (!types.length) rows.push(h("div", { class: "mp-row" }, h("span", { class: "mp-k" }, label("Sklad")), h("span", { class: "muted txt mp-note" }, "loď nemá zbraň s municí")));
+      for (const t of types) {
+        const tdef = MODULES[t];
+        const have = m.store?.[t] ?? 0;
+        const cap = storeCapacity(loadout, t);
+        const missing = Math.max(0, cap - have);
+        const cost = Math.ceil(missing * (tdef.ammoPrice ?? 0));
+        const full = missing <= 0;
+        rows.push(
+          h(
+            "div",
+            { class: "mp-row" },
+            h("span", { class: "mp-k" }, icon(tdef.icon, "#fbbf24", 10), " ", label(tdef.name)),
+            h("span", { class: "mp-v" }, `${have}/${cap}`),
+            !full && !broken && shop && !inCargo
+              ? h("button", { class: `px tiny ${pay(cost) ? "on" : ""}`, disabled: !pay(cost), title: `Doplnit ${missing} ks do skladu za ${cost} kreditů${pay(cost) ? "" : " – nedostatek kreditů"}`, onclick: () => {
+                  modPop = null;
+                  change({ ...loadout, modules: loadout.modules.map((x) => (x.id === m.id ? { ...x, store: { ...x.store, [t]: cap } } : x)) });
+                } }, label("Doplnit"), " ", costTag(cost, pay(cost)))
+              : full
+                ? h("span", { class: "muted txt mp-note" }, "plný")
+                : broken
+                  ? h("span", { class: "muted txt mp-note" }, "nejdřív opravit")
+                  : null,
+          ),
+        );
+      }
     }
     // natočení
     if (hasFacing(m.type)) {

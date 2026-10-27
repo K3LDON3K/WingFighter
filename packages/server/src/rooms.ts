@@ -1,5 +1,6 @@
 import {
   type BotLevel,
+  AMMO_TYPES,
   applyTuning,
   computeStats,
   DEFAULT_TUNING,
@@ -143,7 +144,10 @@ function cleanLoadout(raw: unknown): ShipLoadout | null {
     const def = MODULES[mm.type as ModuleType];
     const facing = typeof mm.facing === "string" ? (mm.facing as ShipLoadout["modules"][number]["facing"]) : undefined;
     const ammo = def.ammo === undefined ? undefined : typeof mm.ammo === "number" && Number.isFinite(mm.ammo) ? Math.max(0, Math.min(def.ammo, Math.round(mm.ammo))) : def.ammo;
-    modules.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: mm.slot as ShipLoadout["modules"][number]["slot"], ammo, facing, ...(mm.off === true ? { off: true } : {}), ...(mm.repair === true ? { repair: true } : {}) });
+    // sklad munice: zásoba po druzích (jen čísla; kapacitu a cenu hlídá obchod)
+    const rawStore = mm.type === "ammostore" && mm.store && typeof mm.store === "object" ? (mm.store as Record<string, unknown>) : undefined;
+    const store = rawStore ? Object.fromEntries(AMMO_TYPES.filter((t) => typeof rawStore[t] === "number" && Number.isFinite(rawStore[t] as number)).map((t) => [t, Math.max(0, Math.round(rawStore[t] as number))])) : undefined;
+    modules.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: mm.slot as ShipLoadout["modules"][number]["slot"], ammo, facing, ...(mm.off === true ? { off: true } : {}), ...(mm.repair === true ? { repair: true } : {}), ...(store && Object.keys(store).length ? { store } : {}) });
   }
   if (modules.length > 8) return null;
   let cargo: ShipLoadout["cargo"];
@@ -155,7 +159,9 @@ function cleanLoadout(raw: unknown): ShipLoadout | null {
       if (typeof mm.id !== "string" || typeof mm.type !== "string" || !MODULE_TYPES.includes(mm.type as ModuleType)) return null;
       const def = MODULES[mm.type as ModuleType];
       const ammo = def.ammo === undefined ? undefined : typeof mm.ammo === "number" && Number.isFinite(mm.ammo) ? Math.max(0, Math.min(def.ammo, Math.round(mm.ammo))) : def.ammo;
-      cargo.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: "front", ammo });
+      const rawStore = mm.type === "ammostore" && mm.store && typeof mm.store === "object" ? (mm.store as Record<string, unknown>) : undefined;
+      const store = rawStore ? Object.fromEntries(AMMO_TYPES.filter((t) => typeof rawStore[t] === "number" && Number.isFinite(rawStore[t] as number)).map((t) => [t, Math.max(0, Math.round(rawStore[t] as number))])) : undefined;
+      cargo.push({ id: mm.id.slice(0, 32), type: mm.type as ModuleType, slot: "front", ammo, ...(store && Object.keys(store).length ? { store } : {}) });
     }
     if (cargo.length > 8) return null;
   }

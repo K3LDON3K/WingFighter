@@ -108,7 +108,16 @@ ukáže výbavu cizí lodi; hluboký sken (2 náboje) hned odkryje mapu do 2000 
 **Manévry botů** (3 body technologie): hráči (jen jemu, ne spoluhráčům) ukáže naplánované manévry nepřátelských
 botů v dohledu jeho týmu – čárkovaná dráha v barvě nepřítele a průsvitný duch s nápisem SKEN – v tomto a příštím
 kole; lidské protihráče neodhalí. **Pasivně:** předpověď dráhy komet v kole vidí jen hráč, jehož vlastní loď má
-funkční skener. **Droid – opravář** (140 cr, váha 0,5, 15 HP): čerpá technologii, nebere akci, úkony se provedou
+funkční skener. **Sklad munice** (120 cr, váha 1, 20 HP, malý slot, kategorie Technologie): zásoba munice navíc – pro každý druh
+(torpéda, miny, náboje) pojme tolik, kolik nesou nainstalované zbraně toho druhu (loď tak veze 2× munice, každý
+další sklad +1×). Kupuje se prázdný; munici do něj dokupuješ zvlášť v hangáru (okénko modulu, řádek na každý druh, cena
+za kus jako u zbraně) nebo u funkční stanice (KOMUNIKACE → Munice do skladu: loď v okruhu sběru stanice rychlostí ≤ 2,
+1 akce, naskladní se hned na začátku kola, platí se jen to, co se vešlo). Opravář „Munice“ přidá do skladu 1 kus
+(náboje 10) za 2 technologie. Střílí se nejdřív ze skladu, až pak z munice ve zbrani (u tlačítka zbraně „3+3“,
+ve VÝZBROJ „+3“, hex skladu ukazuje rozpis). Munice ve skladu váží jako ve zbrani. Sklad funguje jen nainstalovaný
+(v nákladu se s municí nemanipuluje a nepočítá se); bez zbraně daného druhu zásoba zůstává, jen se nedá použít
+(a nejde odprodat). Zničení skladu zničí i munici v něm (log to hlásí); po opravě začíná prázdný.
+**Droid – opravář** (140 cr, váha 0,5, 15 HP): čerpá technologii, nebere akci, úkony se provedou
 hned při plánování (libovolný počet, i víc opravářů na lodi). Oprava modulu (4): plně opraví vybraný modul, i
 zničený. Munice (2): vyrobí 1 náboj do torpédometu nebo min (jen do plného zásobníku). Oprava trupu (3): +25 %
 maxima trupu (ladění → „Opravář – oprava trupu“), ne přes maximum. Instalace (1): nasadí modul z nákladu do
@@ -194,6 +203,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.170 – Nový malý modul **Sklad munice** (120 cr, váha 1, 20 HP): pro každý druh munice pojme tolik, kolik nesou nainstalované zbraně toho druhu (2× munice; každý další sklad +1×). Kupuje se prázdný, munice se dokupuje zvlášť v hangáru (okénko modulu), u stanice (KOMUNIKACE → Munice do skladu, v okruhu sběru, rychlost ≤ 2, 1 akce, hned) nebo opravářem (Munice: +1 kus / 10 nábojů za 2 tech). Střílí se nejdřív ze skladu; stav vidíš u tlačítka zbraně („3+3“), ve VÝZBROJ a na hexu skladu v inventáři/hangáru. Funguje jen nainstalovaný; zničení skladu zničí jeho munici. Tlačítko KOMUNIKACE (stanice) je nově v segmentu LOĎ vpravo (od v3.168 chybělo ve spodní liště).
 - v3.169 – Hacknutý systém: u cizí lodi s hacknutým modulem je vedle jména červená ikona hackera (vidí jen tým hackera, do konce kola). Inventář: okno se kotví na střed obrazovky vlevo od bočních lišt (dřív u dlouhé lišty přetékalo dolů) a po otevření je kolem lodi vždy vidět okruh sběru trosek. Stojící loď (např. po nárazu): tlačítko ZASTAVIT není „stisknuté“, jen šedé („loď už stojí“). Droid opravář: proužek „OPRAVA n“ se vejde do tlačítka. Opravený zničený štít nabíhá jen na 50 % (ne plný).
 - v3.168 – Tlačítko SKENER přesunuto ze spodní lišty do segmentu LOĎ vpravo (štít · skener · inventář); podtlačítka Sken lodi · Vesmír · Manévry vyjíždějí vlevo jako u droidů. Skupina Speciální ve spodní liště zanikla – lišta má jen Zbraně a Pohyb.
 - v3.167 – Hacker × skener: hack modulu cizí lodi jde jen u lodi, do jejíchž systémů se tým dostal skenem lodi (kdokoliv z týmu použil „sken lodi“ – přístup platí do konce bitvy pro celý tým), nebo u lodi bez funkčního štítu (bez štítového modulu, zničený/hacknutý štít, vybitý energetický štít či všechny segmenty na nule). Loď v bouři nejde skenovat ani hackovat. Cíl musí být dál v dohledu hackera. Naskenovaná loď má na mapě vedle jména malou značku skeneru – vidí ji jen tým s přístupem (oběť ne). Hluboký sken přístup nedává.

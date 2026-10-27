@@ -41,6 +41,12 @@ import {
   modulePos,
   applyShieldRecharge,
   applyRepair,
+  torpedoModule,
+  addStoreAmmo,
+  storeCapacity,
+  storeAmmo,
+  weaponAmmo,
+  moduleWeight,
   applyHack,
   BATTLESHIP_PROFILE,
   damageStation,
@@ -1630,6 +1636,83 @@ describe("vesmírná stanice", () => {
     pl.credits = 10;
     r = resolveTurn(g3, [{ shipId: me3.id, maneuverId: "m1a0", fire: false, action: { type: "comm", stationId: "st1", moduleType: "laser" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
     expect(r.events.some((e) => e.type === "stationOrder" && !e.ok && e.reason === "credits")).toBe(true);
+  });
+});
+
+describe("sklad munice", () => {
+  const mkStation = (x: number, y: number) => ({ id: "st1", x, y, radius: STATION.radius, hull: STATION.hull, maxHull: STATION.hull, shields: STATION.shields, maxShields: STATION.shields, broken: false, stock: STATION.stock });
+  it("kapacita podle zbraní, střílí se nejdřív ze skladu, zničený sklad munici ztratí, v nákladu nefunguje", () => {
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    const foe = place(g, "ship-p2-0", 700, 500, Math.PI);
+    me.loadout.modules = [newModule("torpedo", "front", "t1"), newModule("ammostore", "back", "s1"), newModule("mine", "left", "mi1")];
+    expect(storeCapacity(me.loadout, "torpedo")).toBe(MODULES.torpedo.ammo);
+    expect(storeCapacity(me.loadout, "mine")).toBe(MODULES.mine.ammo);
+    expect(storeCapacity(me.loadout, "mg")).toBe(0);
+    expect(addStoreAmmo(me.loadout, "torpedo", 10)).toBe(MODULES.torpedo.ammo); // jen po kapacitu
+    refreshShip(me);
+    expect(me.stats.torpedoes).toBe(2 * MODULES.torpedo.ammo!);
+    expect(weaponAmmo(me.loadout, me.loadout.modules[0])).toBe(2 * MODULES.torpedo.ammo!);
+    // váha: munice ve skladu váží
+    expect(moduleWeight(me.loadout.modules[1])).toBeCloseTo(MODULES.ammostore.weight + MODULES.torpedo.ammo! * MODULES.torpedo.ammoWeight!);
+    // výstřel bere ze skladu
+    const r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: false, special: { type: "torpedo", targetId: foe.id } }, { shipId: foe.id, maneuverId: "m1a0", fire: false }], createRng(1));
+    const me2 = r.state.ships.find((s) => s.id === me.id)!;
+    expect(me2.loadout.modules[1].store?.torpedo).toBe(MODULES.torpedo.ammo! - 1);
+    expect(me2.loadout.modules[0].ammo).toBe(MODULES.torpedo.ammo);
+    // zbraň s prázdným zásobníkem, ale sklad plný → jde střílet
+    me.loadout.modules[0].ammo = 0;
+    expect(torpedoModule(me)).toBeDefined();
+    // zničení skladu = munice pryč
+    me.loadout.modules[1].hp = 0;
+    expect(storeAmmo(me.loadout, "torpedo")).toBe(0);
+    expect(torpedoModule(me)).toBeUndefined();
+    // v nákladu se sklad nepočítá
+    me.loadout.modules[1].hp = undefined;
+    me.loadout.cargo = [me.loadout.modules[1]];
+    me.loadout.modules = me.loadout.modules.filter((m) => m.id !== "s1");
+    expect(storeAmmo(me.loadout, "torpedo")).toBe(0);
+  });
+  it("obchod: sklad se kupuje prázdný, munice po kapacitu za cenu kusu, nejde odprodat; opravář +1 kus; stanice naskladní v okruhu", () => {
+    const base: ShipLoadout = { hullId: "fighter", pilotId: "cadet", modules: [newModule("torpedo", "front", "t1")] };
+    const withStore: ShipLoadout = { ...base, modules: [...base.modules, newModule("ammostore", "back", "s1")] };
+    let tr = applyLoadoutTrade(base, withStore);
+    expect(tr.cost).toBe(MODULES.ammostore.price);
+    expect(tr.loadout.modules[1].store).toBeUndefined();
+    // dokoupení 3 torpéd do skladu
+    const filled: ShipLoadout = { ...tr.loadout, modules: tr.loadout.modules.map((m) => (m.id === "s1" ? { ...m, store: { torpedo: 3, mine: 5 } } : m)) };
+    tr = applyLoadoutTrade(tr.loadout, filled);
+    expect(tr.cost).toBe(Math.ceil(3 * MODULES.torpedo.ammoPrice!)); // miny bez minového modulu = kapacita 0
+    expect(tr.loadout.modules[1].store).toEqual({ torpedo: 3 });
+    // odprodat nejde
+    const less: ShipLoadout = { ...tr.loadout, modules: tr.loadout.modules.map((m) => (m.id === "s1" ? { ...m, store: { torpedo: 1 } } : m)) };
+    const tr2 = applyLoadoutTrade(tr.loadout, less);
+    expect(tr2.cost).toBe(0);
+    expect(tr2.loadout.modules[1].store).toEqual({ torpedo: 3 });
+    // opravář: +1 torpédo do skladu
+    const g = game();
+    const me = place(g, "ship-p1-0", 500, 500, 0);
+    place(g, "ship-p2-0", 1500, 1200, 0);
+    me.loadout.modules = [newModule("torpedo", "front", "t1"), newModule("ammostore", "back", "s1"), newModule("repair", "left", "r1")];
+    refreshShip(me);
+    me.techPoints = 6;
+    let rr = applyRepair(g, me, { kind: "ammo", moduleId: "s1", ammoType: "torpedo" });
+    expect(rr.error).toBeUndefined();
+    expect(me.loadout.modules[1].store?.torpedo).toBe(1);
+    expect(applyRepair(g, me, { kind: "ammo", moduleId: "s1", ammoType: "mine" }).error).toMatch(/plný/);
+    // stanice: v okruhu sběru naskladní po kapacitu za kredity
+    g.stations = [mkStation(500 + STATION.radius + 100, 500)];
+    const pl = g.players.find((p) => p.id === me.ownerId)!;
+    pl.credits = 1000;
+    const r = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: false, action: { type: "comm", stationId: "st1", ammoType: "torpedo" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    const od = r.events.find((e) => e.type === "stationOrder");
+    expect(od && od.type === "stationOrder" && od.ok && od.amount).toBe(MODULES.torpedo.ammo! - 1);
+    expect(r.state.ships.find((s) => s.id === me.id)!.loadout.modules[1].store?.torpedo).toBe(MODULES.torpedo.ammo);
+    expect(r.state.players.find((p) => p.id === me.ownerId)!.credits).toBe(1000 - Math.ceil((MODULES.torpedo.ammo! - 1) * MODULES.torpedo.ammoPrice!) + RULES.creditsPerTurn);
+    // mimo okruh
+    g.stations = [mkStation(1200, 500)];
+    const r2 = resolveTurn(g, [{ shipId: me.id, maneuverId: "m1a0", fire: false, action: { type: "comm", stationId: "st1", ammoType: "torpedo" } }, { shipId: "ship-p2-0", maneuverId: "m1a0", fire: false }], createRng(1));
+    expect(r2.events.some((e) => e.type === "stationOrder" && !e.ok && e.reason === "range")).toBe(true);
   });
 });
 

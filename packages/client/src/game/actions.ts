@@ -1,4 +1,4 @@
-import { CARGO, RULES, actionCost, actionPointsOf, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, profileFor, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders, shotsOf, shotsOfType, stationInPickupRange } from "@wingfighter/shared";
+import { CARGO, RULES, actionCost, actionPointsOf, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, profileFor, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders, shotsOf, shotsOfType, stationInPickupRange, weaponAmmo } from "@wingfighter/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -36,7 +36,7 @@ export function actionAvailable(a: ActionOption, ship: Ship): boolean {
 const toggleType = (ship: Ship, o: ShipOrders, type: "laser" | "mg"): Partial<ShipOrders> => {
   const shots = shotsOf(ship, o);
   if (shotsOfType(ship, o, type).length) return { shots: shots.filter((sh) => ship.loadout.modules.find((m) => m.id === sh.moduleId)?.type !== type) };
-  const mod = ship.loadout.modules.find((m) => m.type === type && moduleWorking(m) && (type !== "mg" || (m.ammo ?? 0) > 0));
+  const mod = ship.loadout.modules.find((m) => m.type === type && moduleWorking(m) && (type !== "mg" || weaponAmmo(ship.loadout, m) > 0));
   return mod ? { shots: [...shots, { moduleId: mod.id }] } : {};
 };
 const noAp = (ship: Ship, o: ShipOrders, active: boolean) => (!active && actionCost(ship, o) >= actionPointsOf(ship) ? `žádná volná akce (max. ${actionPointsOf(ship)} za kolo)` : null);
@@ -70,7 +70,7 @@ export const ACTIONS: ActionOption[] = [
     glyph: "⁘",
     label: "Kulomet (1 akce)",
     description: "Na začátku kola vystřelí dávku projektilů s rozptylem na cíl ve výseči kulometu (krátký dosah, široká výseč). Každý projektil má šanci zasáhnout podle vzdálenosti a dává malé zranění. Míří na preferovaný cíl (loď, torpédo, trosky), jinak na nejbližší nepřátelskou loď. Funguje i v bouři.",
-    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mg") ? "loď nemá kulomet" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m)) ? "kulomet je zničený" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m) && (m.ammo ?? 0) > 0) ? "došly náboje" : noAp(ship, o, shotsOfType(ship, o, "mg").length > 0)),
+    disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "mg") ? "loď nemá kulomet" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m)) ? "kulomet je zničený" : !ship.loadout.modules.some((m) => m.type === "mg" && moduleWorking(m) && weaponAmmo(ship.loadout, m) > 0) ? "došly náboje" : noAp(ship, o, shotsOfType(ship, o, "mg").length > 0)),
     active: (o, ship) => shotsOfType(ship, o, "mg").length > 0,
     apply: (o, ship) => toggleType(ship, o, "mg"),
     requiresModule: "mg",
@@ -82,7 +82,7 @@ export const ACTIONS: ActionOption[] = [
     description: `Fázové torpédo: vyletí rovně z lodi (${TORPEDO.launchDist} j. rychlostí ${TORPEDO.launchSpeed}/kolo), pak se otáčí na cíl a po zaměření zrychlí až na ${TORPEDO.speed}/kolo; při plné rychlosti zatáčí jen mírně a cíl mimo výseč před sebou ztratí. Cíl zadáš jen na mapě: klikni na viditelnou nepřátelskou loď či torpédo do ${TORPEDO.lockRange} (sleduje ji celý let), nebo na bod do ${TORPEDO.pointRange} – tam vybuchne (poloměr ${TORPEDO.blastRadius}, zranění ${TORPEDO.blastDamage} všem, kráter do asteroidu). Přímý zásah lodi = ${TORPEDO.damage}.`,
     disabled: (ship, _s, o) => (!ship.loadout.modules.some((m) => m.type === "torpedo") ? "loď nemá torpédomet" : !ship.loadout.modules.some((m) => m.type === "torpedo" && moduleWorking(m)) ? "torpédomet je zničený" : ship.ammo.torpedoes > 0 ? noAp(ship, o, o.special?.type === "torpedo") : "došla torpéda"),
     active: (o) => o.special?.type === "torpedo",
-    apply: (o, ship) => ({ special: o.special?.type === "torpedo" ? undefined : { type: "torpedo", moduleId: ship.loadout.modules.find((m) => m.type === "torpedo" && moduleWorking(m) && (m.ammo ?? 0) > 0)?.id } }),
+    apply: (o, ship) => ({ special: o.special?.type === "torpedo" ? undefined : { type: "torpedo", moduleId: ship.loadout.modules.find((m) => m.type === "torpedo" && moduleWorking(m) && weaponAmmo(ship.loadout, m) > 0)?.id } }),
     pick: "torpedo",
     requiresModule: "torpedo",
   },

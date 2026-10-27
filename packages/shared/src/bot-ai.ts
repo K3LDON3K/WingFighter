@@ -17,7 +17,7 @@ import { insideMap } from "./mapshape.ts";
 import { pointInStorm } from "./mapgen.ts";
 import { actionCost, actionPointsOf, aimPose, ammoModules, obstacles, stationInPickupRange, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, repairBlocked, repairableModules, sectorHit, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
 import type { Rng } from "./rng.ts";
-import { cargoCapacity, laserHalfArc, laserRange, mgRange, moduleWorking, MODULES, profileOf, torpedoLockRange, torpedoPointRange } from "./ships.ts";
+import { weaponAmmo, cargoCapacity, laserHalfArc, laserRange, mgRange, moduleWorking, MODULES, profileOf, torpedoLockRange, torpedoPointRange } from "./ships.ts";
 import type { BotLevel, GameState, Maneuver, RepairOrder, Segments, Ship, ShipOrders, Shot } from "./types.ts";
 
 /** Předpokládané pozice nepřítele po tomto kole (s vahou). */
@@ -54,7 +54,7 @@ function offenseAt(me: Ship, mePose: Pose, enemy: Ship, pose: Pose): number {
     if (mod.type === "laser" && me.stats.attack > 0) {
       const odds = laserOdds(shooter, target, mod.id);
       if (odds.coverage > 0) dmg += odds.expectedDamage;
-    } else if (mod.type === "mg" && (mod.ammo ?? 0) > 0) {
+    } else if (mod.type === "mg" && weaponAmmo(shooter.loadout, mod) > 0) {
       const aim = aimPose(shooter, mod);
       const ha = sectorHit(aim, mgRange(shooter), MG.halfArc, target);
       const cov = ha.coverage;
@@ -280,7 +280,7 @@ function planShots(state: GameState, ship: Ship, enemies: Ship[]): { shot: Shot;
         if (!best || v > best.v) best = { id: e.id, v };
       }
       if (best && best.v > 1) out.push({ shot: { moduleId: mod.id, targetId: best.id }, value: best.v });
-    } else if (mod.type === "mg" && (mod.ammo ?? 0) > 0) {
+    } else if (mod.type === "mg" && weaponAmmo(ship.loadout, mod) > 0) {
       let best: { id: string; v: number } | undefined;
       for (const e of enemies) {
         const pv = mgPreview(state, ship, e.id, mod.id);

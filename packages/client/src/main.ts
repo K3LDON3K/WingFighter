@@ -1,5 +1,7 @@
 import {
   setPilots,
+  weaponAmmo,
+  AMMO_TYPES,
   type RepairOrder,
   type HackOrder,
   RULES,
@@ -1051,7 +1053,7 @@ function showScanResult(ship: Ship) {
   if (!mapEl || !game) return;
   mapEl.querySelector(".scan-wrap")?.remove();
   const lo = ship.loadout;
-  const lines = lo.modules.map((m) => `${MODULES[m.type].name}${m.facing ? ` (${FACING_NAMES[m.facing]})` : ""}${m.ammo !== undefined ? ` · ${m.ammo} ks` : ""}`);
+  const lines = lo.modules.map((m) => `${MODULES[m.type].name}${m.facing ? ` (${FACING_NAMES[m.facing]})` : ""}${m.ammo !== undefined ? ` · ${m.ammo} ks` : ""}${m.type === "ammostore" ? ` · ${AMMO_TYPES.filter((t) => (m.store?.[t] ?? 0) > 0).map((t) => `${MODULES[t].short} ${m.store![t]}`).join(", ") || "prázdný"}` : ""}`);
   const entry = game.log.find((l) => l.turn === game!.state.turn) ?? (game.log.push({ turn: game.state.turn, lines: [] }), game.log[game.log.length - 1]);
   entry.lines.push(`Sken ${ship.name}: ${HULLS[lo.hullId]?.name ?? lo.hullId}, pilot ${PILOTS[lo.pilotId]?.name ?? lo.pilotId}; ${lines.length ? lines.join(", ") : "bez modulů"}.`);
   const wrap = h(
@@ -1600,11 +1602,11 @@ function renderSide() {
         g.repairOpen = false;
         renderSide();
       },
-      commOrder: (id, stationId, moduleType) => {
+      commOrder: (id, stationId, moduleType, ammoType) => {
         const g = game!;
         const o = g.orders.get(id);
         if (!o) return;
-        g.orders.set(id, { ...o, action: { type: "comm", stationId, moduleType } });
+        g.orders.set(id, { ...o, action: ammoType ? { type: "comm", stationId, ammoType } : { type: "comm", stationId, moduleType: moduleType! } });
         g.commOpen = false;
         sfx("click");
         renderSide();
@@ -1958,7 +1960,7 @@ function chooseIcon(shipId: string, id: string) {
       g.activeShot = moduleId;
       sfx("toggle");
     } else {
-      const why = mod.type === "laser" && inStorm(g.state, ship) ? "v bouři lasery nefungují" : !moduleWorking(mod) ? "modul je zničený" : mod.type === "mg" && (mod.ammo ?? 0) <= 0 ? "došly náboje" : actionCost(ship, o) >= actionPointsOf(ship) ? `žádná volná akce (max. ${actionPointsOf(ship)} za kolo)` : null;
+      const why = mod.type === "laser" && inStorm(g.state, ship) ? "v bouři lasery nefungují" : !moduleWorking(mod) ? "modul je zničený" : mod.type === "mg" && weaponAmmo(ship.loadout, mod) <= 0 ? "došly náboje" : actionCost(ship, o) >= actionPointsOf(ship) ? `žádná volná akce (max. ${actionPointsOf(ship)} za kolo)` : null;
       if (why) {
         showError(`${MODULES[mod.type].name}: ${why}.`);
         return;
