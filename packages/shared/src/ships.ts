@@ -598,7 +598,8 @@ export function computeStats(loadout: ShipLoadout): ShipStats {
     radius: hull.radius,
     colliders: hull.colliders ?? [{ x: 0, y: 0, r: hull.radius }],
     vision: VISION_REF.value,
-    stressMax: STRESS_MAX_REF.value,
+    stressMax: hull.stressMax ?? STRESS_MAX_REF.value,
+    actionPoints: hull.actionPoints ?? RULES.actionPoints,
     techMax: hull.techMax ?? TECH.max,
     segmentModules: 0,
   };

@@ -16,6 +16,7 @@ export interface ViewShip extends Pose {
   evading?: boolean;
   roll?: number;
   stressPoints: number;
+  stressMax: number;
   /** Trup (pro výběr spritu). */
   hullId: string;
   radius: number;
@@ -114,6 +115,7 @@ export function shipToView(s: Ship): ViewShip {
     shieldEff: s.shieldEff,
     segments: [...s.segments] as Segments,
     stressPoints: s.stressPoints,
+    stressMax: s.stats.stressMax,
     hullId: s.loadout.hullId,
     radius: s.stats.radius,
     colliders: s.stats.colliders,

@@ -150,6 +150,10 @@ export interface HullDef {
   rangeMul?: number;
   /** Body technologie na bitvu (chybí = obecná hodnota z ladění). */
   techMax?: number;
+  /** Maximum stresových bodů trupu (ladění; pilot upravuje). */
+  stressMax?: number;
+  /** Akce na kolo (ladění). */
+  actionPoints?: number;
   /** Lasery mají do všech směrů stejnou výseč jako dopředu (bitevník). */
   sameArcs?: boolean;
 }
@@ -252,6 +256,8 @@ export interface ShipStats {
   vision: number;
   /** Maximum stresových bodů (ladění + pilot). */
   stressMax: number;
+  /** Akce na kolo (podle trupu). */
+  actionPoints: number;
   /** Body technologie na celou bitvu (ladění); utrácí je skener. */
   techMax: number;
   /** Počet segmentových štítových modulů (životy segmentu = počet × segmentHp). */

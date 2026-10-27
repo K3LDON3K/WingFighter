@@ -1,7 +1,7 @@
 import { moduleWorking } from "./ships.ts";
 import { insideMap } from "./mapshape.ts";
 import { LASER, RULES, TORPEDO } from "./constants.ts";
-import { actionCost, obstacles } from "./resolve.ts";
+import { actionCost, actionPointsOf, obstacles } from "./resolve.ts";
 import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from "./geometry.ts";
 import { isRed, listManeuvers, maneuverEnd, maneuverPath, maneuverStress } from "./maneuvers.ts";
 import { circleHitsAsteroid } from "./asteroids.ts";
@@ -53,7 +53,7 @@ export function planBot(state: GameState, playerId: string, rng: Rng, level: Bot
 
     const orders: ShipOrders = { shipId: ship.id, maneuverId: best.id, shots: [], preferredTargetId: nearest?.id };
     if (turnHeading !== undefined) orders.action = { type: "turn", heading: turnHeading };
-    const left = () => RULES.actionPoints - actionCost(ship, orders);
+    const left = () => actionPointsOf(ship) - actionCost(ship, orders);
     const lasers = ship.loadout.modules.filter((m) => m.type === "laser" && moduleWorking(m));
     const addLaser = () => {
       const m = lasers.find((x) => !orders.shots!.some((sh) => sh.moduleId === x.id));

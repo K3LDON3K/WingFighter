@@ -543,6 +543,10 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
 export function actionCost(ship: Ship, o: ShipOrders): number {
   return actionList(ship, o).length;
 }
+/** Akce na kolo pro danou loď (podle trupu, ladění). */
+export function actionPointsOf(ship: Pick<Ship, "stats">): number {
+  return ship.stats.actionPoints ?? RULES.actionPoints;
+}
 
 /** Je cíl (loď nebo torpédo) nepřátelský a existující? */
 /** Torpédový modul s municí (zadaný, nebo první s municí). */
@@ -692,10 +696,11 @@ export function sanitizeOrders(state: GameState, playerId: string, incoming: Shi
     }
     const o: ShipOrders = { shipId: ship.id, maneuverId: man.id, action, special, shots, preferredTargetId, droid };
     // limit akcí: nejdřív padá zbraň, pak střely (od poslední), pak úhyb, nakonec manévr
-    if (actionCost(ship, o) > RULES.actionPoints) o.special = undefined;
-    if (actionCost(ship, o) > RULES.actionPoints) o.action = undefined;
-    while (actionCost(ship, o) > RULES.actionPoints && o.shots!.length) o.shots!.pop();
-    if (actionCost(ship, o) > RULES.actionPoints) o.maneuverId = def.maneuverId;
+    const ap = actionPointsOf(ship);
+    if (actionCost(ship, o) > ap) o.special = undefined;
+    if (actionCost(ship, o) > ap) o.action = undefined;
+    while (actionCost(ship, o) > ap && o.shots!.length) o.shots!.pop();
+    if (actionCost(ship, o) > ap) o.maneuverId = def.maneuverId;
     // odvozené starší příznaky (pro čtení)
     const ls = shotsOfType(ship, o, "laser");
     const ms = shotsOfType(ship, o, "mg");

@@ -1022,7 +1022,7 @@ export class Renderer {
     ctx.fillStyle = s.hull <= s.maxHull * 0.3 ? "#ef4444" : "#22c55e";
     ctx.fillRect(bx, by + 3, hw, 2);
     // stresové body (jen vlastní tým vidí detail; ostatní také – informace není tajná)
-    for (let i = 0; i < STRESS.max; i++) {
+    for (let i = 0; i < (s.stressMax ?? STRESS.max); i++) {
       ctx.fillStyle = i < s.stressPoints ? "#f472b6" : "rgba(244,114,182,0.25)";
       ctx.fillRect(s.x + s.radius + SHIELD_GAP + 4 + i * 5, s.y - top - 4, 3, 3);
     }

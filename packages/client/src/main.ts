@@ -4,6 +4,7 @@ import {
   type HackOrder,
   RULES,
   actionCost,
+  actionPointsOf,
   ANGLE_STEP,
   defaultOrders,
   dist,
@@ -519,7 +520,7 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
   if (!man) return false;
   // bez volných stresových bodů se manévr vůbec nenabízí (dřív šel vybrat a jen se neprovedl)
   if (effStressCost(man, o) > ship.stressPoints) return false;
-  if (actionCost(ship, { ...o, maneuverId: man.id }) > RULES.actionPoints) return false;
+  if (actionCost(ship, { ...o, maneuverId: man.id }) > actionPointsOf(ship)) return false;
   if (man.id !== o.maneuverId) {
     game.orders.set(shipId, { ...o, maneuverId: man.id });
     // při kreslení myší se manévr mění mnohokrát za sekundu – panel překreslit až v dalším snímku
@@ -1354,8 +1355,8 @@ function unusedActions(): { unused: number; total: number } {
   for (const [id, o] of game.orders) {
     const ship = game.state.ships.find((x) => x.id === id && x.alive);
     if (!ship) continue;
-    unused += Math.max(0, RULES.actionPoints - actionCost(ship, o));
-    total += RULES.actionPoints;
+    unused += Math.max(0, actionPointsOf(ship) - actionCost(ship, o));
+    total += actionPointsOf(ship);
   }
   return { unused, total };
 }
@@ -1946,7 +1947,7 @@ function chooseIcon(shipId: string, id: string) {
       g.activeShot = moduleId;
       sfx("toggle");
     } else {
-      const why = mod.type === "laser" && inStorm(g.state, ship) ? "v bouři lasery nefungují" : !moduleWorking(mod) ? "modul je zničený" : mod.type === "mg" && (mod.ammo ?? 0) <= 0 ? "došly náboje" : actionCost(ship, o) >= RULES.actionPoints ? `žádná volná akce (max. ${RULES.actionPoints} za kolo)` : null;
+      const why = mod.type === "laser" && inStorm(g.state, ship) ? "v bouři lasery nefungují" : !moduleWorking(mod) ? "modul je zničený" : mod.type === "mg" && (mod.ammo ?? 0) <= 0 ? "došly náboje" : actionCost(ship, o) >= actionPointsOf(ship) ? `žádná volná akce (max. ${actionPointsOf(ship)} za kolo)` : null;
       if (why) {
         showError(`${MODULES[mod.type].name}: ${why}.`);
         return;
@@ -2039,7 +2040,7 @@ function bindInput(c: HTMLCanvasElement) {
     const o = g.orders.get(shipId)!;
     const curCost = actionCost(ship, o);
     const adjusting = curCost > actionCost(ship, { ...o, maneuverId: defaultOrders(ship).maneuverId });
-    if (curCost >= RULES.actionPoints && !adjusting) {
+    if (curCost >= actionPointsOf(ship) && !adjusting) {
       showError("Úprava pohybu stojí akci a obě už máš použité. Odeber zbraň.");
       return false;
     }

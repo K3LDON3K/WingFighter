@@ -15,7 +15,7 @@ import { bearingTo, circlesOverlap, dist, inArc, samplePath, type Pose } from ".
 import { listManeuvers, maneuverEnd, maneuverPath, makeManeuver } from "./maneuvers.ts";
 import { insideMap } from "./mapshape.ts";
 import { pointInStorm } from "./mapgen.ts";
-import { actionCost, aimPose, ammoModules, obstacles, stationInPickupRange, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, repairBlocked, repairableModules, sectorHit, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
+import { actionCost, actionPointsOf, aimPose, ammoModules, obstacles, stationInPickupRange, canAfford, defaultOrders, droidModule, effStressCost, hitSegment, inCometTail, laserOdds, mgHitChance, mgPreview, mineModule, repairBlocked, repairableModules, sectorHit, shieldRechargeBlocked, torpedoModule, validShieldAction } from "./resolve.ts";
 import type { Rng } from "./rng.ts";
 import { cargoCapacity, laserHalfArc, laserRange, mgRange, moduleWorking, MODULES, profileOf, torpedoLockRange, torpedoPointRange } from "./ships.ts";
 import type { BotLevel, GameState, Maneuver, RepairOrder, Segments, Ship, ShipOrders, Shot } from "./types.ts";
@@ -422,7 +422,7 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
       }
       if (rep.length) orders.repair = rep;
     }
-    const left = () => RULES.actionPoints - actionCost(ship, orders);
+    const left = () => actionPointsOf(ship) - actionCost(ship, orders);
 
     // 2. nabídka akcí s užitkem; vezmou se nejlepší, co se vejdou
     type Opt = { value: number; kind: "shot" | "action" | "special"; apply: () => void };
@@ -474,7 +474,7 @@ export function planSmartBot(state: GameState, playerId: string, rng: Rng, level
     // manévr jiný než „rovně stejnou rychlostí“ stojí akci: vyplatí se jen, když je lepší než akce, o kterou tím přijdu
     const free = cands.find((c) => c.man.id === freeId);
     if (free && chosen.man.id !== free.man.id) {
-      const withMove = RULES.actionPoints - actionCost(ship, orders);
+      const withMove = actionPointsOf(ship) - actionCost(ship, orders);
       const dropped = opts[withMove]?.value ?? 0; // první akce, která se už nevejde
       if (dropped > chosen.score - free.score) {
         orders.maneuverId = free.man.id;

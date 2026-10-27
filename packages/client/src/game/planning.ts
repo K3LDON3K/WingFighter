@@ -75,6 +75,7 @@ import {
   shotsOfType,
   shotTargetId,
   actionCost,
+  actionPointsOf,
 } from "@wingfighter/shared";
 import { clear, h } from "../dom.ts";
 import { isTouchMode } from "../touch.ts";
@@ -475,7 +476,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
 
   /* ---- 3. akce ---- */
   const apips = h("div", { class: "apip" });
-  for (let i = 0; i < RULES.actionPoints; i++) apips.append(h("i", { class: i < RULES.actionPoints - acts.length ? "on" : "" }));
+  for (let i = 0; i < actionPointsOf(ship); i++) apips.append(h("i", { class: i < actionPointsOf(ship) - acts.length ? "on" : "" }));
   /** Skupina suroviny v hlavičce (varianta C): popisek nad pilulkami. */
   const resGroup = (name: string, pips: HTMLElement, title: string, cls = "") => h("div", { class: `res-grp ${cls}`, title }, h("span", { class: "res-lbl" }, label(name)), pips);
   const spips = h("div", { class: "apip pink" });
@@ -487,7 +488,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
   const resources = h(
     "div",
     { class: "res-row" },
-    resGroup("Akce", apips, `Akce: ${RULES.actionPoints - acts.length}/${RULES.actionPoints} volné. Dobíjí se každé kolo.`),
+    resGroup("Akce", apips, `Akce: ${actionPointsOf(ship) - acts.length}/${actionPointsOf(ship)} volné. Dobíjí se každé kolo.`),
     resGroup("Stres", spips, `Stresové body ${ship.stressPoints}/${ship.stats.stressMax}: oranžový manévr −1, nebezpečný (červený) −2, zelený +1.`),
     resGroup(inStormNow ? "Technologie ⚡ bouře" : "Technologie", tpips, `Technologie ${ship.techPoints}/${ship.stats.techMax}: body na celou bitvu, nedobíjí se (průlet ocasem komety: los – buď štít, nebo +${COMET.tailTech}). Sken lodi ${SCANNER.shipCost}, hluboký sken ${SCANNER.deepCost}.${inStormNow ? "\nV bouři je technologie deaktivovaná – skener nefunguje." : ""}`, inStormNow ? "storm" : ""),
   );
@@ -517,8 +518,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           const isActive = on && m.activeShot === mod.id;
           const destroyed = !moduleWorking(mod);
           const noAmmo = type === "mg" && (mod.ammo ?? 0) <= 0;
-          const noAp = !on && actionCost(ship, o) >= RULES.actionPoints;
-          const why = destroyed ? "ZNIČENO – modul nefunguje" : stormOff ? "systém je v bouři mimo provoz" : noAmmo ? "došly náboje" : noAp ? `žádná volná akce (max. ${RULES.actionPoints} za kolo)` : null;
+          const noAp = !on && actionCost(ship, o) >= actionPointsOf(ship);
+          const why = destroyed ? "ZNIČENO – modul nefunguje" : stormOff ? "systém je v bouři mimo provoz" : noAmmo ? "došly náboje" : noAp ? `žádná volná akce (max. ${actionPointsOf(ship)} za kolo)` : null;
           const name = `${MODULES[type].name}${mods.length > 1 ? ` ${i + 1}` : ""} · ${FACING_NAMES[mod.facing ?? "front"]}`;
           const tid = shot ? shotTargetId(o, shot.shot) : undefined;
           const tname = tid ? (m.state.ships.find((x) => x.id === tid)?.name ?? "cíl") : null;

@@ -70,6 +70,11 @@ export interface Tuning {
   // akce a stres
   actionPoints: number;
   stressMax: number;
+  /** Akce na kolo a max. stres zvlášť pro stíhač a bitevník. */
+  actionPointsFighter: number;
+  actionPointsBattleship: number;
+  stressMaxFighter: number;
+  stressMaxBattleship: number;
   stressCostRed: number;
   stressCostDanger: number;
   stressRegenGreen: number;
@@ -226,6 +231,10 @@ export const DEFAULT_TUNING: Tuning = {
   torpedoTrackArcDeg: 90,
   actionPoints: 2,
   stressMax: 3,
+  actionPointsFighter: 2,
+  actionPointsBattleship: 2,
+  stressMaxFighter: 3,
+  stressMaxBattleship: 3,
   stressCostRed: 1,
   stressCostDanger: 2,
   stressRegenGreen: 1,
@@ -329,24 +338,28 @@ export interface TuningField {
 /** Popis polí pro UI (pořadí = pořadí v menu). */
 export const TUNING_FIELDS: TuningField[] = [
   // --- loď ---
-  { key: "hull", label: "Stíhač – trup", group: "Loď", min: 10, max: 1000, step: 10 },
-  { key: "agility", label: "Stíhač – obratnost (kostky obrany)", group: "Loď", min: 0, max: 6, step: 1 },
-  { key: "maxSpeedFighter", label: "Stíhač – max. rychlost", group: "Loď", min: 1, max: 5, step: 1, hint: "bez váhy výbavy; váha ubírá" },
-  { key: "hullBattleship", label: "Bitevník – trup", group: "Loď", min: 50, max: 1000, step: 10 },
-  { key: "agilityBattleship", label: "Bitevník – obratnost (kostky obrany)", group: "Loď", min: 0, max: 6, step: 1 },
-  { key: "techBattleship", label: "Bitevník – body technologie", group: "Loď", min: 0, max: 20, step: 1, hint: "stíhač má obecnou hodnotu ze sekce Skener" },
-  { key: "maxSpeedBattleship", label: "Bitevník – max. rychlost", group: "Loď", min: 1, max: 5, step: 1 },
-  { key: "vision", label: "Dohled (fog of war)", group: "Loď", min: 100, max: 4000, step: 50 },
-  { key: "weightPerSpeed", label: "Váha na −1 max. rychlosti", group: "Loď", min: 1, max: 30, step: 1, hint: "součet váhy modulů / tato hodnota = o kolik klesne max. rychlost" },
-  { key: "collisionShip", label: "Náraz loď–loď", group: "Loď", min: 0, max: 100, step: 5 },
-  { key: "collisionAsteroid", label: "Náraz do asteroidu", group: "Loď", min: 0, max: 100, step: 5 },
+  { key: "hull", label: "Trup", group: "Stíhač", min: 10, max: 1000, step: 10 },
+  { key: "agility", label: "Obratnost (kostky obrany)", group: "Stíhač", min: 0, max: 6, step: 1 },
+  { key: "maxSpeedFighter", label: "Max. rychlost", group: "Stíhač", min: 1, max: 5, step: 1, hint: "bez váhy výbavy; váha ubírá" },
+  { key: "actionPointsFighter", label: "Akce na kolo", group: "Stíhač", min: 1, max: 5, step: 1 },
+  { key: "stressMaxFighter", label: "Stresové body – max", group: "Stíhač", min: 1, max: 10, step: 1, hint: "pilot může ±1" },
+  { key: "hullBattleship", label: "Trup", group: "Bitevník", min: 50, max: 1000, step: 10 },
+  { key: "agilityBattleship", label: "Obratnost (kostky obrany)", group: "Bitevník", min: 0, max: 6, step: 1 },
+  { key: "techBattleship", label: "Body technologie", group: "Bitevník", min: 0, max: 20, step: 1, hint: "stíhač má obecnou hodnotu ze sekce Skener" },
+  { key: "maxSpeedBattleship", label: "Max. rychlost", group: "Bitevník", min: 1, max: 5, step: 1 },
+  { key: "actionPointsBattleship", label: "Akce na kolo", group: "Bitevník", min: 1, max: 5, step: 1 },
+  { key: "stressMaxBattleship", label: "Stresové body – max", group: "Bitevník", min: 1, max: 10, step: 1, hint: "pilot může ±1" },
+  { key: "vision", label: "Dohled (fog of war)", group: "Loď (obecné)", min: 100, max: 4000, step: 50 },
+  { key: "weightPerSpeed", label: "Váha na −1 max. rychlosti", group: "Loď (obecné)", min: 1, max: 30, step: 1, hint: "součet váhy modulů / tato hodnota = o kolik klesne max. rychlost" },
+  { key: "collisionShip", label: "Náraz loď–loď", group: "Loď (obecné)", min: 0, max: 100, step: 5 },
+  { key: "collisionAsteroid", label: "Náraz do asteroidu", group: "Loď (obecné)", min: 0, max: 100, step: 5 },
   { key: "repairHullPct", label: "Opravář – oprava trupu (% maxima)", group: "Akce a stres", min: 5, max: 100, step: 5, hint: "droid opravář za 3 body technologie opraví trup o tolik % maxima" },
   { key: "hackOrdnanceCost", label: "Hacker – hack miny/torpéda (technologie)", group: "Akce a stres", min: 0, max: 6, step: 1 },
   { key: "hackModuleCost", label: "Hacker – hack cizího modulu (technologie)", group: "Akce a stres", min: 0, max: 6, step: 1, hint: "modul protivníka na toto kolo nefunguje" },
   { key: "repairAutoCost", label: "Opravář – pasivní oprava (technologie)", group: "Akce a stres", min: 0, max: 6, step: 1 },
   { key: "repairAutoPct", label: "Opravář – pasivní oprava (% trupu za kolo)", group: "Akce a stres", min: 1, max: 25, step: 1 },
   { key: "repairAutoTurns", label: "Opravář – pasivní oprava (kol)", group: "Akce a stres", min: 1, max: 10, step: 1 },
-  { key: "asteroidHitPct", label: "Asteroid – kolizní obrys (% obrázku)", group: "Loď", min: 70, max: 100, step: 1, hint: "menší než 100 = asteroid jde těsně obletět (platí pro lodě, torpéda i lasery)" },
+  { key: "asteroidHitPct", label: "Asteroid – kolizní obrys (% obrázku)", group: "Loď (obecné)", min: 70, max: 100, step: 1, hint: "menší než 100 = asteroid jde těsně obletět (platí pro lodě, torpéda i lasery)" },
   { key: "stationHull", label: "Stanice – trup", group: "Stanice", min: 100, max: 10000, step: 100 },
   { key: "stationShields", label: "Stanice – energetický štít", group: "Stanice", min: 0, max: 1000, step: 10 },
   { key: "stationShieldRegen", label: "Stanice – dobití štítu za kolo", group: "Stanice", min: 0, max: 200, step: 5 },
@@ -354,12 +367,12 @@ export const TUNING_FIELDS: TuningField[] = [
   { key: "stationPickupRange", label: "Stanice – okruh sběru", group: "Stanice", min: 80, max: 400, step: 10 },
   { key: "stationBlastDamage", label: "Stanice – výbuch při zničení (zranění do 150)", group: "Stanice", min: 0, max: 300, step: 10 },
   { key: "stationReward", label: "Stanice – odměna za zničení (kredity)", group: "Stanice", min: 0, max: 500, step: 10 },
-  { key: "crashCrater", label: "Díra po nárazu lodi – min. poloměr", group: "Loď", min: 0, max: 100, step: 2, hint: "náraz do asteroidu vykousne díru; větší loď dělá větší díru" },
-  { key: "collisionEdge", label: "Náraz do okraje mapy", group: "Loď", min: 0, max: 100, step: 5 },
-  { key: "craterRadius", label: "Kráter v asteroidu – poloměr", group: "Loď", min: 0, max: 150, step: 5 },
+  { key: "crashCrater", label: "Díra po nárazu lodi – min. poloměr", group: "Loď (obecné)", min: 0, max: 100, step: 2, hint: "náraz do asteroidu vykousne díru; větší loď dělá větší díru" },
+  { key: "collisionEdge", label: "Náraz do okraje mapy", group: "Loď (obecné)", min: 0, max: 100, step: 5 },
+  { key: "craterRadius", label: "Kráter v asteroidu – poloměr", group: "Loď (obecné)", min: 0, max: 150, step: 5 },
   // --- akce a stres ---
-  { key: "actionPoints", label: "Akce na kolo", group: "Akce a stres", min: 1, max: 5, step: 1 },
-  { key: "stressMax", label: "Stresové body – max", group: "Akce a stres", min: 1, max: 10, step: 1 },
+  { key: "actionPoints", label: "Akce na kolo – ostatní trupy (výchozí)", group: "Akce a stres", min: 1, max: 5, step: 1, hint: "stíhač a bitevník mají vlastní hodnotu v záložce Stíhač / Bitevník" },
+  { key: "stressMax", label: "Stresové body – max, ostatní trupy (výchozí)", group: "Akce a stres", min: 1, max: 10, step: 1 },
   { key: "stressCostRed", label: "Červený manévr – cena", group: "Akce a stres", min: 0, max: 5, step: 1 },
   { key: "stressCostDanger", label: "Nebezpečný manévr – cena", group: "Akce a stres", min: 0, max: 5, step: 1 },
   { key: "dangerHullPercent", label: "Nebezpečný manévr – % trupu", group: "Akce a stres", min: 0, max: 50, step: 1 },
@@ -574,6 +587,10 @@ export function applyTuning(t: Tuning): void {
   HULLS.battleship.hull = t.hullBattleship;
   HULLS.battleship.agility = t.agilityBattleship;
   HULLS.battleship.techMax = t.techBattleship;
+  HULLS.fighter.actionPoints = t.actionPointsFighter;
+  HULLS.battleship.actionPoints = t.actionPointsBattleship;
+  HULLS.fighter.stressMax = t.stressMaxFighter;
+  HULLS.battleship.stressMax = t.stressMaxBattleship;
   BATTLESHIP_PROFILE.maxSpeed = t.maxSpeedBattleship;
   LASER_DICE.value = t.laserDice;
   MODULES["shield-whole"].shields = t.shields;

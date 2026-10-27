@@ -1,4 +1,4 @@
-import { CARGO, RULES, actionCost, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, profileFor, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders, shotsOf, shotsOfType, stationInPickupRange } from "@wingfighter/shared";
+import { CARGO, RULES, actionCost, actionPointsOf, cargoCapacity, dist, inStorm, makeManeuver, mineModule, mineSideOf, moduleWorking, parseManeuverId, profileOf, profileFor, effStressCost, effEvadeCost, TORPEDO, type GameState, type Segments, type Ship, type ShipOrders, shotsOf, shotsOfType, stationInPickupRange } from "@wingfighter/shared";
 
 /** Jedna ikona ve věnečku u konce dráhy. Každá představuje jednu akci (1 bod). */
 export interface ActionOption {
@@ -39,7 +39,7 @@ const toggleType = (ship: Ship, o: ShipOrders, type: "laser" | "mg"): Partial<Sh
   const mod = ship.loadout.modules.find((m) => m.type === type && moduleWorking(m) && (type !== "mg" || (m.ammo ?? 0) > 0));
   return mod ? { shots: [...shots, { moduleId: mod.id }] } : {};
 };
-const noAp = (ship: Ship, o: ShipOrders, active: boolean) => (!active && actionCost(ship, o) >= RULES.actionPoints ? `žádná volná akce (max. ${RULES.actionPoints} za kolo)` : null);
+const noAp = (ship: Ship, o: ShipOrders, active: boolean) => (!active && actionCost(ship, o) >= actionPointsOf(ship) ? `žádná volná akce (max. ${actionPointsOf(ship)} za kolo)` : null);
 
 export const ACTIONS: ActionOption[] = [
   {
@@ -170,7 +170,7 @@ export const ACTIONS: ActionOption[] = [
       if (!man) return "loď otočku nezvládne";
       if (effStressCost(man, o) > ship.stressPoints) return `chybí stres (otočka stojí ${effStressCost(man, o)})`;
       const cost = actionCost(ship, { ...o, maneuverId: man.id });
-      return cost > RULES.actionPoints ? `otočka by stála ${cost} akce` : null;
+      return cost > actionPointsOf(ship) ? `otočka by stála ${cost} akce` : null;
     },
     active: (o, ship) => (stoppedNow(ship, o) ? o.action?.type === "turn" : !!parseManeuverId(o.maneuverId)?.koiogran),
     apply: (o, ship) => {
