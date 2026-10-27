@@ -186,6 +186,58 @@ function hpFrac(m: ModuleInstance): number {
   return max > 0 ? Math.max(0, Math.min(1, moduleHp(m) / max)) : 1;
 }
 
+/**
+ * Malý hex modulu (jako v nákladu / plástvi): obrys barvou kategorie, výplň podle životů, název, volitelný podtitulek
+ * (životy / munice), stav „ZNIČEN“. Pro okénka v bitvě (opravář). `r` = poloměr hexu.
+ */
+export function moduleStateHex(
+  m: ModuleInstance | null,
+  opts: { r?: number; sub?: string; subColor?: string; selected?: boolean; dim?: boolean; title?: string; onClick?: () => void; empty?: string; mark?: string } = {},
+): SVGSVGElement {
+  const r = opts.r ?? 28;
+  const w = 2 * r + 6;
+  const hh = Math.sqrt(3) * r;
+  const hgt = hh + 6;
+  const cx = w / 2;
+  const cy = hgt / 2;
+  const pts = [0, 60, 120, 180, 240, 300].map((a) => `${(cx + r * Math.cos((a * Math.PI) / 180)).toFixed(1)},${(cy + r * Math.sin((a * Math.PI) / 180)).toFixed(1)}`).join(" ");
+  const svg = svgEl("svg", { viewBox: `0 0 ${w} ${hgt}`, width: w, height: hgt, class: `mod-hex ${opts.onClick ? "selectable" : ""} ${opts.dim ? "dim" : ""} ${opts.selected ? "sel" : ""}` });
+  if (!m) {
+    svg.append(svgEl("polygon", { points: pts, fill: opts.onClick ? "#0f172a" : "none", stroke: opts.selected ? "#fb923c" : "#475569", "stroke-width": 2, "stroke-dasharray": "3 4" }));
+    svg.append(svgEl("text", { x: cx, y: cy + 4, "font-family": "Jersey, ui-monospace, monospace", "font-size": 10, fill: opts.onClick ? "#86efac" : "#64748b", "text-anchor": "middle" }, opts.empty ?? "VOLNÉ"));
+  } else {
+    const def = MODULES[m.type];
+    const broken = moduleBroken(m);
+    const col = opts.selected ? "#fb923c" : broken ? "#ef4444" : moduleColor(m.type);
+    svg.append(svgEl("polygon", { points: pts, fill: broken ? "#3b0a0a" : "#0f172a", stroke: col, "stroke-width": 3, "stroke-linejoin": "miter" }));
+    svg.append(...hpFill(pts, { y: 3, h: hh }, col, opts.selected ? 0.3 : broken ? 0.35 : 0.18, broken ? 1 : hpFrac(m)));
+    const words = def.name.toUpperCase().replace(/ [–-] /g, " ").split(" ");
+    const fs = r >= 26 ? 10 : 9;
+    const base = cy + (opts.sub ? -1 : 3) - (words.length - 1) * (fs / 2);
+    words.forEach((w2, k) => svg.append(svgEl("text", { x: cx, y: base + k * fs, "font-family": "Jersey, ui-monospace, monospace", "font-size": fs, fill: "#f8fafc", "text-anchor": "middle" }, w2)));
+    if (opts.sub) svg.append(svgEl("text", { x: cx, y: cy + hh / 2 - 6, "font-family": "Jersey", "font-size": 9, fill: opts.subColor ?? (broken ? "#fca5a5" : "#fbbf24"), "text-anchor": "middle" }, opts.sub));
+    if (opts.mark) svg.append(svgEl("text", { x: cx, y: cy - hh / 2 + 12, "font-family": "Jersey", "font-size": 9, fill: "#cbd5e1", "text-anchor": "middle" }, opts.mark));
+  }
+  if (opts.title) svg.append(svgEl("title", {}, opts.title));
+  if (opts.onClick) svg.addEventListener("click", opts.onClick);
+  return svg;
+}
+/** Poloha hexu slotu v malé plástvi (stejné rozložení jako v nákresu lodi), v px pro poloměr `r`; levý horní roh. */
+export function slotHexOffset(slot: SlotId, r: number): { x: number; y: number } {
+  const hw = 2 * r + 6;
+  const hh = Math.sqrt(3) * r + 6;
+  const col = (hw - 6) * 0.75;
+  const map: Record<SlotId, { x: number; y: number }> = {
+    front: { x: 0, y: 0 },
+    back: { x: 0, y: hh - 6 },
+    left: { x: -col, y: 1.5 * (hh - 6) },
+    right: { x: col, y: 1.5 * (hh - 6) },
+    podLeft: { x: -col, y: 0.5 * (hh - 6) },
+    podRight: { x: col, y: 0.5 * (hh - 6) },
+  };
+  return map[slot];
+}
+
 /** Barvy kategorií: zbraně červeně (energetické oranžověji), štíty modře, droidi fialově, technologie tyrkysově. */
 export const CATEGORY_COLOR: Record<ModuleCategory, string> = { weapon: "#ef4444", shield: "#3b82f6", droid: "#c084fc", tech: "#2dd4bf" };
 export function moduleColor(type: ModuleType): string {

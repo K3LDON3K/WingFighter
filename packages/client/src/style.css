@@ -5343,3 +5343,161 @@ body.drag-on * {
   height: auto;
   min-width: 0;
 }
+
+/* ---- lišta droidů: svisle na pravém okraji mapy, v barvě droidů (fialová) ---- */
+.droidbar {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  background: #1e1033;
+  border: 3px solid;
+  border-color: #d8b4fe #3b0764 #3b0764 #d8b4fe;
+  border-right: 0;
+  z-index: 6;
+  zoom: var(--ui-zoom, 1);
+}
+.droidbar:empty {
+  display: none;
+}
+.droidbar .cap {
+  font-size: 10px;
+  color: #d8b4fe;
+  letter-spacing: 1px;
+  text-align: center;
+}
+.droidbar .bb-weapon {
+  height: 56px;
+  background: #2e1065;
+  border-color: #c084fc #3b0764 #3b0764 #c084fc;
+}
+.droidbar .bb-weapon.on {
+  background: #c084fc;
+  color: #1c1917;
+  border-color: #f3e8ff #6b21a8 #6b21a8 #f3e8ff;
+}
+.dr-row {
+  position: relative;
+}
+/* vysunutá část: [panel] — [sloupec podtlačítek] — tlačítko droida */
+.dr-fly {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 7;
+  width: max-content;
+  animation: flyin 0.22s steps(4, end) both;
+}
+@keyframes flyin {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%);
+  }
+}
+.dr-fly::after {
+  content: "";
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  width: 12px;
+  height: 4px;
+  margin-top: -2px;
+  background: #c084fc;
+}
+.dr-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dr-conn {
+  width: 8px;
+  height: 4px;
+  background: #c084fc;
+  flex: none;
+}
+.dr-panel {
+  background: #1e1033;
+  border: 3px solid;
+  border-color: #d8b4fe #3b0764 #3b0764 #d8b4fe;
+  box-shadow: 0 0 0 2px #05070f;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 180px;
+  max-width: 420px;
+}
+.dr-panel .cap {
+  font-size: 11px;
+  color: #e9d5ff;
+  letter-spacing: 1px;
+  text-align: center;
+}
+.dr-panel .note {
+  font-size: 10px;
+  color: #a78bfa;
+  text-align: center;
+}
+.dr-panel .snote {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: center;
+  font-size: 12px;
+}
+.dr-panel .muted {
+  font-size: 12px;
+}
+.dr-panel .rslots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+.dr-panel .rslot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  background: #0f172a;
+  border-color: #64748b #0b1220 #0b1220 #64748b;
+}
+.dr-panel .rslot:hover:not(:disabled) {
+  background: #c084fc;
+  color: #1c1917;
+}
+.dr-panel .stab.go {
+  justify-content: center;
+}
+.dr-hexes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  max-width: 420px;
+}
+.dr-comb {
+  position: relative;
+}
+.mod-hex.selectable {
+  cursor: pointer;
+}
+.mod-hex.selectable:hover polygon:first-of-type {
+  fill: #312e81;
+}
+.mod-hex.dim {
+  opacity: 0.4;
+}
