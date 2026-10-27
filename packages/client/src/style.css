@@ -417,7 +417,7 @@ h3,
 }
 .maplog {
   position: absolute;
-  top: 46px;
+  top: 10px;
   right: 10px;
   width: 360px;
   max-height: calc(100% - 56px);
@@ -992,9 +992,9 @@ h3,
 }
 .bb-toggle .q {
   position: absolute;
-  right: 4px;
-  top: 4px;
-  font-size: 17px;
+  right: 5px;
+  top: 1px;
+  font-size: 15px;
   color: #fecaca;
   text-shadow: 1px 1px #450a0a;
   line-height: 1;
@@ -1097,7 +1097,7 @@ h3,
 .map-tools {
   position: absolute;
   top: 10px;
-  right: 10px;
+  left: 10px;
   display: flex;
   gap: 4px;
 }
@@ -1107,10 +1107,25 @@ h3,
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 4px;
+  width: 220px;
 }
 .map-zoom .mz-gap {
-  width: 10px;
+  display: none;
+}
+/* tlačítko POHLED: skryté, zapíná se v ladění (záložka Zobrazení); pak je pod − 👁 + */
+.map-zoom .center-btn {
+  display: none;
+  order: 9;
+  flex-basis: 100%;
+  width: max-content;
+  margin: 2px auto 0;
+  justify-content: center;
+}
+body.show-center-btn .map-zoom .center-btn {
+  display: inline-flex;
 }
 .map-zoom .mz-sq {
   width: 32px;
@@ -2855,7 +2870,7 @@ body.touch .lo-refill {
 /* ---- seznam hráčů (stav kola) ---- */
 .pstat {
   position: absolute;
-  right: 10px;
+  left: 10px;
   top: 46px;
   width: 150px;
   background: rgba(11, 16, 32, 0.9);
@@ -5902,4 +5917,33 @@ body.drag-on * {
 }
 .invbar .shield-pop .sreset.icon:hover {
   background: #b91c1c;
+}
+
+/* počítadlo kola pod SPUSTIT KOLO, kredity nad jménem lodi */
+.bb-go .keycap-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bb-turn {
+  font-size: 10px;
+  color: #94a3b8;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.bb-cr {
+  position: absolute;
+  left: -2px;
+  bottom: calc(100% + 6px);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+  letter-spacing: 1px;
+  background: rgba(5, 7, 15, 0.8);
+  border: 2px solid #1e293b;
+  padding: 1px 8px;
+  white-space: nowrap;
 }

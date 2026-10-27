@@ -107,7 +107,7 @@ import { DIFFICULTY_COLOR, finishPops, renderBottomBar, renderDroidBar, renderIn
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
-import { renderTuningPanel, showHitboxes, showSelectRing } from "./tuning-panel.ts";
+import { renderTuningPanel, showCenterBtn, showHitboxes, showSelectRing } from "./tuning-panel.ts";
 import { applyTouchClass, isTouchMode } from "./touch.ts";
 import { keepAwake } from "./wakelock.ts";
 import { initTooltips } from "./tooltip.ts";
@@ -702,11 +702,9 @@ function mountGame() {
     h(
       "div",
       { class: "map-tools" },
-      h("button", { class: "gear", id: "inv-btn", title: "Inventář lodi (připravuje se)", onclick: () => ((game!.inventoryOpen = !game!.inventoryOpen), renderSide()) }, icon("inventory", "currentColor", 12), label("inventář")),
-      h("button", { class: "gear touch-only", title: "Menu", onclick: () => toggleMenu(!game?.menuOpen) }, "☰ ", label("menu")),
+      h("button", { class: "gear", title: "Herní menu (Esc)", onclick: () => toggleMenu() }, icon("log", "currentColor", 12), label("menu")),
       h("button", { class: "gear", title: "Tabulka skóre (Tab)", onclick: () => toggleStats() }, icon("log", "currentColor", 12), label("skóre")),
       h("button", { class: "gear", title: "Ladění parametrů hry", onclick: () => (tuningOpen ? ((tuningOpen = false), renderSide()) : withTuneAccess(() => ((tuningOpen = true), renderSide()))) }, icon("target", "currentColor", 12), label("ladění")),
-      h("button", { class: "gear", title: "Herní menu (Esc)", onclick: () => toggleMenu() }, icon("log", "currentColor", 12), label("menu")),
     ),
     pstatEl,
     tooltipEl,
@@ -717,6 +715,7 @@ function mountGame() {
     toastEl,
   );
   app.append(h("div", { class: "game" }, h("div", { class: "mapcol" }, mapEl, barEl, subEl)));
+  document.body.classList.toggle("show-center-btn", showCenterBtn());
 
   const ctx = canvas.getContext("2d")!;
   renderer = new Renderer(canvas, ctx);
@@ -1208,8 +1207,10 @@ function renderHud() {
     })
     .join(" · ");
   const credits = s.players.find((p) => p.id === playerId)?.credits;
-  const html = `<div class="big">KOLO ${game.anim ? game.anim["result"].turn : s.turn}${limit}${credits !== undefined ? `<span class="hud-cr" title="Kredity: zbytek rozpočtu + odměny">${credits} CR</span>` : ""}</div><div>${counts}</div>`;
+  const html = ""; // kolo je pod SPUSTIT KOLO, kredity nad jménem lodi, počty v dohledu se už neukazují
   if (hudEl.innerHTML !== html) hudEl.innerHTML = html;
+  hudEl.style.display = "none";
+  void counts;
 
   if (overlayEl) {
     const finished = s.status === "finished" && !game.anim && game.queue.length === 0;

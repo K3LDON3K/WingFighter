@@ -412,6 +412,10 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
     h(
       "div",
       { class: "bb-tab", style: `color:${teamColor}` },
+      (() => {
+        const cr = m.state.players.find((p) => p.id === m.myId)?.credits;
+        return cr !== undefined ? h("div", { class: "bb-cr", title: "Kredity: zbytek rozpočtu + odměny (za sestřely, trosky, přežití)" }, icon("credits", "#fbbf24", 10), ` ${cr} CR`) : null;
+      })(),
       h("span", { class: "txt" }, ship.name),
       my.length > 1 ? h("div", { class: "ship-tabs" }, ...my.map((s, i) => h("button", { class: `px ${s.id === ship.id ? "on" : ""}`, title: `${s.name} · ${HULLS[s.loadout.hullId]?.name ?? ""} · ${PILOTS[s.loadout.pilotId]?.name ?? ""} · trup ${s.hull}/${s.stats.hull}`, onclick: () => cb.select(s.id) }, icon(s.loadout.hullId === "battleship" ? "battleship" : "ship", "currentColor", 9), ` ${i + 1}`))) : null,
     ),
@@ -891,7 +895,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
         ? h("button", { class: "px bb-launch waiting", title: "Klik = vrátit se k úpravám", onclick: () => cb.unready() }, icon("wait", "#e2e8f0", 18), h("span", { class: "l1" }, label("Čekám")), h("span", { class: "sub" }, label("klik = upravit")))
         : h("button", { class: "px bb-launch", disabled: inHand > 0, title: inHand > 0 ? "Nejdřív rozmísti body štítu" : "Spustit kolo (Enter)", onclick: () => cb.ready() }, icon("play", "#fff", 16), h("span", { class: "l1" }, label("Spustit")), h("span", { class: "l2" }, label("kolo"))),
     ),
-    h("div", { class: "keycap" }, "ENTER"),
+    h("div", { class: "keycap-row" }, h("div", { class: "keycap" }, "ENTER"), h("span", { class: "bb-turn", title: "Číslo kola" }, label(`kolo ${m.state.turn}${m.state.settings.turnLimit ? ` / ${m.state.settings.turnLimit}` : ""}`))),
   );
 
   /* ---- 5. pilot (svislý sloupec) ---- */

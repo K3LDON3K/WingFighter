@@ -51,6 +51,9 @@ function setLocalFlag(key: string, on: boolean) {
 export const showHitboxes = () => localFlag(KEY_HITBOXES);
 /** Bílý kroužek kolem vybrané lodi (a slabý při najetí myší) – výchozí vypnuto. */
 export const showSelectRing = () => localFlag(KEY_SELRING);
+const KEY_CENTERBTN = "wingfighter.showCenterBtn";
+/** Tlačítko POHLED (režim sledování kamery) nahoře na mapě – výchozí skryté, klávesa C funguje vždy. */
+export const showCenterBtn = () => localFlag(KEY_CENTERBTN);
 
 const PILOT_GROUP = "Piloti";
 const GROUPS = [...new Set(TUNING_FIELDS.map((f) => f.group)), PILOT_GROUP, LOCAL_GROUP];
@@ -215,7 +218,9 @@ function build(root: HTMLElement, tuning: Tuning, canEdit: boolean, a: TuningAct
   const tsel = h("select", { onchange: () => setTouchSetting(tsel.value as TouchSetting) }, ...(["auto", "on", "off"] as TouchSetting[]).map((v) => h("option", { value: v, selected: touchSetting() === v }, v === "auto" ? `automaticky (${deviceIsTouch() ? "dotykové zařízení" : "myš"})` : v === "on" ? "zapnuto" : "vypnuto")));
   const tRow = h("label", { class: "tune-row", title: "Dotykové ovládání: tažení = posun, dva prsty = zoom, tažení z vlastní lodi = kreslení dráhy s potvrzením ✓ / ✕, podržení = info, tlačítko ☰ místo Esc." }, h("span", { class: "txt tune-label" }, "Dotykové ovládání (tablet)"), tsel);
   const noteRow = h("div", { class: "muted txt", style: "padding:6px 0" }, "Volby v této záložce se neposílají na server – mění jen zobrazení v tomto prohlížeči.");
-  b.localRows.push(tRow, srRow, hbRow, noteRow);
+  const cbtn = h("input", { type: "checkbox", checked: showCenterBtn(), onchange: () => { setLocalFlag(KEY_CENTERBTN, cbtn.checked); document.body.classList.toggle("show-center-btn", cbtn.checked); } });
+  const cbRow = h("label", { class: "tune-row", title: "Tlačítko POHLED (sledování kamery: loď / volný / …) pod tlačítky − 👁 + nahoře na mapě. Klávesa C funguje i bez tlačítka." }, h("span", { class: "txt tune-label" }, "Tlačítko POHLED na mapě"), cbtn);
+  b.localRows.push(tRow, srRow, hbRow, cbRow, noteRow);
   body.append(tRow, srRow, hbRow, noteRow);
   // editor pilotů
   const pilotBox = h("div", { class: "pilot-editor" });
