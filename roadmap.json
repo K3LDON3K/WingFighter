@@ -136,5 +136,13 @@
     "text": "více hráčů může ovládat obrovskou loď a plnit mise nebo odrážet ostatní. hráč může i vyletět stíhačem z této lodi a fungovat samostatně",
     "status": "later",
     "done": false
+  },
+  {
+    "id": "i03gbt6w",
+    "group": "UI",
+    "title": "ukončení hry, pokud ostatní hráči opustí hru",
+    "text": "",
+    "status": "next",
+    "done": false
   }
 ]
