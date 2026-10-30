@@ -106,7 +106,7 @@ import { renderLoadout } from "./loadout-ui.ts";
 import { actionById, stoppedNow } from "./game/actions.ts";
 import { describeEvents, TurnAnimation } from "./game/animation.ts";
 import { Camera } from "./game/camera.ts";
-import { DIFFICULTY_COLOR, finishPops, renderBottomBar, renderDroidBar, renderInventoryBar, shieldInHand, updateManeuverPanel } from "./game/planning.ts";
+import { DIFFICULTY_COLOR, type HoverSystem, finishPops, renderBottomBar, renderDroidBar, renderInventoryBar, shieldInHand, updateManeuverPanel } from "./game/planning.ts";
 import { ICON_RADIUS, Renderer, type IconSpot, type Overlay } from "./game/renderer.ts";
 import { viewFromState, type ViewModel } from "./game/view.ts";
 import { renderLobby } from "./lobby.ts";
@@ -150,6 +150,8 @@ interface GameSession {
   weaponOpen?: "laser" | "mg" | null;
   /** Najetí myší na tlačítko zbraně: náhled výsečí těchto modulů (bez zapnutí střelby). */
   hoverWeapon?: { shipId: string; moduleIds: string[] } | null;
+  /** Najetí myší na tlačítko systému: náhled jeho dosahu (bez zapnutí). */
+  hoverSystem?: { shipId: string; kind: HoverSystem } | null;
   /** Rychlost zamknutá kolečkem/klávesou – myš pak mění jen směr. */
   speedLock: Map<string, number>;
   selectedShipId?: string;
@@ -993,6 +995,21 @@ function buildOverlay(view: ViewModel): Overlay {
         overlay.rangeCircle = { radius: CARGO.range, label: `zvednutí nákladu · dosah ${CARGO.range} · rychlost ≤ ${CARGO.maxSpeed}` };
         if (o.action?.type === "pickup" && o.action.targetId) overlay.targetId = o.action.targetId;
       }
+      // najetí myší na tlačítko systému: náhled dosahu bez zapnutí (nepřepisuje to, co už je na mapě kvůli zvolené akci)
+      const hs = g.hoverSystem?.shipId === ship.id && !g.anim ? g.hoverSystem.kind : null;
+      if (hs === "torpedo" && !overlay.rangeCircle && o.special?.type !== "torpedo") {
+        overlay.rangeCircle = { radius: torpedoLockRange(ship), label: `torpédo: zaměření ${torpedoLockRange(ship)} · bod až ${torpedoPointRange(ship)}` };
+        overlay.rangeCircle2 = { radius: torpedoPointRange(ship) };
+      } else if (hs === "mine" && !overlay.mineField && o.special?.type !== "mine") {
+        const mm = mineModule(ship) ?? ship.loadout.modules.find((x) => x.type === "mine");
+        if (mm) {
+          const pos = mineDropPosition(ship, mineSideOf(mm.facing));
+          overlay.mineField = { x: pos.x, y: pos.y };
+        }
+      } else if (hs === "scanner" && !overlay.scanRanges) overlay.scanRanges = { ship: SCANNER.range, deep: SCANNER.deepRange };
+      else if (hs === "cargo" && !overlay.rangeCircle) overlay.rangeCircle = { radius: CARGO.range, label: `zvednutí nákladu · dosah ${CARGO.range} · rychlost ≤ ${CARGO.maxSpeed}` };
+      else if (hs === "comm" && !overlay.rangeCircle) overlay.rangeCircle = { radius: ship.stats.vision, label: `komunikace: funkční stanice v dohledu ${ship.stats.vision} · munice do skladu jen v jejím okruhu sběru` };
+      else if (hs === "hacker" && !overlay.rangeCircle) overlay.rangeCircle = { radius: ship.stats.vision, label: `hacker: cíl (mina, torpédo, naskenovaná loď) v dohledu ${ship.stats.vision}` };
       if (o.special?.type === "mine") {
         const side = mineSideOf(mineModule(ship)?.facing);
         if (g.minePick === "side") {
@@ -1706,6 +1723,9 @@ function renderSide() {
       hoverWeapon: (id, moduleIds) => {
         game!.hoverWeapon = moduleIds ? { shipId: id, moduleIds } : null;
       },
+      hoverSystem: (id, kind) => {
+        game!.hoverSystem = kind ? { shipId: id, kind } : null;
+      },
       weaponToggle: (id, type) => {
         game!.selectedShipId = id;
         game!.hackOpen = false;
@@ -1753,6 +1773,7 @@ function renderSide() {
       },
     } satisfies Parameters<typeof renderBottomBar>[2];
   game.hoverWeapon = null; // tlačítka se překreslí – náhled výseče se obnoví dalším najetím myší
+  game.hoverSystem = null;
   renderBottomBar(barEl, planModel, planCb, subEl ?? undefined);
   if (droidEl) renderDroidBar(droidEl, planModel, planCb);
   if (invEl) renderInventoryBar(invEl, planModel, planCb);
