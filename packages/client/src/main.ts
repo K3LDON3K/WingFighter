@@ -148,6 +148,8 @@ interface GameSession {
   activeShot?: string;
   /** Otevřené podmenu zbraně s více moduly. */
   weaponOpen?: "laser" | "mg" | null;
+  /** Najetí myší na tlačítko zbraně: náhled výsečí těchto modulů (bez zapnutí střelby). */
+  hoverWeapon?: { shipId: string; moduleIds: string[] } | null;
   /** Rychlost zamknutá kolečkem/klávesou – myš pak mění jen směr. */
   speedLock: Map<string, number>;
   selectedShipId?: string;
@@ -895,6 +897,16 @@ function buildOverlay(view: ViewModel): Overlay {
     const turned = o.action?.type === "turn" && stoppedNow(ship, o) ? ({ ...ship, heading: o.action.heading } as typeof ship) : ship;
     vs.heading = turned.heading;
     const vsT = vs;
+    // najetí myší na zbraň: výseče modulů, které zrovna nestřílí (čárkovaně) – jen náhled dostřelu
+    if (g.hoverWeapon?.shipId === ship.id && !g.anim) {
+      const firing = new Set([...laserShots, ...mgShots].map((x) => x.mod.id));
+      for (const mid of g.hoverWeapon.moduleIds) {
+        const mod = ship.loadout.modules.find((x) => x.id === mid);
+        if (!mod || firing.has(mid) || !moduleWorking(mod)) continue;
+        if (mod.type === "laser") (overlay.hoverArcs ??= []).push({ ...laserArcOf(turned, mid), color: TEAM_COLORS[ship.team] });
+        else if (mod.type === "mg") (overlay.hoverArcs ??= []).push({ ...mgArcOf(turned, mid), color: "#fbbf24" });
+      }
+    }
     if (man.speed > 0 || man.koiogran) overlay.previews.push({ ship: vsT, maneuver: man, aiming, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
     else overlay.previews.push({ ship: vsT, maneuver: man, aiming: false, fire: laserShots.length > 0, stopNow: ship.speed > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
     const end = maneuverEnd(turned, man);
@@ -1691,6 +1703,9 @@ function renderSide() {
         if (sh.shieldType === "segment") closeShieldEdit(game!, id);
         renderSide();
       },
+      hoverWeapon: (id, moduleIds) => {
+        game!.hoverWeapon = moduleIds ? { shipId: id, moduleIds } : null;
+      },
       weaponToggle: (id, type) => {
         game!.selectedShipId = id;
         game!.hackOpen = false;
@@ -1737,6 +1752,7 @@ function renderSide() {
         renderSide();
       },
     } satisfies Parameters<typeof renderBottomBar>[2];
+  game.hoverWeapon = null; // tlačítka se překreslí – náhled výseče se obnoví dalším najetím myší
   renderBottomBar(barEl, planModel, planCb, subEl ?? undefined);
   if (droidEl) renderDroidBar(droidEl, planModel, planCb);
   if (invEl) renderInventoryBar(invEl, planModel, planCb);

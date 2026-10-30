@@ -58,6 +58,8 @@ export interface Overlay {
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
   previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; stopNow?: boolean; laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[]; mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[] }[];
+  /** Náhled výsečí při najetí myší na tlačítko zbraně (čárkovaně, bez zapnutí střelby). */
+  hoverArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number; color: string }[];
   /** Dohled vlastního týmu (fog of war). */
   vision?: { x: number; y: number; r: number }[];
   /** Kreslit slabý kruh dohledu kolem vlastních lodí. */
@@ -231,6 +233,7 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
     for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArcs, p.mgArcs, p.stopNow);
+    for (const a of overlay.hoverArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, a.color, a.range ?? LASER.range, a.halfArc, true);
     for (const p of overlay.botPlans ?? []) this.drawBotPlan(p.ship, p.maneuver);
     for (const l of overlay.torpedoLines ?? []) this.drawTorpedoLine(l);
 
@@ -1056,20 +1059,33 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawArc(p: Pose, color: string, range = LASER.range, halfArc = LASER.halfArc) {
+  drawArc(p: Pose, color: string, range = LASER.range, halfArc = LASER.halfArc, hover = false) {
     const ctx = this.ctx;
     ctx.save();
-    ctx.globalAlpha = 0.14;
+    ctx.globalAlpha = hover ? 0.08 : 0.14;
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
     ctx.arc(p.x, p.y, range, p.heading - halfArc, p.heading + halfArc);
     ctx.closePath();
     ctx.fill();
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = hover ? 0.9 : 0.5;
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = hover ? 2 : 1;
+    if (hover) ctx.setLineDash([6, 5]);
     ctx.stroke();
+    if (hover) {
+      // popisek dostřelu u oblouku
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.95;
+      ctx.font = "13px Jersey, ui-monospace, Menlo, monospace";
+      ctx.textAlign = "center";
+      const lx = p.x + Math.cos(p.heading) * (range + 14);
+      const ly = p.y + Math.sin(p.heading) * (range + 14);
+      ctx.fillText(`DOSTŘEL ${range}`, lx, ly + 4);
+      ctx.restore();
+      return;
+    }
     ctx.globalAlpha = 0.25;
     for (let b = 1; b < 3; b++) {
       ctx.beginPath();

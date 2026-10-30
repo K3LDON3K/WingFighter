@@ -119,6 +119,8 @@ export interface PlanningCallbacks {
   scanToggle(shipId: string): void;
   /** Otevřít / zavřít podmenu zbraně s více moduly. */
   weaponToggle(shipId: string, type: "laser" | "mg"): void;
+  /** Najetí myší na zbraň: náhled výseče/dostřelu na mapě bez zapnutí střelby (null = konec). */
+  hoverWeapon(shipId: string, moduleIds: string[] | null): void;
   droidToggle(shipId: string): void;
   /** Droid – opravář: otevřít/zavřít okénko, zvolit úkon, zvolit modul z nákladu (instalace), provést hned. */
   repairToggle(shipId: string): void;
@@ -553,6 +555,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
                 ...(destroyed ? { warn: "ZNIČENO – modul nefunguje" } : {}),
               }),
               onclick: () => cb.chooseAction(ship.id, `shot:${mod.id}`),
+              onmouseenter: () => cb.hoverWeapon(ship.id, [mod.id]),
+              onmouseleave: () => cb.hoverWeapon(ship.id, null),
             },
             costPipsAll({ actions: 1 }, on, "stojí 1 akci"),
             icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
@@ -578,6 +582,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
               disabled: locked || stormOff || allDestroyed,
               ...tipAttr({ ...actionTip(a.id, ship, o, man, allDestroyed ? null : stormOff ? "systém je v bouři mimo provoz" : null), note: `${mods.length}× ${MODULES[type].name} · stisk otevře volbu modulů (každý modul = 1 akce, vlastní cíl)${onCount ? ` · střílí ${onCount}` : ""}` }),
               onclick: () => cb.weaponToggle(ship.id, type),
+              onmouseenter: () => cb.hoverWeapon(ship.id, mods.map((x) => x.id)),
+              onmouseleave: () => cb.hoverWeapon(ship.id, null),
             },
             costPipsAll({ actions: onCount || 1 }, onCount > 0, onCount ? `utraceno ${onCount} ${onCount === 1 ? "akce" : "akce"}` : "1 akce za každý modul"),
             icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
