@@ -58,6 +58,8 @@ export interface Overlay {
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
   previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; stopNow?: boolean; laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[]; mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[] }[];
+  /** Režim DOSAHY: další kruhy dosahu kolem vybrané lodi (každý s barvou a popiskem). */
+  rangeRings?: { radius: number; label: string; color: string }[];
   /** Náhled výsečí při najetí myší na tlačítko zbraně (čárkovaně, bez zapnutí střelby). */
   hoverArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number; color: string }[];
   /** Dohled vlastního týmu (fog of war). */
@@ -213,6 +215,7 @@ export class Renderer {
     const sel = overlay.selectedShipId ? view.ships.find((x) => x.id === overlay.selectedShipId) : undefined;
     if (sel && overlay.rangeCircle2) this.drawRange(sel, overlay.rangeCircle2.radius, "rgba(251,191,36,0.35)", "");
     if (sel && overlay.rangeCircle) this.drawRange(sel, overlay.rangeCircle.radius, "#fbbf24", overlay.rangeCircle.label);
+    if (sel) for (const r of overlay.rangeRings ?? []) this.drawRange(sel, r.radius, r.color, r.label, 0.7, 1.5);
     if (sel && overlay.scanRanges) {
       ctx.save();
       ctx.fillStyle = "rgba(45,212,191,0.07)";

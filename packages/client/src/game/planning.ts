@@ -101,6 +101,42 @@ import { moduleColor, moduleStateHex, renderLoadout, showTip, slotHexOffset } fr
 
 export type HoverSystem = "torpedo" | "mine" | "scanner" | "cargo" | "comm" | "hacker";
 
+/* ---- náhled dosahu: myš = najetí, dotyk = podržení tlačítka (cca 350 ms) ---- */
+let lastPointerTouch = false;
+let suppressClickUntil = 0;
+if (typeof document !== "undefined") {
+  document.addEventListener("pointerdown", (ev) => (lastPointerTouch = ev.pointerType !== "mouse"), true);
+  // po dlouhém stisku následuje click – ten spolknout, ať se akce nezapne
+  document.addEventListener("click", (ev) => { if (performance.now() < suppressClickUntil) { ev.stopPropagation(); ev.preventDefault(); } }, true);
+}
+/** Atributy tlačítka pro náhled dosahu: najetí myší (on/off), na dotyku podržení (náhled drží ještě 1,5 s po puštění). */
+function previewAttrs(on: () => void, off: () => void): Record<string, unknown> {
+  let timer = 0;
+  let offTimer = 0;
+  let held = false;
+  const end = () => {
+    clearTimeout(timer);
+    if (held) {
+      suppressClickUntil = performance.now() + 700;
+      offTimer = window.setTimeout(() => { held = false; off(); }, 1500);
+    }
+  };
+  return {
+    onmouseenter: () => { if (!lastPointerTouch) on(); },
+    onmouseleave: () => { if (!held && !lastPointerTouch) off(); },
+    onpointerdown: (ev: PointerEvent) => {
+      if (ev.pointerType === "mouse") return;
+      clearTimeout(offTimer);
+      held = false;
+      timer = window.setTimeout(() => { held = true; on(); }, 350);
+    },
+    onpointerup: end,
+    onpointercancel: end,
+    onpointerleave: (ev: PointerEvent) => { if (ev.pointerType !== "mouse") end(); },
+    oncontextmenu: (ev: Event) => { if (lastPointerTouch) ev.preventDefault(); },
+  };
+}
+
 export interface PlanningCallbacks {
   select(shipId: string): void;
   setOrders(shipId: string, patch: Partial<ShipOrders>): void;
@@ -559,8 +595,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
                 ...(destroyed ? { warn: "ZNIČENO – modul nefunguje" } : {}),
               }),
               onclick: () => cb.chooseAction(ship.id, `shot:${mod.id}`),
-              onmouseenter: () => cb.hoverWeapon(ship.id, [mod.id]),
-              onmouseleave: () => cb.hoverWeapon(ship.id, null),
+              ...previewAttrs(() => cb.hoverWeapon(ship.id, [mod.id]), () => cb.hoverWeapon(ship.id, null)),
             },
             costPipsAll({ actions: 1 }, on, "stojí 1 akci"),
             icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
@@ -586,8 +621,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
               disabled: locked || stormOff || allDestroyed,
               ...tipAttr({ ...actionTip(a.id, ship, o, man, allDestroyed ? null : stormOff ? "systém je v bouři mimo provoz" : null), note: `${mods.length}× ${MODULES[type].name} · stisk otevře volbu modulů (každý modul = 1 akce, vlastní cíl)${onCount ? ` · střílí ${onCount}` : ""}` }),
               onclick: () => cb.weaponToggle(ship.id, type),
-              onmouseenter: () => cb.hoverWeapon(ship.id, mods.map((x) => x.id)),
-              onmouseleave: () => cb.hoverWeapon(ship.id, null),
+              ...previewAttrs(() => cb.hoverWeapon(ship.id, mods.map((x) => x.id)), () => cb.hoverWeapon(ship.id, null)),
             },
             costPipsAll({ actions: onCount || 1 }, onCount > 0, onCount ? `utraceno ${onCount} ${onCount === 1 ? "akce" : "akce"}` : "1 akce za každý modul"),
             icon(ACTION_ICON[a.id] ?? "target", "currentColor", 22),
@@ -637,7 +671,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
               ...(stopDone ? { note: "loď proletí dráhu a na jejím konci zastaví · stisk = zrušit zastavení" } : moveDone ? { note: "nakresleno a platí · stisk = reset (rovně stejnou rychlostí, zdarma)" } : shieldDone ? { note: "úprava platí · stisk = otevřít (upravit, dobít, reset)" } : a.id === "shield" && rechargeMode ? { note: "režim DOBÍT – klik vedle = zavřít" } : a.id === "shield" && editing ? { note: "rozmísti body −/+ a klikni vedle – úprava se potvrdí" } : {}),
               ...(destroyed ? { warn: "ZNIČENO – modul nefunguje" } : {}),
             }),
-            ...(a.id === "torpedo" || a.id === "mine" ? { onmouseenter: () => cb.hoverSystem(ship.id, a.id as HoverSystem), onmouseleave: () => cb.hoverSystem(ship.id, null) } : {}),
+            ...(a.id === "torpedo" || a.id === "mine" ? previewAttrs(() => cb.hoverSystem(ship.id, a.id as HoverSystem), () => cb.hoverSystem(ship.id, null)) : {}),
             onclick: () =>
               moveDone
                 ? cb.cancelManeuver(ship.id)
@@ -1073,8 +1107,7 @@ export function renderDroidBar(root: HTMLElement, m: PlanningModel, cb: Planning
         disabled: locked || !!why,
         ...tipAttr({ icon: "hack", iconColor: "#c084fc", title: "Droid – hacker", fx: [], note: `${techNote} · v bouři nefunguje`, ...(hDestroyed ? { warn: "ZNIČENO – modul nefunguje" } : why ? { warn: `Nelze: ${why}.` } : {}) }),
         onclick: () => cb.hackToggle(ship.id),
-        onmouseenter: () => cb.hoverSystem(ship.id, "hacker"),
-        onmouseleave: () => cb.hoverSystem(ship.id, null),
+        ...previewAttrs(() => cb.hoverSystem(ship.id, "hacker"), () => cb.hoverSystem(ship.id, null)),
       },
       icon("hack", "currentColor", 22),
       h("span", { class: "lbl" }, label("Hacker")),
@@ -1191,8 +1224,7 @@ export function renderInventoryBar(root: HTMLElement, m: PlanningModel, cb: Plan
           note: cargoDone ? `${jetOn ? "vyhození" : installSlot ? "zvednutí a nasazení" : "zvednutí"} platí · stisk = reset` : "klik vedle okénko zavře a volba platí",
         }),
         onclick: () => (cargoDone ? cb.cancelAction(ship.id) : cb.cargoToggle(ship.id)),
-        onmouseenter: () => cb.hoverSystem(ship.id, "cargo"),
-        onmouseleave: () => cb.hoverSystem(ship.id, null),
+        ...previewAttrs(() => cb.hoverSystem(ship.id, "cargo"), () => cb.hoverSystem(ship.id, null)),
       },
       costPips(1, cargoSpent > 0 ? "spent" : "red", "stojí 1 akci (jen vyhození / zvednutí)"),
       icon("cargo", "currentColor", 22),
@@ -1614,8 +1646,7 @@ function renderScannerButton(root: HTMLElement, m: PlanningModel, cb: PlanningCa
               disabled: locked || stormed || tech < Math.min(SCANNER.shipCost, SCANNER.deepCost),
               ...tipAttr({ ...actionTip("scanner", ship, o, man), note: `technologie ${tech}/${ship.stats.techMax} · nebere akci · v bouři nefunguje`, ...(tech < Math.min(SCANNER.shipCost, SCANNER.deepCost) ? { warn: "Nelze: nedostatek technologie." } : {}) }),
               onclick: () => cb.scanToggle(ship.id),
-              onmouseenter: () => cb.hoverSystem(ship.id, "scanner"),
-              onmouseleave: () => cb.hoverSystem(ship.id, null),
+              ...previewAttrs(() => cb.hoverSystem(ship.id, "scanner"), () => cb.hoverSystem(ship.id, null)),
             },
             icon("scan", "currentColor", 22),
             h("span", { class: "lbl" }, label("Skener")),
@@ -1666,8 +1697,7 @@ function renderCommButton(root: HTMLElement, m: PlanningModel, cb: PlanningCallb
         disabled: locked || (busy && !stores.length),
         ...tipAttr({ icon: "scan", iconColor: "#a5f3fc", title: "Komunikace se stanicí", cost: { actions: 1 }, fx: [{ icon: "credits", text: "objednáš modul za cenu z obchodu" }, { icon: "debris", text: "stanice ho vypustí jako trosky směrem k tobě (zvedne kdokoliv)" }, { icon: "crate", text: "v okruhu sběru (rychlost ≤ 2): munice do skladu, naskladní se hned" }], note: `kredity ${credits} · stanice vyřídí 1 objednávku modulu za kolo`, ...(busy ? { warn: "Objednávky modulů: linka je v tomto kole obsazená." } : {}) }),
         onclick: () => (commOn && !m.commOpen ? cb.cancelAction(ship.id) : cb.commToggle(ship.id)),
-        onmouseenter: () => cb.hoverSystem(ship.id, "comm"),
-        onmouseleave: () => cb.hoverSystem(ship.id, null),
+        ...previewAttrs(() => cb.hoverSystem(ship.id, "comm"), () => cb.hoverSystem(ship.id, null)),
       },
       costPips(1, spent ? "spent" : "red", "stojí 1 akci"),
       icon("scan", "currentColor", 22),

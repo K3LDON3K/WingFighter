@@ -1127,6 +1127,17 @@ h3,
 body.show-center-btn .map-zoom .center-btn {
   display: inline-flex;
 }
+.map-zoom .ranges-btn.on {
+  background: #fbbf24;
+  color: #0b1020;
+  border-color: #fde68a #92400e #92400e #fde68a;
+}
+.bb-weapon,
+.droid-btn {
+  -webkit-touch-callout: none;
+  user-select: none;
+  touch-action: manipulation;
+}
 .map-zoom .mz-sq {
   width: 32px;
   font-size: 14px;

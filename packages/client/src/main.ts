@@ -152,6 +152,8 @@ interface GameSession {
   hoverWeapon?: { shipId: string; moduleIds: string[] } | null;
   /** Najetí myší na tlačítko systému: náhled jeho dosahu (bez zapnutí). */
   hoverSystem?: { shipId: string; kind: HoverSystem } | null;
+  /** Režim DOSAHY (tlačítko u zoomu): trvale ukázat dosahy všech zbraní a systémů vybrané lodi. */
+  showRanges?: boolean;
   /** Rychlost zamknutá kolečkem/klávesou – myš pak mění jen směr. */
   speedLock: Map<string, number>;
   selectedShipId?: string;
@@ -364,6 +366,7 @@ function startGame(state: GameState) {
     minePick: null,
     shieldEdit: false,
     inventoryOpen: false,
+    showRanges: (() => { try { return localStorage.getItem(RANGES_KEY) === "1"; } catch { return false; } })(),
     jettisonPick: false,
     menuOpen: false,
     confirmOpen: false,
@@ -473,6 +476,7 @@ function centerOnShip(shipId: string | undefined, force = false) {
 let centerBtnMode: number | null | undefined;
 /** Tlačítko CENTROVAT ukazuje aktivní režim (tři políčka) a název; po ručním posunu kamery nic. */
 function updateCenterBtn() {
+  if (rangesBtn && game) rangesBtn.classList.toggle("on", !!game.showRanges);
   if (!centerBtn) return;
   const m = activeCenterMode();
   if (m === centerBtnMode && centerBtn.childElementCount) return;
@@ -670,6 +674,15 @@ let barEl: HTMLElement | null = null;
 let subEl: HTMLElement | null = null;
 let droidEl: HTMLElement | null = null;
 let invEl: HTMLElement | null = null;
+let rangesBtn: HTMLElement | null = null;
+const RANGES_KEY = "wingfighter.showRanges";
+function toggleRanges() {
+  if (!game) return;
+  game.showRanges = !game.showRanges;
+  try { localStorage.setItem(RANGES_KEY, game.showRanges ? "1" : "0"); } catch { /* bez úložiště */ }
+  rangesBtn?.classList.toggle("on", !!game.showRanges);
+  sfx("toggle");
+}
 let hudEl: HTMLElement | null = null;
 let overlayEl: HTMLElement | null = null;
 let menuEl: HTMLElement | null = null;
@@ -703,8 +716,8 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint mouse-only" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ"),
-    h("div", { class: "hint touch-only" }, "TÁHNOUT Z VLASTNÍ LODI = DRÁHA (PAK ✓ / ✕) · ŤUKNOUT NA NEPŘÍTELE = CÍL · TÁHNOUT = POSUN · 2 PRSTY = ZOOM · PODRŽET = INFO"),
+    h("div", { class: "hint mouse-only" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ · NAJETÍ NA ZBRAŇ = DOSAH"),
+    h("div", { class: "hint touch-only" }, "TÁHNOUT Z VLASTNÍ LODI = DRÁHA (PAK ✓ / ✕) · ŤUKNOUT NA NEPŘÍTELE = CÍL · TÁHNOUT = POSUN · 2 PRSTY = ZOOM · PODRŽET = INFO · PODRŽET TLAČÍTKO ZBRANĚ = DOSAH"),
     sideEl,
     h("div", { class: "sidestack" }, droidEl, invEl),
     h(
@@ -715,6 +728,7 @@ function mountGame() {
       h("button", { class: "gear mz-sq", title: "Oddálit (−)", onclick: () => zoomBy(1 / ZOOM_STEP) }, "−"),
       h("button", { class: "gear mz-sq", title: "Najít vybranou loď: vycentrovat na ni, zoom zůstane (F)", onclick: () => lookAtShip(game?.selectedShipId) }, icon("eye", "currentColor", 12)),
       h("button", { class: "gear mz-sq", title: "Přiblížit (+)", onclick: () => zoomBy(ZOOM_STEP) }, "+"),
+      (rangesBtn = h("button", { class: "gear mz-sq ranges-btn", title: "DOSAHY: trvale ukázat dosahy všech zbraní a systémů vybrané lodi (lasery/kulomet výseče, torpédo, mina, skener, sběr trosek)", onclick: () => toggleRanges() }, icon("target", "currentColor", 12))),
     ),
     h(
       "div",
@@ -1010,6 +1024,26 @@ function buildOverlay(view: ViewModel): Overlay {
       else if (hs === "cargo" && !overlay.rangeCircle) overlay.rangeCircle = { radius: CARGO.range, label: `zvednutí nákladu · dosah ${CARGO.range} · rychlost ≤ ${CARGO.maxSpeed}` };
       else if (hs === "comm" && !overlay.rangeCircle) overlay.rangeCircle = { radius: ship.stats.vision, label: `komunikace: funkční stanice v dohledu ${ship.stats.vision} · munice do skladu jen v jejím okruhu sběru` };
       else if (hs === "hacker" && !overlay.rangeCircle) overlay.rangeCircle = { radius: ship.stats.vision, label: `hacker: cíl (mina, torpédo, naskenovaná loď) v dohledu ${ship.stats.vision}` };
+      if (g.showRanges && !g.anim) {
+        // režim DOSAHY: všechno najednou – výseče nestřílejících laserů/kulometů, kruhy torpéda, pole miny, skener, sběr trosek
+        const firing = new Set([...laserShots, ...mgShots].map((x) => x.mod.id));
+        for (const mod of ship.loadout.modules) {
+          if (!moduleWorking(mod)) continue;
+          if (mod.type === "laser" && !firing.has(mod.id)) (overlay.hoverArcs ??= []).push({ ...laserArcOf(turned, mod.id), color: TEAM_COLORS[ship.team] });
+          else if (mod.type === "mg" && !firing.has(mod.id)) (overlay.hoverArcs ??= []).push({ ...mgArcOf(turned, mod.id), color: "#fbbf24" });
+        }
+        const rings: NonNullable<Overlay["rangeRings"]> = [];
+        const hasType = (t: string) => ship.loadout.modules.some((x) => x.type === t && moduleWorking(x));
+        if (hasType("torpedo") && o.special?.type !== "torpedo" && !overlay.rangeCircle) rings.push({ radius: torpedoLockRange(ship), label: `torpédo ${torpedoLockRange(ship)}`, color: "#fb923c" }, { radius: torpedoPointRange(ship), label: `torpédo na bod ${torpedoPointRange(ship)}`, color: "rgba(251,146,60,0.45)" });
+        if (hasType("mine") && !overlay.mineField && o.special?.type !== "mine") {
+          const mm = mineModule(ship) ?? ship.loadout.modules.find((x) => x.type === "mine")!;
+          const pos = mineDropPosition(ship, mineSideOf(mm.facing));
+          overlay.mineField = { x: pos.x, y: pos.y };
+        }
+        if (hasType("scanner") && !overlay.scanRanges) overlay.scanRanges = { ship: SCANNER.range, deep: SCANNER.deepRange };
+        if (!overlay.rangeCircle || overlay.rangeCircle.radius !== CARGO.range) rings.push({ radius: CARGO.range, label: `sběr trosek ${CARGO.range}`, color: "#94a3b8" });
+        if (rings.length) overlay.rangeRings = rings;
+      }
       if (o.special?.type === "mine") {
         const side = mineSideOf(mineModule(ship)?.facing);
         if (g.minePick === "side") {
