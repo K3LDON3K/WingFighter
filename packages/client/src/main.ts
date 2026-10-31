@@ -2099,6 +2099,15 @@ function confirmManeuver(id: string): boolean {
 function chooseIcon(shipId: string, id: string) {
   const g = game!;
   g.selectedShipId = shipId;
+  if (id === "split") {
+    // dělený manévr: tlačítko ZALOMIT ve skupině Pohyb (myš rovnou kreslí druhou část, dotyk tvaruje úchyty na mapě)
+    if (!isTouchMode() && g.aimingShipId !== shipId) {
+      g.aimingShipId = shipId;
+      aimBackup.set(shipId, g.orders.get(shipId)?.maneuverId ?? "");
+    }
+    toggleSplit(shipId);
+    return;
+  }
   // volba jiné akce zavře otevřená okénka droida / skeneru (podmenu zbraně zůstává jen pro její vlastní tlačítka)
   g.droidOpen = false;
   if (!g.scanPick) g.scanOpen = false;

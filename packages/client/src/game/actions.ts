@@ -26,6 +26,7 @@ export function stoppedNow(ship: Ship, o: ShipOrders): boolean {
 
 export function actionAvailable(a: ActionOption, ship: Ship): boolean {
   if (a.id === "stop") return true;
+  if (a.id === "split") return !!profileOf(ship.loadout).split; // jen obratné trupy (stíhač); bitevník tlačítko nemá
   if (a.id === "evade") return ship.loadout.hullId !== "battleship";
   if (a.id === "shield") return ship.loadout.modules.some((m) => m.type === "shield-segment");
   if (a.id === "jettison") return ship.loadout.modules.length > 0;
@@ -129,6 +130,22 @@ export const ACTIONS: ActionOption[] = [
       if (atEnd) return { maneuverId: makeManeuver(profile, cur!.speed, cur!.angle, false, ship.speed, true, cur!.split)?.id ?? o.maneuverId };
       return { maneuverId: makeManeuver(profile, 0, 0, false, ship.speed)?.id ?? o.maneuverId };
     },
+  },
+  {
+    id: "split",
+    glyph: "◆",
+    label: "Zalomit dráhu",
+    description: "Dělený manévr (jen stíhač): dráha ze dvou oblouků s vlastním úhlem, stejná rychlost i délka – např. 2 políčka rovně a pak 2 doleva, nebo esíčko. Zlom ◆ leží na celém políčku (volba „zlom po“ v panelu Manévr). Myš: po zalomení kurzor kreslí druhou část, klik potvrdí (klávesa Z). Dotyk: tažením ◆ posuneš zlom, tažením ○ tvaruješ druhou část. Součet úhlů do max. úhlu rychlosti; barva podle ostřejší části, nikdy zelený. Stisk znovu = narovnat.",
+    disabled: (ship, _s, o) => {
+      const cur = parseManeuverId(o.maneuverId);
+      if (cur?.split) return null;
+      if (stoppedNow(ship, o)) return "stojící loď dráhu nezalomí";
+      if ((cur?.speed ?? ship.speed) < 2) return "dělený manévr jde až od rychlosti 2";
+      const costs = !!cur && (cur.speed !== ship.speed || cur.angle !== 0 || cur.koiogran);
+      return noAp(ship, o, costs);
+    },
+    active: (o) => !!parseManeuverId(o.maneuverId)?.split,
+    apply: () => ({}), // řeší klient (toggleSplit) – potřebuje zámek rychlosti a režim kreslení
   },
   {
     id: "evade",

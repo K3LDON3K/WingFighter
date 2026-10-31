@@ -257,10 +257,10 @@ const DIFFICULTY_SHORT: Record<Difficulty, string> = { green: "zelený", white: 
 /** Kategorie akcí v liště: zbraně · pohyb · speciální. */
 const ACTION_GROUPS: { label: string; ids: string[] }[] = [
   { label: "Zbraně", ids: ["laser", "mg", "torpedo", "mine"] },
-  { label: "Pohyb", ids: ["move", "stop", "evade", "koiogran"] },
+  { label: "Pohyb", ids: ["move", "split", "stop", "evade", "koiogran"] },
 ];
 const FACING_GLYPH: Record<string, string> = { front: "↑", right: "→", back: "↓", left: "←" };
-const ACTION_ICON: Record<string, string> = { pickup: "cargo", move: "pen", stop: "stop", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
+const ACTION_ICON: Record<string, string> = { pickup: "cargo", move: "pen", split: "split", stop: "stop", laser: "laser", mg: "mg", torpedo: "torpedo", mine: "mine", koiogran: "turn", evade: "evade", shield: "segments", jettison: "debris" };
 
 function angleGlyph(angle: number, koiogran: boolean): string {
   if (koiogran) return "⟲";
@@ -334,9 +334,7 @@ let lastCb: PlanningCallbacks | null = null;
 function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLElement {
   const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false, stop: false };
   const dcolor = man ? (o.droid?.overdrive && maneuverStress(man) > 0 ? DIFFICULTY_COLOR.white : DIFFICULTY_COLOR[man.difficulty]) : "#f87171";
-  const profile = profileFor(ship, o);
   const split = cur.split;
-  const canSplit = !!profile.split && cur.speed >= 2;
   const glyphs = split
     ? [angleGlyph(cur.angle, false), h("span", { class: "man-split-sep" }, "◆"), angleGlyph(split.angle2, false)]
     : [angleGlyph(cur.angle, false)];
@@ -362,18 +360,11 @@ function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLEle
     h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && maneuverStress(man) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
     ...parts,
     h("div", { class: "spacer" }),
-    // dole vedle sebe: ZALOMIT (stíhač) nebo klávesa mezerník, a otazník nápovědy
+    // dole vedle sebe: klávesa mezerník a otazník nápovědy (ZALOMIT je ve skupině Pohyb)
     h(
       "div",
       { class: "man-foot" },
-      canSplit
-        ? h(
-            "button",
-            { class: `px tiny man-splitbtn ${split ? "on" : ""}`, title: split ? "Narovnat dráhu zpět na jeden oblouk (Z)" : "Zalomit dráhu: dvě části s vlastním úhlem, stejná rychlost i délka (Z)", onclick: () => lastCb?.toggleSplit(ship.id) },
-            "◆ ",
-            label(split ? "narovnat" : "zalomit"),
-          )
-        : h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
+      h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
       h("button", { class: "px tiny qbtn", title: "Nápověda: rychlosti, úhly, barvy manévrů, zastavení a otočení", onclick: () => infoDialog({ title: "Manévry – nápověda", body: maneuverHelp(ship), wide: true }) }, "?"),
     ),
   );
@@ -721,7 +712,8 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             const turnInPlace = a.id === "koiogran" && stoppedNow(ship, o);
             const stopMan = a.id === "stop" ? (() => { const cur = parseManeuverId(o.maneuverId); const atEnd = !!cur && cur.speed > 0 && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0 || cur.stop || !!cur.split); return atEnd ? makeManeuver(profileFor(ship, o), cur!.speed, cur!.angle, false, ship.speed, true, cur!.split) : makeManeuver(profileFor(ship, o), 0, 0, false, ship.speed); })() : null;
             const manStress = turnInPlace ? 0 : a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : stopMan ? effStressCost(stopMan, o) : 0;
-            const c = { actions: a.id === "koiogran" && !turnInPlace ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
+            // zalomení samo nic nestojí navíc (je součástí úpravy pohybu)
+            const c = { actions: a.id === "split" ? 0 : a.id === "koiogran" && !turnInPlace ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];
             if (c.stress > 0) parts.push(`${c.stress} stres`);
             if (c.stress < 0) parts.push(`vrací ${-c.stress} stres`);
@@ -729,7 +721,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
             return costPipsAll(c, dots > 0 && !(isMove && aiming), `stojí ${parts.join(" + ")}${a.id === "move" ? " (rovně stejnou rychlostí zdarma)" : ""}`);
           })(),
           icon(isMove && aiming ? "check" : a.id === "koiogran" && stoppedNow(ship, o) ? "center" : (ACTION_ICON[a.id] ?? "target"), "currentColor", 22),
-          h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.id === "koiogran" && stoppedNow(ship, o) ? "Otočit" : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad"))),
+          h("span", { class: "lbl" }, label(isMove ? (aiming ? "Potvrdit" : "Manévr") : a.id === "koiogran" && stoppedNow(ship, o) ? "Otočit" : a.label.replace(/ \([12] akce\)/, "").replace(" 180°", "").replace("Úhybný manévr", "Úhyb").replace("Úprava štítu", "Štít").replace("Vyhodit modul", "Vyhodit").replace("Zvednout náklad", "Náklad").replace("Zalomit dráhu", "Zalomit"))),
           stopDone ? h("span", { class: "reset-strip" }, label("na konci dráhy")) : done ? h("span", { class: "reset-strip" }, "↺ ", label("reset")) : null,
           stormOff ? h("span", { class: "sb" }, "⚡") : null,
           destroyed ? h("span", { class: "dead-x" }, "✕") : null,
