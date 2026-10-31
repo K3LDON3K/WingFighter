@@ -64,11 +64,15 @@ export function worseDifficulty(a: Difficulty, b: Difficulty): Difficulty {
   return DIFF_ORDER.indexOf(a) >= DIFF_ORDER.indexOf(b) ? a : b;
 }
 
+/** Je úhel "ostrý" (sám o sobě červený)? */
+export function isSharp(speed: number, angle: number, koiogran = false): boolean {
+  const a = Math.abs(angle);
+  return koiogran || a >= 70 || (speed >= 4 && a >= 40);
+}
+
 /**
- * Náročnost děleného manévru: součet úhlů obou částí nesmí přesáhnout max. úhel dané rychlosti,
- * barva je podle ostřejší části – úhel části přepočtený na celou délku dráhy (60° ve 2 ze 4 políček
- * je ostré jako 120° v celém oblouku): do max. úhlu jako běžný oblouk, do dvojnásobku aspoň prudký,
- * nad dvojnásobek nebezpečný. Dělený manévr není nikdy zelený. null = nejde.
+ * Náročnost děleného manévru: součet úhlů obou částí nesmí přesáhnout max. úhel dané rychlosti
+ * a barva je jako u běžného oblouku se stejným součtem úhlů (zlom sám nic nezhoršuje). null = nejde.
  */
 export function classifySplitCurve(profile: ManeuverProfile, speed: number, angle: number, split: ManeuverSplit, prevSpeed: number): Difficulty | null {
   if (!profile.split) return null;
@@ -76,29 +80,9 @@ export function classifySplitCurve(profile: ManeuverProfile, speed: number, angl
   if (!Number.isInteger(split.angle2) || split.angle2 % ANGLE_STEP !== 0) return null;
   if (!Number.isInteger(angle) || angle % ANGLE_STEP !== 0) return null;
   if (speed > profile.maxSpeed || speed >= profile.maxAngle.length) return null;
-  const maxA = profile.maxAngle[speed];
-  if (Math.abs(angle) + Math.abs(split.angle2) > maxA) return null;
-  const whole = classifyCurve(profile, speed, 0, prevSpeed); // změna rychlosti, rozjezd, zastavení
-  if (!whole) return null;
-  let out: Difficulty = whole === "green" ? "white" : whole;
-  for (const [a, len] of [
-    [angle, split.at],
-    [split.angle2, speed - split.at],
-  ]) {
-    const eff = (Math.abs(a) * speed) / len;
-    let d: Difficulty;
-    if (eff > 2 * maxA) d = "danger";
-    else if (eff > maxA) d = worseDifficulty("red", classifyCurve(profile, speed, maxA, prevSpeed) ?? "red");
-    else d = classifyCurve(profile, speed, Math.ceil(eff / ANGLE_STEP) * ANGLE_STEP * Math.sign(a || 1), prevSpeed) ?? "danger";
-    out = worseDifficulty(out, d);
-  }
-  return out;
-}
-
-/** Je úhel "ostrý" (sám o sobě červený)? */
-export function isSharp(speed: number, angle: number, koiogran = false): boolean {
-  const a = Math.abs(angle);
-  return koiogran || a >= 70 || (speed >= 4 && a >= 40);
+  const total = Math.abs(angle) + Math.abs(split.angle2);
+  if (total > profile.maxAngle[speed]) return null;
+  return classifyCurve(profile, speed, total, prevSpeed);
 }
 
 /**

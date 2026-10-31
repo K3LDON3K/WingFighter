@@ -2327,21 +2327,25 @@ describe("hmotnost a dělený manévr", () => {
   it("dělený manévr stíhače: id, součet úhlů ≤ max úhel, barva podle ostřejší části, dráha ze dvou oblouků", () => {
     expect(parseManeuverId("m4a0z2a60")).toEqual({ speed: 4, angle: 0, koiogran: false, stop: false, split: { at: 2, angle2: 60 } });
     expect(parseManeuverId("k3a-20z1a20")?.koiogran).toBe(true);
-    // 2 rovně + 2 doleva 60° při rychlosti 4: součet 60 ≤ 60, efektivně 120° = 2× max → prudký
+    // barva = jako běžný oblouk se stejným součtem úhlů: 2 rovně + 2 doleva 60° při rychlosti 4 → 60° při 4 = prudký
     const a = resolveManeuver(FIGHTER_PROFILE, "m4a0z2a-60", 4)!;
     expect(a.difficulty).toBe("red");
     expect(a.split).toEqual({ at: 2, angle2: -60 });
-    // 1 doleva 60° + 3 rovně: 60° v jednom políčku = 240° > 2× max → nebezpečný
-    expect(resolveManeuver(FIGHTER_PROFILE, "m4a-60z1a0", 4)?.difficulty).toBe("danger");
-    // esíčko 50+50 = 100 > 60 → nejde; 30+30 jde (efektivně 60° při 4 = ostré → prudký)
+    // zlom hned po prvním políčku: stejný součet → stejná barva
+    expect(resolveManeuver(FIGHTER_PROFILE, "m4a-60z1a0", 4)?.difficulty).toBe("red");
+    // esíčko 50+50 = 100 > 60 → nejde; 30+30 jde (součet 60 při 4 = ostré → prudký)
     expect(resolveManeuver(FIGHTER_PROFILE, "m4a50z2a-50", 4)).toBeNull();
     expect(resolveManeuver(FIGHTER_PROFILE, "m4a30z2a-30", 4)?.difficulty).toBe("red");
-    // zlom musí být uvnitř dráhy; dělený manévr není nikdy zelený
+    // zlom musí být uvnitř dráhy; mírný dělený manévr je zelený jako mírný oblouk
     expect(resolveManeuver(FIGHTER_PROFILE, "m4a0z4a10", 4)).toBeNull();
     expect(resolveManeuver(FIGHTER_PROFILE, "m4a0z0a10", 4)).toBeNull();
-    expect(resolveManeuver(FIGHTER_PROFILE, "m2a10z1a10", 2)?.difficulty).toBe("white");
-    expect(classifySplitCurve(FIGHTER_PROFILE, 3, 0, { at: 1, angle2: 90 }, 3)).toBe("red"); // 90° ve 2 ze 3 = 135° < 180
-    expect(classifySplitCurve(FIGHTER_PROFILE, 3, 90, { at: 1, angle2: 0 }, 3)).toBe("danger"); // 90° v 1 ze 3 = 270°
+    expect(resolveManeuver(FIGHTER_PROFILE, "m2a10z1a10", 2)?.difficulty).toBe("green");
+    // rychlost 3: 2 rovně + 1 doleva 30° = bílá (jako 3 + 30°), 2 rovně + 1 doleva 70° = prudká
+    expect(resolveManeuver(FIGHTER_PROFILE, "m3a0z2a-30", 3)?.difficulty).toBe("white");
+    expect(resolveManeuver(FIGHTER_PROFILE, "m3a0z2a-70", 3)?.difficulty).toBe("red");
+    expect(classifySplitCurve(FIGHTER_PROFILE, 3, 0, { at: 1, angle2: 90 }, 3)).toBe("red");
+    expect(classifySplitCurve(FIGHTER_PROFILE, 3, 90, { at: 1, angle2: 0 }, 3)).toBe("red");
+    expect(classifySplitCurve(FIGHTER_PROFILE, 3, 0, { at: 1, angle2: 10 }, 5)).toBe("red"); // změna rychlosti o 2 platí dál
     // dráha: po 2 políčkách rovně je zlom, konec je vlevo od osy a celková délka 4 políčka
     const start = { x: 0, y: 0, heading: 0 };
     const sp = splitPoint(start, a)!;

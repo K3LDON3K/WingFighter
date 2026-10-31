@@ -2053,7 +2053,10 @@ function toggleSplit(id: string): boolean {
     showError("Dělený manévr jde až od rychlosti 2.");
     return false;
   }
-  const ok = setManeuver(id, cur.speed, cur.angle, cur.koiogran, cur.stop, { at: Math.floor(cur.speed / 2), angle2: 0 });
+  // zlom tam, kde je zrovna kurzor (po celých políčkách; myš při kreslení), jinak co nejdál – poslední políčko se ohýbá
+  const d = !isTouchMode() && g.mouse && g.aimingShipId === id ? Math.hypot(g.mouse.x - ship.x, g.mouse.y - ship.y) : null;
+  const at = d === null ? Math.floor(cur.speed / 2) : Math.max(1, Math.min(cur.speed - 1, Math.round(d / MOVE_UNIT)));
+  const ok = setManeuver(id, cur.speed, cur.angle, cur.koiogran, cur.stop, { at, angle2: 0 });
   if (!ok) {
     showError("Tuto dráhu nejde zalomit.");
     return false;

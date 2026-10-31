@@ -135,7 +135,7 @@ export const ACTIONS: ActionOption[] = [
     id: "split",
     glyph: "◆",
     label: "Zalomit dráhu",
-    description: "Dělený manévr (jen stíhač): dráha ze dvou oblouků s vlastním úhlem, stejná rychlost i délka – např. 2 políčka rovně a pak 2 doleva, nebo esíčko. Zlom ◆ leží na celém políčku (volba „zlom po“ v panelu Manévr). Myš: po zalomení kurzor kreslí druhou část, klik potvrdí (klávesa Z). Dotyk: tažením ◆ posuneš zlom, tažením ○ tvaruješ druhou část. Součet úhlů do max. úhlu rychlosti; barva podle ostřejší části, nikdy zelený. Stisk znovu = narovnat.",
+    description: "Dělený manévr (jen stíhač): dráha ze dvou oblouků s vlastním úhlem, stejná rychlost i délka – např. 2 políčka rovně a pak 2 doleva, nebo esíčko. Zlom ◆ leží na celém políčku (volba „zlom po“ v panelu Manévr). Myš: po zalomení kurzor kreslí druhou část, klik potvrdí (klávesa Z). Dotyk: tažením ◆ posuneš zlom, tažením ○ tvaruješ druhou část. Zlom vznikne u kurzoru (klávesa Z při kreslení) nebo uprostřed (tlačítko); posun pipkami „zlom po“ nebo tažením ◆. Součet úhlů do max. úhlu rychlosti; barva jako u běžného oblouku se stejným součtem. Stisk znovu = narovnat.",
     disabled: (ship, _s, o) => {
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.split) return null;
