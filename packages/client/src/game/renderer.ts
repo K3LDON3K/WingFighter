@@ -1173,7 +1173,7 @@ export class Renderer {
     for (let k = 1; k <= man.speed; k++) {
       const q = pts[Math.round((k / man.speed) * last)];
       ctx.beginPath();
-      ctx.arc(q.x, q.y, aiming ? 5 : 4, 0, Math.PI * 2);
+      ctx.arc(q.x, q.y, handles ? 6 : aiming ? 5 : 4, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();

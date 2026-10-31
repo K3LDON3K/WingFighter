@@ -736,8 +736,8 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint mouse-only" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · Z = ZALOMIT DRÁHU · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ · NAJETÍ NA ZBRAŇ = DOSAH"),
-    h("div", { class: "hint touch-only" }, "TÁHNOUT Z VLASTNÍ LODI = DRÁHA (PAK ✓ / ✕) · ZALOMIT = ◆ A ○ NA DRÁZE TÁHNOUT · ŤUKNOUT NA NEPŘÍTELE = CÍL · TÁHNOUT = POSUN · 2 PRSTY = ZOOM · PODRŽET = INFO · PODRŽET TLAČÍTKO ZBRANĚ = DOSAH"),
+    h("div", { class: "hint mouse-only" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · Z / KLIK NA TEČKU DRÁHY = ZALOMIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ · NAJETÍ NA ZBRAŇ = DOSAH"),
+    h("div", { class: "hint touch-only" }, "TÁHNOUT Z VLASTNÍ LODI = DRÁHA (PAK ✓ / ✕) · TÁHNOUT Z TEČKY DRÁHY = ZALOMIT (◆ POSUN, ○ TVAR) · ŤUKNOUT NA NEPŘÍTELE = CÍL · TÁHNOUT = POSUN · 2 PRSTY = ZOOM · PODRŽET = INFO · PODRŽET TLAČÍTKO ZBRANĚ = DOSAH"),
     sideEl,
     h("div", { class: "sidestack" }, droidEl, invEl),
     h(
@@ -943,7 +943,8 @@ function buildOverlay(view: ViewModel): Overlay {
         else if (mod.type === "mg") (overlay.hoverArcs ??= []).push({ ...mgArcOf(turned, mid), color: "#fbbf24" });
       }
     }
-    const handles = !!man.split && !g.submitted && (aiming || (isTouchMode() && g.selectedShipId === ship.id));
+    // úchyty: na dotyku u vybrané lodi vždy (tečky = místa zlomu), u dělené dráhy i ◆ a ○; myš při kreslení
+    const handles = !g.submitted && (aiming || (isTouchMode() && g.selectedShipId === ship.id)) && (!!man.split || profile.split === true);
     if (man.speed > 0 || man.koiogran) overlay.previews.push({ ship: vsT, maneuver: man, aiming, fire: laserShots.length > 0, handles, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
     else overlay.previews.push({ ship: vsT, maneuver: man, aiming: false, fire: laserShots.length > 0, stopNow: ship.speed > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
     const end = maneuverEnd(turned, man);
@@ -2068,6 +2069,54 @@ function toggleSplit(id: string): boolean {
   return true;
 }
 
+/** Tečka dráhy (hranice políčka 1 … rychlost − 1) vybrané vlastní lodi pod kurzorem / prstem – místo, kde jde dráhu zalomit. */
+function pathDotAt(w: { x: number; y: number }): { id: string; at: number } | null {
+  const g = game;
+  if (!g || !cam || g.anim || g.submitted) return null;
+  const ship = g.state.ships.find((x) => x.id === g.selectedShipId && x.ownerId === playerId && x.alive);
+  const o = ship && g.orders.get(ship.id);
+  if (!ship || !o) return null;
+  const profile = profileFor(ship, o);
+  if (!profile.split) return null;
+  const man = resolveManeuver(profile, o.maneuverId, ship.speed);
+  if (!man || man.speed < 2) return null;
+  const path = maneuverPath(startPose(ship, o), man);
+  const r = (isTouchMode() ? 22 : 12) / cam.zoom;
+  let best: { id: string; at: number; d: number } | null = null;
+  for (let k = 1; k < man.speed; k++) {
+    if (man.split && k === man.split.at) continue; // zlom má vlastní úchyt ◆
+    const q = path(k / man.speed);
+    const d = Math.hypot(w.x - q.x, w.y - q.y);
+    if (d <= r && (!best || d < best.d)) best = { id: ship.id, at: k, d };
+  }
+  return best && { id: best.id, at: best.at };
+}
+
+/** Zalomí dráhu na daném políčku (nebo tam zlom přesune), zamkne rychlost a přepne kreslení na druhou část. */
+function kinkAt(id: string, at: number): boolean {
+  const g = game;
+  if (!g || g.submitted) return false;
+  const ship = g.state.ships.find((x) => x.id === id);
+  const o = ship && g.orders.get(id);
+  if (!ship || !o) return false;
+  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false, stop: false };
+  if (cur.speed < 2) return false;
+  if (g.aimingShipId !== id) {
+    g.aimingShipId = id;
+    aimBackup.set(id, o.maneuverId);
+  }
+  const ok = setManeuver(id, cur.speed, cur.angle, cur.koiogran, cur.stop, { at, angle2: cur.split?.angle2 ?? 0 });
+  if (!ok) {
+    showError("Tuto dráhu nejde zalomit.");
+    return false;
+  }
+  g.speedLock.set(id, cur.speed);
+  splitPart = 2;
+  if (!cur.split) sfx("toggle");
+  renderSide();
+  return true;
+}
+
 /** Posune zlom děleného manévru na dané políčko (1 … rychlost − 1). */
 function setSplitAt(id: string, at: number): boolean {
   const g = game;
@@ -2233,7 +2282,7 @@ function bindInput(c: HTMLCanvasElement) {
   let aimDrag: string | null = null; // loď, ze které se táhne dráha
   let turnDrag: string | null = null; // dotyk: otáčení stojící lodi tažením prstu kdekoliv po mapě
   /** Dotyk: tažení úchytu děleného manévru (◆ = posun zlomu po políčkách, ○ = tvar druhé části). */
-  let handleDrag: { id: string; kind: "split" | "end" } | null = null;
+  let handleDrag: { id: string; kind: "split" | "end" | "dot"; at?: number } | null = null;
   /** Úchyt děleného manévru vybrané lodi pod prstem (dotyk). */
   const splitHandleAt = (w: { x: number; y: number }): { id: string; kind: "split" | "end" } | null => {
     const g = game!;
@@ -2310,7 +2359,7 @@ function bindInput(c: HTMLCanvasElement) {
     game.hoverIcon = undefined;
     const hit = !game.anim && !game.submitted ? entityAt(w.x, w.y) : undefined;
     const turnShip = game.turnPick && !game.anim && !game.submitted ? game.state.ships.find((x) => x.id === game!.selectedShipId) : undefined;
-    const hs = iconAt(w.x, w.y) ? null : splitHandleAt(w);
+    const hs = iconAt(w.x, w.y) ? null : (splitHandleAt(w) ?? (() => { const d = pathDotAt(w); return d ? { id: d.id, kind: "dot" as const, at: d.at } : null; })());
     handleDrag = null;
     if (hs) {
       // úchyt děleného manévru: tažením ◆ posouváš zlom, tažením ○ tvaruješ druhou část
@@ -2376,6 +2425,17 @@ function bindInput(c: HTMLCanvasElement) {
           const at = Math.max(1, Math.min(cur.speed - 1, Math.round(Math.hypot(w.x - ship.x, w.y - ship.y) / MOVE_UNIT)));
           if (at !== cur.split.at) setSplitAt(id, at);
         }
+      } else if (kind === "dot") {
+        // tažení od tečky: dráha se zalomí právě tady a prst tvaruje druhou část
+        if (!game.aimingShipId || game.aimingShipId !== id) {
+          if (!startAiming(id) || !kinkAt(id, handleDrag.at!)) {
+            handleDrag = null;
+            return;
+          }
+        }
+        splitPart = 2;
+        aimAt(w.x, w.y);
+        renderSide();
       } else {
         if (game.aimingShipId !== id && !startAiming(id)) {
           handleDrag = null;
@@ -2438,9 +2498,11 @@ function bindInput(c: HTMLCanvasElement) {
     if (!game || !cam) return;
     const g = game;
     if (handleDrag) {
-      const { id } = handleDrag;
+      const { id, kind, at } = handleDrag;
       handleDrag = null;
       g.mouse = null;
+      // ťuknutí na tečku bez tažení: zalomit právě tady (dráha platí hned)
+      if (kind === "dot" && !moved && at !== undefined && startAiming(id)) kinkAt(id, at);
       if (g.aimingShipId === id && !confirmManeuver(id)) cancelAiming(id);
       renderSide();
       return;
@@ -2576,6 +2638,14 @@ function bindInput(c: HTMLCanvasElement) {
       }
     }
     if (closed) renderSide();
+    // 0) tečka na dráze vlastní lodi: zalomit dráhu právě tady (kurzor pak kreslí druhou část)
+    if (!touch) {
+      const dot = pathDotAt(w);
+      if (dot) {
+        kinkAt(dot.id, dot.at);
+        return;
+      }
+    }
     // 1) míření: klik / ťuknutí kamkoliv potvrdí dráhu
     if (g.aimingShipId) {
       confirmManeuver(g.aimingShipId);
