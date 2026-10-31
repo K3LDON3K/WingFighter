@@ -96,6 +96,21 @@ v dohledu nabízí akci **Komunikace** (skupina Speciální, 1 akce): objednáš
 (z kreditů ve hře), stanice ho na začátku kola vypustí jako trosky ~120 od svého okraje směrem k tobě – a zvednout
 ho může kdokoliv. Každá stanice vyřídí 1 objednávku za kolo. Boti stanice používají. Vše v ladění (sekce Stanice).
 
+### Editor map a vlastní mapy
+Tlačítko **EDITOR MAP** v hlavním menu (vedle Vytvořit místnost) otevře editor. Mapa má **obrys** (elipsa se zadanými
+rozměry, nebo volný obrys – „z elipsy“ ji převede na 24 bodů, které jde tahat; klik na hranu přidá bod, dvojklik smaže),
+**asteroidy** (klik = asteroid velikosti S/M/L/XL s náhodným tvarem, 🎲 přehodí tvar, „doplnit“ přidá náhodné do volných míst),
+**bouře štětcem** (tažení maluje kruhy, guma maže), **startovní body** s týmem nebo „kdokoliv“ (tažení od bodu = kurz),
+**startovní zóny** týmů (obdélník tažením), **stanice** a **dráhy komet** (lomená čára od okraje k okraji, každá s intervalem kol,
+prvním kolem, rychlostí a velikostí; přepínač „náhodné komety navíc“). Mřížka 45 j. s přichytáváním, zpět/vpřed (Ctrl+Z/Y),
+kolečko = zoom, pravé tlačítko nebo tažení prázdna = posun; na dotyku tažení prstem, dva prsty = zoom. Panel „Kontrola“ hlásí
+starty v překážkách, asteroidy mimo mapu nebo dráhy komet končící uvnitř. **Uložit** pošle mapu na server (`maps.json` vedle
+`tuning.json` – vidí ji všichni na tomto serveru), Uložit jako = kopie, Načíst ze seznamu, **Export / Import JSON** pro přenos,
+🗑 smaže vlastní mapu (jen autor). V lobby → Nastavení hry → Bitva · mapa přepínač **Generovaná / Vlastní** se seznamem map
+a náhledem (starty podle týmů, dráhy komet, zóny); u vlastní mapy se nastavení velikosti, asteroidů, bouří, stanic, pozadí a
+seedu skrývají (jsou dané mapou), v sérii může mít každá bitva jinou mapu. Při startu bitvy dostane hráč start svého týmu
+(nebo „kdokoliv“); hrací plocha, odrazy od okraje, okrajová bouře a tvrdý okraj kopírují obrys mapy.
+
 ### Fog of war
 Každá loď vidí do vzdálenosti **960** (3 × zaměřovací dostřel torpéda); tým dohled sdílí. Server každému
 posílá jen to, co jeho tým vidí – cizí lodě, torpéda, miny, trosky, komety (jádro nebo kus ocasu v dohledu)
@@ -215,6 +230,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.181 – **Editor map a vlastní mapy (1. část).** Nový editor z hlavního menu: obrys mapy (elipsa nebo volný mnohoúhelník), asteroidy S–XL s náhodným tvarem a 🎲, bouře štětcem s gumou, startovní body s týmem / kdokoliv a kurzem, startovní zóny, stanice, dráhy komet s intervalem/rychlostí/velikostí, mřížka s přichytáváním, zpět/vpřed, kontrola mapy, uložení na server (`maps.json`), načítání, kopie, export/import JSON, mazání (autor). Lobby: přepínač Generovaná / Vlastní se seznamem map, náhled vlastní mapy (obrys, starty podle týmů, zóny, dráhy komet), souhrnné čipy a souhrn bitvy. Pravidla: hrací plocha může být libovolný obrys – uvnitř/venku, odraz od hrany, tvrdý okraj, okrajová bouře, komety od okraje i bot počítají s obrysem; starty s týmem dostanou jen hráči daného týmu. Server: zprávy `listMaps / getMap / saveMap / deleteMap`, úložiště `maps.json`. Zatím **nefunguje ve hře**: dráhy komet a startovní zóny (uloží se, použijí se v další části), „Vyzkoušet (bot)“ z editoru. Testy: 98.
 - v3.180 – Dělený manévr: tečky dosažitelných pozic při kreslení ukazují jen konce, kam se dá opravdu dostat – u zalomené dráhy jde o konce **druhé části od zlomu** (při tvarování první části konce s držením druhé), s barvou podle pravidel děleného manévru; dřív se kreslily konce celého oblouku od lodi, kam zalomená dráha vést nemohla.
 - v3.179 – Dělený manévr: **tečky dráhy jsou místa zlomu.** Myš: klik na tečku (hranici políčka) dráhu zalomí právě tam a kurzor rovnou kreslí druhou část (klik potvrdí). Dotyk: tažení z tečky zalomí a prst tvaruje druhou část, ťuknutí na tečku jen zalomí; tečky jsou u vybrané lodi větší. Dřív tečky nic nedělaly (byly jen značky ujetých políček) – zalomit šlo jen tlačítkem/Z a pak posouvat ◆. Nápověda dole upravena.
 - v3.178 – Dělený manévr: **barva podle součtu úhlů** – stejná jako běžný oblouk se stejným součtem (rychlost 3: 2 rovně + 1 doleva 30° = bílá, +70° = oranžová; mírný dělený manévr může být i zelený); dřívější přepočet ostrosti části zrušen. **Zlom kdekoliv**: Z při kreslení zalomí dráhu tam, kde je zrovna kurzor (zaokrouhleno na políčko, 1 … rychlost − 1), tlačítko ZALOMIT uprostřed; pipky „zlom po“ a dotykový úchyt ◆ dál posouvají zlom na libovolné políčko. Nápověda a README upraveny.

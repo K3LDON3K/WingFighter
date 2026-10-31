@@ -1,10 +1,11 @@
 import { generateProfile } from "./asteroids.ts";
 import { MAP, RULES, STATION } from "./constants.ts";
-import type { Pose } from "./geometry.ts";
+import type { Pose, Vec } from "./geometry.ts";
 import { computeStats, HULLS, DEFAULT_LOADOUT, moduleCost, refillLoadout, shieldTypeOf, shipNames, pilotList } from "./ships.ts";
 import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuning.ts";
 import { effectivePlacement, type Asteroid, type GameSettings, type GameState, type PlayerInfo, type Ship, type ShipLoadout, type Station, type Storm } from "./types.ts";
-import { generateMap, START_MARGIN } from "./mapgen.ts";
+import { DEFAULT_MAP, generateMap, START_MARGIN } from "./mapgen.ts";
+import { customToGenerated, type CustomMap } from "./custommap.ts";
 import { insideMap } from "./mapshape.ts";
 
 /** Mapa 1 – statické asteroidy (vx, vy = 0; v budoucnu mohou létat). Tvar se generuje ze seedu. */
@@ -66,6 +67,8 @@ export interface CreateGameOptions {
   settings: GameSettings;
   loadout?: ShipLoadout;
   tuning?: Tuning;
+  /** Vlastní mapa z editoru (server ji dohledá podle settings.map.customId); má přednost před generátorem. */
+  customMap?: CustomMap;
 }
 
 /**
@@ -93,8 +96,14 @@ export function createGame(opts: CreateGameOptions): GameState {
   let startAt: ((p: PlayerInfo) => Pose) | null = null;
   let teamPose: ((team: number) => Pose) | null = null;
   const poseOf = (st: { x: number; y: number; heading: number } | undefined): Pose => (st ? { x: st.x, y: st.y, heading: st.heading } : { x: START_MARGIN, y: height / 2, heading: 0 });
-  if (settings.map) {
-    const gen = generateMap(settings.map);
+  let outline: Vec[] | undefined;
+  if (settings.map || opts.customMap) {
+    const custom = opts.customMap;
+    const gen = custom ? customToGenerated(custom) : generateMap(settings.map ?? DEFAULT_MAP);
+    const startTeams: (number | undefined)[] = custom ? (gen as ReturnType<typeof customToGenerated>).startTeams : gen.starts.map(() => undefined);
+    /** Smí tým použít start i (vlastní mapa: start bez týmu = kdokoliv)? */
+    const startOk = (i: number, team: number) => startTeams[i] === undefined || startTeams[i] === team;
+    outline = custom ? (gen as ReturnType<typeof customToGenerated>).outline : undefined;
     width = gen.width;
     height = gen.height;
     asteroids = gen.asteroids;
@@ -106,7 +115,11 @@ export function createGame(opts: CreateGameOptions): GameState {
       // každý hráč náhodný volný bod, zvolené body se ignorují
       const pool = gen.starts.map((_, i) => i);
       for (const p of players) {
-        const at = pool.length ? pool.splice(rnd(pool.length), 1)[0] : rnd(gen.starts.length);
+        const mine = pool.filter((i) => startOk(i, p.team));
+        const from = mine.length ? mine : pool;
+        const at = from.length ? from[rnd(from.length)] : rnd(gen.starts.length);
+        const k = pool.indexOf(at);
+        if (k >= 0) pool.splice(k, 1);
         p.startIndex = at;
       }
       startAt = (p) => poseOf(gen.starts[p.startIndex ?? 0]);
@@ -126,7 +139,12 @@ export function createGame(opts: CreateGameOptions): GameState {
       }
       for (const team of teams) {
         if (teamIdx.has(team)) continue;
-        teamIdx.set(team, pool.length ? pool.splice(rnd(pool.length), 1)[0] : rnd(gen.starts.length));
+        const mine = pool.filter((i) => startOk(i, team));
+        const from = mine.length ? mine : pool;
+        const at = from.length ? from[rnd(from.length)] : rnd(gen.starts.length);
+        const k = pool.indexOf(at);
+        if (k >= 0) pool.splice(k, 1);
+        teamIdx.set(team, at);
       }
       for (const p of players) p.startIndex = teamIdx.get(p.team);
       teamPose = (team) => poseOf(gen.starts[teamIdx.get(team) ?? 0]);
@@ -139,9 +157,10 @@ export function createGame(opts: CreateGameOptions): GameState {
         if (i === undefined || [...assigned.values()].includes(i)) {
           // volný bod co nejdál od už obsazených (hlavně od cizích týmů)
           const used = [...assigned.entries()].map(([pid, idx]) => ({ idx, team: players.find((q) => q.id === pid)?.team }));
-          let best = freeIdx[0];
+          const candidates = freeIdx.some((i) => startOk(i, p.team)) ? freeIdx.filter((i) => startOk(i, p.team)) : freeIdx;
+          let best = candidates[0];
           let bestScore = -1;
-          for (const cand of freeIdx) {
+          for (const cand of candidates) {
             const c = gen.starts[cand];
             let score = Infinity;
             for (const u of used) {
@@ -229,7 +248,8 @@ export function createGame(opts: CreateGameOptions): GameState {
     tuning,
     width,
     height,
-    asteroids: asteroids.filter((a) => insideMap({ width, height }, a, a.radius)),
+    outline,
+    asteroids: asteroids.filter((a) => insideMap({ width, height, outline }, a, a.radius)),
     storms,
     stations,
     border: RULES.borderWidth > 0 ? RULES.borderWidth : undefined,

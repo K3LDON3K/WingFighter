@@ -2,7 +2,7 @@ import {
   RULES,
   HULLS,
   PILOTS,
-  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner, LOADOUT_PRESETS, applyPreset, unarmedShips, hasWeapon, SKY_CHOICES, SKY_LABEL, type SkyChoice, BOT_LEVELS, BOT_LEVEL_LABEL, BOT_LEVEL_HINT, type BotLevel } from "@wingfighter/shared";
+  type ShipLoadout, applyTuning, DEFAULT_MAP, MAP_SIZES, MAX_TEAMS_TDM, MODULE_TYPES, MODULES, TEAM_COLORS, TEAM_NAMES, fleetPoints, validateFleet, type MapSettings, type ModuleType, type RoomPlayer, type RoomState, type RoomSummary, type Placement, PLACEMENTS, PLACEMENT_LABEL, PLACEMENT_HINT, effectivePlacement, type BattleSettings, SERIES_MIN, SERIES_MAX, isSeries, newBattle, seriesStandings, seriesWinner, LOADOUT_PRESETS, applyPreset, unarmedShips, hasWeapon, SKY_CHOICES, SKY_LABEL, type SkyChoice, BOT_LEVELS, BOT_LEVEL_LABEL, BOT_LEVEL_HINT, type BotLevel, type CustomMap, type CustomMapSummary } from "@wingfighter/shared";
 import { confirmDialog } from "./dialog.ts";
 import { logoCanvas } from "./logo.ts";
 import { openRoadmap } from "./roadmap.ts";
@@ -26,6 +26,11 @@ export interface LobbyModel {
   room: RoomState | null;
   error: string;
   connected: boolean;
+  /** Otevřít editor map (hlavní menu). */
+  openEditor?: () => void;
+  /** Vlastní mapy ze serveru (výběr v nastavení místnosti) a načtení celé mapy pro náhled (vyžádá se, když chybí). */
+  maps?: CustomMapSummary[];
+  mapOf?: (id: string) => CustomMap | undefined;
 }
 
 /** Rozepsané hodnoty formulářů – přežijí překreslení při každé zprávě ze serveru. */
@@ -119,6 +124,8 @@ function lobbyView(m: LobbyModel, net: Net, setName: (n: string) => void) {
         { class: "row" },
         roomName,
         h("button", { class: "primary", onclick: () => (commitName(), net.send({ type: "createRoom", name: roomName.value })) }, label("Vytvořit místnost")),
+        h("div", { class: "spacer" }),
+        h("button", { title: "Vlastní mapy: nakresli obrys, asteroidy, bouře, starty, stanice a dráhy komet; uložené mapy jdou vybrat při zakládání místnosti.", onclick: () => (commitName(), m.openEditor?.()) }, "✎ ", label("Editor map")),
       ),
     ),
     h(
@@ -563,11 +570,15 @@ function roomView(m: LobbyModel, net: Net) {
         h(
           "div",
           { class: "sum-strip" },
-          sumChip("map", B, MAP_SIZES[map.size]?.label.split(" ")[0] ?? map.size, `Velikost mapy: ${MAP_SIZES[map.size]?.label ?? map.size}`),
-          sumChip("rock", B, `${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids}${map.clusters ? " · shluky" : ""}`, "Asteroidy"),
-          sumChip("storm", B, map.storms === 0 ? "bez bouří" : `${map.storms} ${map.storms === 1 ? "bouře" : map.storms < 5 ? "bouře" : "bouří"}`, "Bouře"),
-          sumChip("comet", B, { none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"] ?? "žádné", "Komety"),
-          sumChip("seed", B, String(map.seed), "Seed mapy"),
+          ...(map.customId
+            ? [sumChip("map", B, `vlastní: ${(m.maps ?? []).find((x) => x.id === map.customId)?.name ?? "?"}`, "Vlastní mapa z editoru"), sumChip("comet", B, { none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"] ?? "žádné", "Komety (náhodné jen pokud je mapa povoluje)")]
+            : [
+                sumChip("map", B, MAP_SIZES[map.size]?.label.split(" ")[0] ?? map.size, `Velikost mapy: ${MAP_SIZES[map.size]?.label ?? map.size}`),
+                sumChip("rock", B, `${{ none: "žádné", few: "málo", medium: "střední", many: "hodně" }[map.asteroids] ?? map.asteroids}${map.clusters ? " · shluky" : ""}`, "Asteroidy"),
+                sumChip("storm", B, map.storms === 0 ? "bez bouří" : `${map.storms} ${map.storms === 1 ? "bouře" : map.storms < 5 ? "bouře" : "bouří"}`, "Bouře"),
+                sumChip("comet", B, { none: "žádné", few: "málo", medium: "středně", many: "hodně" }[map.comets ?? "none"] ?? "žádné", "Komety"),
+                sumChip("seed", B, String(map.seed), "Seed mapy"),
+              ]),
           h("span", { class: "sum-sep" }),
           sumChip("people", Y, settings.mode === "tdm" ? `${settings.teams ?? 2} týmy` : "každý sám", settings.mode === "tdm" ? `Týmový deathmatch · ${settings.teams ?? 2} týmy` : "Deathmatch · všichni proti všem"),
           sumChip("place", Y, PLACEMENT_LABEL[placement].replace(" umístění", "").toLowerCase(), `Umístění na mapě: ${PLACEMENT_LABEL[placement]}`),
@@ -787,7 +798,7 @@ function roomView(m: LobbyModel, net: Net) {
                 "div",
                 { class: "game-side" },
                 h("div", { class: "fsec-h" }, label(teamManual ? "Mapa · start týmu" : "Mapa · startovní bod"), h("span", { class: "spacer" }), startChips),
-                renderMapPreview(map, previewPlayers, pickerId, pickStart, 1200, !!pickerId, room.tuning.borderWidth),
+                renderMapPreview(map, previewPlayers, pickerId, pickStart, 1200, !!pickerId, room.tuning.borderWidth, map.customId ? m.mapOf?.(map.customId) : undefined),
                 h("div", { class: "muted txt" }, startHelp),
               ),
         );
@@ -805,7 +816,7 @@ function roomView(m: LobbyModel, net: Net) {
             "div",
             { class: "sum-battle" },
             h("div", { class: "fsec-h" }, label(series ? `Bitva ${i + 1}` : "Bitva")),
-            kv("Mapa", `${MAP_SIZES[bm.size]?.label ?? bm.size} · seed ${bm.seed}${bm.symmetric ? " · zrcadlená" : ""}`),
+            kv("Mapa", bm.customId ? `vlastní: ${(m.maps ?? []).find((x) => x.id === bm.customId)?.name ?? "?"}` : `${MAP_SIZES[bm.size]?.label ?? bm.size} · seed ${bm.seed}${bm.symmetric ? " · zrcadlená" : ""}`),
             kv("Asteroidy", `${lvl(bm.asteroids, AST)}${bm.clusters ? " ve shlucích" : ""}`),
             kv("Bouře", bm.storms === 0 ? "žádné" : `${bm.storms} (${["malé", "střední", "velké"][["small", "medium", "large"].indexOf(bm.stormSize)] ?? bm.stormSize})`),
             kv("Komety", `${lvl(bm.comets ?? "none", COM)}${bm.cometsHitAsteroids ? " · naráží do asteroidů" : ""}`),
@@ -869,79 +880,113 @@ function roomView(m: LobbyModel, net: Net) {
             section(
               series ? `Bitva ${battleSel + 1} · mapa` : "Bitva · mapa",
               frow(
-                "Velikost",
+                "Mapa",
                 h(
                   "div",
                   { class: "pips-row" },
-                  ...(Object.keys(MAP_SIZES) as MapSettings["size"][]).map((k, i) => {
-                    const on = map.size === k;
-                    const sz = [10, 14, 18, 22][i] ?? 22;
-                    const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
-                    // ovál podle velikosti mapy (poměr 3:2)
-                    s.append(svgEl("ellipse", { cx: "13", cy: "13", rx: String(sz / 2), ry: String(sz / 3), fill: on ? "#1e3a5f" : "none", stroke: on ? "#7dd3fc" : "#334155", "stroke-width": "2" }));
-                    return h("button", { class: `pip size ${on ? "on" : ""}`, disabled: !isHost, title: `${MAP_SIZES[k].label} · ${MAP_SIZES[k].starts} startovních bodů`, onclick: () => setMap({ size: k }) }, s);
-                  }),
-                  h("span", { class: "txt muted pips-txt" }, MAP_SIZES[map.size]?.label ?? map.size),
+                  h("button", { class: `px tiny ${!map.customId ? "on" : ""}`, disabled: !isHost, title: "Náhodně generovaná mapa podle velikosti, seedu a nastavení níže", onclick: () => setMap({ customId: undefined }) }, label("Generovaná")),
+                  h("button", { class: `px tiny ${map.customId ? "on" : ""}`, disabled: !isHost || !(m.maps?.length), title: m.maps?.length ? "Vlastní mapa z editoru (uložená na serveru)" : "Zatím žádná vlastní mapa – nakresli ji v Editoru map (hlavní menu)", onclick: () => m.maps?.length && setMap({ customId: m.maps[0].id }) }, label("Vlastní")),
+                  map.customId
+                    ? h(
+                        "select",
+                        { class: "fsel", disabled: !isHost, style: "max-width:220px", onchange: (e) => setMap({ customId: (e.target as HTMLSelectElement).value }) },
+                        ...(m.maps ?? []).map((x) => h("option", { value: x.id, selected: x.id === map.customId }, `${x.name} · ${x.author || "?"} · ${x.width}×${x.height}`)),
+                        !(m.maps ?? []).some((x) => x.id === map.customId) ? h("option", { value: map.customId, selected: true }, "(mapa už na serveru není)") : null,
+                      )
+                    : h("span", { class: "txt muted pips-txt" }, m.maps?.length ? `${m.maps.length} vlastních k dispozici` : "generovaná"),
                 ),
-                "Velikost mapy v herních jednotkách; větší mapa = víc startovních bodů a delší přelety.",
+                "Generovaná mapa vzniká ze seedu a nastavení níže. Vlastní mapu nakreslíš v Editoru map (hlavní menu): obrys, asteroidy, bouře, starty podle týmů, stanice i dráhy komet jsou pak dané mapou.",
               ),
-              frow(
-                "Asteroidy",
-                pips(3, Math.max(0, AST_LEVELS.indexOf(map.asteroids)), "rock", (k) => rockSvg(true, ROCK_LEVEL[k - 1]), (k) => rockSvg(false, ROCK_LEVEL[k - 1]), (k) => ["málo", "střední", "hodně"][k - 1], (v) => setMap({ asteroids: AST_LEVELS[v] }), ["žádné", "málo", "střední", "hodně"][Math.max(0, AST_LEVELS.indexOf(map.asteroids))]),
-                "Hustota asteroidů na mapě.",
-              ),
-              frow(
-                "Rozložení",
-                h("div", { class: "pips-row" }, h("button", { class: `pip rock ${!map.clusters ? "on" : ""}`, disabled: !isHost, title: "Rovnoměrně rozptýlené", onclick: () => setMap({ clusters: false }) }, rockSvg(true, ROCKS_SPREAD)), h("button", { class: `pip rock ${map.clusters ? "on" : ""}`, disabled: !isHost, title: "Ve shlucích", onclick: () => setMap({ clusters: true }) }, rockSvg(true, ROCKS_CLUSTER)), h("span", { class: "txt muted pips-txt" }, map.clusters ? "ve shlucích" : "rozptýlené")),
-                "Asteroidy rovnoměrně rozptýlené, nebo v hustších shlucích s volnými koridory.",
-              ),
-              frow(
-                "Bouře",
-                pips(5, map.storms, "storm", () => stormSvg(9), () => emptySvg(), (k) => `${k} bouří`, (v) => setMap({ storms: v }), map.storms === 0 ? "žádná" : map.storms === 1 ? "1 bouře" : map.storms < 5 ? `${map.storms} bouře` : "5 bouří"),
-                "Počet elektromagnetických bouří (fialové): uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener jí nepronikne, loď v bouři není vidět.",
-              ),
-              frow(
-                "Velikost bouří",
-                h("div", { class: "pips-row" }, ...STORM_SIZES.map((sz, i) => h("button", { class: `pip storm ${map.stormSize === sz ? "on" : ""}`, disabled: !isHost, title: ["malé", "střední", "velké"][i] + " bouře", onclick: () => setMap({ stormSize: sz }) }, stormSvg([4, 7, 10][i])))),
-              ),
-              frow(
-                "Symetrie",
-                h(
-                  "div",
-                  { class: "pips-row" },
-                  ...[false, true].map((sym) => {
-                    const on = map.symmetric === sym;
-                    const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
-                    const pts: [number, number, number][] = sym ? [[6, 8, 3], [20, 8, 3], [9, 18, 2.5], [17, 18, 2.5]] : [[6, 7, 3], [18, 10, 2], [10, 19, 2.5], [21, 19, 3.5]];
-                    if (sym) s.append(svgEl("line", { x1: "13", y1: "3", x2: "13", y2: "23", stroke: on ? "#7dd3fc" : "#334155", "stroke-width": "1", "stroke-dasharray": "2 2" }));
-                    for (const [x, y, r] of pts) s.append(svgEl("circle", { cx: String(x), cy: String(y), r: String(r), fill: on ? "#b9ad8a" : "none", stroke: on ? "#7a6f52" : "#334155", "stroke-width": on ? "1" : "2" }));
-                    return h("button", { class: `pip size ${on ? "on" : ""}`, disabled: !isHost, title: sym ? "Zrcadlená mapa – obě strany mají stejné podmínky" : "Náhodná mapa bez zrcadlení", onclick: () => setMap({ symmetric: sym }) }, s);
-                  }),
-                  h("span", { class: "txt muted pips-txt" }, map.symmetric ? "zrcadlená" : "náhodná"),
-                ),
-                "Zrcadlená mapa dá oběma stranám stejné podmínky.",
-              ),
+              ...(map.customId
+                ? [
+                    frow(
+                      "Vlastní mapa",
+                      h("span", { class: "txt muted fsub" }, (() => {
+                        const sm = (m.maps ?? []).find((x) => x.id === map.customId);
+                        if (!sm) return "mapa už na serveru není – vyber jinou";
+                        return `${sm.name} · autor ${sm.author || "?"} · ${sm.width}×${sm.height} · ${sm.starts} startů${sm.teams ? ` (${sm.teams} týmové)` : ""}`;
+                      })()),
+                      "Velikost, asteroidy, bouře, stanice, pozadí, zrcadlení a seed jsou dané mapou. Náhodné komety jen pokud je mapa povoluje; dráhy komet podle mapy.",
+                    ),
+                  ]
+                : [
+                  frow(
+                    "Velikost",
+                    h(
+                      "div",
+                      { class: "pips-row" },
+                      ...(Object.keys(MAP_SIZES) as MapSettings["size"][]).map((k, i) => {
+                        const on = map.size === k;
+                        const sz = [10, 14, 18, 22][i] ?? 22;
+                        const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+                        // ovál podle velikosti mapy (poměr 3:2)
+                        s.append(svgEl("ellipse", { cx: "13", cy: "13", rx: String(sz / 2), ry: String(sz / 3), fill: on ? "#1e3a5f" : "none", stroke: on ? "#7dd3fc" : "#334155", "stroke-width": "2" }));
+                        return h("button", { class: `pip size ${on ? "on" : ""}`, disabled: !isHost, title: `${MAP_SIZES[k].label} · ${MAP_SIZES[k].starts} startovních bodů`, onclick: () => setMap({ size: k }) }, s);
+                      }),
+                      h("span", { class: "txt muted pips-txt" }, MAP_SIZES[map.size]?.label ?? map.size),
+                    ),
+                    "Velikost mapy v herních jednotkách; větší mapa = víc startovních bodů a delší přelety.",
+                  ),
+                  frow(
+                    "Asteroidy",
+                    pips(3, Math.max(0, AST_LEVELS.indexOf(map.asteroids)), "rock", (k) => rockSvg(true, ROCK_LEVEL[k - 1]), (k) => rockSvg(false, ROCK_LEVEL[k - 1]), (k) => ["málo", "střední", "hodně"][k - 1], (v) => setMap({ asteroids: AST_LEVELS[v] }), ["žádné", "málo", "střední", "hodně"][Math.max(0, AST_LEVELS.indexOf(map.asteroids))]),
+                    "Hustota asteroidů na mapě.",
+                  ),
+                  frow(
+                    "Rozložení",
+                    h("div", { class: "pips-row" }, h("button", { class: `pip rock ${!map.clusters ? "on" : ""}`, disabled: !isHost, title: "Rovnoměrně rozptýlené", onclick: () => setMap({ clusters: false }) }, rockSvg(true, ROCKS_SPREAD)), h("button", { class: `pip rock ${map.clusters ? "on" : ""}`, disabled: !isHost, title: "Ve shlucích", onclick: () => setMap({ clusters: true }) }, rockSvg(true, ROCKS_CLUSTER)), h("span", { class: "txt muted pips-txt" }, map.clusters ? "ve shlucích" : "rozptýlené")),
+                    "Asteroidy rovnoměrně rozptýlené, nebo v hustších shlucích s volnými koridory.",
+                  ),
+                  frow(
+                    "Bouře",
+                    pips(5, map.storms, "storm", () => stormSvg(9), () => emptySvg(), (k) => `${k} bouří`, (v) => setMap({ storms: v }), map.storms === 0 ? "žádná" : map.storms === 1 ? "1 bouře" : map.storms < 5 ? `${map.storms} bouře` : "5 bouří"),
+                    "Počet elektromagnetických bouří (fialové): uvnitř nefungují štíty ani lasery, torpéda letí rovně, skener jí nepronikne, loď v bouři není vidět.",
+                  ),
+                  frow(
+                    "Velikost bouří",
+                    h("div", { class: "pips-row" }, ...STORM_SIZES.map((sz, i) => h("button", { class: `pip storm ${map.stormSize === sz ? "on" : ""}`, disabled: !isHost, title: ["malé", "střední", "velké"][i] + " bouře", onclick: () => setMap({ stormSize: sz }) }, stormSvg([4, 7, 10][i])))),
+                  ),
+                  frow(
+                    "Symetrie",
+                    h(
+                      "div",
+                      { class: "pips-row" },
+                      ...[false, true].map((sym) => {
+                        const on = map.symmetric === sym;
+                        const s = svgEl("svg", { width: "26", height: "26", viewBox: "0 0 26 26" });
+                        const pts: [number, number, number][] = sym ? [[6, 8, 3], [20, 8, 3], [9, 18, 2.5], [17, 18, 2.5]] : [[6, 7, 3], [18, 10, 2], [10, 19, 2.5], [21, 19, 3.5]];
+                        if (sym) s.append(svgEl("line", { x1: "13", y1: "3", x2: "13", y2: "23", stroke: on ? "#7dd3fc" : "#334155", "stroke-width": "1", "stroke-dasharray": "2 2" }));
+                        for (const [x, y, r] of pts) s.append(svgEl("circle", { cx: String(x), cy: String(y), r: String(r), fill: on ? "#b9ad8a" : "none", stroke: on ? "#7a6f52" : "#334155", "stroke-width": on ? "1" : "2" }));
+                        return h("button", { class: `pip size ${on ? "on" : ""}`, disabled: !isHost, title: sym ? "Zrcadlená mapa – obě strany mají stejné podmínky" : "Náhodná mapa bez zrcadlení", onclick: () => setMap({ symmetric: sym }) }, s);
+                      }),
+                      h("span", { class: "txt muted pips-txt" }, map.symmetric ? "zrcadlená" : "náhodná"),
+                    ),
+                    "Zrcadlená mapa dá oběma stranám stejné podmínky.",
+                  ),
+                  ]),
               frow(
                 "Komety",
                 pips(3, Math.max(0, COMET_LEVELS.indexOf(map.comets ?? "none")), "comet", () => cometSvg(true), () => cometSvg(false), (k) => ["málo", "středně", "hodně"][k - 1], (v) => setMap({ comets: COMET_LEVELS[v] }), ["žádné", "málo", "středně", "hodně"][Math.max(0, COMET_LEVELS.indexOf(map.comets ?? "none"))]),
                 "Komety přilétají na okraj mapy a letí přes ni rychleji než torpéda: náraz zraní loď, sestřel dává kredity, průlet ocasem doplní štít nebo technologii (los).",
               ),
               frow("", h("div", { class: "fpair" }, h("span", { class: "txt muted fsub" }, "komety naráží do asteroidů"), toggle(!!map.cometsHitAsteroids, (v) => setMap({ cometsHitAsteroids: v }))), "Zapnuto: kometa se o asteroid roztříští a vykousne kráter. Vypnuto: proletí jím."),
-              frow(
-                "Stanice",
-                pips(2, map.stations ?? 0, "station", () => stationSvg(true), () => stationSvg(false), (k) => `${k} ${k === 1 ? "stanice" : "stanice"}`, (v) => setMap({ stations: v }), (map.stations ?? 0) === 0 ? "žádná" : (map.stations ?? 0) === 1 ? "1 stanice" : "2 stanice"),
-                "Vesmírné stanice na náhodném místě: překážka, neutrální. V okruhu sběru si loď (rychlost ≤ 2) tlačítkem NÁKLAD nabere náhodný modul ze zásoby. Funkční stanice (trup 2000, energetický štít) vyřizuje objednávky modulů (akce Komunikace v dohledu); po zničení je rozbitá.",
-              ),
-              frow(
-                "Pozadí",
-                pipRow("size", map.sky ?? "none", SKY_CHOICES.map((k) => [k, SKY_LABEL[k] + (k === "random" ? " – motiv podle seedu (u série může mít každá bitva jiný)" : k === "none" ? " – jen hvězdy" : ""), (on: boolean) => skySvg(k, on)] as [SkyChoice, string, (on: boolean) => Node]), (v) => setMap({ sky: v }), SKY_LABEL[map.sky ?? "none"].toLowerCase()),
-                "Vzdálená paralaxní vrstva (galaxie, mlhoviny, planety) – jen vizuální, na hru nemá vliv. Hráč si ji může vypnout v Nastavení grafiky.",
-              ),
-              frow(
-                "Seed",
-                h("div", { class: "fpair" }, h("input", { class: "fsel", type: "number", value: String(map.seed), min: "0", max: "999999", disabled: !isHost, style: "width:118px", onchange: (e) => setMap({ seed: Number((e.target as HTMLInputElement).value) || 0 }) }), isHost ? h("button", { class: "fdice", title: "Nová náhodná mapa", onclick: () => setMap({ seed: Math.floor(Math.random() * 100000) }) }, "🎲") : null),
-                "Stejný seed = stejná mapa.",
-              ),
+              ...(map.customId ? [] : [
+                  frow(
+                    "Stanice",
+                    pips(2, map.stations ?? 0, "station", () => stationSvg(true), () => stationSvg(false), (k) => `${k} ${k === 1 ? "stanice" : "stanice"}`, (v) => setMap({ stations: v }), (map.stations ?? 0) === 0 ? "žádná" : (map.stations ?? 0) === 1 ? "1 stanice" : "2 stanice"),
+                    "Vesmírné stanice na náhodném místě: překážka, neutrální. V okruhu sběru si loď (rychlost ≤ 2) tlačítkem NÁKLAD nabere náhodný modul ze zásoby. Funkční stanice (trup 2000, energetický štít) vyřizuje objednávky modulů (akce Komunikace v dohledu); po zničení je rozbitá.",
+                  ),
+                  frow(
+                    "Pozadí",
+                    pipRow("size", map.sky ?? "none", SKY_CHOICES.map((k) => [k, SKY_LABEL[k] + (k === "random" ? " – motiv podle seedu (u série může mít každá bitva jiný)" : k === "none" ? " – jen hvězdy" : ""), (on: boolean) => skySvg(k, on)] as [SkyChoice, string, (on: boolean) => Node]), (v) => setMap({ sky: v }), SKY_LABEL[map.sky ?? "none"].toLowerCase()),
+                    "Vzdálená paralaxní vrstva (galaxie, mlhoviny, planety) – jen vizuální, na hru nemá vliv. Hráč si ji může vypnout v Nastavení grafiky.",
+                  ),
+                  frow(
+                    "Seed",
+                    h("div", { class: "fpair" }, h("input", { class: "fsel", type: "number", value: String(map.seed), min: "0", max: "999999", disabled: !isHost, style: "width:118px", onchange: (e) => setMap({ seed: Number((e.target as HTMLInputElement).value) || 0 }) }), isHost ? h("button", { class: "fdice", title: "Nová náhodná mapa", onclick: () => setMap({ seed: Math.floor(Math.random() * 100000) }) }, "🎲") : null),
+                    "Stejný seed = stejná mapa.",
+                  ),
+              ]),
               frow(
                 "Limit kol",
                 h("div", { class: "fpair" }, h("input", { class: "fsel", type: "number", value: String(battle.turnLimit), min: "0", max: "99", disabled: !isHost, style: "width:118px", onchange: (e) => setBattle({ turnLimit: Math.max(0, Math.min(99, Math.round(Number((e.target as HTMLInputElement).value) || 0))) }) }), ...(isHost ? [0, 20, 30, 40].map((n) => h("button", { class: `px tiny ${battle.turnLimit === n ? "on" : ""}`, onclick: () => setBattle({ turnLimit: n }) }, n === 0 ? "∞" : String(n))) : [])),
@@ -1038,7 +1083,9 @@ function roomView(m: LobbyModel, net: Net) {
             "div",
             { class: "game-side" },
             h("div", { class: "fsec-h" }, label(series ? `Náhled mapy · bitva ${battleSel + 1}` : randomPlacement ? "Náhled mapy" : teamManual ? "Náhled mapy · start týmu" : "Náhled mapy · startovní bod")),
-            renderMapPreview(map, selIsCurrent ? previewPlayers : [], selIsCurrent ? pickerId : "", pickStart, 520, selIsCurrent && !!pickerId),
+            map.customId && !m.mapOf?.(map.customId)
+              ? h("div", { class: "muted txt", style: "padding:20px" }, (m.maps ?? []).some((x) => x.id === map.customId) ? "Načítám vlastní mapu…" : "Vlastní mapa už na serveru není.")
+              : renderMapPreview(map, selIsCurrent ? previewPlayers : [], selIsCurrent ? pickerId : "", pickStart, 520, selIsCurrent && !!pickerId, 0, map.customId ? m.mapOf?.(map.customId) : undefined),
             h("div", { class: "muted txt" }, selIsCurrent ? startHelp : "Náhled jiné než příští bitvy – startovní body se vybírají až před ní."),
             selIsCurrent ? startChips : null,
           ),

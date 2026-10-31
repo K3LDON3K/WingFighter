@@ -27,6 +27,7 @@ import {
 import type { Camera } from "./camera.ts";
 import { segmentColor, strengthColor } from "./shield-ui.ts";
 import { drawBorderStorm, drawStormBolts, drawStormClouds, drawStormSparks } from "./storm-draw.ts";
+import { traceMap } from "./map-path.ts";
 import { DIFFICULTY_COLOR } from "./planning.ts";
 import { drawSprite, shade, SpriteCache } from "./sprites.ts";
 import type { ViewComet, ViewDebris, ViewModel, ViewShip, ViewStation } from "./view.ts";
@@ -172,14 +173,14 @@ export class Renderer {
       this.ctx = sx;
       if (state.border) {
         sx.beginPath();
-        sx.ellipse(state.width / 2, state.height / 2, state.width / 2 + state.border, state.height / 2 + state.border, 0, 0, Math.PI * 2);
+        traceMap(sx, state, state.border);
         sx.clip();
       }
       this.drawBackground(state, cam);
       const sky = state.settings.map ? skyThemeOf(state.settings.map) : null;
       if (parallaxEnabled() && sky) drawParallax(sx, sky, state.settings.map!.seed, state.width, state.height, cam);
       this.drawGrid(state);
-      if (state.border) drawBorderStorm(sx, state.width, state.height, state.border, cam.zoom);
+      if (state.border) drawBorderStorm(sx, state, state.border, cam.zoom);
       if (state.storms?.length) drawStormClouds(sx, state.storms, cam.zoom);
       this.ctx = saved;
       sx.restore();
@@ -195,7 +196,7 @@ export class Renderer {
     // za tvrdým okrajem se nekreslí vůbec nic
     if (state.border) {
       ctx.beginPath();
-      ctx.ellipse(state.width / 2, state.height / 2, state.width / 2 + state.border, state.height / 2 + state.border, 0, 0, Math.PI * 2);
+      traceMap(ctx, state, state.border);
       ctx.clip();
     }
     // ořez na viditelný výřez: objekty mimo obraz se nekreslí (velké mapy, hodně hráčů)
@@ -421,11 +422,11 @@ export class Renderer {
       ctx.fillRect(cam.x, cam.y, vw, vh);
       ctx.restore();
     }
-    // hrací plocha je ovál
+    // hrací plocha je ovál (nebo obrys vlastní mapy)
     ctx.strokeStyle = "rgba(148,163,184,0.35)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(state.width / 2, state.height / 2, state.width / 2, state.height / 2, 0, 0, Math.PI * 2);
+    traceMap(ctx, state);
     ctx.stroke();
   }
 
@@ -433,7 +434,7 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(state.width / 2, state.height / 2, state.width / 2, state.height / 2, 0, 0, Math.PI * 2);
+    traceMap(ctx, state);
     ctx.clip();
     ctx.strokeStyle = "rgba(148,163,184,0.07)";
     ctx.lineWidth = 1;

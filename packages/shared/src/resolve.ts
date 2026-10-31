@@ -1438,7 +1438,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     if (!ship.alive) continue;
     const set = new Set<string>();
     const cols = ship.stats.colliders.map((c) => ({ ...c, r: c.r + 1 }));
-    if (!shipInsideMap(state.width, state.height, ship, cols)) set.add("edge");
+    if (!shipInsideMap(state, ship, cols)) set.add("edge");
     for (const a of state.asteroids) if (shipHitsAsteroid(a, ship, cols)) set.add(a.id);
     for (const o of state.ships) if (o !== ship && o.alive && shipsOverlap(ship, cols, o, o.stats.colliders)) set.add(o.id);
     touching.set(ship.id, set);
@@ -1545,7 +1545,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
         const t = k / MOVE_STEPS;
         let hit: { with: "edge" | "asteroid" | "ship"; otherId?: string; heading: number } | null = null;
 
-        const outside = !shipInsideMap(state.width, state.height, p, cols);
+        const outside = !shipInsideMap(state, p, cols);
         if (state.border) {
           // okrajová bouře: loď letí dál (bouře zraňuje průběžně); dotyk tvrdého okraje = zničení
           if (beyondHardEdge(state, p, state.border, br)) {
@@ -1911,7 +1911,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
 
   const spotFree = (self: Ship, p: Pose): boolean => {
     const cols = self.stats.colliders;
-    if (!shipInsideMap(state.width, state.height, p, cols)) return false;
+    if (!shipInsideMap(state, p, cols)) return false;
     if (obstacles(state).some((a) => shipHitsAsteroid(a, p, cols))) return false;
     for (const o of state.ships) {
       if (o !== self && o.alive && shipsOverlap(p, cols, o, o.stats.colliders)) return false;

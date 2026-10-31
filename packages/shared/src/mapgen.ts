@@ -47,6 +47,8 @@ export function sanitizeMapSettings(raw: unknown, base: MapSettings = DEFAULT_MA
   if (typeof r.cometsHitAsteroids === "boolean") out.cometsHitAsteroids = r.cometsHitAsteroids;
   if (typeof r.stations === "number" && Number.isFinite(r.stations)) out.stations = Math.max(0, Math.min(2, Math.round(r.stations)));
   if (r.sky === "random" || r.sky === "none" || (typeof r.sky === "string" && (SKY_THEMES as string[]).includes(r.sky))) out.sky = r.sky as MapSettings["sky"];
+  if (typeof r.customId === "string" && /^[\w-]{3,64}$/.test(r.customId)) out.customId = r.customId;
+  else if (r.customId === null || r.customId === undefined) delete out.customId;
   return out;
 }
 

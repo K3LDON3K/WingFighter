@@ -76,6 +76,7 @@ import { savePilots } from "./pilot-store.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
 import { getSavedTuning, initialTuning, saveTuning } from "./tuning-store.ts";
+import { deleteMap, getMap, listMaps, saveMap } from "./maps-store.ts";
 
 export interface Client {
   id: string;
@@ -708,6 +709,29 @@ export class Hub {
         }
         return;
       }
+      case "listMaps":
+        this.send(client, { type: "maps", maps: listMaps() });
+        return;
+      case "getMap":
+        this.send(client, { type: "map", map: getMap(String(msg.id)) ?? null });
+        return;
+      case "saveMap": {
+        const res = saveMap(msg.map, client.name);
+        if (res.error || !res.map) return this.error(client, `Mapu se nepodařilo uložit: ${res.error ?? "?"}.`);
+        this.send(client, { type: "map", map: res.map, saved: true });
+        // seznam map se změnil – všem (lobby i editor)
+        this.broadcastAll({ type: "maps", maps: listMaps() });
+        return;
+      }
+      case "deleteMap": {
+        const m = getMap(String(msg.id));
+        if (!m) return;
+        // mazat smí autor (podle jména) nebo kdokoliv, když autor není znám
+        if (m.author && m.author !== client.name) return this.error(client, `Mapu může smazat jen její autor (${m.author}).`);
+        deleteMap(m.id);
+        this.broadcastAll({ type: "maps", maps: listMaps() });
+        return;
+      }
       case "openRoom": {
         if (!room || room.game || room.hostId !== client.id) return;
         room.open = !!msg.open;
@@ -882,7 +906,12 @@ export class Hub {
       m.loadoutsAtStart = structuredClone(m.loadouts);
     }
     const players: PlayerInfo[] = members.map((m) => ({ id: m.id, name: m.name, team: m.team, isBot: m.isBot, botLevel: m.isBot ? (m.botLevel ?? "kadet") : undefined, loadout: refillLoadout(m.loadouts[0]), loadouts: m.loadouts.map(refillLoadout), credits: m.isBot ? undefined : room.walletOf(m), startIndex: m.startIndex, commander: m.commander }));
-    const state = createGame({ players, settings: room.settings, tuning: room.tuning });
+    const customMap = room.settings.map?.customId ? getMap(room.settings.map.customId) : undefined;
+    if (room.settings.map?.customId && !customMap) {
+      this.error(host, "Vlastní mapa už na serveru není – vyber jinou.");
+      return;
+    }
+    const state = createGame({ players, settings: room.settings, tuning: room.tuning, customMap });
     const rng = createRng((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     room.game = { state, orders: new Map(), rng, memory: new Map(), pendingEvents: [] };
     const g = room.game;
@@ -1190,6 +1219,11 @@ export class Hub {
   private broadcastRooms() {
     const msg: ServerMessage = { type: "rooms", rooms: this.roomList() };
     for (const c of this.clients.values()) if (!c.roomCode) this.send(c, msg);
+  }
+
+  /** Všem připojeným (seznam vlastních map). */
+  private broadcastAll(msg: ServerMessage) {
+    for (const c of this.clients.values()) this.send(c, msg);
   }
 }
 

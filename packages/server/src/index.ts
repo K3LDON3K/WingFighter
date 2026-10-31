@@ -7,11 +7,16 @@ import { WebSocketServer } from "ws";
 import type { ClientMessage } from "@wingfighter/shared";
 import { Hub } from "./rooms.ts";
 import { loadSavedTuning, TUNING_FILE } from "./tuning-store.ts";
+import { loadMaps, MAPS_FILE } from "./maps-store.ts";
 import { loadPilots } from "./pilot-store.ts";
 import { loadRoadmap, ROADMAP_FILE, saveRoadmap } from "./roadmap-store.ts";
 import { sanitizeRoadmap } from "@wingfighter/shared";
 
 if (loadSavedTuning()) console.log(`  Načteny uložené parametry: ${TUNING_FILE}`);
+{
+  const n = loadMaps();
+  if (n) console.log(`  Vlastní mapy: ${n} (${MAPS_FILE})`);
+}
 loadPilots();
 console.log(`  Roadmapa: ${ROADMAP_FILE}`);
 

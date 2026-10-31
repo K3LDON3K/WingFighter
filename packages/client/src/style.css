@@ -6062,3 +6062,28 @@ body.drag-on * {
   border-color: #60a5fa;
   color: #fff;
 }
+
+/* ---------- Editor map ---------- */
+.screen.editor { display: grid; grid-template-rows: 40px 1fr 46px; gap: 6px; height: 100vh; height: 100dvh; padding: 6px; box-sizing: border-box; }
+.ed-top, .ed-bottom { display: flex; align-items: center; gap: 8px; background: #0f172a; border: 2px solid #334155; padding: 0 10px; min-width: 0; overflow: hidden; }
+.ed-top b { color: #7dd3fc; letter-spacing: 1px; white-space: nowrap; }
+.ed-name { background: #020617; border: 1px solid #334155; color: #e2e8f0; padding: 3px 6px; width: 200px; font: inherit; }
+.ed-status { margin-left: 8px; white-space: nowrap; }
+.ed-mid { display: grid; grid-template-columns: 150px 1fr 260px; gap: 6px; min-height: 0; }
+.ed-left, .ed-right { overflow: auto; }
+.ed-left h4, .ed-right h4 { margin: 8px 0 4px; font-size: 10px; color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; }
+.ed-tool { display: flex; align-items: center; gap: 6px; width: 100%; border: 1px solid #334155; padding: 6px; margin-bottom: 4px; background: #1e293b; border-radius: 3px; font-size: 11px; color: #e2e8f0; cursor: pointer; text-align: left; }
+.ed-tool.on { background: #1d4ed8; border-color: #60a5fa; color: #fff; }
+.ed-tool i { width: 16px; text-align: center; font-style: normal; color: #fbbf24; }
+.ed-tool.on i { color: #fff; }
+.ed-hint { font-size: 11px; margin-top: 8px; line-height: 1.35; }
+.ed-canvas { width: 100%; height: 100%; display: block; background: #04060d; border: 2px solid #334155; touch-action: none; cursor: crosshair; min-height: 0; }
+.ed-row { display: flex; gap: 4px; align-items: center; margin: 3px 0; font-size: 11px; flex-wrap: wrap; }
+.ed-row label { width: 84px; color: #94a3b8; flex: none; }
+.ed-pip { padding: 2px 6px !important; font-size: 10px !important; }
+.ed-pip.on { background: #fbbf24 !important; color: #0b1020 !important; border-color: #fbbf24 !important; font-weight: 700; }
+.ed-num { background: #020617; border: 1px solid #334155; color: #e2e8f0; padding: 2px 4px; font: inherit; font-size: 11px; }
+.ed-bottom .fsel { max-width: 180px; }
+@media (max-width: 900px) {
+  .ed-mid { grid-template-columns: 110px 1fr 200px; }
+}

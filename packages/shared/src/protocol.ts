@@ -1,5 +1,6 @@
 import type { Tuning } from "./tuning.ts";
 import type { SeriesState } from "./series.ts";
+import type { CustomMap, CustomMapSummary } from "./custommap.ts";
 import type { BotLevel, GameSettings, GameState, HackOrder, PilotDef, RepairOrder, Ship, ShipLoadout, ShipOrders, TurnResult } from "./types.ts";
 
 /** Stav místnosti v lobby. */
@@ -85,6 +86,11 @@ export type ClientMessage =
   | { type: "setTuning"; tuning: Partial<Tuning> }
   | { type: "resetTuning" }
   | { type: "saveTuning" }
+  /** Vlastní mapy (editor): seznam, celá mapa, uložení, smazání. */
+  | { type: "listMaps" }
+  | { type: "getMap"; id: string }
+  | { type: "saveMap"; map: CustomMap }
+  | { type: "deleteMap"; id: string }
   | { type: "loadTuning" }
   | { type: "startGame" }
   | { type: "submitOrders"; orders: ShipOrders[] }
@@ -109,6 +115,8 @@ export type ServerMessage =
   | { type: "gameState"; state: GameState; ready: string[]; alive?: string[] }
   | { type: "planningStatus"; ready: string[]; alive?: string[] }
   | { type: "tuning"; tuning: Tuning }
+  | { type: "maps"; maps: CustomMapSummary[] }
+  | { type: "map"; map: CustomMap | null; /** Po uložení: potvrzení klientovi, který ukládal. */ saved?: boolean }
   | { type: "notice"; message: string }
   | { type: "turnResult"; result: TurnResult }
   /** Výsledek skenu lodi: plná loď včetně výbavy (jen pro skenujícího). */

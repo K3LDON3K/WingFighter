@@ -90,6 +90,13 @@ import {
   listManeuvers,
   makeManeuver,
   maneuverEnd,
+  beyondHardEdge,
+  edgeNormal,
+  reflectAtEdge,
+  pointOnEdge,
+  clampToMap,
+  sanitizeCustomMap,
+  customToGenerated,
   maneuverPath,
   splitPoint,
   classifySplitCurve,
@@ -2373,5 +2380,66 @@ describe("hmotnost a dělený manévr", () => {
     const e2 = maneuverEnd({ x: 500, y: 500, heading: 0 }, a);
     expect(f2.x).toBeCloseTo(e2.x, 3);
     expect(f2.y).toBeCloseTo(e2.y, 3);
+  });
+});
+
+describe("vlastní mapa (editor)", () => {
+  const square = [
+    { x: 0, y: 0 },
+    { x: 1000, y: 0 },
+    { x: 1000, y: 1000 },
+    { x: 0, y: 1000 },
+  ];
+  it("obrys: uvnitř / venku, tvrdý okraj, normála a odraz, bod na hraně", () => {
+    const m = { width: 1000, height: 1000, outline: square };
+    expect(insideMap(m, { x: 500, y: 500 })).toBe(true);
+    expect(insideMap(m, { x: 990, y: 500 }, 20)).toBe(false); // s poloměrem 20 už přesahuje
+    expect(insideMap(m, { x: 1100, y: 500 })).toBe(false);
+    expect(beyondHardEdge(m, { x: 1100, y: 500 }, 160)).toBe(false);
+    expect(beyondHardEdge(m, { x: 1200, y: 500 }, 160)).toBe(true);
+    expect(edgeNormal(m, { x: 1000, y: 500 })).toBeCloseTo(0, 5); // pravá hrana → ven = +x
+    expect(reflectAtEdge(m, { x: 1000, y: 500 }, 0)).toBeCloseTo(Math.PI, 5);
+    const e = pointOnEdge(m, 0, 100);
+    expect(e.x).toBeCloseTo(900, 5);
+    expect(e.y).toBeCloseTo(500, 5);
+    const c = clampToMap(m, { x: 1300, y: 500 }, 50);
+    expect(c.x).toBeCloseTo(950, 5);
+    // elipsa beze změny
+    expect(insideMap({ width: 1000, height: 1000 }, { x: 990, y: 990 })).toBe(false);
+  });
+
+  it("sanitizace a převod na mapu bitvy: starty podle týmů, asteroidy s tvarem, bouře, stanice, dráhy komet", () => {
+    const raw = {
+      name: "  Test  ",
+      width: 2000,
+      height: 1500,
+      outline: [{ x: 0, y: 0 }, { x: 2000, y: 0 }, { x: 2000, y: 1500 }, { x: 0, y: 1500 }],
+      asteroids: [{ x: 500, y: 500, radius: 40, seed: 7 }, { x: 5000, y: 5000, radius: 40, seed: 1 }],
+      storms: [{ blobs: [{ x: 1000, y: 700, r: 120 }] }],
+      starts: [{ x: 200, y: 700, heading: 0, team: 0 }, { x: 1800, y: 700, heading: Math.PI, team: 1 }, { x: 1000, y: 100, heading: 1 }],
+      stations: [{ x: 1000, y: 1200 }],
+      cometLanes: [{ points: [{ x: -100, y: 100 }, { x: 2100, y: 1400 }], every: 3, first: 2, speed: "fast", size: "large" }],
+      randomComets: true,
+    };
+    const m = sanitizeCustomMap(raw)!;
+    expect(m.name).toBe("Test");
+    expect(m.outline?.length).toBe(4);
+    expect(m.starts[2].team).toBeUndefined();
+    expect(m.cometLanes[0].speed).toBe("fast");
+    const g = customToGenerated(m);
+    expect(g.asteroids.length).toBe(1); // mimo obrys se vynechá
+    expect(g.asteroids[0].profile.length).toBeGreaterThan(0);
+    expect(g.startTeams).toEqual([0, 1, undefined]);
+    expect(g.stations.length).toBe(1);
+    expect(sanitizeCustomMap(null)).toBeNull();
+    // bitva na vlastní mapě: hráč týmu 1 dostane start svého týmu (nebo volný), ne cizí
+    const settings = { mode: "tdm" as const, turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" as const, placement: "manual" as const, map: { ...DEFAULT_MAP, customId: m.id } };
+    const gm = createGame({ players: [{ id: "A", name: "A", team: 0, isBot: false, loadouts: [structuredClone(DEFAULT_LOADOUT)] }, { id: "B", name: "B", team: 1, isBot: true, loadouts: [structuredClone(DEFAULT_LOADOUT)] }], settings, tuning: DEFAULT_TUNING, customMap: m });
+    expect(gm.outline?.length).toBe(4);
+    const sa = gm.ships.find((s) => s.ownerId === "A")!;
+    const sb = gm.ships.find((s) => s.ownerId === "B")!;
+    expect([200, 1000]).toContain(Math.round(sa.x));
+    expect([1800, 1000]).toContain(Math.round(sb.x));
+    expect(sa.x).not.toBe(sb.x);
   });
 });

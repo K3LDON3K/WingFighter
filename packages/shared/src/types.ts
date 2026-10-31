@@ -454,6 +454,8 @@ export interface MapSettings {
   cometsHitAsteroids: boolean;
   /** Vzdálené pozadí (paralaxní vrstva, jen vizuální): motiv, nebo náhodný podle seedu. */
   sky?: SkyChoice;
+  /** Vlastní mapa z editoru (id v úložišti serveru); je-li nastavená, velikost/seed/asteroidy/bouře/zrcadlení se nepoužijí. */
+  customId?: string;
 }
 
 export type BotLevel = "kadet" | "pilot" | "eso";
@@ -576,6 +578,8 @@ export interface GameState {
   tuning: Tuning;
   width: number;
   height: number;
+  /** Volný obrys hrací plochy (vlastní mapa z editoru); chybí = elipsa vepsaná do width × height. */
+  outline?: { x: number; y: number }[];
   asteroids: Asteroid[];
   storms: Storm[];
   stations?: Station[];

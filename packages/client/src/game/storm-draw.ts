@@ -1,4 +1,5 @@
-import type { Storm } from "@wingfighter/shared";
+import type { MapBox, Storm } from "@wingfighter/shared";
+import { traceMap } from "./map-path.ts";
 
 /**
  * Elektromagnetická bouře – varianta A: měkké fialovo-růžové mraky, řídký pixelový šum, občasné bílé blesky.
@@ -120,26 +121,22 @@ export function drawStormSparks(ctx: CanvasRenderingContext2D, x: number, y: num
 }
 
 /**
- * Okrajová bouře kolem oválné mapy – jen dvě tenké čáry (šetří výkon): fialová na hraně hrací plochy
+ * Okrajová bouře kolem mapy (ovál nebo obrys vlastní mapy) – jen dvě tenké čáry (šetří výkon): fialová na hraně hrací plochy
  * (za ní bouře zraňuje) a červená na tvrdém okraji (elipsa o `border` větší; dotyk = zničení).
  */
-export function drawBorderStorm(ctx: CanvasRenderingContext2D, w: number, h: number, border: number, zoom: number) {
-  const cx = w / 2;
-  const cy = h / 2;
-  const a = w / 2;
-  const b = h / 2;
+export function drawBorderStorm(ctx: CanvasRenderingContext2D, m: MapBox, border: number, zoom: number) {
   const k = 1 / Math.min(1, zoom); // tloušťka čar nezávislá na oddálení
   ctx.save();
   ctx.strokeStyle = "rgba(192,132,252,0.8)";
   ctx.lineWidth = 2 * k;
   ctx.setLineDash([]);
   ctx.beginPath();
-  ctx.ellipse(cx, cy, a, b, 0, 0, Math.PI * 2);
+  traceMap(ctx, m);
   ctx.stroke();
   ctx.strokeStyle = "rgba(239,68,68,0.9)";
   ctx.lineWidth = 2 * k;
   ctx.beginPath();
-  ctx.ellipse(cx, cy, a + border, b + border, 0, 0, Math.PI * 2);
+  traceMap(ctx, m, border);
   ctx.stroke();
   ctx.restore();
 }

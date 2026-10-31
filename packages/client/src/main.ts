@@ -28,6 +28,8 @@ import {
   splitPoint,
   type Maneuver,
   type ManeuverSplit,
+  type CustomMap,
+  type CustomMapSummary,
   rightOf,
   effStressCost,
   profileFor,
@@ -73,6 +75,7 @@ import {
   seriesWinner,
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
+import { editorOnMap, editorOnMaps, isEditorOpen, openEditor } from "./editor.ts";
 import { withTuneAccess } from "./tune-lock.ts";
 import { audioReady, isMuted, setMuted, setSfxListener, sfx, unlockAudio } from "./sound.ts";
 import { loadLibrary, playMode, renderSynth } from "./music.ts";
@@ -218,7 +221,11 @@ let room: RoomState | null = null;
 let error = "";
 let errorTimer: number | undefined;
 let game: GameSession | null = null;
-let screen: "lobby" | "game" = "lobby";
+let screen: "lobby" | "game" | "editor" = "lobby";
+/** Vlastní mapy ze serveru (pro výběr v lobby) a načtené celé mapy (náhled). */
+let lobbyMaps: CustomMapSummary[] = [];
+const lobbyMapCache = new Map<string, CustomMap>();
+const lobbyMapRequested = new Set<string>();
 let tuningOpen = false;
 
 /** Promítne parametry bitvy do pravidel a přepočítá maxima lodí (klientská kopie). */
@@ -277,6 +284,7 @@ net.on((msg) => {
       playerId = msg.playerId;
       if (!playerName) setName(msg.name);
       checkBuild(msg.build);
+      net.send({ type: "listMaps" }); // vlastní mapy pro výběr v lobby
       break;
     case "rooms":
       rooms = msg.rooms;
@@ -333,6 +341,26 @@ net.on((msg) => {
       if (game) {
         game.queue.push(msg.result);
         pumpQueue();
+      }
+      break;
+    case "maps":
+      editorOnMaps(msg.maps);
+      lobbyMaps = msg.maps;
+      // uložená mapa se mohla změnit – náhled načíst znovu
+      for (const sm of msg.maps) {
+        const c = lobbyMapCache.get(sm.id);
+        if (c && c.updatedAt !== sm.updatedAt) {
+          lobbyMapCache.delete(sm.id);
+          lobbyMapRequested.delete(sm.id);
+        }
+      }
+      if (screen === "lobby") render();
+      break;
+    case "map":
+      if (isEditorOpen()) editorOnMap(msg.map, msg.saved);
+      else if (msg.map) {
+        lobbyMapCache.set(msg.map.id, msg.map);
+        if (screen === "lobby") render();
       }
       break;
     case "tuning":
@@ -2970,11 +2998,41 @@ function render() {
     renderSide();
     return;
   }
+  if (screen === "editor") return; // editor si překresluje sám
   if (splash) {
     renderSplash();
     return;
   }
-  renderLobby(app, { playerId, name: playerName, rooms, room, error: error || notice, connected }, net, setName);
+  renderLobby(
+    app,
+    {
+      playerId,
+      name: playerName,
+      rooms,
+      room,
+      error: error || notice,
+      connected,
+      openEditor: () => {
+        screen = "editor";
+        openEditor(app, net, playerName, () => {
+          screen = "lobby";
+          net.send({ type: "listMaps" });
+          render();
+        });
+      },
+      maps: lobbyMaps,
+      mapOf: (id) => {
+        const c = lobbyMapCache.get(id);
+        if (!c && !lobbyMapRequested.has(id)) {
+          lobbyMapRequested.add(id);
+          net.send({ type: "getMap", id });
+        }
+        return c;
+      },
+    },
+    net,
+    setName,
+  );
 }
 
 applyTouchClass();
