@@ -98,7 +98,9 @@ ho může kdokoliv. Každá stanice vyřídí 1 objednávku za kolo. Boti stanic
 
 ### Editor map a vlastní mapy
 Tlačítko **EDITOR MAP** v hlavním menu (vedle Vytvořit místnost) otevře editor. Mapa má **obrys** (elipsa se zadanými
-rozměry, nebo volný obrys – „z elipsy“ ji převede na 24 bodů, které jde tahat; klik na hranu přidá bod, dvojklik smaže),
+rozměry, nebo volný obrys: **od ruky** – tažením nakreslíš libovolný tvar, vyhladí se na max. 200 bodů; nebo **body** – „z elipsy“ ji převede
+na 24 bodů, které jde tahat, klik na hranu přidá bod, dvojklik smaže). **Plocha mapy se obrysu přizpůsobí sama** (rozměry = obrys + okraj,
+vše se posune; příliš velký tvar se zmenší na limit), takže mřížka, doplňování asteroidů i hra fungují v celém tvaru,
 **asteroidy** (klik = asteroid velikosti S/M/L/XL s náhodným tvarem, 🎲 přehodí tvar, „doplnit“ přidá náhodné do volných míst),
 **bouře štětcem** (tažení maluje kruhy, guma maže), **startovní body** s týmem nebo „kdokoliv“ (tažení od bodu = kurz),
 **startovní zóny** týmů (obdélník tažením), **stanice** a **dráhy komet** (lomená čára od okraje k okraji, každá s intervalem kol,
@@ -230,6 +232,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.182 – Editor map: **obrys od ruky** – v nástroji Obrys přepínač „body / od ruky“; tažením nakreslíš libovolný tvar (i členitý), vyhladí se (RDP, max. 200 bodů) a stane se obrysem. **Plocha mapy se přizpůsobí obrysu**: rozměry = ohraničující obdélník + okraj 220 j., všechny objekty se posunou (po posunu bodu obrysu ven také), tvar větší než limit se rovnoměrně zmenší; u volného obrysu jsou rozměry odvozené (jen zobrazené). Mřížka, doplňování asteroidů a hra tím fungují v celém tvaru.
 - v3.181 – **Editor map a vlastní mapy (1. část).** Nový editor z hlavního menu: obrys mapy (elipsa nebo volný mnohoúhelník), asteroidy S–XL s náhodným tvarem a 🎲, bouře štětcem s gumou, startovní body s týmem / kdokoliv a kurzem, startovní zóny, stanice, dráhy komet s intervalem/rychlostí/velikostí, mřížka s přichytáváním, zpět/vpřed, kontrola mapy, uložení na server (`maps.json`), načítání, kopie, export/import JSON, mazání (autor). Lobby: přepínač Generovaná / Vlastní se seznamem map, náhled vlastní mapy (obrys, starty podle týmů, zóny, dráhy komet), souhrnné čipy a souhrn bitvy. Pravidla: hrací plocha může být libovolný obrys – uvnitř/venku, odraz od hrany, tvrdý okraj, okrajová bouře, komety od okraje i bot počítají s obrysem; starty s týmem dostanou jen hráči daného týmu. Server: zprávy `listMaps / getMap / saveMap / deleteMap`, úložiště `maps.json`. Zatím **nefunguje ve hře**: dráhy komet a startovní zóny (uloží se, použijí se v další části), „Vyzkoušet (bot)“ z editoru. Testy: 98.
 - v3.180 – Dělený manévr: tečky dosažitelných pozic při kreslení ukazují jen konce, kam se dá opravdu dostat – u zalomené dráhy jde o konce **druhé části od zlomu** (při tvarování první části konce s držením druhé), s barvou podle pravidel děleného manévru; dřív se kreslily konce celého oblouku od lodi, kam zalomená dráha vést nemohla.
 - v3.179 – Dělený manévr: **tečky dráhy jsou místa zlomu.** Myš: klik na tečku (hranici políčka) dráhu zalomí právě tam a kurzor rovnou kreslí druhou část (klik potvrdí). Dotyk: tažení z tečky zalomí a prst tvaruje druhou část, ťuknutí na tečku jen zalomí; tečky jsou u vybrané lodi větší. Dřív tečky nic nedělaly (byly jen značky ujetých políček) – zalomit šlo jen tlačítkem/Z a pak posouvat ◆. Nápověda dole upravena.
