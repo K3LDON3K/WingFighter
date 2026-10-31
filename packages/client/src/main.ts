@@ -159,6 +159,8 @@ interface GameSession {
   selectedShipId?: string;
   submitted: boolean;
   ready: string[];
+  /** Hráči s živou lodí podle serveru (cizí lodě mimo dohled v `state` nejsou); null = zatím neznáme. */
+  alive: string[] | null;
   log: { turn: number; lines: string[] }[];
   /** Čeká se na kliknutí na cíl. */
   picking: "torpedo" | "lock" | null;
@@ -303,10 +305,12 @@ net.on((msg) => {
         } else resetOrders();
       }
       game!.ready = msg.ready;
+      if (msg.alive) game!.alive = msg.alive;
       game!.submitted = msg.ready.includes(playerId);
       break;
     case "planningStatus":
       if (game) {
+        if (msg.alive) game.alive = msg.alive;
         game.ready = msg.ready;
         game.submitted = msg.ready.includes(playerId);
         renderSide();
@@ -361,6 +365,7 @@ function startGame(state: GameState) {
     speedLock: new Map(),
     submitted: false,
     ready: [],
+    alive: null,
     log: [],
     picking: null,
     minePick: null,
@@ -570,7 +575,7 @@ function pumpQueue() {
     adoptTuning(game.state);
     game.view = game.anim!.finalView();
     game.anim = null;
-    game.ready = [];
+    // `ready` nenulujeme – server po vyhodnocení pošle planningStatus nového kola (kdo stihl odeslat během přehrávání, zůstane ✓)
     resetOrders();
     if (game.state.status !== "finished") {
       sfx("turnStart");
@@ -1412,10 +1417,11 @@ function renderPlayersStatus() {
       pstatEl.append(h("div", { class: `tcap ${lastTeam >= 0 ? "gap" : ""}`, style: `color:${TEAM_COLORS[p.team]}` }, label(TEAM_NAMES[p.team] ?? `tým ${p.team + 1}`)));
       lastTeam = p.team;
     }
-    const alive = game.state.ships.some((sh) => sh.ownerId === p.id && sh.alive);
+    // živé cizí lodě mimo dohled ve stavu nejsou – kdo žije, říká server (`alive`); vraky se posílají vždy
+    const alive = game.alive ? game.alive.includes(p.id) : game.state.ships.some((sh) => sh.ownerId === p.id && sh.alive);
     const done = p.isBot || game.ready.includes(p.id) || !alive;
     const off = !p.isBot && !p.connected;
-    const hasShip = game.state.ships.some((sh) => sh.ownerId === p.id);
+    const hasShip = alive || game.state.ships.some((sh) => sh.ownerId === p.id);
     const dead = hasShip && !alive;
     const mark = dead ? icon("skull", "#94a3b8", 10) : off ? icon("wait", "#64748b", 10) : playing ? icon("play", "#64748b", 10) : done ? icon("check", "#4ade80", 10) : icon("wait", "#facc15", 10);
     pstatEl.append(h("div", { class: `p ${p.id === playerId ? "me" : ""} ${off ? "off" : ""} ${dead ? "dead" : ""}`, title: dead ? "sestřelen" : off ? "odpojen" : done ? "kolo odesláno" : "plánuje" }, mark, h("span", { style: `color:${TEAM_COLORS[p.team]}` }, p.name)));

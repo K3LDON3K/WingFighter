@@ -105,8 +105,9 @@ export type ServerMessage =
   | { type: "rooms"; rooms: RoomSummary[] }
   | { type: "room"; room: RoomState | null }
   | { type: "gameStart"; state: GameState }
-  | { type: "gameState"; state: GameState; ready: string[] }
-  | { type: "planningStatus"; ready: string[] }
+  /** `alive` = hráči, kteří mají živou loď (nezávisle na mlze – cizí lodě mimo dohled ve stavu nejsou). */
+  | { type: "gameState"; state: GameState; ready: string[]; alive?: string[] }
+  | { type: "planningStatus"; ready: string[]; alive?: string[] }
   | { type: "tuning"; tuning: Tuning }
   | { type: "notice"; message: string }
   | { type: "turnResult"; result: TurnResult }

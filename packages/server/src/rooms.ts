@@ -344,7 +344,7 @@ export class Hub {
       this.broadcastRoom(room);
       if (room.game) {
         const g = room.game;
-        this.send(client, { type: "gameState", state: stateForTeam(g.state, teamOf(g, client.id), memoryFor(g, teamOf(g, client.id))), ready: this.readyList(room) });
+        this.send(client, { type: "gameState", state: stateForTeam(g.state, teamOf(g, client.id), memoryFor(g, teamOf(g, client.id))), ready: this.readyList(room), alive: this.aliveList(room) });
       }
     } else {
       client.roomCode = null;
@@ -763,7 +763,7 @@ export class Hub {
           const c = this.clients.get(m.id);
           if (!c) continue;
           const t = teamOf(g, m.id);
-          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room) });
+          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room), alive: this.aliveList(room) });
         }
         return;
       }
@@ -781,7 +781,7 @@ export class Hub {
           const c = this.clients.get(m.id);
           if (!c) continue;
           const t = teamOf(g, m.id);
-          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room) });
+          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room), alive: this.aliveList(room) });
         }
         return;
       }
@@ -801,7 +801,7 @@ export class Hub {
           const c = this.clients.get(m.id);
           if (!c) continue;
           const t = teamOf(g, m.id);
-          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room) });
+          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room), alive: this.aliveList(room) });
         }
         return;
       }
@@ -822,7 +822,7 @@ export class Hub {
           const c = this.clients.get(m.id);
           if (!c) continue;
           const t = teamOf(g, m.id);
-          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room) });
+          this.send(c, { type: "gameState", state: stateForTeam(g.state, t, memoryFor(g, t)), ready: this.readyList(room), alive: this.aliveList(room) });
         }
         return;
       }
@@ -895,6 +895,7 @@ export class Hub {
     }
     this.broadcastRooms();
     this.planBots(room);
+    this.broadcastPlanning(room); // panel hráčů: kdo má živou loď (i mimo dohled)
     this.maybeResolve(room);
   }
 
@@ -1018,6 +1019,13 @@ export class Hub {
     return [...room.members.values()].filter((m) => m.ready).map((m) => m.id);
   }
 
+  /** Hráči s živou lodí – pro panel hráčů (klient cizí lodě mimo dohled nevidí, takže to sám nepozná). */
+  private aliveList(room: Room): string[] {
+    const g = room.game;
+    if (!g) return [];
+    return [...room.members.values()].filter((m) => g.state.ships.some((s) => s.alive && s.ownerId === m.id)).map((m) => m.id);
+  }
+
   private maybeResolve(room: Room) {
     const g = room.game;
     if (!g || g.state.status === "finished") return;
@@ -1049,6 +1057,8 @@ export class Hub {
     }
     if (g.state.status !== "finished") {
       this.planBots(room);
+      // nový seznam připravených/živých pro panel hráčů (kdo padl, už nic neposílá)
+      this.broadcastPlanning(room);
       // pokud už nikdo nemusí nic poslat (např. všichni lidé odpojeni), pokračujeme automaticky
       if (this.waitingFor(room).length === 0 && room.humans().some((m) => this.clients.get(m.id)?.ws)) {
         setTimeout(() => this.maybeResolve(room), 3000);
@@ -1166,7 +1176,7 @@ export class Hub {
   }
 
   private broadcastPlanning(room: Room) {
-    this.broadcast(room, { type: "planningStatus", ready: this.readyList(room) });
+    this.broadcast(room, { type: "planningStatus", ready: this.readyList(room), alive: this.aliveList(room) });
   }
 
   private roomList(): RoomSummary[] {
