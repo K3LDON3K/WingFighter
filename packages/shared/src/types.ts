@@ -19,6 +19,15 @@ export interface Maneuver {
   difficulty: Difficulty;
   /** U otočky: náročnost samotné křivky (otočka k ní přidává stres: zelená/bílá → 1, červená → 2, nebezpečná → 3). */
   base?: Difficulty;
+  /** Dělený manévr: prvních `at` políček s úhlem `angle`, zbytek s úhlem `angle2` (id "m4a0z2a60"). */
+  split?: ManeuverSplit;
+}
+
+export interface ManeuverSplit {
+  /** Zlom po tolika políčkách (1 … rychlost − 1). */
+  at: number;
+  /** Úhel druhé části ve stupních. */
+  angle2: number;
 }
 
 /** Co motor/trup dovolí. Index pole maxAngle = rychlost. */
@@ -33,6 +42,10 @@ export interface ManeuverProfile {
   startMax: number;
   /** Z jaké nejvyšší rychlosti jde zastavit (stíhač 2 – oranžově, bitevník 1). */
   stopMax: number;
+  /** Setrvačnost: zpomalení o 1 je prudké (oranžové) místo bílého (bitevník). */
+  brakeRed?: boolean;
+  /** Dělený manévr: dráha ze dvou oblouků se zlomem na celém políčku (stíhač). */
+  split?: boolean;
 }
 
 /** Akce po pohybu – jedna za kolo (nebo místo ní speciální zbraň). */
@@ -159,6 +172,8 @@ export interface HullDef {
   actionPoints?: number;
   /** Lasery mají do všech směrů stejnou výseč jako dopředu (bitevník). */
   sameArcs?: boolean;
+  /** Hmotnost při srážce lodí (chybí = 1). Těžší loď lehčí odmrští a sama jen zpomalí o 1; stejná hmotnost = obě zastaví. */
+  mass?: number;
 }
 
 /** Modifikátory pilota (přičítají se ke statistikám lodi). */
@@ -589,7 +604,18 @@ export type DieFace = "hit" | "crit" | "focus" | "blank" | "evade";
 /** Události jednoho kola – klient podle nich animuje. */
 export type TurnEvent =
   | { type: "move"; paths: MovePath[] }
-  | { type: "collision"; shipId: string; with: "ship" | "asteroid" | "edge" | "comet"; otherId?: string; t: number; newHeading: number }
+  | {
+      type: "collision";
+      shipId: string;
+      with: "ship" | "asteroid" | "edge" | "comet";
+      otherId?: string;
+      t: number;
+      newHeading: number;
+      /** Lehčí loď odmrštěná těžší lodí (zastaví, ztratí stres). */
+      shoved?: boolean;
+      /** Těžší loď, která lehčí jen „otřela“: zpomalí o 1 a letí dál. */
+      brushed?: boolean;
+    }
   /** Kometa: přílet na okraj mapy, zásah zbraní (lasery/kulomet před pohybem), zánik během pohybu (náraz do lodi/asteroidu/torpéda/miny, odlet z mapy). */
   | { type: "spawnComet"; comet: Comet }
   | { type: "cometShot"; cometId: string; shooterId: string; x: number; y: number; damage: number; hullAfter: number; destroyed: boolean; reward: number }
@@ -672,6 +698,8 @@ export interface MovePath {
   kind: "ship" | "torpedo" | "comet";
   /** Vzorky dráhy (MOVE_STEPS + 1). Po zastavení se poslední pozice opakuje. */
   points: Pose[];
+  /** Dělený manévr: bod zlomu (◆ v přehrávání). */
+  split?: { x: number; y: number };
 }
 
 export interface TurnResult {

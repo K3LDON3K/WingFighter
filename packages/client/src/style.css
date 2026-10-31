@@ -5999,3 +5999,66 @@ body.drag-on * {
   width: 72px;
   height: 52px;
 }
+
+/* Dělený manévr (panel Manévr): dva glyfy, volba zlomu, tlačítko ZALOMIT */
+.man-glyph.two {
+  width: auto;
+  font-size: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.man-split-sep {
+  color: #fbbf24;
+  font-size: 11px;
+  font-family: system-ui, sans-serif;
+}
+.man-zlom-lbl {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+.man-zlom {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+}
+.bb-maneuver .man-zlom .zpip {
+  width: 18px;
+  height: 16px;
+  padding: 0;
+  font-size: 9px;
+  border: 1px solid #475569;
+  border-radius: 3px;
+  background: #1e293b;
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bb-maneuver .man-zlom .zpip.on {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #0b1020;
+  font-weight: 700;
+}
+.bb-maneuver .man-foot .man-splitbtn {
+  width: auto;
+  padding: 3px 5px;
+  font-size: 8px;
+  margin: 0;
+  white-space: nowrap;
+}
+.bb-maneuver.split .man-readout {
+  margin-top: 2px;
+  height: 26px;
+}
+.bb-maneuver.split .man-angle {
+  font-size: 14px;
+}
+.bb-maneuver .man-splitbtn.on {
+  background: #1d4ed8;
+  border-color: #60a5fa;
+  color: #fff;
+}

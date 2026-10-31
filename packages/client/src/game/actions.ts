@@ -49,7 +49,7 @@ export const ACTIONS: ActionOption[] = [
     description: "Změna směru nebo rychlosti: klik na tlačítko (nebo mezerník / klik na vlastní loď) začne kreslit dráhu myší – pohyb myši = směr a rychlost, kolečko / 1–5 = rychlost, klik nebo mezerník = potvrdit. Rovně stejnou rychlostí je zdarma; jiná rychlost nebo zatočení stojí 1 akci.",
     disabled: (ship, _s, o) => {
       const cur = parseManeuverId(o.maneuverId);
-      const costs = !!cur && (cur.speed !== ship.speed || cur.angle !== 0 || cur.koiogran);
+      const costs = !!cur && (cur.speed !== ship.speed || cur.angle !== 0 || cur.koiogran || !!cur.split);
       return noAp(ship, o, costs);
     },
     active: () => false,
@@ -108,10 +108,10 @@ export const ACTIONS: ActionOption[] = [
       if (ship.speed === 0 && (!cur || cur.speed === 0)) return "loď už stojí";
       if (cur?.speed === 0 || cur?.stop) return noAp(ship, o, true);
       if (cur?.koiogran) return "s otočkou 180° zastavit nejde";
-      const atEnd = !!cur && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0);
+      const atEnd = !!cur && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0 || !!cur.split);
       const sp = atEnd ? cur!.speed : ship.speed;
       if (sp < 1 || sp > prof.stopMax) return atEnd ? `zastavit jde jen na konci dráhy rychlostí ${prof.stopMax >= 2 ? "1–2" : "1"}` : `zastavit jde jen z rychlosti ${prof.stopMax >= 2 ? "1–2" : "1"}`;
-      const man = atEnd ? makeManeuver(prof, cur!.speed, cur!.angle, false, ship.speed, true) : makeManeuver(prof, 0, 0, false, ship.speed);
+      const man = atEnd ? makeManeuver(prof, cur!.speed, cur!.angle, false, ship.speed, true, cur!.split) : makeManeuver(prof, 0, 0, false, ship.speed);
       if (!man) return "zastavení tu nejde";
       if (effStressCost(man, o) > ship.stressPoints) return `chybí stres (zastavení stojí ${effStressCost(man, o)})`;
       return noAp(ship, o, false);
@@ -124,9 +124,9 @@ export const ACTIONS: ActionOption[] = [
       const profile = profileFor(ship, o);
       const cur = parseManeuverId(o.maneuverId);
       if (cur?.speed === 0) return { maneuverId: makeManeuver(profile, 1, 0, false, ship.speed)?.id ?? o.maneuverId };
-      if (cur?.stop) return { maneuverId: makeManeuver(profile, cur.speed, cur.angle, false, ship.speed)?.id ?? o.maneuverId };
-      const atEnd = !!cur && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0);
-      if (atEnd) return { maneuverId: makeManeuver(profile, cur!.speed, cur!.angle, false, ship.speed, true)?.id ?? o.maneuverId };
+      if (cur?.stop) return { maneuverId: makeManeuver(profile, cur.speed, cur.angle, false, ship.speed, false, cur.split)?.id ?? o.maneuverId };
+      const atEnd = !!cur && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0 || !!cur.split);
+      if (atEnd) return { maneuverId: makeManeuver(profile, cur!.speed, cur!.angle, false, ship.speed, true, cur!.split)?.id ?? o.maneuverId };
       return { maneuverId: makeManeuver(profile, 0, 0, false, ship.speed)?.id ?? o.maneuverId };
     },
   },
@@ -168,7 +168,7 @@ export const ACTIONS: ActionOption[] = [
       if (cur?.koiogran) return null;
       const profile = profileFor(ship, o);
       const sp = Math.max(2, cur?.speed ?? ship.speed);
-      const man = makeManeuver(profile, sp, cur?.angle ?? 0, true, ship.speed) ?? makeManeuver(profile, sp, 0, true, ship.speed);
+      const man = makeManeuver(profile, sp, cur?.angle ?? 0, true, ship.speed, false, cur?.split) ?? makeManeuver(profile, sp, 0, true, ship.speed);
       if (!man) return "loď otočku nezvládne";
       if (effStressCost(man, o) > ship.stressPoints) return `chybí stres (otočka stojí ${effStressCost(man, o)})`;
       const cost = actionCost(ship, { ...o, maneuverId: man.id });
@@ -180,9 +180,9 @@ export const ACTIONS: ActionOption[] = [
       const profile = profileFor(ship, o);
       const cur = parseManeuverId(o.maneuverId);
       // přepínač: zachová rychlost i úhel křivky; otočka jde od rychlosti 2
-      if (cur?.koiogran) return { maneuverId: makeManeuver(profile, cur.speed, cur.angle, false, ship.speed)?.id ?? o.maneuverId };
+      if (cur?.koiogran) return { maneuverId: makeManeuver(profile, cur.speed, cur.angle, false, ship.speed, false, cur.split)?.id ?? o.maneuverId };
       const sp = Math.max(2, cur?.speed ?? ship.speed);
-      return { maneuverId: (makeManeuver(profile, sp, cur?.angle ?? 0, true, ship.speed) ?? makeManeuver(profile, sp, 0, true, ship.speed))?.id ?? o.maneuverId };
+      return { maneuverId: (makeManeuver(profile, sp, cur?.angle ?? 0, true, ship.speed, false, cur?.split) ?? makeManeuver(profile, sp, 0, true, ship.speed))?.id ?? o.maneuverId };
     },
   },
 ];

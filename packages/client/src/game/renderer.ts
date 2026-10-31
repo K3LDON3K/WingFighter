@@ -13,6 +13,7 @@ import {
   TORPEDO,
   forward,
   maneuverPath,
+  splitPoint,
   samplePath,
   type Asteroid,
   type GameState,
@@ -57,7 +58,7 @@ export interface Overlay {
   selectedShipId?: string;
   hoverId?: string;
   /** Plánované dráhy vlastních lodí; `aiming` = právě se kreslí myší. */
-  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; stopNow?: boolean; laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[]; mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[] }[];
+  previews?: { ship: ViewShip; maneuver: Maneuver; aiming: boolean; fire: boolean; stopNow?: boolean; /** Dělený manévr: velké úchyty ◆ (zlom) a ○ (konec) k tažení (dotyk / kreslení). */ handles?: boolean; laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[]; mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[] }[];
   /** Režim DOSAHY: další kruhy dosahu kolem vybrané lodi (každý s barvou a popiskem). */
   rangeRings?: { radius: number; label: string; color: string }[];
   /** Náhled výsečí při najetí myší na tlačítko zbraně (čárkovaně, bez zapnutí střelby). */
@@ -235,7 +236,7 @@ export class Renderer {
       }
       ctx.globalAlpha = 1;
     }
-    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArcs, p.mgArcs, p.stopNow);
+    for (const p of overlay.previews ?? []) this.drawPreview(p.ship, p.maneuver, p.aiming, p.fire, p.laserArcs, p.mgArcs, p.stopNow, p.handles);
     for (const a of overlay.hoverArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, a.color, a.range ?? LASER.range, a.halfArc, true);
     for (const p of overlay.botPlans ?? []) this.drawBotPlan(p.ship, p.maneuver);
     for (const l of overlay.torpedoLines ?? []) this.drawTorpedoLine(l);
@@ -1130,7 +1131,21 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[], mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[], stopBadge = false) {
+  /** Kosočtverec ◆ (zlom děleného manévru). */
+  drawDiamond(x: number, y: number, r: number, color: string) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = color;
+    ctx.fillRect(-r, -r, 2 * r, 2 * r);
+    ctx.strokeStyle = "#0b1020";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-r, -r, 2 * r, 2 * r);
+    ctx.restore();
+  }
+
+  private drawPreview(ship: ViewShip, man: Maneuver, aiming: boolean, fire: boolean, laserArcs?: { x: number; y: number; heading: number; halfArc: number; range?: number }[], mgArcs?: { x: number; y: number; heading: number; halfArc: number; range: number }[], stopBadge = false, handles = false) {
     const ctx = this.ctx;
     const color = TEAM_COLORS[ship.team];
     if (man.speed === 0 && !man.koiogran) {
@@ -1162,6 +1177,20 @@ export class Renderer {
       ctx.fill();
     }
     ctx.restore();
+    if (man.split) {
+      // dělený manévr: zlom ◆ (při kreslení / na dotyku velký úchyt), konec ○ jako úchyt druhé části
+      const sp = splitPoint(ship, man);
+      if (sp) this.drawDiamond(sp.x, sp.y, handles ? 9 : 5, "#fbbf24");
+      if (handles) {
+        ctx.save();
+        ctx.strokeStyle = "#f8fafc";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(end.x, end.y, 11, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
     // výseče zbraní: každá z pozice svého modulu na trupu (lasery střílí ze startovní pozice, před pohybem)
     for (const a of laserArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, color, a.range ?? LASER.range, a.halfArc);
     for (const a of mgArcs ?? []) this.drawArc({ x: a.x, y: a.y, heading: a.heading }, "#fbbf24", a.range, a.halfArc);
@@ -1393,6 +1422,13 @@ export class Renderer {
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.radius * (0.2 + 0.8 * t), 0, Math.PI * 2);
         ctx.stroke();
+        ctx.restore();
+        break;
+      }
+      case "diamond": {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, (1 - t) * 3);
+        this.drawDiamond(e.x, e.y, 5, e.color);
         ctx.restore();
         break;
       }

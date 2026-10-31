@@ -90,6 +90,9 @@ import {
   listManeuvers,
   makeManeuver,
   maneuverEnd,
+  maneuverPath,
+  splitPoint,
+  classifySplitCurve,
   MINE,
   MOVE_UNIT,
   planBot,
@@ -958,7 +961,7 @@ describe("bitevník", () => {
     expect(mgRange({ loadout: lo })).toBe(Math.round(MG.range * 1.25));
     expect(torpedoLockRange({ loadout: lo })).toBe(Math.round(TORPEDO.lockRange * 1.25));
     expect(laserRange({ loadout: { hullId: "fighter" } })).toBe(LASER.range);
-    expect(HULLS.battleship.profile.maxAngle[3]).toBeGreaterThanOrEqual(80);
+    expect(HULLS.battleship.profile.maxAngle).toEqual([0, 90, 70, 50, 30, 30]); // těžkopádný: rozjetý zatáčí jen mírně
     // velký modul jde i do spojeného levoboku; na stíhači jen příď + záď
     expect(hullLargePairs(HULLS.battleship).length).toBe(3);
     expect(hullLargePairs(HULLS.fighter)).toEqual([["front", "back"]]);
@@ -2262,5 +2265,109 @@ describe("více zbraní v kole", () => {
     const dup = sanitizeOrders(g, "p1", [{ shipId: me.id, maneuverId: man, shots: [{ moduleId: "la" }, { moduleId: "la" }, { moduleId: "lb" }], special: { type: "mine" } }]);
     expect(dup[0].shots!.map((s) => s.moduleId)).toEqual(["la", "lb"]);
     expect(actionCost(me, dup[0])).toBeLessThanOrEqual(RULES.actionPoints);
+  });
+});
+
+describe("hmotnost a dělený manévr", () => {
+  it("srážka stíhač × bitevník: stíhač odmrštěn a zastaví (stres 0, plné zranění), bitevník jen zpomalí o 1 a letí dál", () => {
+    const g = game();
+    const f = place(g, "ship-p1-0", 500, 500, 0);
+    const b = place(g, "ship-p2-0", 700, 500, Math.PI);
+    b.loadout = { ...b.loadout, hullId: "battleship" };
+    b.stats = computeStats(b.loadout);
+    b.hull = b.stats.hull;
+    f.stressPoints = 3;
+    const orders: ShipOrders[] = [
+      { shipId: f.id, maneuverId: "m2a0", fire: false },
+      { shipId: b.id, maneuverId: "m3a0", fire: false },
+    ];
+    const r = resolveTurn(g, orders, createRng(1));
+    const f2 = r.state.ships.find((s) => s.id === f.id)!;
+    const b2 = r.state.ships.find((s) => s.id === b.id)!;
+    const cols = r.events.filter((e) => e.type === "collision");
+    expect(cols.some((e) => e.type === "collision" && e.shipId === f.id && e.shoved)).toBe(true);
+    expect(cols.some((e) => e.type === "collision" && e.shipId === b.id && e.brushed)).toBe(true);
+    expect(f2.speed).toBe(0);
+    expect(f2.stressPoints).toBe(0);
+    expect(b2.speed).toBe(2); // 3 − 1
+    // bitevník doletěl dál než do místa dotyku: plná dráha 3 políčka
+    expect(b2.x).toBeCloseTo(700 - 3 * MOVE_UNIT, 0);
+    // stíhač byl odhozen od bitevníku (nedoletěl na konec své dráhy), kurz zůstal
+    expect(f2.x).toBeLessThan(500 + 2 * MOVE_UNIT - 10);
+    expect(f2.heading).toBeCloseTo(0, 5);
+    // zranění: stíhač plné, bitevník třetinové
+    expect(r.events.some((e) => e.type === "damage" && e.shipId === f.id && e.amount === DEFAULT_TUNING.collisionShip)).toBe(true);
+    expect(r.events.some((e) => e.type === "damage" && e.shipId === b.id && e.amount === Math.round(DEFAULT_TUNING.collisionShip / 3))).toBe(true);
+  });
+
+  it("stojící bitevník je zeď: nezpomalí (zůstane 0), stíhač se odrazí", () => {
+    const g = game();
+    const f = place(g, "ship-p1-0", 500, 500, 0);
+    const b = place(g, "ship-p2-0", 640, 500, Math.PI);
+    b.loadout = { ...b.loadout, hullId: "battleship" };
+    b.stats = computeStats(b.loadout);
+    b.speed = 0;
+    const r = resolveTurn(g, [{ shipId: f.id, maneuverId: "m3a0", fire: false }, { shipId: b.id, maneuverId: "m0a0", fire: false }], createRng(2));
+    const b2 = r.state.ships.find((s) => s.id === b.id)!;
+    const f2 = r.state.ships.find((s) => s.id === f.id)!;
+    expect(b2.speed).toBe(0);
+    expect(b2.x).toBeCloseTo(640, 3);
+    expect(f2.speed).toBe(0);
+    expect(r.events.some((e) => e.type === "collision" && e.shipId === f.id && e.shoved)).toBe(true);
+  });
+
+  it("bitevník: brzdění o 1 je prudké, zrychlení o 1 bílé; dělený manévr nemá", () => {
+    expect(resolveManeuver(BATTLESHIP_PROFILE, "m2a0", 3)?.difficulty).toBe("red");
+    expect(resolveManeuver(BATTLESHIP_PROFILE, "m3a0", 2)?.difficulty).toBe("green");
+    expect(resolveManeuver(BATTLESHIP_PROFILE, "m4a0", 3)?.difficulty).toBe("white");
+    expect(resolveManeuver(BATTLESHIP_PROFILE, "m4a0z2a30", 4)).toBeNull();
+    expect(BATTLESHIP_PROFILE.maxAngle[4]).toBe(30);
+  });
+
+  it("dělený manévr stíhače: id, součet úhlů ≤ max úhel, barva podle ostřejší části, dráha ze dvou oblouků", () => {
+    expect(parseManeuverId("m4a0z2a60")).toEqual({ speed: 4, angle: 0, koiogran: false, stop: false, split: { at: 2, angle2: 60 } });
+    expect(parseManeuverId("k3a-20z1a20")?.koiogran).toBe(true);
+    // 2 rovně + 2 doleva 60° při rychlosti 4: součet 60 ≤ 60, efektivně 120° = 2× max → prudký
+    const a = resolveManeuver(FIGHTER_PROFILE, "m4a0z2a-60", 4)!;
+    expect(a.difficulty).toBe("red");
+    expect(a.split).toEqual({ at: 2, angle2: -60 });
+    // 1 doleva 60° + 3 rovně: 60° v jednom políčku = 240° > 2× max → nebezpečný
+    expect(resolveManeuver(FIGHTER_PROFILE, "m4a-60z1a0", 4)?.difficulty).toBe("danger");
+    // esíčko 50+50 = 100 > 60 → nejde; 30+30 jde (efektivně 60° při 4 = ostré → prudký)
+    expect(resolveManeuver(FIGHTER_PROFILE, "m4a50z2a-50", 4)).toBeNull();
+    expect(resolveManeuver(FIGHTER_PROFILE, "m4a30z2a-30", 4)?.difficulty).toBe("red");
+    // zlom musí být uvnitř dráhy; dělený manévr není nikdy zelený
+    expect(resolveManeuver(FIGHTER_PROFILE, "m4a0z4a10", 4)).toBeNull();
+    expect(resolveManeuver(FIGHTER_PROFILE, "m4a0z0a10", 4)).toBeNull();
+    expect(resolveManeuver(FIGHTER_PROFILE, "m2a10z1a10", 2)?.difficulty).toBe("white");
+    expect(classifySplitCurve(FIGHTER_PROFILE, 3, 0, { at: 1, angle2: 90 }, 3)).toBe("red"); // 90° ve 2 ze 3 = 135° < 180
+    expect(classifySplitCurve(FIGHTER_PROFILE, 3, 90, { at: 1, angle2: 0 }, 3)).toBe("danger"); // 90° v 1 ze 3 = 270°
+    // dráha: po 2 políčkách rovně je zlom, konec je vlevo od osy a celková délka 4 políčka
+    const start = { x: 0, y: 0, heading: 0 };
+    const sp = splitPoint(start, a)!;
+    expect(sp.x).toBeCloseTo(2 * MOVE_UNIT, 5);
+    expect(sp.y).toBeCloseTo(0, 5);
+    const end = maneuverEnd(start, a);
+    expect(end.y).toBeLessThan(-10);
+    expect(end.heading).toBeCloseTo((-60 * Math.PI) / 180, 5);
+    // délka dráhy ≈ 4 políčka
+    const path = maneuverPath(start, a);
+    let len = 0;
+    for (let i = 1; i <= 200; i++) {
+      const p = path(i / 200);
+      const q = path((i - 1) / 200);
+      len += Math.hypot(p.x - q.x, p.y - q.y);
+    }
+    expect(len).toBeCloseTo(4 * MOVE_UNIT, 0);
+    // odehraje se: loď skončí na konci složené dráhy
+    const g = game();
+    const f = place(g, "ship-p1-0", 500, 500, 0);
+    f.speed = 4;
+    f.stressPoints = 3;
+    const r = resolveTurn(g, [{ shipId: f.id, maneuverId: "m4a0z2a-60", fire: false }], createRng(1));
+    const f2 = r.state.ships.find((s) => s.id === f.id)!;
+    const e2 = maneuverEnd({ x: 500, y: 500, heading: 0 }, a);
+    expect(f2.x).toBeCloseTo(e2.x, 3);
+    expect(f2.y).toBeCloseTo(e2.y, 3);
   });
 });

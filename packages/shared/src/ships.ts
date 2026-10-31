@@ -13,7 +13,7 @@ export const HULLS: Record<string, HullDef> = {
   fighter: {
     id: "fighter",
     name: "Stíhač",
-    description: "Malá rychlá loď. Čtyři malé sloty: příď, záď, levobok, pravobok. Příď + záď jde spojit v jeden velký slot.",
+    description: "Malá rychlá a obratná loď: umí dělený manévr (dráha ze dvou oblouků – např. 2 rovně a pak 2 doleva). Čtyři malé sloty: příď, záď, levobok, pravobok. Příď + záď jde spojit v jeden velký slot. Při srážce s bitevníkem je odmrštěn.",
     radius: 16,
     points: 1,
     // kolizní model z pixelového spritu: tělo, příď, levé a pravé křídlo (plameny motorů se nepočítají)
@@ -32,11 +32,12 @@ export const HULLS: Record<string, HullDef> = {
       { id: "right", name: "pravobok", size: "small" },
     ],
     profile: FIGHTER_PROFILE,
+    mass: 1,
   },
   battleship: {
     id: "battleship",
     name: "Bitevník",
-    description: "Střední loď, asi 3× větší než stíhač. Dostřel všech zbraní o 25 % delší, lasery mají do všech směrů stejnou výseč (±20°). Šest slotů: příď, záď, přední a zadní levobok, přední a zadní pravobok. Příď + záď, oba levoboky i oba pravoboky jde spojit v jeden velký slot. Pomalejší (max. rychlost 4), otočka jen z rychlosti 2–3, větší trup a náklad, 10 bodů technologie. Stojí 2 lodní body.",
+    description: "Střední loď, asi 3× větší než stíhač. Dostřel všech zbraní o 25 % delší, lasery mají do všech směrů stejnou výseč (±20°). Šest slotů: příď, záď, přední a zadní levobok, přední a zadní pravobok. Příď + záď, oba levoboky i oba pravoboky jde spojit v jeden velký slot. Těžkopádný: max. rychlost 4, při rychlosti zatáčí jen mírně (90/70/50/30°), brzdění o 1 je prudké, otočka jen z rychlosti 2–3, bez děleného manévru. Při srážce stíhač odmrští a sám jen zpomalí o 1. Větší trup a náklad, 10 bodů technologie. Stojí 2 lodní body.",
     radius: 58,
     points: 2,
     // kolizní model podle spritu (50×40 px × 3, střed 24/20): trup od zádi (x −63) po příď (+72), dvě gondoly (y ±36, x −60…+18)
@@ -72,6 +73,7 @@ export const HULLS: Record<string, HullDef> = {
     rangeMul: 1.25,
     techMax: 10,
     sameArcs: true,
+    mass: 3,
   },
 };
 

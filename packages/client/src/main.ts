@@ -25,6 +25,9 @@ import {
   parseManeuverId,
   resolveManeuver,
   maneuverPath,
+  splitPoint,
+  type Maneuver,
+  type ManeuverSplit,
   rightOf,
   effStressCost,
   profileFor,
@@ -518,7 +521,7 @@ function ensureVisible(shipId: string | undefined) {
 }
 
 /** Nastaví manévr; úhel ořízne na to, co loď při dané rychlosti zvládne. Vrací true při úspěchu. */
-function setManeuver(shipId: string, speed: number, angle: number, koiogran: boolean, stop = false): boolean {
+function setManeuver(shipId: string, speed: number, angle: number, koiogran: boolean, stop = false, split: ManeuverSplit | null = null): boolean {
   if (!game) return false;
   const ship = game.state.ships.find((s) => s.id === shipId);
   const o = game.orders.get(shipId);
@@ -526,7 +529,19 @@ function setManeuver(shipId: string, speed: number, angle: number, koiogran: boo
   const profile = profileFor(ship, o);
   speed = Math.max(koiogran ? 2 : 0, Math.min(profile.maxSpeed, Math.round(speed)));
   const st = stop && !koiogran && speed >= 1 && speed <= profile.stopMax; // zastavení na konci jde jen při pomalé dráze
-  let man = makeManeuver(profile, speed, angle, koiogran, ship.speed, st);
+  let man: Maneuver | null = null;
+  if (split && profile.split && speed >= 2) {
+    // dělený manévr: zlom uvnitř dráhy, součet úhlů do max. úhlu rychlosti (ořízne se druhá část, pak první)
+    const max = profile.maxAngle[speed] ?? 0;
+    const at = Math.max(1, Math.min(speed - 1, Math.round(split.at)));
+    let a1 = Math.round(angle / ANGLE_STEP) * ANGLE_STEP;
+    let a2 = Math.round(split.angle2 / ANGLE_STEP) * ANGLE_STEP;
+    if (Math.abs(a1) > max) a1 = Math.sign(a1) * max;
+    if (Math.abs(a1) + Math.abs(a2) > max) a2 = Math.sign(a2) * Math.max(0, max - Math.abs(a1));
+    man = makeManeuver(profile, speed, a1, koiogran, ship.speed, st, { at, angle2: a2 });
+    if (!man) return false; // změna rychlosti mimo možnosti motoru: dělený manévr nejde, dráhu neměnit
+  }
+  if (!man) man = makeManeuver(profile, speed, angle, koiogran, ship.speed, st);
   if (!man) {
     const max = profile.maxAngle[speed];
     const clamped = Math.sign(angle) * Math.min(Math.abs(angle), max);
@@ -721,8 +736,8 @@ function mountGame() {
     { class: "map" },
     canvas,
     hudEl,
-    h("div", { class: "hint mouse-only" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ · NAJETÍ NA ZBRAŇ = DOSAH"),
-    h("div", { class: "hint touch-only" }, "TÁHNOUT Z VLASTNÍ LODI = DRÁHA (PAK ✓ / ✕) · ŤUKNOUT NA NEPŘÍTELE = CÍL · TÁHNOUT = POSUN · 2 PRSTY = ZOOM · PODRŽET = INFO · PODRŽET TLAČÍTKO ZBRANĚ = DOSAH"),
+    h("div", { class: "hint mouse-only" }, "KLIK NA LOĎ = KRESLIT DRÁHU · KLIK = POTVRDIT · Z = ZALOMIT DRÁHU · KLIK NA NEPŘÍTELE = CÍL · TAŽENÍ = POSUN · KOLEČKO / +- = ZOOM · C = POHLED · F = NAJÍT LOĎ · NAJETÍ NA ZBRAŇ = DOSAH"),
+    h("div", { class: "hint touch-only" }, "TÁHNOUT Z VLASTNÍ LODI = DRÁHA (PAK ✓ / ✕) · ZALOMIT = ◆ A ○ NA DRÁZE TÁHNOUT · ŤUKNOUT NA NEPŘÍTELE = CÍL · TÁHNOUT = POSUN · 2 PRSTY = ZOOM · PODRŽET = INFO · PODRŽET TLAČÍTKO ZBRANĚ = DOSAH"),
     sideEl,
     h("div", { class: "sidestack" }, droidEl, invEl),
     h(
@@ -928,7 +943,8 @@ function buildOverlay(view: ViewModel): Overlay {
         else if (mod.type === "mg") (overlay.hoverArcs ??= []).push({ ...mgArcOf(turned, mid), color: "#fbbf24" });
       }
     }
-    if (man.speed > 0 || man.koiogran) overlay.previews.push({ ship: vsT, maneuver: man, aiming, fire: laserShots.length > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
+    const handles = !!man.split && !g.submitted && (aiming || (isTouchMode() && g.selectedShipId === ship.id));
+    if (man.speed > 0 || man.koiogran) overlay.previews.push({ ship: vsT, maneuver: man, aiming, fire: laserShots.length > 0, handles, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
     else overlay.previews.push({ ship: vsT, maneuver: man, aiming: false, fire: laserShots.length > 0, stopNow: ship.speed > 0, laserArcs: laserShots.map(({ mod }) => laserArcOf(turned, mod.id)), mgArcs: mgShots.map(({ mod }) => mgArcOf(turned, mod.id)) });
     const end = maneuverEnd(turned, man);
 
@@ -1545,6 +1561,18 @@ function renderSide() {
         sfx("cancel");
         renderSide();
       },
+      toggleSplit: (id) => {
+        const g = game!;
+        if (g.submitted) return;
+        // myš: při zalomení rovnou kreslit druhou část; dotyk: dráhu tvarují úchyty na mapě
+        if (!isTouchMode() && g.aimingShipId !== id) {
+          g.aimingShipId = id;
+          aimBackup.set(id, g.orders.get(id)?.maneuverId ?? "");
+        }
+        g.selectedShipId = id;
+        toggleSplit(id);
+      },
+      setSplitAt: (id, at) => setSplitAt(id, at),
       aim: (id) => {
         if (game!.aimingShipId === id) {
           confirmManeuver(id);
@@ -1954,6 +1982,21 @@ function iconAt(x: number, y: number): IconSpot | undefined {
 }
 
 /** Míření: směr (a bez zámku i rychlost) podle polohy myši vůči lodi. */
+/** Část děleného manévru, kterou právě kreslí kurzor / prst (výchozí = druhá). */
+let splitPart: 1 | 2 = 2;
+
+/** Výchozí poloha lodi pro kreslení dráhy (včetně otočení akcí „kurz“). */
+function startPose(ship: Ship, o: ShipOrders): Pose {
+  return { x: ship.x, y: ship.y, heading: o.action?.type === "turn" ? o.action.heading : ship.heading };
+}
+
+/** Úhel oblouku z výchozí pózy k bodu: koncový bod oblouku leží na polovině úhlu zatáčky → úhel = 2 × směr k bodu. */
+function arcAngleTo(from: Pose, wx: number, wy: number): number {
+  const bearing = normalizeAngle(Math.atan2(wy - from.y, wx - from.x) - from.heading);
+  const angle = Math.round((((bearing * 180) / Math.PI) * 2) / ANGLE_STEP) * ANGLE_STEP;
+  return Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, angle));
+}
+
 function aimAt(wx: number, wy: number) {
   const g = game;
   if (!g || g.submitted) return;
@@ -1964,18 +2007,76 @@ function aimAt(wx: number, wy: number) {
   if (!ship || !o) return;
   const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false, stop: false };
   const profile = profileFor(ship, o);
+  const start = startPose(ship, o);
+  if (cur.split) {
+    // dělený manévr: rychlost je zamčená, kurzor tvaruje jen jednu část
+    if (splitPart === 1) {
+      if (Math.hypot(wx - ship.x, wy - ship.y) < ship.stats.radius + 4) return;
+      setManeuver(id, cur.speed, arcAngleTo(start, wx, wy), cur.koiogran, cur.stop, cur.split);
+    } else {
+      const man = resolveManeuver(profile, o.maneuverId, ship.speed);
+      const sp = man && splitPoint(start, man);
+      if (!sp) return;
+      if (Math.hypot(wx - sp.x, wy - sp.y) < 6) return;
+      setManeuver(id, cur.speed, cur.angle, cur.koiogran, cur.stop, { at: cur.split.at, angle2: arcAngleTo(sp, wx, wy) });
+    }
+    return;
+  }
   const d = Math.hypot(wx - ship.x, wy - ship.y);
   if (d < ship.stats.radius + 4) return; // těsně u lodi nic neměnit
-  const heading0 = o.action?.type === "turn" ? o.action.heading : ship.heading;
-  const bearing = normalizeAngle(Math.atan2(wy - ship.y, wx - ship.x) - heading0);
-  // koncový bod oblouku leží na polovině úhlu zatáčky → úhel = 2 × směr k myši
-  let angle = Math.round((((bearing * 180) / Math.PI) * 2) / ANGLE_STEP) * ANGLE_STEP;
-  angle = Math.max(-MAX_ANGLE, Math.min(MAX_ANGLE, angle));
+  const angle = arcAngleTo(start, wx, wy);
   // v režimu otočky je nejnižší rychlost 2; myš těsně u lodi = zastavit (rychlost 0, jen z rychlosti 1)
   const raw = Math.round(d / (MOVE_UNIT * 0.9));
   const minSp = cur.koiogran ? 2 : ship.speed >= 1 && ship.speed <= profile.stopMax ? 0 : 1;
   const speed = g.speedLock.get(id) ?? Math.max(minSp, Math.min(5, raw));
   setManeuver(id, speed, speed === 0 ? 0 : angle, cur.koiogran, cur.stop);
+}
+
+/** Zalomit / narovnat dráhu (Z, tlačítko ZALOMIT). Při zalomení se rychlost zamkne a kurzor kreslí druhou část. */
+function toggleSplit(id: string): boolean {
+  const g = game;
+  if (!g || g.submitted) return false;
+  const ship = g.state.ships.find((s) => s.id === id);
+  const o = g.orders.get(id);
+  if (!ship || !o) return false;
+  const profile = profileFor(ship, o);
+  if (!profile.split) return false;
+  const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false, stop: false };
+  if (cur.split) {
+    g.speedLock.delete(id);
+    const ok = setManeuver(id, cur.speed, cur.angle, cur.koiogran, cur.stop);
+    sfx("toggle");
+    renderSide();
+    return ok;
+  }
+  if (cur.speed < 2) {
+    showError("Dělený manévr jde až od rychlosti 2.");
+    return false;
+  }
+  const ok = setManeuver(id, cur.speed, cur.angle, cur.koiogran, cur.stop, { at: Math.floor(cur.speed / 2), angle2: 0 });
+  if (!ok) {
+    showError("Tuto dráhu nejde zalomit.");
+    return false;
+  }
+  g.speedLock.set(id, cur.speed);
+  splitPart = 2;
+  sfx("toggle");
+  renderSide();
+  return true;
+}
+
+/** Posune zlom děleného manévru na dané políčko (1 … rychlost − 1). */
+function setSplitAt(id: string, at: number): boolean {
+  const g = game;
+  if (!g || g.submitted) return false;
+  const ship = g.state.ships.find((s) => s.id === id);
+  const o = g.orders.get(id);
+  if (!ship || !o) return false;
+  const cur = parseManeuverId(o.maneuverId);
+  if (!cur?.split) return false;
+  const ok = setManeuver(id, cur.speed, cur.angle, cur.koiogran, cur.stop, { at, angle2: cur.split.angle2 });
+  if (ok) renderSide();
+  return ok;
 }
 
 function confirmManeuver(id: string): boolean {
@@ -2119,6 +2220,25 @@ function bindInput(c: HTMLCanvasElement) {
   let pinch: { dist: number; mx: number; my: number } | null = null;
   let aimDrag: string | null = null; // loď, ze které se táhne dráha
   let turnDrag: string | null = null; // dotyk: otáčení stojící lodi tažením prstu kdekoliv po mapě
+  /** Dotyk: tažení úchytu děleného manévru (◆ = posun zlomu po políčkách, ○ = tvar druhé části). */
+  let handleDrag: { id: string; kind: "split" | "end" } | null = null;
+  /** Úchyt děleného manévru vybrané lodi pod prstem (dotyk). */
+  const splitHandleAt = (w: { x: number; y: number }): { id: string; kind: "split" | "end" } | null => {
+    const g = game!;
+    if (g.anim || g.submitted || !cam) return null;
+    const ship = g.state.ships.find((x) => x.id === g.selectedShipId && x.ownerId === playerId && x.alive);
+    const o = ship && g.orders.get(ship.id);
+    if (!ship || !o) return null;
+    const man = resolveManeuver(profileFor(ship, o), o.maneuverId, ship.speed);
+    if (!man?.split) return null;
+    const start = startPose(ship, o);
+    const r = 24 / cam.zoom;
+    const sp = splitPoint(start, man);
+    if (sp && Math.hypot(w.x - sp.x, w.y - sp.y) <= r) return { id: ship.id, kind: "split" };
+    const end = maneuverEnd(start, man);
+    if (Math.hypot(w.x - end.x, w.y - end.y) <= r) return { id: ship.id, kind: "end" };
+    return null;
+  };
   let longPress = 0;
   let longPressed = false;
   const TAP_SLOP = 8;
@@ -2178,7 +2298,14 @@ function bindInput(c: HTMLCanvasElement) {
     game.hoverIcon = undefined;
     const hit = !game.anim && !game.submitted ? entityAt(w.x, w.y) : undefined;
     const turnShip = game.turnPick && !game.anim && !game.submitted ? game.state.ships.find((x) => x.id === game!.selectedShipId) : undefined;
-    if (turnShip && game.orders.get(turnShip.id)?.action?.type === "turn" && !iconAt(w.x, w.y)) {
+    const hs = iconAt(w.x, w.y) ? null : splitHandleAt(w);
+    handleDrag = null;
+    if (hs) {
+      // úchyt děleného manévru: tažením ◆ posouváš zlom, tažením ○ tvaruješ druhou část
+      handleDrag = hs;
+      aimDrag = null;
+      turnDrag = null;
+    } else if (turnShip && game.orders.get(turnShip.id)?.action?.type === "turn" && !iconAt(w.x, w.y)) {
       // otáčení na místě: tažení prstem kdekoliv po mapě otáčí loď, zvednutí prstu kurz potvrdí
       turnDrag = turnShip.id;
       aimDrag = null;
@@ -2224,6 +2351,30 @@ function bindInput(c: HTMLCanvasElement) {
     if (!moved && !aimDragMoved(e)) return;
     moved = true;
     clearTimeout(longPress);
+    if (handleDrag) {
+      const { id, kind } = handleDrag;
+      const ship = game.state.ships.find((x) => x.id === id);
+      const o = ship && game.orders.get(id);
+      if (!ship || !o) return;
+      const w = worldPos({ clientX: e.clientX, clientY: e.clientY - AIM_OFFSET });
+      game.mouse = w;
+      if (kind === "split") {
+        const cur = parseManeuverId(o.maneuverId);
+        if (cur?.split) {
+          const at = Math.max(1, Math.min(cur.speed - 1, Math.round(Math.hypot(w.x - ship.x, w.y - ship.y) / MOVE_UNIT)));
+          if (at !== cur.split.at) setSplitAt(id, at);
+        }
+      } else {
+        if (game.aimingShipId !== id && !startAiming(id)) {
+          handleDrag = null;
+          return;
+        }
+        splitPart = 2;
+        aimAt(w.x, w.y);
+        renderSide();
+      }
+      return;
+    }
     if (turnDrag) {
       const ship = game.state.ships.find((x) => x.id === turnDrag);
       const o = ship && game.orders.get(ship.id);
@@ -2240,6 +2391,7 @@ function bindInput(c: HTMLCanvasElement) {
       }
       const w = worldPos({ clientX: e.clientX, clientY: e.clientY - AIM_OFFSET });
       game.mouse = w;
+      splitPart = 1; // tažení od lodi tvaruje první část (u děleného manévru), druhou úchyt ○
       aimAt(w.x, w.y);
       renderSide();
       return;
@@ -2273,6 +2425,14 @@ function bindInput(c: HTMLCanvasElement) {
     if (fingers.size > 0) return;
     if (!game || !cam) return;
     const g = game;
+    if (handleDrag) {
+      const { id } = handleDrag;
+      handleDrag = null;
+      g.mouse = null;
+      if (g.aimingShipId === id && !confirmManeuver(id)) cancelAiming(id);
+      renderSide();
+      return;
+    }
     if (turnDrag) {
       const id = turnDrag;
       turnDrag = null;
@@ -2429,6 +2589,7 @@ function bindInput(c: HTMLCanvasElement) {
         renderSide();
         return;
       }
+      splitPart = 2; // u děleného manévru kurzor tvaruje druhou část (první = narovnat Z a nakreslit znovu)
       if (startAiming(hit.id)) renderSide();
       return;
     }
@@ -2547,7 +2708,7 @@ function bindInput(c: HTMLCanvasElement) {
         if (cur) {
           const sp = Math.max(cur.koiogran ? 2 : 0, Math.min(5, cur.speed + (e.deltaY < 0 ? 1 : -1)));
           game.speedLock.set(id, sp);
-          setManeuver(id, sp, sp === 0 ? 0 : cur.angle, cur.koiogran, cur.stop);
+          setManeuver(id, sp, sp === 0 ? 0 : cur.angle, cur.koiogran, cur.stop, cur.split ? { at: Math.min(cur.split.at, sp - 1), angle2: cur.split.angle2 } : null);
         }
         return;
       }
@@ -2665,7 +2826,11 @@ function bindInput(c: HTMLCanvasElement) {
       renderSide();
     } else if (/^[0-5]$/.test(e.key)) {
       game.speedLock.set(id, Number(e.key));
-      setManeuver(id, Number(e.key), e.key === "0" ? 0 : cur.angle, cur.koiogran, cur.stop);
+      setManeuver(id, Number(e.key), e.key === "0" ? 0 : cur.angle, cur.koiogran, cur.stop, cur.split ? { at: Math.min(cur.split.at, Number(e.key) - 1), angle2: cur.split.angle2 } : null);
+    } else if (e.key === "z" || e.key === "Z") {
+      // zalomit dráhu (dělený manévr): kreslí-li se dráha, kurzor dál tvaruje druhou část
+      if (!game.aimingShipId) game.aimingShipId = id;
+      toggleSplit(id);
     } else if (e.key === "k" || e.key === "K") {
       chooseIcon(id, "koiogran");
     } else if (e.key === " ") {

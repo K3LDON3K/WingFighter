@@ -47,9 +47,21 @@ rychlosti dráhy: 1 bílé, 2 oranžové – jen stíhač; duch má odznak ■, 
 dráhy, zastaví hned a OTOČKA ji pak ještě otočí na místě (celkem 2 akce); bitevník úhybný manévr neumí vůbec; stojící loď
 nemůže uhýbat ani dělat otočku 180°, může se ale za 1 akci **otočit na místě** do libovolného směru (tlačítko
 OTOČKA se u stojící lodi změní na OTOČIT, klik na mapě) a pak vyrazit – stíhač na 1 (zelený) nebo rovnou na 2 (oranžový), bitevník jen na 1. **Zrychlování a
-brzdění:** stíhač ±1 bílé, ±2 oranžové, ±3 nebezpečné (víc nejde); bitevník ±1 bílé, ±2 nebezpečné, ±3 nejde.
-**Srážky zastavují:** loď–loď (stačí dotyk štítů) – obě zastaví v místě dotyku, 15 zranění každé, obě ztratí akci
-a mají rychlost 0; v příštím kole mají vůči sobě imunitu (nesrazí se, i když se rozjíždějí skrz sebe). Náraz do asteroidu nebo stanice – loď u něj zastaví (rychlost 0), vykousne do asteroidu díru
+brzdění:** stíhač ±1 bílé, ±2 oranžové, ±3 nebezpečné (víc nejde); bitevník +1 bílé, **brzdění o 1 oranžové** (setrvačnost), ±2 nebezpečné, ±3 nejde.
+**Bitevník je těžkopádný:** rozjetý zatáčí jen mírně (úhly 90/70/50/30° podle rychlosti 1–4), otočka jen z rychlosti 2–3, dělený manévr nemá.
+
+**Dělený manévr (jen stíhač):** dráha ze dvou oblouků – např. při rychlosti 4 dvě políčka rovně a pak dvě doleva, nebo esíčko.
+Stejná rychlost i délka, jedna akce „úprava pohybu“; zlom ◆ leží vždy na hranici celého políčka (volba „zlom po“ v panelu Manévr).
+Myš: při kreslení **Z** (nebo tlačítko ZALOMIT) zamkne první část a kurzor kreslí druhou, klik potvrdí, druhé Z narovná.
+Dotyk: nakreslit dráhu, ťuknout ZALOMIT – na dráze se objeví velké úchyty ◆ (tažením posuneš zlom) a ○ (tažením tvaruješ druhou část), tažením od lodi první část.
+Pravidla: součet obou úhlů nesmí přesáhnout max. úhel dané rychlosti; barva je podle ostřejší části – úhel části přepočtený na celou dráhu
+(60° ve 2 ze 4 políček je ostré jako 120°): do max. úhlu jako běžný oblouk, do dvojnásobku aspoň oranžová, nad dvojnásobek červená; dělený manévr
+není nikdy zelený. Otočka i zastavení na konci fungují i u dělené dráhy. V přehrávání kola je zlom označen ◆.
+
+**Srážky:** loď–loď (stačí dotyk štítů) **stejné hmotnosti** (stíhač × stíhač, bitevník × bitevník) – obě zastaví v místě dotyku, 15 zranění každé, obě ztratí akci
+a mají rychlost 0; v příštím kole mají vůči sobě imunitu (nesrazí se, i když se rozjíždějí skrz sebe). **Stíhač × bitevník** (hmotnost 1 : 3):
+stíhač je odmrštěn směrem od bitevníku (aspoň o políčko), zastaví (rychlost 0), dostane 15 zranění a stres klesne na 0; bitevník jen **zpomalí o 1**,
+letí dál po své dráze a dostane třetinové zranění (5). Stojící bitevník je zeď (nezpomalí). Úhybný manévr stíhače skrz bitevník proletí jako skrz každou nepřátelskou loď. Náraz do asteroidu nebo stanice – loď u něj zastaví (rychlost 0), vykousne do asteroidu díru
 (velikost podle lodi, min. poloměr v ladění), 15 zranění a stres na 0. Kometa loď odmrští náhodným směrem
 (rychlost 1, stres 0); okraj mapy loď odrazí zpět (15 zranění).
 
@@ -203,6 +215,7 @@ Příkazy (z kořenové složky):
 | `npm run typecheck` | kontrola typů ve všech balíčcích                           |
 
 ## Historie změn
+- v3.176 – **Bitevník vs. stíhač: hmotnost a setrvačnost; dělený manévr stíhače.** Srážka stíhač × bitevník už není symetrická: stíhač je odmrštěn směrem od bitevníku (aspoň o políčko), zastaví, dostane plné zranění a stres na 0; bitevník jen zpomalí o 1, letí dál a dostane třetinové zranění (stojící bitevník = zeď). Srážky lodí stejné hmotnosti beze změny. Bitevník je těžkopádnější: úhly 90/70/50/30° podle rychlosti, brzdění o 1 je oranžové. Nový **dělený manévr** (jen stíhač): dráha ze dvou oblouků se zlomem ◆ na celém políčku (např. 2 rovně + 2 doleva, esíčko), stejná rychlost i délka; id manévru `m4a0z2a-60`. Pravidla: součet úhlů ≤ max. úhel rychlosti, barva podle ostřejší části (úhel přepočtený na celou dráhu: do max. běžně, do 2× aspoň oranžová, nad 2× červená), nikdy zelený; otočka/zastavení na konci fungují. Ovládání: myš Z / tlačítko ZALOMIT (kurzor pak kreslí druhou část, klik potvrdí, druhé Z narovná), kolečko a klávesy 0–5 zlom zachovají; dotyk ZALOMIT + velké úchyty ◆ (posun zlomu po políčkách) a ○ (tvar druhé části) na dráze, tažením od lodi první část. Panel Manévr: dva glyfy, „0°+60°“, volba „zlom po“. V přehrávání kola je zlom označen ◆; log a efekt „ODMRŠTĚN“ u srážky. Nápověda manévrů a README doplněny. Testy: 96.
 - v3.175 – Torpéda v barvě týmu: tělo torpéda (8×2 px, se stínováním a bílou špičkou), plamen motoru (vnější v barvě týmu, světlejší jádro) i slabá záře kolem jsou v barvě týmu, který torpédo právě ovládá. Po hacku torpéda se přebarví celé včetně plamene (server mu přepíše tým, klient dostane nový stav hned). Dřív měl sprite jen jeden týmový pixel a plamen byl vždy oranžový, takže se torpéda nedala rozlišit. Ztracené torpédo (bez cíle) má dál bledší plamen.
 - v3.174 – Oprava panelu hráčů: soupeř, jehož lodě jsou mimo dohled (typicky host na začátku bitvy), se ostatním mylně ukazoval jako „kolo odesláno“ ✓ – klient jeho živé lodě ve stavu neměl, a tak ho považoval za vyřazeného. Server teď s každým stavem posílá seznam hráčů s živou lodí nezávisle na mlze (`alive`) a panel se řídí jím; po vyhodnocení kola i při startu bitvy se stav panelu rozešle hned. Kdo odešle další kolo během přehrávání animace u ostatních, už o svou ✓ nepřijde.
 - v3.173 – Náhled dosahu i na dotyku: **podržení tlačítka** zbraně/systému (~0,35 s) ukáže dosah na mapě a drží ho ještě 1,5 s po puštění; krátké ťuknutí dál zapíná akci (po dlouhém stisku se akce nezapne). Nové tlačítko **DOSAHY** (⌖ vedle − 👁 +): trvale ukáže dosahy všech zbraní a systémů vybrané lodi najednou – výseče nestřílejících laserů/kulometů, kruhy torpéda (zaměření + bod), pole miny, dosahy skeneru, okruh sběru trosek; přepínač si pamatuje stav. Nápověda dole doplněna.

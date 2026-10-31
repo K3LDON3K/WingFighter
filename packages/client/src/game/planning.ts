@@ -149,6 +149,9 @@ export interface PlanningCallbacks {
   aim(shipId: string): void;
   /** ✕ pod MANÉVR: při kreslení vrátí původní dráhu, jinak nastaví rovně stejnou rychlostí (zdarma). */
   cancelManeuver(shipId: string): void;
+  /** Dělený manévr: zalomit / narovnat dráhu; posunout zlom na políčko. */
+  toggleSplit(shipId: string): void;
+  setSplitAt(shipId: string, at: number): void;
   ready(): void;
   unready(): void;
   /** Otevře inventář s výběrem modulu k vyhození. */
@@ -304,7 +307,7 @@ function maneuverHelp(ship: Ship): HTMLElement {
     "div",
     { class: "mhelp" },
     h("h4", {}, label("Dráha")),
-    h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 0–5 rychlost zamknou, K = otočka, mezerník potvrdí."), li(`Zastavení: ZASTAVIT bez nakreslené dráhy zastaví hned (z rychlosti 1 bílé${prof.stopMax >= 2 ? ", stíhač i z 2 oranžově +1 stres" : ""}; také klávesa 0 nebo myš těsně u lodi). Nakreslíš-li nejdřív dráhu a pak stiskneš ZASTAVIT, loď ji proletí a na jejím konci zastaví (dráha rychlostí 1 bílé${prof.stopMax >= 2 ? ", rychlostí 2 oranžové" : ""}; 1 akce navíc, duch má odznak ■, panel ukáže „2 → 0“).`), li(`Stojící loď nemůže uhýbat ani dělat otočku 180°; tlačítkem OTOČKA (= OTOČIT) se za 1 akci otočí na místě do libovolného směru (myš: loď se otáčí za kurzorem, klik potvrdí; dotyk: táhni prstem po mapě) – i v kole, kdy právě zastavila – a pak vyrazí: ${prof.startMax >= 2 ? "stíhač na 1 (zelený) nebo rovnou na 2 (oranžový)" : "bitevník jen na 1"}.`), ship.loadout.hullId === "battleship" ? li("Bitevník úhybný manévr neumí.") : null),
+    h("ul", {}, li(`Manévr = rychlost + změna kurzu. Dráha je oblouk: délka = rychlost × ${MOVE_UNIT} jednotek, loď se po ní otočí o zvolený úhel.`), li("Kreslení: klik na loď, směr podle polohy myši (úhel = 2× směr k myši), rychlost podle vzdálenosti. Kolečko / klávesy 0–5 rychlost zamknou, K = otočka, mezerník potvrdí."), li(`Zastavení: ZASTAVIT bez nakreslené dráhy zastaví hned (z rychlosti 1 bílé${prof.stopMax >= 2 ? ", stíhač i z 2 oranžově +1 stres" : ""}; také klávesa 0 nebo myš těsně u lodi). Nakreslíš-li nejdřív dráhu a pak stiskneš ZASTAVIT, loď ji proletí a na jejím konci zastaví (dráha rychlostí 1 bílé${prof.stopMax >= 2 ? ", rychlostí 2 oranžové" : ""}; 1 akce navíc, duch má odznak ■, panel ukáže „2 → 0“).`), li(`Stojící loď nemůže uhýbat ani dělat otočku 180°; tlačítkem OTOČKA (= OTOČIT) se za 1 akci otočí na místě do libovolného směru (myš: loď se otáčí za kurzorem, klik potvrdí; dotyk: táhni prstem po mapě) – i v kole, kdy právě zastavila – a pak vyrazí: ${prof.startMax >= 2 ? "stíhač na 1 (zelený) nebo rovnou na 2 (oranžový)" : "bitevník jen na 1"}.`), ship.loadout.hullId === "battleship" ? li("Bitevník úhybný manévr neumí, je těžkopádný (rozjetý zatáčí jen mírně, už brzdění o 1 je oranžové) a při srážce stíhač odmrští – sám jen zpomalí o 1.") : li("Dělený manévr (jen stíhač): Z nebo tlačítko ZALOMIT rozdělí dráhu na dvě části s vlastním úhlem, zlom ◆ leží na celém políčku (volba „zlom po“), rychlost i délka zůstávají. Myš po zalomení kreslí druhou část (klik potvrdí; druhé Z narovná). Dotyk: tažením ◆ posuneš zlom, tažením ○ tvaruješ druhou část, tažením od lodi první. Součet obou úhlů nesmí přesáhnout max. úhel rychlosti; barva je podle ostřejší části (úhel přepočtený na celou dráhu: 60° ve 2 ze 4 políček = jako 120°) – do max. jako běžný oblouk, do dvojnásobku aspoň oranžová, nad něj červená. Nikdy není zelený."), li("Srážka s bitevníkem: stíhač je odmrštěn stranou, zastaví a přijde o stres; bitevník jen zpomalí o 1 a letí dál (zranění: stíhač plné, bitevník třetinové). Stojící bitevník je zeď. Úhyb skrz něj proletí jako skrz každou nepřátelskou loď.")),
     h("h4", {}, label("Rychlost")),
     h("ul", {}, li(`${HULLS[ship.loadout.hullId]?.name ?? "Loď"}: 1–${hullProf.maxSpeed}; tvoje loď teď max. ${prof.maxSpeed} (váha výbavy: každých ${WEIGHT.perSpeed} váhy = −1; overdrive droida váhu ignoruje).`), li(`Otočka o 180° jde jen z rychlosti ${prof.koiogranSpeeds.length ? `${Math.min(...prof.koiogranSpeeds)}–${Math.max(...prof.koiogranSpeeds)}` : "–"}, stojí 2 akce (s overdrivem 1) a po ní rychlost klesne o ${RULES.koiogranSpeedDrop}.`)),
     h("h4", {}, label("Úhel")),
@@ -324,28 +327,53 @@ function maneuverHelp(ship: Ship): HTMLElement {
   );
 }
 
-/** Panel „Manévr“ (náhled nakreslené dráhy: směr, rychlost, úhel, náročnost). */
+/** Poslední callbacky lišty – panel Manévr se při kreslení vyměňuje samostatně (bez cb). */
+let lastCb: PlanningCallbacks | null = null;
+
+/** Panel „Manévr“ (náhled nakreslené dráhy: směr, rychlost, úhel, náročnost; u stíhače zalomení dráhy). */
 function maneuverPanel(ship: Ship, o: ShipOrders, man: Maneuver | null): HTMLElement {
   const cur = parseManeuverId(o.maneuverId) ?? { speed: ship.speed, angle: 0, koiogran: false, stop: false };
   const dcolor = man ? (o.droid?.overdrive && maneuverStress(man) > 0 ? DIFFICULTY_COLOR.white : DIFFICULTY_COLOR[man.difficulty]) : "#f87171";
+  const profile = profileFor(ship, o);
+  const split = cur.split;
+  const canSplit = !!profile.split && cur.speed >= 2;
+  const glyphs = split
+    ? [angleGlyph(cur.angle, false), h("span", { class: "man-split-sep" }, "◆"), angleGlyph(split.angle2, false)]
+    : [angleGlyph(cur.angle, false)];
+  const angleTxt = split ? `${Math.abs(cur.angle)}°+${Math.abs(split.angle2)}°` : `${Math.abs(cur.angle)}°`;
+  const parts: (HTMLElement | null)[] = [];
+  if (split) {
+    // zlom po kterém políčku (1 … rychlost − 1)
+    const pips = h("div", { class: "man-zlom", title: "Zlom dráhy po tolika políčkách" });
+    for (let k = 1; k < cur.speed; k++) pips.append(h("button", { class: `zpip ${k === split.at ? "on" : ""}`, onclick: () => lastCb?.setSplitAt(ship.id, k) }, String(k)));
+    parts.push(h("div", { class: "man-zlom-lbl" }, label("zlom po")), pips);
+  }
   return h(
     "div",
-    { class: "pnl bb-maneuver" },
+    { class: `pnl bb-maneuver ${split ? "split" : ""}` },
     h("div", { class: "ttl man-ttl" }, label("Manévr")),
     h(
       "div",
-      { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] : "Neplatný manévr" },
-      h("span", { class: "man-glyph", style: `color:${dcolor}` }, angleGlyph(cur.angle, false), cur.koiogran ? h("span", { class: "man-koi", title: "Otočka 180° na konci" }, "⟲") : null),
+      { class: "man-readout", title: man ? DIFFICULTY_LABEL[man.difficulty] + (split ? " · dělený manévr" : "") : "Neplatný manévr" },
+      h("span", { class: `man-glyph ${split ? "two" : ""}`, style: `color:${dcolor}` }, ...glyphs, cur.koiogran ? h("span", { class: "man-koi", title: "Otočka 180° na konci" }, "⟲") : null),
       h("span", { class: "man-speed" }, cur.stop ? `${cur.speed}→0` : String(cur.speed)),
     ),
-    h("div", { class: "man-angle" }, `${Math.abs(cur.angle)}°${cur.koiogran ? " +180°" : ""}`),
+    h("div", { class: "man-angle" }, `${angleTxt}${cur.koiogran ? " +180°" : ""}`),
     h("div", { class: "man-diff", style: `color:${dcolor}` }, label(man ? (effStressCost(man, o) > ship.stressPoints ? "chybí stres" : o.droid?.overdrive && maneuverStress(man) > 0 ? "overdrive" : DIFFICULTY_SHORT[man.difficulty]) : "neplatný")),
+    ...parts,
     h("div", { class: "spacer" }),
-    // dole vedle sebe: otazník nápovědy a klávesa mezerník
+    // dole vedle sebe: ZALOMIT (stíhač) nebo klávesa mezerník, a otazník nápovědy
     h(
       "div",
       { class: "man-foot" },
-      h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
+      canSplit
+        ? h(
+            "button",
+            { class: `px tiny man-splitbtn ${split ? "on" : ""}`, title: split ? "Narovnat dráhu zpět na jeden oblouk (Z)" : "Zalomit dráhu: dvě části s vlastním úhlem, stejná rychlost i délka (Z)", onclick: () => lastCb?.toggleSplit(ship.id) },
+            "◆ ",
+            label(split ? "narovnat" : "zalomit"),
+          )
+        : h("div", { class: "keycap", title: "Mezerník začne / potvrdí kreslení dráhy" }, label("mezerník")),
       h("button", { class: "px tiny qbtn", title: "Nápověda: rychlosti, úhly, barvy manévrů, zastavení a otočení", onclick: () => infoDialog({ title: "Manévry – nápověda", body: maneuverHelp(ship), wide: true }) }, "?"),
     ),
   );
@@ -369,6 +397,7 @@ export function updateManeuverPanel(root: HTMLElement, m: PlanningModel): boolea
 
 /** Spodní lišta (root) + podlišta pod ní (sub): ukazatele akce/stres/technologie a popisek k vybrané akci. */
 export function renderBottomBar(root: HTMLElement, m: PlanningModel, cb: PlanningCallbacks, sub?: HTMLElement) {
+  lastCb = cb;
   clear(root);
   if (sub) clear(sub);
   popsNow.clear();
@@ -690,7 +719,7 @@ function renderBottomBarInner(root: HTMLElement, m: PlanningModel, cb: PlanningC
           (() => {
             // cena ve všech surovinách: otočka 2 akce + stres oranžového manévru, úhyb 1 akce + stres, manévr 1 akce + stres podle nakreslené dráhy
             const turnInPlace = a.id === "koiogran" && stoppedNow(ship, o);
-            const stopMan = a.id === "stop" ? (() => { const cur = parseManeuverId(o.maneuverId); const atEnd = !!cur && cur.speed > 0 && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0 || cur.stop); return atEnd ? makeManeuver(profileFor(ship, o), cur!.speed, cur!.angle, false, ship.speed, true) : makeManeuver(profileFor(ship, o), 0, 0, false, ship.speed); })() : null;
+            const stopMan = a.id === "stop" ? (() => { const cur = parseManeuverId(o.maneuverId); const atEnd = !!cur && cur.speed > 0 && (!!o.pathDrawn || cur.speed !== ship.speed || cur.angle !== 0 || cur.stop || !!cur.split); return atEnd ? makeManeuver(profileFor(ship, o), cur!.speed, cur!.angle, false, ship.speed, true, cur!.split) : makeManeuver(profileFor(ship, o), 0, 0, false, ship.speed); })() : null;
             const manStress = turnInPlace ? 0 : a.id === "koiogran" ? (man?.koiogran ? effStressCost(man, o) : effStressCost("red", o)) : a.id === "move" && man && !man.koiogran ? effStressCost(man, o) : stopMan ? effStressCost(stopMan, o) : 0;
             const c = { actions: a.id === "koiogran" && !turnInPlace ? (o.droid?.overdrive ? 1 : 2) : 1, stress: a.id === "evade" ? effEvadeCost(o) : manStress };
             const parts = [`${c.actions} ${c.actions === 1 ? "akci" : "akce"}`];

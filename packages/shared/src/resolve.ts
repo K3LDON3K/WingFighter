@@ -35,7 +35,7 @@ import {
   type Pose,
   type Vec,
 } from "./geometry.ts";
-import { listManeuvers, makeManeuver, maneuverId, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, stressCost } from "./maneuvers.ts";
+import { listManeuvers, makeManeuver, maneuverId, maneuverLength, maneuverPath, maneuverStress, parseManeuverId, resolveManeuver, splitPoint, stressCost } from "./maneuvers.ts";
 import { activeShield, allowedFacings, addStoreAmmo, AMMO_TYPES, cargoCapacity, consumeAmmo, storeCapacity, storeModules, storeRefillCost, storeRepairUnit, storeRoom, weaponAmmo, computeStats, defaultFacing, hasFacing, hullOf, laserRange, mgRange, torpedoLockRange, torpedoPointRange, facingAngle, laserHalfArc, mineSideOf, modulePos, moduleHp, moduleMaxHp, moduleUsable, moduleWorking, moveModule, MODULES, MODULE_CATEGORY, MODULE_TYPES, newModule, normalizeShields, occupiedSlots, profileOf, shieldTypeOf } from "./ships.ts";
 import { lineCrossesStorm, pointInStorm } from "./mapgen.ts";
 import { beyondHardEdge, edgeNormal, insideMap, pointOnEdge, reflectAtEdge } from "./mapshape.ts";
@@ -523,7 +523,7 @@ export function actionList(ship: Ship, o: ShipOrders): { id: ActionId; label: st
       if (!o.droid?.overdrive) out.push({ id: "move", label: "úprava pohybu" });
       out.push({ id: "koiogran", label: "otočka 180°" });
     }
-    else if (m.speed !== ship.speed || m.angle !== 0) out.push({ id: "move", label: "úprava pohybu" });
+    else if (m.speed !== ship.speed || m.angle !== 0 || m.split) out.push({ id: "move", label: "úprava pohybu" });
     if (m.stop) out.push({ id: "stop", label: "zastavení na konci dráhy" });
   }
   if (o.action?.type === "evade") out.push({ id: "evade", label: "úhybný manévr" });
@@ -1403,6 +1403,24 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
   const cometCrashed = new Set<string>();
   /** Lodě zastavené srážkou (loď–loď): po tahu rychlost 0. */
   const stopped = new Set<string>();
+  /** Těžší lodě, které při srážce lehčí loď odmrštily: po tahu rychlost o 1 nižší. */
+  const slowed = new Set<string>();
+  /** Lehčí lodě odmrštěné těžší lodí: po tahu nulový stres (ztráta kontroly). */
+  const rammed = new Set<string>();
+  /** Odmrštění: zbytek dráhy posune loď stranou (kurz zůstává), aspoň o jedno políčko. */
+  const shove = (m: Mover, k: number, dir: number) => {
+    const p0 = m.samples[k - 1];
+    const remSteps = MOVE_STEPS - (k - 1);
+    const rem = Math.max(MOVE_UNIT, (m.length * remSteps) / MOVE_STEPS);
+    const f = forward(dir);
+    for (let i = k; i <= MOVE_STEPS; i++) {
+      const s = (i - (k - 1)) / remSteps;
+      m.samples[i] = { x: p0.x + f.x * rem * s, y: p0.y + f.y * rem * s, heading: p0.heading };
+    }
+    m.deflections++;
+    m.collided = true;
+    m.frozenAt = MOVE_STEPS; // po odmrštění už dál neletí (další srážky neřešíme)
+  };
   /** Zastavení na místě: zbytek dráhy stojí tam, kde k dotyku došlo (vzorek k−1). */
   const freeze = (m: Mover, k: number) => {
     const p0 = m.samples[Math.max(0, k - 1)];
@@ -1591,10 +1609,37 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
               continue;
             }
             if (stillTouching(ship.id, other.id, true)) continue;
-            // srážka lodí: obě zastaví v místě dotyku (i štítů), kurz zůstává; příští kolo se vůči sobě nesrazí
-            hit = { with: "ship", otherId: other.id, heading: p.heading };
             ship.collidedWith = { ...(ship.collidedWith ?? {}), [other.id]: turn + 1 };
             other.collidedWith = { ...(other.collidedWith ?? {}), [ship.id]: turn + 1 };
+            const mShip = hullOf(ship.loadout).mass ?? 1;
+            const mOther = hullOf(other.loadout).mass ?? 1;
+            if (mShip !== mOther) {
+              // nestejná hmotnost (stíhač × bitevník): lehká loď je odmrštěna stranou a zastaví (plné zranění, ztráta stresu),
+              // těžká jen zpomalí o 1, letí dál a dostane třetinové zranění; stojící těžká loď je zeď
+              const heavy = mShip > mOther ? ship : other;
+              const light = heavy === ship ? other : ship;
+              const hm = shipMovers.get(heavy.id)!;
+              const lm = shipMovers.get(light.id)!;
+              const hp = posAt(hm, k);
+              const lp = posAt(lm, k);
+              const away = normalizeAngle(Math.atan2(lp.y - hp.y, lp.x - hp.x) + scatter());
+              if (lm.frozenAt === null) shove(lm, k, away);
+              stopped.add(light.id);
+              rammed.add(light.id);
+              touching.get(light.id)!.add(heavy.id);
+              touching.get(heavy.id)!.add(light.id);
+              events.push({ type: "collision", shipId: light.id, with: "ship", otherId: heavy.id, t, newHeading: posAt(lm, k).heading, shoved: true });
+              applyDamage(light, RULES.collisionShip, events, hp);
+              if (!light.alive) lm.frozenAt = k;
+              if (hm.frozenAt === null && (maneuverOf.get(heavy.id)?.speed ?? 0) > 0) slowed.add(heavy.id);
+              events.push({ type: "collision", shipId: heavy.id, with: "ship", otherId: light.id, t, newHeading: hp.heading, brushed: true });
+              applyDamage(heavy, Math.max(1, Math.round(RULES.collisionShip / 3)), events, lp);
+              if (!heavy.alive) hm.frozenAt = k;
+              changed = true;
+              break;
+            }
+            // srážka lodí stejné hmotnosti: obě zastaví v místě dotyku (i štítů), kurz zůstává; příští kolo se vůči sobě nesrazí
+            hit = { with: "ship", otherId: other.id, heading: p.heading };
             if (om.frozenAt === null) {
               freeze(om, k);
               stopped.add(other.id);
@@ -1781,7 +1826,12 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     const points = m.samples.map((_, i) => m.samples[Math.min(i, end)]);
     const man = maneuverOf.get(ship.id)!;
     if (man.koiogran && m.collided) points[MOVE_STEPS] = { ...points[MOVE_STEPS], heading: points[MOVE_STEPS - 1].heading };
-    paths.push({ id: ship.id, kind: "ship", points });
+    const mp: MovePath = { id: ship.id, kind: "ship", points };
+    if (man.split && !m.collided) {
+      const sp = splitPoint(m.samples[0], man);
+      if (sp) mp.split = { x: sp.x, y: sp.y };
+    }
+    paths.push(mp);
     const fin = points[MOVE_STEPS];
     ship.x = fin.x;
     ship.y = fin.y;
@@ -1828,6 +1878,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
     ship.speed = man.stop ? 0 : man.koiogran ? Math.max(1, man.speed - RULES.koiogranSpeedDrop) : man.speed;
     if (crashed.has(ship.id) || stopped.has(ship.id)) ship.speed = 0;
     else if (cometCrashed.has(ship.id)) ship.speed = 1;
+    else if (slowed.has(ship.id)) ship.speed = Math.max(0, ship.speed - 1);
     const cost = effStressCost(man, od);
     const stM = statsOf(state, ship.ownerId);
     if (stM) {
@@ -1835,7 +1886,7 @@ export function resolveTurn(input: GameState, allOrders: ShipOrders[], rng: Rng)
       if (man.koiogran) stM.maneuvers.koiogran++;
     }
     const before = ship.stressPoints;
-    ship.stressPoints = crashed.has(ship.id) || cometCrashed.has(ship.id) ? 0 : clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
+    ship.stressPoints = crashed.has(ship.id) || cometCrashed.has(ship.id) || rammed.has(ship.id) ? 0 : clamp(ship.stressPoints - cost, 0, ship.stats.stressMax);
     if (ship.stressPoints !== before) events.push({ type: "stress", shipId: ship.id, stressPoints: ship.stressPoints, delta: ship.stressPoints - before });
     if (man.difficulty === "danger" && !od?.droid?.overdrive) applyDamage(ship, Math.max(1, Math.round((ship.stats.hull * STRESS.dangerHullPercent) / 100)), events);
   }

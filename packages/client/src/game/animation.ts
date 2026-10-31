@@ -39,7 +39,11 @@ export function describeEvents(result: TurnResult, prev: GameState): string[] {
       case "collision":
         lines.push(
           e.with === "ship"
-            ? `${name(e.shipId)} se srazil s ${name(e.otherId!)} – obě lodě zastavily.`
+            ? e.shoved
+              ? `${name(e.shipId)} se srazil s ${name(e.otherId!)} – odmrštěn, zastavil a ztratil stres.`
+              : e.brushed
+                ? `${name(e.shipId)} odhodil ${name(e.otherId!)} – jen zpomalil o 1 a letí dál.`
+                : `${name(e.shipId)} se srazil s ${name(e.otherId!)} – obě lodě zastavily.`
             : e.with === "asteroid"
               ? `${name(e.shipId)} narazil do ${e.otherId?.startsWith("station") ? "stanice" : "asteroidu"} a zastavil (rychlost 0).`
               : e.with === "comet"
@@ -259,7 +263,11 @@ export class TurnAnimation {
         case "move":
           time = moveStart;
           movePassed = true;
-          for (const p of e.paths) this.tweens.push({ id: p.id, kind: p.kind, points: p.points, start: moveStart, duration: MOVE_DURATION });
+          for (const p of e.paths) {
+            this.tweens.push({ id: p.id, kind: p.kind, points: p.points, start: moveStart, duration: MOVE_DURATION });
+            // dělený manévr: ◆ v místě zlomu po dobu pohybu (a chvíli po něm)
+            if (p.split) this.view.effects.push({ kind: "diamond", x: p.split.x, y: p.split.y, color: "#fbbf24", start: moveStart, duration: MOVE_DURATION + 1500 });
+          }
           break;
         case "collision":
         case "mineBlast":
@@ -455,7 +463,8 @@ export class TurnAnimation {
     switch (e.type) {
       case "collision": {
         const s = v.ships.find((x) => x.id === e.shipId);
-        if (s) v.effects.push({ kind: "ring", x: s.x, y: s.y, radius: 30, color: "#f8fafc", start: now, duration: 500 });
+        if (s) v.effects.push({ kind: "ring", x: s.x, y: s.y, radius: e.brushed ? 20 : 30, color: e.shoved ? "#fbbf24" : "#f8fafc", start: now, duration: 500 });
+        if (s && e.shoved) v.effects.push({ kind: "text", x: s.x, y: s.y - 20, text: "ODMRŠTĚN", color: "#fbbf24", start: now, duration: 900 });
         break;
       }
       case "jettison": {
