@@ -174,7 +174,7 @@ export class Renderer {
       if (state.border) {
         sx.beginPath();
         traceMap(sx, state, state.border);
-        sx.clip();
+        sx.clip("evenodd");
       }
       this.drawBackground(state, cam);
       const sky = state.settings.map ? skyThemeOf(state.settings.map) : null;
@@ -197,7 +197,7 @@ export class Renderer {
     if (state.border) {
       ctx.beginPath();
       traceMap(ctx, state, state.border);
-      ctx.clip();
+      ctx.clip("evenodd");
     }
     // ořez na viditelný výřez: objekty mimo obraz se nekreslí (velké mapy, hodně hráčů)
     const vx0 = cam.x;
@@ -435,7 +435,7 @@ export class Renderer {
     ctx.save();
     ctx.beginPath();
     traceMap(ctx, state);
-    ctx.clip();
+    ctx.clip("evenodd");
     ctx.strokeStyle = "rgba(148,163,184,0.07)";
     ctx.lineWidth = 1;
     ctx.beginPath();

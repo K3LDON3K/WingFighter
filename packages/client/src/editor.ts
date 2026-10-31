@@ -9,9 +9,14 @@ import {
   insideMap,
   MOVE_UNIT,
   newCustomMap,
-  nearestOnPolygon,
+  nearestOnShape,
   pointInStorm,
+  polygonArea,
   polygonCentroid,
+  shapeDifference,
+  shapeOf,
+  shapeUnion,
+  type MapShape,
   sanitizeCustomMap,
   SKY_CHOICES,
   SKY_LABEL,
@@ -21,6 +26,7 @@ import {
   type CustomMap,
   type CustomMapSummary,
   type SkyChoice,
+  type Vec,
 } from "@wingfighter/shared";
 import { clear, h } from "./dom.ts";
 import { icon, label } from "./icons.ts";
@@ -32,7 +38,7 @@ type Tool = "outline" | "asteroid" | "storm" | "start" | "zone" | "station" | "c
 type Sel = { kind: "asteroid" | "start" | "station" | "zone" | "lane" | "blob" | "vertex"; i: number; j?: number } | null;
 
 const TOOLS: { id: Tool; glyph: string; name: string; hint: string }[] = [
-  { id: "outline", glyph: "◯", name: "Obrys mapy", hint: "Body: tažením posuň bod, klik na hranu přidá, dvojklik smaže. Od ruky: tažením nakresli libovolný tvar (vyhladí se). Plocha mapy se obrysu přizpůsobí sama." },
+  { id: "outline", glyph: "◯", name: "Obrys mapy", hint: "Body: tažením posuň bod, klik na hranu přidá bod, dvojklik smaže. Laso: nakresli tvar, + přičte / − odečte (díry, víc kusů). Štětec: maluješ kruhem + / −. Plocha mapy se tvaru přizpůsobí sama." },
   { id: "asteroid", glyph: "●", name: "Asteroidy", hint: "Klik = asteroid zvolené velikosti, tažení = přesun. Vybraný: 🎲 tvar, ✕." },
   { id: "storm", glyph: "▒", name: "Bouře (štětec)", hint: "Tažením maluješ bouři zvoleným štětcem; režim guma maže." },
   { id: "start", glyph: "➤", name: "Starty", hint: "Klik = startovní bod zvoleného týmu, tažení od bodu = kurz, tažení těla = přesun." },
@@ -72,7 +78,11 @@ interface EditorState {
   /** Rozkreslená dráha komety (body, dokud se neukončí). */
   lane: { x: number; y: number }[] | null;
   /** Obrys: úprava bodů, nebo kreslení od ruky tažením. */
-  outlineMode: "points" | "freehand";
+  outlineMode: "points" | "lasso" | "brush";
+  /** Laso / štětec: přičítat, nebo odečítat. */
+  boolOp: "add" | "sub";
+  /** Poloměr štětce tvaru. */
+  shapeBrush: number;
   /** Právě kreslený obrys od ruky. */
   stroke: { x: number; y: number }[] | null;
 }
@@ -111,6 +121,8 @@ export function openEditor(app: HTMLElement, net: Net, author: string, exit: () 
     status: "",
     lane: null,
     outlineMode: "points",
+    boolOp: "add",
+    shapeBrush: 200,
     stroke: null,
   };
   net.send({ type: "listMaps" });
@@ -148,6 +160,7 @@ export function editorOnMap(map: CustomMap | null, saved?: boolean) {
     st.redo = [];
     st.dirty = false;
     st.status = `Načteno: ${map.name}`;
+    shapeM();
     normalizeBounds();
     renderEditor();
     fitView();
@@ -183,8 +196,96 @@ function redo() {
   renderEditor();
 }
 function box() {
-  return { width: st!.map.width, height: st!.map.height, outline: st!.map.outline };
+  return { width: st!.map.width, height: st!.map.height, outline: st!.map.outline, shape: st!.map.shape };
 }
+/** Tvar mapy k úpravám (starší `outline` se převede na `shape`); null = elipsa. */
+function shapeM(): MapShape | null {
+  const m = st!.map;
+  if (!m.shape && m.outline && m.outline.length >= 3) {
+    m.shape = [[m.outline]];
+    delete m.outline;
+  }
+  return m.shape ?? null;
+}
+/** Všechny prstence tvaru (pro body). */
+function allRings(): { key: number; ring: Vec[] }[] {
+  const sh = shapeM();
+  if (!sh) return [];
+  const out: { key: number; ring: Vec[] }[] = [];
+  sh.forEach((poly, pi) => poly.forEach((ring, ri) => out.push({ key: pi * 100 + ri, ring })));
+  return out;
+}
+function ringByKey(key: number): Vec[] | null {
+  const sh = shapeM();
+  return sh?.[Math.floor(key / 100)]?.[key % 100] ?? null;
+}
+/** Po booleovské operaci: vyhodit drobné kusy a díry, mírně zjednodušit, omezit počet bodů. */
+function cleanShape(sh: MapShape, tol = 8): MapShape {
+  let out: MapShape = sh
+    .map((poly) => poly.filter((ring, i) => Math.abs(polygonArea(ring)) >= (i === 0 ? CUSTOM_MAP_LIMITS.minPieceArea : 2000)).map((ring) => simplifyClosed(ring, tol)))
+    .filter((poly) => poly.length && poly[0].length >= 3)
+    .slice(0, CUSTOM_MAP_LIMITS.maxPieces);
+  let total = out.reduce((n, poly) => n + poly.reduce((k, r) => k + r.length, 0), 0);
+  let t = tol;
+  while (total > CUSTOM_MAP_LIMITS.maxShapePoints && t < 400) {
+    t *= 1.5;
+    out = out.map((poly) => poly.map((ring) => simplifyClosed(ring, t))).filter((poly) => poly[0].length >= 3);
+    total = out.reduce((n, poly) => n + poly.reduce((k, r) => k + r.length, 0), 0);
+  }
+  return out;
+}
+/** Zjednodušení uzavřeného prstence (RDP přes dvě poloviny, ať se neztratí uzavření). */
+function simplifyClosed(ring: Vec[], tol: number): Vec[] {
+  if (ring.length <= 4) return ring;
+  const half = Math.floor(ring.length / 2);
+  const a = simplify(ring.slice(0, half + 1), tol);
+  const b = simplify([...ring.slice(half), ring[0]], tol);
+  const out = [...a.slice(0, -1), ...b.slice(0, -1)];
+  return out.length >= 3 ? out.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })) : ring;
+}
+/** Použije laso / štětec na tvar (+ sjednocení, − rozdíl) a přizpůsobí plochu. */
+function applyShapeOp(piece: MapShape) {
+  if (!st) return;
+  const m = st.map;
+  pushUndo();
+  const base = shapeM() ?? [[ellipsePoly(m.width, m.height, 32)]];
+  let res = st.boolOp === "add" ? shapeUnion(base, piece) : shapeDifference(base, piece);
+  res = cleanShape(res);
+  if (!res.length) {
+    st.undo.pop();
+    st.status = "Takhle by z mapy nic nezbylo – operace zrušena.";
+    renderEditor();
+    return;
+  }
+  m.shape = res;
+  delete m.outline;
+  normalizeBounds();
+  st.sel = null;
+  const pts = res.reduce((n, poly) => n + poly.reduce((k, r) => k + r.length, 0), 0);
+  const holes = res.reduce((n, poly) => n + poly.length - 1, 0);
+  st.status = `Tvar: ${res.length} ${res.length === 1 ? "kus" : res.length < 5 ? "kusy" : "kusů"}, ${holes} ${holes === 1 ? "díra" : holes < 5 ? "díry" : "děr"}, ${pts} bodů · plocha ${m.width}×${m.height}`;
+  renderEditor();
+  fitView();
+}
+/** Kruhový štětec podél tahu jako sjednocení kruhů. */
+function brushShape(stroke: Vec[], r: number): MapShape {
+  const circle = (c: Vec): Vec[] => Array.from({ length: 20 }, (_, i) => ({ x: c.x + Math.cos((i / 20) * Math.PI * 2) * r, y: c.y + Math.sin((i / 20) * Math.PI * 2) * r }));
+  let acc: MapShape = [[circle(stroke[0])]];
+  let last = stroke[0];
+  for (const p of stroke) {
+    if (Math.hypot(p.x - last.x, p.y - last.y) < r * 0.4) continue;
+    // spojnice (obdélník) + kruh, ať tah nemá mezery
+    const dx = p.x - last.x;
+    const dy = p.y - last.y;
+    const l = Math.hypot(dx, dy) || 1;
+    const nx = (dy / l) * r;
+    const ny = (-dx / l) * r;
+    acc = shapeUnion(acc, [[[{ x: last.x + nx, y: last.y + ny }, { x: p.x + nx, y: p.y + ny }, { x: p.x - nx, y: p.y - ny }, { x: last.x - nx, y: last.y - ny }]], [circle(p)]]);
+    last = p;
+  }
+  return acc;
+}
+
 function fitView() {
   if (!st || !canvas) return;
   const pad = 300;
@@ -230,13 +331,15 @@ function simplify(pts: { x: number; y: number }[], tol: number): { x: number; y:
 function normalizeBounds() {
   if (!st) return;
   const m = st.map;
-  if (!m.outline || m.outline.length < 3) return;
+  const sh = shapeM();
+  if (!sh) return;
+  const shapePts = sh.flatMap((poly) => poly.flat());
   const MARGIN = 220;
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
-  for (const p of m.outline) {
+  for (const p of shapePts) {
     minX = Math.min(minX, p.x);
     minY = Math.min(minY, p.y);
     maxX = Math.max(maxX, p.x);
@@ -252,7 +355,7 @@ function normalizeBounds() {
     p.y = Math.round((p.y + dy) * scale);
   };
   if (dx === 0 && dy === 0 && scale === 1 && m.width === Math.round((maxX - minX) * scale) + 2 * MARGIN && m.height === Math.round((maxY - minY) * scale) + 2 * MARGIN) return;
-  for (const p of m.outline) tr(p);
+  for (const p of shapePts) tr(p);
   for (const a of m.asteroids) {
     tr(a);
     a.radius = Math.max(12, Math.round(a.radius * scale));
@@ -279,7 +382,7 @@ function normalizeBounds() {
       p.x = Math.round(p.x + cx);
       p.y = Math.round(p.y + cy);
     };
-    for (const p of m.outline) sh(p);
+    for (const p of shapePts) sh(p);
     for (const a of m.asteroids) sh(a);
     for (const sm of m.storms) for (const b of sm.blobs) sh(b);
     for (const p of m.starts) sh(p);
@@ -300,8 +403,8 @@ function ellipsePoly(w: number, hh: number, n = 24) {
 function hitTest(w: { x: number; y: number }): Sel {
   const m = st!.map;
   const r = 14 / st!.cam.zoom;
-  if (st!.tool === "outline" && m.outline) {
-    for (let i = 0; i < m.outline.length; i++) if (Math.hypot(m.outline[i].x - w.x, m.outline[i].y - w.y) <= r) return { kind: "vertex", i };
+  if (st!.tool === "outline" && shapeM()) {
+    for (const { key, ring } of allRings()) for (let i = 0; i < ring.length; i++) if (Math.hypot(ring[i].x - w.x, ring[i].y - w.y) <= r) return { kind: "vertex", i, j: key };
   }
   const ms = Math.max(1, (1 / st!.cam.zoom) * 0.9);
   for (let i = m.starts.length - 1; i >= 0; i--) if (Math.hypot(m.starts[i].x - w.x, m.starts[i].y - w.y) <= 22 * ms) return { kind: "start", i };
@@ -344,7 +447,11 @@ function deleteSel() {
   else if (s.kind === "blob") {
     m.storms[s.i].blobs.splice(s.j!, 1);
     if (!m.storms[s.i].blobs.length) m.storms.splice(s.i, 1);
-  } else if (s.kind === "vertex" && m.outline && m.outline.length > 3) m.outline.splice(s.i, 1);
+  } else if (s.kind === "vertex") {
+    const ring = ringByKey(s.j!);
+    if (ring && ring.length > 3) ring.splice(s.i, 1);
+    if (m.shape) m.shape = [...m.shape];
+  }
   st.sel = null;
   renderEditor();
 }
@@ -421,18 +528,38 @@ function renderEditor() {
   // Mapa / obrys
   sec(
     "Mapa",
-    m.outline
-      ? row("plocha", h("span", { class: "muted txt" }, `${m.width} × ${m.height} (podle obrysu)`))
+    shapeM()
+      ? row("plocha", h("span", { class: "muted txt" }, `${m.width} × ${m.height} (podle tvaru)`))
       : row("šířka × výška", numIn(m.width, CUSTOM_MAP_LIMITS.minSize, CUSTOM_MAP_LIMITS.maxSize, (n) => (pushUndo(), (m.width = n), renderEditor()), 64), " × ", numIn(m.height, CUSTOM_MAP_LIMITS.minSize, CUSTOM_MAP_LIMITS.maxSize, (n) => (pushUndo(), (m.height = n), renderEditor()), 64)),
     s.tool === "outline"
-      ? row("kreslení", pip(s.outlineMode === "points", "body", () => ((s.outlineMode = "points"), renderEditor()), "Upravovat body obrysu"), pip(s.outlineMode === "freehand", "od ruky", () => ((s.outlineMode = "freehand"), renderEditor()), "Tažením nakreslit libovolný tvar – nahradí současný obrys"))
+      ? row(
+          "režim",
+          pip(s.outlineMode === "points", "body", () => ((s.outlineMode = "points"), renderEditor()), "Upravovat body: tažení, klik na hranu = nový bod, dvojklik = smazat"),
+          pip(s.outlineMode === "lasso", "laso", () => ((s.outlineMode = "lasso"), renderEditor()), "Nakreslit tvar od ruky a přičíst / odečíst"),
+          pip(s.outlineMode === "brush", "štětec", () => ((s.outlineMode = "brush"), renderEditor()), "Malovat plochu kruhovým štětcem (+ přidává, − ubírá)"),
+        )
       : null,
+    s.tool === "outline" && s.outlineMode !== "points"
+      ? row(
+          "operace",
+          pip(s.boolOp === "add", "+ přidat", () => ((s.boolOp = "add"), renderEditor()), "Sjednotit s tvarem (nový kus, nebo rozšíření)", s.boolOp === "add" ? "background:#22c55e;border-color:#22c55e;color:#0b1020" : ""),
+          pip(s.boolOp === "sub", "− odebrat", () => ((s.boolOp = "sub"), renderEditor()), "Odečíst od tvaru (díra, zářez, rozdělení)", s.boolOp === "sub" ? "background:#ef4444;border-color:#ef4444;color:#fff" : ""),
+        )
+      : null,
+    s.tool === "outline" && s.outlineMode === "brush" ? row("štětec", ...([100, 200, 350] as const).map((r, i) => pip(s.shapeBrush === r, ["malý", "střední", "velký"][i], () => ((s.shapeBrush = r), renderEditor())))) : null,
     row(
-      "obrys",
-      m.outline
-        ? h("button", { class: "px tiny", title: "Zahodit volný obrys, mapa bude elipsa", onclick: () => (pushUndo(), (m.outline = undefined), (s.sel = null), renderEditor()) }, "→ elipsa")
-        : h("button", { class: "px tiny", title: "Převést elipsu na 24 bodů, které jde tahat", onclick: () => (pushUndo(), (m.outline = ellipsePoly(m.width, m.height)), (s.tool = "outline"), renderEditor()) }, "z elipsy"),
-      m.outline ? h("span", { class: "muted txt" }, ` ${m.outline.length} bodů`) : h("span", { class: "muted txt" }, " elipsa"),
+      "tvar",
+      shapeM()
+        ? h("button", { class: "px tiny", title: "Zahodit tvar, mapa bude elipsa", onclick: () => confirmDialog({ title: "Zahodit tvar", text: "Vrátit mapu na elipsu? Tvar se smaže.", ok: "Zahodit", danger: true }, () => (pushUndo(), (m.shape = undefined), delete m.outline, (s.sel = null), renderEditor())) }, "→ elipsa")
+        : h("button", { class: "px tiny", title: "Převést elipsu na 24 bodů, které jde tahat", onclick: () => (pushUndo(), (m.shape = [[ellipsePoly(m.width, m.height)]]), (s.tool = "outline"), (s.outlineMode = "points"), renderEditor()) }, "z elipsy"),
+      shapeM()
+        ? h("span", { class: "muted txt" }, (() => {
+            const sh = shapeM()!;
+            const holes = sh.reduce((n, poly) => n + poly.length - 1, 0);
+            return ` ${sh.length} ${sh.length === 1 ? "kus" : sh.length < 5 ? "kusy" : "kusů"} · ${holes} ${holes === 1 ? "díra" : holes < 5 ? "díry" : "děr"} · ${sh.reduce((n, poly) => n + poly.reduce((k, r) => k + r.length, 0), 0)} bodů`;
+          })())
+        : h("span", { class: "muted txt" }, " elipsa"),
+      shapeM() ? h("button", { class: "px tiny", title: "Ubrat body (vyhladit tvar)", onclick: () => (pushUndo(), (m.shape = cleanShape(shapeM()!, 25)), renderEditor()) }, "zjednodušit") : null,
     ),
   );
   if (s.tool === "asteroid" || s.sel?.kind === "asteroid") {
@@ -563,7 +690,11 @@ function renderEditor() {
 
 function polygonCentroidOf() {
   const m = st!.map;
-  return m.outline ? polygonCentroid(m.outline) : { x: m.width / 2, y: m.height / 2 };
+  const sh = shapeM();
+  if (!sh) return { x: m.width / 2, y: m.height / 2 };
+  let best = sh[0][0];
+  for (const poly of sh) if (Math.abs(polygonArea(poly[0])) > Math.abs(polygonArea(best))) best = poly[0];
+  return polygonCentroid(best);
 }
 
 function save(asNew: boolean) {
@@ -689,40 +820,46 @@ function bindPointer(c: HTMLCanvasElement) {
       renderEditor();
       return;
     }
-    if (tool === "outline" && s.outlineMode === "freehand") {
+    if (tool === "outline" && s.outlineMode !== "points") {
       s.stroke = [{ x: w.x, y: w.y }];
-      drag = { kind: "freehand", start: w, moved: false, last: w };
+      drag = { kind: s.outlineMode === "lasso" ? "lasso" : "brush", start: w, moved: false, last: w };
       requestDraw();
       return;
     }
     if (tool === "outline") {
-      if (!m.outline) {
+      if (!shapeM()) {
         pushUndo();
-        m.outline = ellipsePoly(m.width, m.height);
+        m.shape = [[ellipsePoly(m.width, m.height)]];
       }
       if (hit?.kind === "vertex") {
+        const ring = ringByKey(hit.j!)!;
         if (dbl) {
-          if (m.outline.length > 3) {
+          if (ring.length > 3) {
             pushUndo();
-            m.outline.splice(hit.i, 1);
+            ring.splice(hit.i, 1);
+            m.shape = [...m.shape!];
             s.sel = null;
             renderEditor();
           }
           return;
         }
         s.sel = hit;
-        drag = { kind: "vertex", i: hit.i, start: w, moved: false, last: w };
+        drag = { kind: "vertex", i: hit.i, j: hit.j, start: w, moved: false, last: w };
         pushUndo();
         requestDraw();
         return;
       }
-      // klik blízko hrany = nový bod
-      const near = nearestOnPolygon(m.outline, w);
-      if (near.dist <= 20 / s.cam.zoom && m.outline.length < CUSTOM_MAP_LIMITS.maxOutline) {
+      // klik blízko hrany = nový bod do daného prstence
+      const near = nearestOnShape(shapeM()!, w);
+      const total = shapeM()!.reduce((n, poly) => n + poly.reduce((k, r) => k + r.length, 0), 0);
+      if (near.dist <= 20 / s.cam.zoom && total < CUSTOM_MAP_LIMITS.maxShapePoints) {
         pushUndo();
-        m.outline.splice(near.edge + 1, 0, { x: snapV(w.x), y: snapV(w.y) });
-        s.sel = { kind: "vertex", i: near.edge + 1 };
-        drag = { kind: "vertex", i: near.edge + 1, start: w, moved: false, last: w };
+        const key = near.poly * 100 + near.ring;
+        const ring = ringByKey(key)!;
+        ring.splice(near.edge + 1, 0, { x: snapV(w.x), y: snapV(w.y) });
+        m.shape = [...m.shape!];
+        s.sel = { kind: "vertex", i: near.edge + 1, j: key };
+        drag = { kind: "vertex", i: near.edge + 1, j: key, start: w, moved: false, last: w };
         requestDraw();
         return;
       }
@@ -843,10 +980,13 @@ function bindPointer(c: HTMLCanvasElement) {
         break;
       }
       case "vertex": {
-        m.outline![drag.i!] = { x: snapV(w.x), y: snapV(w.y) };
+        const ring = ringByKey(drag.j!);
+        if (ring) ring[drag.i!] = { x: snapV(w.x), y: snapV(w.y) };
+        if (m.shape) m.shape = [...m.shape]; // nová identita → přepočet posunuté hranice
         break;
       }
-      case "freehand": {
+      case "lasso":
+      case "brush": {
         const lastP = s.stroke![s.stroke!.length - 1];
         if (Math.hypot(lastP.x - w.x, lastP.y - w.y) >= 6 / s.cam.zoom) s.stroke!.push({ x: w.x, y: w.y });
         break;
@@ -914,28 +1054,22 @@ function bindPointer(c: HTMLCanvasElement) {
     const d = drag;
     drag = null;
     if (d.kind === "pan") return;
-    if (d.kind === "freehand") {
+    if (d.kind === "lasso" || d.kind === "brush") {
       const stroke = st.stroke ?? [];
       st.stroke = null;
-      if (stroke.length >= 8) {
-        // vyhladit: zjednodušit podle zoomu, nejvýš limit bodů; pak plochu přizpůsobit
-        let tol = 10 / st.cam.zoom;
-        let pts = simplify(stroke, tol);
-        while (pts.length > CUSTOM_MAP_LIMITS.maxOutline) {
-          tol *= 1.5;
-          pts = simplify(stroke, tol);
+      if (d.kind === "lasso") {
+        if (stroke.length >= 8) {
+          // mírně vyhladit (třes ruky), zachovat tvar; pak přičíst / odečíst
+          const pts = simplify(stroke, 8 / st.cam.zoom);
+          if (pts.length >= 3 && Math.abs(polygonArea(pts)) >= CUSTOM_MAP_LIMITS.minPieceArea / 4) {
+            applyShapeOp([[pts.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }))]]);
+            return;
+          }
         }
-        if (pts.length >= 3) {
-          pushUndo();
-          st.map.outline = pts.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }));
-          normalizeBounds();
-          st.sel = null;
-          st.outlineMode = "points";
-          st.status = `Obrys od ruky: ${pts.length} bodů, plocha ${st.map.width}×${st.map.height}`;
-          renderEditor();
-          fitView();
-          return;
-        }
+        st.status = "Laso: nakresli uzavřenější tvar (větší plochu).";
+      } else if (stroke.length >= 1) {
+        applyShapeOp(brushShape(simplify(stroke, 6 / st.cam.zoom), st.shapeBrush));
+        return;
       }
       renderEditor();
       return;
@@ -1005,7 +1139,7 @@ function toolKind(t: Tool): Sel extends infer S ? (S extends { kind: infer K } ?
 }
 function objOf(s: NonNullable<Sel>): unknown {
   const m = st!.map;
-  return s.kind === "asteroid" ? m.asteroids[s.i] : s.kind === "start" ? m.starts[s.i] : s.kind === "station" ? m.stations[s.i] : s.kind === "zone" ? m.zones[s.i] : s.kind === "blob" ? m.storms[s.i].blobs[s.j!] : s.kind === "vertex" ? m.outline![s.i] : null;
+  return s.kind === "asteroid" ? m.asteroids[s.i] : s.kind === "start" ? m.starts[s.i] : s.kind === "station" ? m.stations[s.i] : s.kind === "zone" ? m.zones[s.i] : s.kind === "blob" ? m.storms[s.i].blobs[s.j!] : s.kind === "vertex" ? ringByKey(s.j!)?.[s.i] ?? null : null;
 }
 function eraseStorm(w: { x: number; y: number }) {
   const m = st!.map;
@@ -1067,7 +1201,7 @@ function draw() {
   ctx.save();
   ctx.beginPath();
   traceMap(ctx, b);
-  ctx.clip();
+  ctx.clip("evenodd");
   ctx.fillStyle = "#070b16";
   ctx.fillRect(-m.width, -m.height, m.width * 3, m.height * 3);
   ctx.strokeStyle = "rgba(148,163,184,0.09)";
@@ -1255,9 +1389,9 @@ function draw() {
   traceMap(ctx, b, 160);
   ctx.stroke();
   ctx.restore();
-  if (s.stroke && s.stroke.length > 1) {
+  if (s.stroke && s.stroke.length > 1 && s.outlineMode === "lasso") {
     ctx.save();
-    ctx.strokeStyle = "#fbbf24";
+    ctx.strokeStyle = s.boolOp === "add" ? "#22c55e" : "#ef4444";
     ctx.lineWidth = 2 * k;
     ctx.beginPath();
     ctx.moveTo(s.stroke[0].x, s.stroke[0].y);
@@ -1265,14 +1399,36 @@ function draw() {
     ctx.stroke();
     ctx.restore();
   }
-  if (s.tool === "outline" && m.outline) {
-    for (let i = 0; i < m.outline.length; i++) {
-      const p = m.outline[i];
-      ctx.fillStyle = s.sel?.kind === "vertex" && s.sel.i === i ? "#fbbf24" : "#f8fafc";
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 6 * k, 0, Math.PI * 2);
-      ctx.fill();
+  if (s.tool === "outline" && shapeM()) {
+    for (const { key, ring } of allRings()) {
+      for (let i = 0; i < ring.length; i++) {
+        const p = ring[i];
+        ctx.fillStyle = s.sel?.kind === "vertex" && s.sel.i === i && s.sel.j === key ? "#fbbf24" : key % 100 ? "#f9a8d4" : "#f8fafc";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6 * k, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
+  }
+  if (s.tool === "outline" && s.outlineMode === "brush" && s.stroke && s.stroke.length) {
+    // stopa štětce
+    const lastP = s.stroke[s.stroke.length - 1];
+    ctx.save();
+    ctx.strokeStyle = s.boolOp === "add" ? "#22c55e" : "#ef4444";
+    ctx.lineWidth = s.shapeBrush * 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath();
+    ctx.moveTo(s.stroke[0].x, s.stroke[0].y);
+    for (const p of s.stroke) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 2 * k;
+    ctx.beginPath();
+    ctx.arc(lastP.x, lastP.y, s.shapeBrush, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
   // ukazatel štětce
   ctx.restore();

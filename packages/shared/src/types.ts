@@ -578,8 +578,10 @@ export interface GameState {
   tuning: Tuning;
   width: number;
   height: number;
-  /** Volný obrys hrací plochy (vlastní mapa z editoru); chybí = elipsa vepsaná do width × height. */
+  /** Volný obrys hrací plochy (starší vlastní mapy); chybí = elipsa vepsaná do width × height. */
   outline?: { x: number; y: number }[];
+  /** Tvar hrací plochy vlastní mapy: kusy [vnější obrys, díry…]; má přednost před `outline`. */
+  shape?: { x: number; y: number }[][][];
   asteroids: Asteroid[];
   storms: Storm[];
   stations?: Station[];

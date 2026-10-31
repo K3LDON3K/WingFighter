@@ -15,7 +15,7 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
   const gen = custom ? customToGenerated(custom) : generateMap(settings);
   const startTeams: (number | undefined)[] = custom ? custom.starts.map((st) => st.team) : gen.starts.map(() => undefined);
   const myTeam = players.find((p) => p.id === myId)?.team;
-  const box = { width: gen.width, height: gen.height, outline: custom?.outline };
+  const box = { width: gen.width, height: gen.height, outline: custom?.outline, shape: custom?.shape };
   /** Obrys hrací plochy (elipsa / volný obrys) ve škále náhledu. */
   const outlinePath = (grow = 0) => {
     ctx.save();
@@ -39,7 +39,7 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
   {
     ctx.save();
     outlinePath(border);
-    ctx.clip();
+    ctx.clip("evenodd");
     ctx.setTransform(scale, 0, 0, scale, pad * scale, pad * scale);
     const sky = skyThemeOf(custom ? { ...settings, sky: custom.sky ?? "none" } : settings);
     if (sky) drawParallax(ctx, sky, settings.seed, gen.width, gen.height, { x: -pad, y: -pad, zoom: scale, viewW: width, viewH: height }, scale, true);
@@ -57,7 +57,7 @@ export function renderMapPreview(settings: MapSettings, players: RoomPlayer[], m
   // mřížka jen uvnitř hrací plochy
   ctx.save();
   outlinePath();
-  ctx.clip();
+  ctx.clip("evenodd");
   ctx.strokeStyle = "rgba(148,163,184,0.08)";
   for (let x = 0; x < gen.width; x += 400) {
     ctx.beginPath();

@@ -6,5 +6,7 @@ if not exist node_modules (
   echo Prvni spusteni - instaluji zavislosti...
   call npm install || (pause & exit /b 1)
 )
+REM doinstalovat pripadne nove zavislosti (s aktualnim package-lock.json je to rychle)
+call npm install --no-audit --no-fund
 call npm start
 pause

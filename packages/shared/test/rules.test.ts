@@ -97,6 +97,10 @@ import {
   clampToMap,
   sanitizeCustomMap,
   customToGenerated,
+  offsetShape,
+  shapeDifference,
+  shapeUnion,
+  polygonArea,
   maneuverPath,
   splitPoint,
   classifySplitCurve,
@@ -2424,6 +2428,7 @@ describe("vlastní mapa (editor)", () => {
     const m = sanitizeCustomMap(raw)!;
     expect(m.name).toBe("Test");
     expect(m.outline?.length).toBe(4);
+    expect(customToGenerated(m).shape?.length).toBe(1); // starší obrys → tvar s jedním kusem
     expect(m.starts[2].team).toBeUndefined();
     expect(m.cometLanes[0].speed).toBe("fast");
     const g = customToGenerated(m);
@@ -2435,11 +2440,54 @@ describe("vlastní mapa (editor)", () => {
     // bitva na vlastní mapě: hráč týmu 1 dostane start svého týmu (nebo volný), ne cizí
     const settings = { mode: "tdm" as const, turnLimit: 0, shipPoints: 1, allowedModules: {}, botLoadout: "default" as const, placement: "manual" as const, map: { ...DEFAULT_MAP, customId: m.id } };
     const gm = createGame({ players: [{ id: "A", name: "A", team: 0, isBot: false, loadouts: [structuredClone(DEFAULT_LOADOUT)] }, { id: "B", name: "B", team: 1, isBot: true, loadouts: [structuredClone(DEFAULT_LOADOUT)] }], settings, tuning: DEFAULT_TUNING, customMap: m });
-    expect(gm.outline?.length).toBe(4);
+    expect(gm.shape?.[0][0].length).toBe(4);
     const sa = gm.ships.find((s) => s.ownerId === "A")!;
     const sb = gm.ships.find((s) => s.ownerId === "B")!;
     expect([200, 1000]).toContain(Math.round(sa.x));
     expect([1800, 1000]).toContain(Math.round(sb.x));
     expect(sa.x).not.toBe(sb.x);
+  });
+});
+
+describe("tvar mapy: víc kusů a díry", () => {
+  const sq = (x: number, y: number, w: number, h: number) => [
+    { x, y },
+    { x: x + w, y },
+    { x: x + w, y: y + h },
+    { x, y: y + h },
+  ];
+  it("díra: uvnitř díry je venku, odraz od okraje díry, posun hranice se spočítá i kolem díry", () => {
+    const shape = [[sq(0, 0, 2000, 2000), sq(800, 800, 400, 400)]];
+    const m = { width: 2000, height: 2000, shape };
+    expect(insideMap(m, { x: 100, y: 100 })).toBe(true);
+    expect(insideMap(m, { x: 1000, y: 1000 })).toBe(false); // v díře
+    expect(insideMap(m, { x: 780, y: 1000 }, 30)).toBe(false); // u kraje díry s poloměrem
+    // normála u kraje díry míří do díry (+x na levé hraně díry)
+    expect(edgeNormal(m, { x: 790, y: 1000 })).toBeCloseTo(0, 3);
+    expect(beyondHardEdge(m, { x: 1000, y: 1000 }, 160)).toBe(true); // střed díry je 200 od kraje > 160
+    expect(beyondHardEdge(m, { x: 900, y: 1000 }, 160)).toBe(false);
+    const off = offsetShape(shape, 100);
+    expect(off.length).toBe(1);
+    expect(off[0].length).toBe(2); // díra zůstává, jen menší
+    const outer = off[0][0];
+    expect(Math.min(...outer.map((p) => p.x))).toBeLessThan(-50);
+    expect(Math.abs(polygonArea(off[0][1]))).toBeLessThan(400 * 400);
+  });
+  it("odečtení pruhu rozdělí mapu na dva kusy; komety a starty fungují v obou", () => {
+    const base = [[sq(0, 0, 3000, 2000)]];
+    const cut = [[sq(1400, -100, 200, 2200)]];
+    const two = shapeDifference(base, cut);
+    expect(two.length).toBe(2);
+    const m = { width: 3000, height: 2000, shape: two };
+    expect(insideMap(m, { x: 500, y: 500 })).toBe(true);
+    expect(insideMap(m, { x: 1500, y: 500 })).toBe(false);
+    expect(insideMap(m, { x: 2500, y: 500 })).toBe(true);
+    const back = shapeUnion(two, cut);
+    expect(back.length).toBe(1);
+    const e = pointOnEdge(m, 0, 10);
+    expect(insideMap(m, e)).toBe(true);
+    const sanitized = sanitizeCustomMap({ name: "dva", width: 3000, height: 2000, shape: two, starts: [{ x: 300, y: 300, heading: 0, team: 0 }, { x: 2700, y: 300, heading: Math.PI, team: 1 }] })!;
+    expect(sanitized.shape?.length).toBe(2);
+    expect(sanitized.outline).toBeUndefined();
   });
 });

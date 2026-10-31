@@ -5,7 +5,7 @@
 import { generateProfile } from "./asteroids.ts";
 import type { Vec } from "./geometry.ts";
 import type { GeneratedMap } from "./mapgen.ts";
-import { insideMap } from "./mapshape.ts";
+import { insideMap, polygonArea, shapeOf, type MapShape } from "./mapshape.ts";
 import { SKY_THEMES, type Asteroid, type SkyChoice, type Storm } from "./types.ts";
 
 export interface CustomAsteroid {
@@ -50,8 +50,10 @@ export interface CustomMap {
   updatedAt: number;
   width: number;
   height: number;
-  /** Volný obrys; chybí = elipsa width × height. */
+  /** Volný obrys (starší zápis); chybí = elipsa width × height. */
   outline?: Vec[];
+  /** Tvar: kusy s dírami; má přednost před `outline`. */
+  shape?: MapShape;
   asteroids: CustomAsteroid[];
   storms: Storm[];
   starts: CustomStart[];
@@ -76,7 +78,7 @@ export interface CustomMapSummary {
   starts: number;
 }
 
-export const CUSTOM_MAP_LIMITS = { minSize: 1200, maxSize: 8000, maxAsteroids: 300, maxStormBlobs: 400, maxStarts: 32, maxZones: 8, maxStations: 4, maxLanes: 8, maxOutline: 200, nameLen: 40 } as const;
+export const CUSTOM_MAP_LIMITS = { minSize: 1200, maxSize: 8000, maxAsteroids: 300, maxStormBlobs: 400, maxStarts: 32, maxZones: 8, maxStations: 4, maxLanes: 8, maxOutline: 300, maxShapePoints: 1200, maxPieces: 12, minPieceArea: 40000, nameLen: 40 } as const;
 
 export function newCustomMap(name: string, author: string, width = 3600, height = 2400): CustomMap {
   const now = Date.now();
@@ -113,6 +115,27 @@ export function sanitizeCustomMap(raw: unknown): CustomMap | null {
   if (Array.isArray(r.outline)) {
     const pts = r.outline.map((p) => vec(p, width, height)).filter((p): p is Vec => !!p).slice(0, L.maxOutline);
     if (pts.length >= 3) out.outline = pts;
+  }
+  if (Array.isArray(r.shape)) {
+    const shape: MapShape = [];
+    let total = 0;
+    for (const poly of r.shape.slice(0, L.maxPieces)) {
+      if (!Array.isArray(poly)) continue;
+      const rings: Vec[][] = [];
+      for (const ring of poly.slice(0, 16)) {
+        if (!Array.isArray(ring)) continue;
+        const pts = ring.map((p) => vec(p, width, height)).filter((p): p is Vec => !!p);
+        if (pts.length < 3 || total + pts.length > L.maxShapePoints) continue;
+        if (Math.abs(polygonArea(pts)) < (rings.length ? 2000 : L.minPieceArea)) continue;
+        rings.push(pts);
+        total += pts.length;
+      }
+      if (rings.length) shape.push(rings);
+    }
+    if (shape.length) {
+      out.shape = shape;
+      delete out.outline;
+    }
   }
   if (Array.isArray(r.asteroids)) {
     for (const a of r.asteroids.slice(0, L.maxAsteroids)) {
@@ -180,12 +203,13 @@ export function sanitizeCustomMap(raw: unknown): CustomMap | null {
 }
 
 /** Mapa pro bitvu z vlastní mapy (stejný tvar jako z generátoru + obrys). */
-export function customToGenerated(m: CustomMap): GeneratedMap & { outline?: Vec[]; startTeams: (number | undefined)[] } {
-  const box = { width: m.width, height: m.height, outline: m.outline };
+export function customToGenerated(m: CustomMap): GeneratedMap & { outline?: Vec[]; shape?: MapShape; startTeams: (number | undefined)[] } {
+  const box = { width: m.width, height: m.height, outline: m.outline, shape: m.shape };
   const asteroids: Asteroid[] = m.asteroids
     .filter((a) => insideMap(box, a, a.radius * 0.5))
     .map((a, i) => ({ id: `a${i + 1}`, x: a.x, y: a.y, radius: a.radius, vx: 0, vy: 0, seed: a.seed, profile: generateProfile(a.radius, a.seed), version: 0 }));
   const storms: Storm[] = m.storms.map((s, i) => ({ id: `storm${i + 1}`, blobs: s.blobs.map((b) => ({ ...b })) }));
   const starts = m.starts.map((s) => ({ x: s.x, y: s.y, heading: s.heading }));
-  return { width: m.width, height: m.height, outline: m.outline ? m.outline.map((p) => ({ ...p })) : undefined, asteroids, storms, starts, startTeams: m.starts.map((s) => s.team), stations: m.stations.map((p) => ({ ...p })) };
+  const sh = shapeOf(box);
+  return { width: m.width, height: m.height, outline: undefined, shape: sh ? sh.map((poly) => poly.map((ring) => ring.map((p) => ({ ...p })))) : undefined, asteroids, storms, starts, startTeams: m.starts.map((s) => s.team), stations: m.stations.map((p) => ({ ...p })) };
 }

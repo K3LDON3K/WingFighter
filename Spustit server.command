@@ -17,6 +17,11 @@ fi
 SERVER_PID=""
 
 start_server() {
+  # nové závislosti (package-lock.json novější než instalace) → doinstalovat
+  if [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
+    echo "Změnily se závislosti – instaluji…"
+    npm install || echo "Instalace závislostí selhala (zkus příkaz i)."
+  fi
   echo "Sestavuji klienta…"
   if ! npm run build --silent; then
     echo "Sestavení klienta selhalo – server nespouštím. Oprav chybu a zadej r."

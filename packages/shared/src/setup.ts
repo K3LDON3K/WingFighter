@@ -6,7 +6,7 @@ import { applyTuning, DEFAULT_TUNING, sanitizeTuning, type Tuning } from "./tuni
 import { effectivePlacement, type Asteroid, type GameSettings, type GameState, type PlayerInfo, type Ship, type ShipLoadout, type Station, type Storm } from "./types.ts";
 import { DEFAULT_MAP, generateMap, START_MARGIN } from "./mapgen.ts";
 import { customToGenerated, type CustomMap } from "./custommap.ts";
-import { insideMap } from "./mapshape.ts";
+import { insideMap, mapCenter, type MapShape } from "./mapshape.ts";
 
 /** Mapa 1 – statické asteroidy (vx, vy = 0; v budoucnu mohou létat). Tvar se generuje ze seedu. */
 const MAP_1: Omit<Asteroid, "profile" | "version">[] = [
@@ -97,13 +97,28 @@ export function createGame(opts: CreateGameOptions): GameState {
   let teamPose: ((team: number) => Pose) | null = null;
   const poseOf = (st: { x: number; y: number; heading: number } | undefined): Pose => (st ? { x: st.x, y: st.y, heading: st.heading } : { x: START_MARGIN, y: height / 2, heading: 0 });
   let outline: Vec[] | undefined;
+  let shape: MapShape | undefined;
   if (settings.map || opts.customMap) {
     const custom = opts.customMap;
     const gen = custom ? customToGenerated(custom) : generateMap(settings.map ?? DEFAULT_MAP);
+    if (custom && gen.starts.length === 0) {
+      // mapa bez startů: náhodné body uvnitř tvaru (dál od okraje), kurz do středu
+      const box = { width: gen.width, height: gen.height, shape: (gen as ReturnType<typeof customToGenerated>).shape };
+      const c = mapCenter(box);
+      let guard = 0;
+      while (gen.starts.length < Math.max(8, teams.length * 4) && guard++ < 4000) {
+        const p = { x: Math.round(Math.random() * gen.width), y: Math.round(Math.random() * gen.height) };
+        if (!insideMap(box, p, 150)) continue;
+        if (gen.asteroids.some((a) => Math.hypot(a.x - p.x, a.y - p.y) < a.radius + 80)) continue;
+        if (gen.starts.some((st) => Math.hypot(st.x - p.x, st.y - p.y) < 300)) continue;
+        gen.starts.push({ ...p, heading: Math.atan2(c.y - p.y, c.x - p.x) });
+      }
+    }
     const startTeams: (number | undefined)[] = custom ? (gen as ReturnType<typeof customToGenerated>).startTeams : gen.starts.map(() => undefined);
     /** Smí tým použít start i (vlastní mapa: start bez týmu = kdokoliv)? */
     const startOk = (i: number, team: number) => startTeams[i] === undefined || startTeams[i] === team;
     outline = custom ? (gen as ReturnType<typeof customToGenerated>).outline : undefined;
+    shape = custom ? (gen as ReturnType<typeof customToGenerated>).shape : undefined;
     width = gen.width;
     height = gen.height;
     asteroids = gen.asteroids;
@@ -249,7 +264,8 @@ export function createGame(opts: CreateGameOptions): GameState {
     width,
     height,
     outline,
-    asteroids: asteroids.filter((a) => insideMap({ width, height, outline }, a, a.radius)),
+    shape,
+    asteroids: asteroids.filter((a) => insideMap({ width, height, outline, shape }, a, a.radius)),
     storms,
     stations,
     border: RULES.borderWidth > 0 ? RULES.borderWidth : undefined,
