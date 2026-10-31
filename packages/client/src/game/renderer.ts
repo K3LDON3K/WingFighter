@@ -246,16 +246,30 @@ export class Renderer {
       ctx.save();
       // délka plamene podle rychlosti (výlet/zaměření = krátký, let = dlouhý); ztracený cíl = bledý plamen
       const thrust = Math.max(0.25, Math.min(1, (t.speed ?? TORPEDO.speed) / Math.max(1, TORPEDO.speed)));
-      ctx.globalAlpha = (0.5 + 0.5 * Math.abs(Math.sin(now / 40 + t.x))) * (t.lost ? 0.5 : 1);
-      ctx.fillStyle = t.phase === "cruise" ? "#fbbf24" : "#fb923c";
+      const teamColor = TEAM_COLORS[t.team] ?? "#fb923c";
+      const flicker = (0.5 + 0.5 * Math.abs(Math.sin(now / 40 + t.x))) * (t.lost ? 0.5 : 1);
+      // plamen v barvě týmu (po hacku se přebarví i plamen): vnější širší, vnitřní světlejší jádro
+      const flame = (len: number, w: number, color: string, alpha: number) => {
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(t.x - f.x * 8 - f.y * w, t.y - f.y * 8 + f.x * w);
+        ctx.lineTo(t.x - f.x * (8 + len), t.y - f.y * (8 + len));
+        ctx.lineTo(t.x - f.x * 8 + f.y * w, t.y - f.y * 8 - f.x * w);
+        ctx.closePath();
+        ctx.fill();
+      };
+      const len = (8 + 6 * Math.random()) * thrust * 1.6;
+      flame(len, 2.5, teamColor, flicker * 0.6);
+      flame(len * 0.7, 1.5, shade(teamColor, 1.5), flicker);
+      // slabá týmová záře kolem těla
+      ctx.globalAlpha = 0.18 * (t.lost ? 0.5 : 1);
+      ctx.fillStyle = teamColor;
       ctx.beginPath();
-      ctx.moveTo(t.x - f.x * 8 - f.y * 2, t.y - f.y * 8 + f.x * 2);
-      ctx.lineTo(t.x - f.x * (8 + (8 + 6 * Math.random()) * thrust * 1.6), t.y - f.y * (8 + (8 + 6 * Math.random()) * thrust * 1.6));
-      ctx.lineTo(t.x - f.x * 8 + f.y * 2, t.y - f.y * 8 - f.x * 2);
-      ctx.closePath();
+      ctx.arc(t.x, t.y, 5.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-      drawSprite(ctx, this.sprites.torpedo(TEAM_COLORS[t.team]), t.x, t.y, t.heading);
+      drawSprite(ctx, this.sprites.torpedo(teamColor), t.x, t.y, t.heading);
       if (t.targetPoint && (t.team === overlay.myTeam || overlay.myTeam === undefined)) this.drawPointMarker(t.targetPoint, TEAM_COLORS[t.team], 0.5);
       const tw = overlay.targetWeapons?.[t.id];
       if (tw?.length) this.marks.push({ x: t.x, y: t.y, r: 8, weapons: tw });

@@ -319,8 +319,9 @@ export function shipSprite(hullId: string, teamColor: string, team: number): Spr
   return hullId === "battleship" ? battleshipSprite(teamColor) : fighterSprite(teamColor, team);
 }
 
+/** Torpédo: tělo v barvě týmu se stínováním (světlá hrana nahoře, tmavší hlavice), bílá špička, žlutá tryska. 8×2, měřítko 2. */
 export function torpedoSprite(teamColor: string): Sprite {
-  const canvas = paint(["EEGGGPW", "EEGGGPW"], { G: "#cbd5e1", P: teamColor, W: "#f8fafc", E: "#fbbf24" });
+  const canvas = paint(["EELPPPHW", "EEPPPPHW"], { P: teamColor, L: shade(teamColor, 1.4), H: shade(teamColor, 0.7), W: "#f8fafc", E: "#fbbf24" });
   return { canvas, scale: 2, cx: 3, cy: 1 };
 }
 
