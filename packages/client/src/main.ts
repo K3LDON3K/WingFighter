@@ -952,7 +952,12 @@ function buildOverlay(view: ViewModel): Overlay {
     if (aiming) {
       const dots: { x: number; y: number; color: string }[] = [];
       for (let a = -MAX_ANGLE; a <= MAX_ANGLE; a += ANGLE_STEP) {
-        const mm = makeManeuver(profile, man.speed, a, man.koiogran, ship.speed);
+        // dělený manévr: dosažitelné konce jen pro část, kterou kurzor zrovna tvaruje (druhá část se drží)
+        const mm = man.split
+          ? splitPart === 1
+            ? makeManeuver(profile, man.speed, a, man.koiogran, ship.speed, man.stop, man.split)
+            : makeManeuver(profile, man.speed, man.angle, man.koiogran, ship.speed, man.stop, { at: man.split.at, angle2: a })
+          : makeManeuver(profile, man.speed, a, man.koiogran, ship.speed, man.stop);
         if (!mm || effStressCost(mm, o) > ship.stressPoints) continue;
         const e = maneuverEnd(turned, mm);
         dots.push({ x: e.x, y: e.y, color: DIFFICULTY_COLOR[mm.difficulty] });
